@@ -16,11 +16,11 @@
 
 #proc main : () -> () {
     #let points = Points::#new_with_size 42;
-    points.x 41 <- 1.0f32;
-    points.y 41 <- 2.0f32;
-    points.z 41 <- 3.0f32;
+    points .x 41 <- 1.0f32;
+    points .y 41 <- 2.0f32;
+    points .z 41 <- 3.0f32;
 
     #let syscall_id = 231u64;
-    #let error_code = points.#len ();
+    #let error_code = points .#len ();
     __syscall syscall_id error_code 0 0 0 0;
 }

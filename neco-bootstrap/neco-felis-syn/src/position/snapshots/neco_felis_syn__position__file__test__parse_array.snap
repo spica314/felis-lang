@@ -759,8 +759,8 @@ File {
                             tail: Then(
                                 StatementsThen {
                                     head: FieldAssign(
-                                        StatementFieldAssign {
-                                            field_access: ProcTermFieldAccess {
+                                        StatementMethodChainAssign {
+                                            method_chain: ProcTermMethodChain {
                                                 object: TokenVariable {
                                                     pos: Pos {
                                                         file_id: FileId(
@@ -777,10 +777,10 @@ File {
                                                             0,
                                                         ),
                                                         line: 19,
-                                                        column: 11,
+                                                        column: 12,
                                                     },
                                                     s: ".",
-                                                    after_whitespace: false,
+                                                    after_whitespace: true,
                                                 },
                                                 field: TokenVariable {
                                                     pos: Pos {
@@ -788,7 +788,7 @@ File {
                                                             0,
                                                         ),
                                                         line: 19,
-                                                        column: 12,
+                                                        column: 13,
                                                     },
                                                     s: "x",
                                                 },
@@ -801,7 +801,7 @@ File {
                                                                         0,
                                                                     ),
                                                                     line: 19,
-                                                                    column: 14,
+                                                                    column: 15,
                                                                 },
                                                                 s: "0",
                                                             },
@@ -817,7 +817,7 @@ File {
                                                         0,
                                                     ),
                                                     line: 19,
-                                                    column: 16,
+                                                    column: 17,
                                                 },
                                                 s: "<-",
                                                 after_whitespace: true,
@@ -830,7 +830,7 @@ File {
                                                                 0,
                                                             ),
                                                             line: 19,
-                                                            column: 19,
+                                                            column: 20,
                                                         },
                                                         s: "10.0f32",
                                                     },
@@ -846,14 +846,14 @@ File {
                                                 0,
                                             ),
                                             line: 19,
-                                            column: 26,
+                                            column: 27,
                                         },
                                     },
                                     tail: Then(
                                         StatementsThen {
                                             head: FieldAssign(
-                                                StatementFieldAssign {
-                                                    field_access: ProcTermFieldAccess {
+                                                StatementMethodChainAssign {
+                                                    method_chain: ProcTermMethodChain {
                                                         object: TokenVariable {
                                                             pos: Pos {
                                                                 file_id: FileId(
@@ -870,10 +870,10 @@ File {
                                                                     0,
                                                                 ),
                                                                 line: 20,
-                                                                column: 11,
+                                                                column: 12,
                                                             },
                                                             s: ".",
-                                                            after_whitespace: false,
+                                                            after_whitespace: true,
                                                         },
                                                         field: TokenVariable {
                                                             pos: Pos {
@@ -881,7 +881,7 @@ File {
                                                                     0,
                                                                 ),
                                                                 line: 20,
-                                                                column: 12,
+                                                                column: 13,
                                                             },
                                                             s: "y",
                                                         },
@@ -894,7 +894,7 @@ File {
                                                                                 0,
                                                                             ),
                                                                             line: 20,
-                                                                            column: 14,
+                                                                            column: 15,
                                                                         },
                                                                         s: "0",
                                                                     },
@@ -910,7 +910,7 @@ File {
                                                                 0,
                                                             ),
                                                             line: 20,
-                                                            column: 16,
+                                                            column: 17,
                                                         },
                                                         s: "<-",
                                                         after_whitespace: true,
@@ -923,7 +923,7 @@ File {
                                                                         0,
                                                                     ),
                                                                     line: 20,
-                                                                    column: 19,
+                                                                    column: 20,
                                                                 },
                                                                 s: "14.0f32",
                                                             },
@@ -939,14 +939,14 @@ File {
                                                         0,
                                                     ),
                                                     line: 20,
-                                                    column: 26,
+                                                    column: 27,
                                                 },
                                             },
                                             tail: Then(
                                                 StatementsThen {
                                                     head: FieldAssign(
-                                                        StatementFieldAssign {
-                                                            field_access: ProcTermFieldAccess {
+                                                        StatementMethodChainAssign {
+                                                            method_chain: ProcTermMethodChain {
                                                                 object: TokenVariable {
                                                                     pos: Pos {
                                                                         file_id: FileId(
@@ -963,10 +963,10 @@ File {
                                                                             0,
                                                                         ),
                                                                         line: 21,
-                                                                        column: 11,
+                                                                        column: 12,
                                                                     },
                                                                     s: ".",
-                                                                    after_whitespace: false,
+                                                                    after_whitespace: true,
                                                                 },
                                                                 field: TokenVariable {
                                                                     pos: Pos {
@@ -974,7 +974,7 @@ File {
                                                                             0,
                                                                         ),
                                                                         line: 21,
-                                                                        column: 12,
+                                                                        column: 13,
                                                                     },
                                                                     s: "z",
                                                                 },
@@ -987,7 +987,7 @@ File {
                                                                                         0,
                                                                                     ),
                                                                                     line: 21,
-                                                                                    column: 14,
+                                                                                    column: 15,
                                                                                 },
                                                                                 s: "0",
                                                                             },
@@ -1003,7 +1003,7 @@ File {
                                                                         0,
                                                                     ),
                                                                     line: 21,
-                                                                    column: 16,
+                                                                    column: 17,
                                                                 },
                                                                 s: "<-",
                                                                 after_whitespace: true,
@@ -1016,7 +1016,7 @@ File {
                                                                                 0,
                                                                             ),
                                                                             line: 21,
-                                                                            column: 19,
+                                                                            column: 20,
                                                                         },
                                                                         s: "18.0f32",
                                                                     },
@@ -1032,7 +1032,7 @@ File {
                                                                 0,
                                                             ),
                                                             line: 21,
-                                                            column: 26,
+                                                            column: 27,
                                                         },
                                                     },
                                                     tail: Then(
@@ -1101,8 +1101,8 @@ File {
                                                                                         },
                                                                                         proc_term: Dereference(
                                                                                             ProcTermDereference {
-                                                                                                term: FieldAccess(
-                                                                                                    ProcTermFieldAccess {
+                                                                                                term: MethodChain(
+                                                                                                    ProcTermMethodChain {
                                                                                                         object: TokenVariable {
                                                                                                             pos: Pos {
                                                                                                                 file_id: FileId(
@@ -1193,8 +1193,8 @@ File {
                                                                                         },
                                                                                         proc_term: Dereference(
                                                                                             ProcTermDereference {
-                                                                                                term: FieldAccess(
-                                                                                                    ProcTermFieldAccess {
+                                                                                                term: MethodChain(
+                                                                                                    ProcTermMethodChain {
                                                                                                         object: TokenVariable {
                                                                                                             pos: Pos {
                                                                                                                 file_id: FileId(
@@ -1369,8 +1369,8 @@ File {
                                                                                                 },
                                                                                                 proc_term: Dereference(
                                                                                                     ProcTermDereference {
-                                                                                                        term: FieldAccess(
-                                                                                                            ProcTermFieldAccess {
+                                                                                                        term: MethodChain(
+                                                                                                            ProcTermMethodChain {
                                                                                                                 object: TokenVariable {
                                                                                                                     pos: Pos {
                                                                                                                         file_id: FileId(

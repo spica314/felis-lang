@@ -1,6 +1,6 @@
 use crate::{
     ItemStruct, Parse, ParseError, Phase, PhaseParse, ProcTermApply, ProcTermConstructorCall,
-    ProcTermDereference, ProcTermFieldAccess, ProcTermIf, ProcTermNumber, ProcTermParen,
+    ProcTermDereference, ProcTermIf, ProcTermMethodChain, ProcTermNumber, ProcTermParen,
     ProcTermStructValue, ProcTermUnit, ProcTermVariable, token::Token,
 };
 
@@ -11,7 +11,7 @@ pub enum ProcTerm<P: Phase> {
     Variable(ProcTermVariable<P>),
     Unit(ProcTermUnit<P>),
     Number(ProcTermNumber<P>),
-    FieldAccess(ProcTermFieldAccess<P>),
+    MethodChain(ProcTermMethodChain<P>),
     ConstructorCall(ProcTermConstructorCall<P>),
     Struct(ItemStruct<P>),
     StructValue(ProcTermStructValue<P>),
@@ -61,16 +61,16 @@ impl Parse for ProcTerm<PhaseParse> {
             }
         }
 
-        if let Some(proc_term_field_access) = ProcTermFieldAccess::parse(tokens, i)? {
+        if let Some(proc_term_method_chain) = ProcTermMethodChain::parse(tokens, i)? {
             // Check for postfix dereference
             if let Some(deref_term) = ProcTermDereference::try_parse_postfix(
-                ProcTerm::FieldAccess(proc_term_field_access.clone()),
+                ProcTerm::MethodChain(proc_term_method_chain.clone()),
                 tokens,
                 i,
             )? {
                 return Ok(Some(deref_term));
             } else {
-                return Ok(Some(ProcTerm::FieldAccess(proc_term_field_access)));
+                return Ok(Some(ProcTerm::MethodChain(proc_term_method_chain)));
             }
         }
 

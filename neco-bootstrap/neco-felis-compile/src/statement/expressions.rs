@@ -22,8 +22,8 @@ pub fn compile_proc_term(
         }
         ProcTerm::Variable(var) => compile_proc_variable(var, variables, output),
         ProcTerm::Number(num) => compile_proc_number(num, output),
-        ProcTerm::FieldAccess(field_access) => memory::compile_proc_field_access(
-            field_access,
+        ProcTerm::MethodChain(method_chain) => memory::compile_proc_method_chain(
+            method_chain,
             variables,
             arrays,
             variable_arrays,
@@ -124,9 +124,9 @@ pub fn compile_proc_apply(
     output: &mut String,
 ) -> Result<(), CompileError> {
     // Handle field access apply (e.g., points.#len ())
-    if let ProcTerm::FieldAccess(field_access) = &*apply.f {
+    if let ProcTerm::MethodChain(method_chain) = &*apply.f {
         // Check if this is an array length operation
-        if field_access.field.s() == "#len" {
+        if method_chain.field.s() == "#len" {
             // Ensure we have no arguments or only unit argument
             if apply.args.len() > 1
                 || (apply.args.len() == 1 && !matches!(apply.args[0], ProcTerm::Unit(_)))
@@ -138,7 +138,7 @@ pub fn compile_proc_apply(
             }
 
             // Generate code to get array length
-            let array_name = field_access.object.s();
+            let array_name = method_chain.object.s();
             if let Some(array_info) = arrays.get(array_name) {
                 // Static array - use compile-time size if available
                 if let Some(size) = array_info.size {
@@ -173,7 +173,7 @@ pub fn compile_proc_apply(
         } else {
             return Err(CompileError::UnsupportedConstruct(format!(
                 "Unsupported field access operation: {}",
-                field_access.field.s()
+                method_chain.field.s()
             )));
         }
     }

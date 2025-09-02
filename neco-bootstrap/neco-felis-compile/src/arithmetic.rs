@@ -1011,10 +1011,10 @@ impl AssemblyCompiler {
                 // Handle parenthesized expressions
                 self.load_f32_proc_argument_into_register(&paren.proc_term, register)
             }
-            ProcTerm::FieldAccess(field_access) => {
+            ProcTerm::MethodChain(method_chain) => {
                 // Handle field access like points.x 0 for f32 loading
-                let object_name = field_access.object.s();
-                let field_name = field_access.field.s();
+                let object_name = method_chain.object.s();
+                let field_name = method_chain.field.s();
 
                 // Check if this is a Structure of Arrays (SoA) access
                 let soa_ptr_var_name = format!("{object_name}_{field_name}_ptr");
@@ -1026,7 +1026,7 @@ impl AssemblyCompiler {
                     ));
 
                     // Handle index if present
-                    if let Some(index_term) = &field_access.index {
+                    if let Some(index_term) = &method_chain.index {
                         // Get array info for element size calculation
                         if let Some(array_type_name) = self.variable_arrays.get(object_name)
                             && let Some(array_info) = self.arrays.get(array_type_name)

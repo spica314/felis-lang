@@ -179,11 +179,11 @@ impl PtxCompiler {
             Statement::FieldAssign(field_assign) => {
                 // Generate PTX code for field assignment
                 // Format: array.field index <- value
-                let _array_var = field_assign.field_access.object_name();
-                let field_name = field_assign.field_access.field_name();
+                let _array_var = field_assign.method_chain.object_name();
+                let field_name = field_assign.method_chain.field_name();
 
                 // Get index register if there's an index
-                let index_reg = if let Some(index) = &field_assign.field_access.index {
+                let index_reg = if let Some(index) = &field_assign.method_chain.index {
                     self.compile_ptx_proc_term(index)?
                 } else {
                     return Err(CompileError::UnsupportedConstruct(

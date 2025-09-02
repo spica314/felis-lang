@@ -16,9 +16,9 @@
 
 #proc main : () -> () {
     #let points = Points::#new_with_size 1;
-    points.x 0 <- 10.0f32;
-    points.y 0 <- 14.0f32;
-    points.z 0 <- 18.0f32;
+    points .x 0 <- 10.0f32;
+    points .y 0 <- 14.0f32;
+    points .z 0 <- 18.0f32;
 
     #let a = points .x 0 .*;
     #let s = __f32_add a (points .y 0 .*);

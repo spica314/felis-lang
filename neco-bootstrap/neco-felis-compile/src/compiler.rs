@@ -489,12 +489,12 @@ cuda_context_ok:
         )
     }
 
-    pub fn compile_proc_field_access(
+    pub fn compile_proc_method_chain(
         &mut self,
-        field_access: &ProcTermFieldAccess<PhaseParse>,
+        method_chain: &ProcTermMethodChain<PhaseParse>,
     ) -> Result<(), CompileError> {
-        crate::statement::memory::compile_proc_field_access(
-            field_access,
+        crate::statement::memory::compile_proc_method_chain(
+            method_chain,
             &self.variables,
             &self.arrays,
             &self.variable_arrays,

@@ -131,15 +131,15 @@ pub fn load_f32_proc_argument_into_register(
     Ok(())
 }
 
-pub fn compile_proc_field_access(
-    field_access: &ProcTermFieldAccess<PhaseParse>,
+pub fn compile_proc_method_chain(
+    method_chain: &ProcTermMethodChain<PhaseParse>,
     variables: &HashMap<String, i32>,
     arrays: &HashMap<String, ArrayInfo>,
     variable_arrays: &HashMap<String, String>,
     output: &mut String,
 ) -> Result<(), CompileError> {
-    let object_name = field_access.object.s();
-    let field_name = field_access.field.s();
+    let object_name = method_chain.object.s();
+    let field_name = method_chain.field.s();
 
     // Check if this is the #len method for an array
     if field_name == "#len" {
@@ -169,7 +169,7 @@ pub fn compile_proc_field_access(
         ));
 
         // Handle index if present
-        if let Some(index_term) = &field_access.index {
+        if let Some(index_term) = &method_chain.index {
             // Get array info for element size calculation
             if let Some(array_type_name) = variable_arrays.get(object_name)
                 && let Some(array_info) = arrays.get(array_type_name)
@@ -238,9 +238,9 @@ pub fn compile_proc_dereference(
 
     // Determine the type being dereferenced to use the correct instruction
     // Check if this is a field access that we can determine the type for
-    if let ProcTerm::FieldAccess(field_access) = &*dereference.term {
-        let object_name = field_access.object.s();
-        let field_name = field_access.field.s();
+    if let ProcTerm::MethodChain(method_chain) = &*dereference.term {
+        let object_name = method_chain.object.s();
+        let field_name = method_chain.field.s();
 
         // Try to get type information from arrays
         if let Some(array_type_name) = variable_arrays.get(object_name)

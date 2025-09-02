@@ -1,23 +1,23 @@
 use crate::{
-    Parse, ParseError, Phase, PhaseParse, ProcTerm, ProcTermFieldAccess, ProcTermNumber,
+    Parse, ParseError, Phase, PhaseParse, ProcTerm, ProcTermMethodChain, ProcTermNumber,
     ProcTermVariable,
     token::{Token, TokenOperator},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct StatementFieldAssign<P: Phase> {
-    pub field_access: ProcTermFieldAccess<P>,
+pub struct StatementMethodChainAssign<P: Phase> {
+    pub method_chain: ProcTermMethodChain<P>,
     pub equals: TokenOperator,
     pub value: Box<ProcTerm<P>>,
     pub ext: P::StatementFieldAssignExt,
 }
 
-impl Parse for StatementFieldAssign<PhaseParse> {
+impl Parse for StatementMethodChainAssign<PhaseParse> {
     fn parse(tokens: &[Token], i: &mut usize) -> Result<Option<Self>, ParseError> {
         let mut k = *i;
 
-        // Parse field access (e.g., "points.x 0")
-        let Some(field_access) = ProcTermFieldAccess::parse(tokens, &mut k)? else {
+        // Parse method chain access (e.g., "points .x 0")
+        let Some(method_chain) = ProcTermMethodChain::parse(tokens, &mut k)? else {
             return Ok(None);
         };
 
@@ -35,14 +35,14 @@ impl Parse for StatementFieldAssign<PhaseParse> {
             return Err(ParseError::Unknown("expected value expression after '<-'"));
         };
 
-        let statement_field_assign = StatementFieldAssign {
-            field_access,
+        let statement_method_chain = StatementMethodChainAssign {
+            method_chain,
             equals,
             value: Box::new(value),
             ext: (),
         };
 
         *i = k;
-        Ok(Some(statement_field_assign))
+        Ok(Some(statement_method_chain))
     }
 }

@@ -308,21 +308,21 @@ pub fn parse_number(number_str: &str) -> String {
 }
 
 /// Compile field assignment for array elements
-pub fn compile_field_assign(
-    field_assign: &StatementFieldAssign<PhaseParse>,
+pub fn compile_method_chain(
+    method_chain: &StatementMethodChainAssign<PhaseParse>,
     output: &mut String,
     variables: &HashMap<String, i32>,
     variable_arrays: &HashMap<String, String>,
     arrays: &HashMap<String, ArrayInfo>,
 ) -> Result<(), CompileError> {
     // This is used for writing array elements like "points.x 0 = 10.0f32"
-    let obj_name = field_assign.field_access.object_name();
-    let field_name = field_assign.field_access.field_name();
+    let obj_name = method_chain.method_chain.object_name();
+    let field_name = method_chain.method_chain.field_name();
 
     // Look up the array type from variable name
     if let Some(array_type_name) = variable_arrays.get(obj_name)
         && let Some(array_info) = arrays.get(array_type_name).cloned()
-        && let Some(index_term) = &field_assign.field_access.index
+        && let Some(index_term) = &method_chain.method_chain.index
     {
         // Get the pointer for this field
         let ptr_var_name = format!("{obj_name}_{field_name}_ptr");
@@ -362,7 +362,7 @@ pub fn compile_field_assign(
             }
 
             // Now store the value to the calculated address
-            match &*field_assign.value {
+            match &*method_chain.value {
                 ProcTerm::Number(num) => {
                     let field_type = get_field_type(
                         &array_info.field_types,
@@ -399,7 +399,7 @@ pub fn compile_field_assign(
                 _ => {
                     return Err(CompileError::UnsupportedConstruct(format!(
                         "Unsupported assignment value: {:?}",
-                        field_assign.value
+                        method_chain.value
                     )));
                 }
             }
@@ -426,7 +426,7 @@ pub fn compile_field_assign(
         };
 
         // For now, assume index 0 and store the value
-        match &*field_assign.value {
+        match &*method_chain.value {
             ProcTerm::Number(num) => {
                 let number_str = num.number.s();
                 if let Some(float_value) = number_str.strip_suffix("f32") {

@@ -4,7 +4,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ProcTermFieldAccess<P: Phase> {
+pub struct ProcTermMethodChain<P: Phase> {
     pub object: TokenVariable,
     pub dot: TokenOperator,
     pub field: TokenVariable,
@@ -12,7 +12,7 @@ pub struct ProcTermFieldAccess<P: Phase> {
     pub ext: P::ProcTermFieldAccessExt,
 }
 
-impl<P: Phase> ProcTermFieldAccess<P> {
+impl<P: Phase> ProcTermMethodChain<P> {
     pub fn object_name(&self) -> &str {
         self.object.s()
     }
@@ -22,7 +22,7 @@ impl<P: Phase> ProcTermFieldAccess<P> {
     }
 }
 
-impl Parse for ProcTermFieldAccess<PhaseParse> {
+impl Parse for ProcTermMethodChain<PhaseParse> {
     fn parse(tokens: &[Token], i: &mut usize) -> Result<Option<Self>, ParseError> {
         let mut k = *i;
 
@@ -32,7 +32,7 @@ impl Parse for ProcTermFieldAccess<PhaseParse> {
         };
 
         // Parse "." operator
-        let Some(dot) = TokenOperator::parse_operator(tokens, &mut k, ".")? else {
+        let Some(dot) = TokenOperator::parse_operator_after_whitespace(tokens, &mut k, ".")? else {
             return Ok(None);
         };
 
@@ -63,7 +63,7 @@ impl Parse for ProcTermFieldAccess<PhaseParse> {
                 .map(|variable| Box::new(ProcTerm::Variable(variable)))
         };
 
-        let proc_term_field_access = ProcTermFieldAccess {
+        let proc_term_method_chain = ProcTermMethodChain {
             object,
             dot,
             field,
@@ -72,6 +72,6 @@ impl Parse for ProcTermFieldAccess<PhaseParse> {
         };
 
         *i = k;
-        Ok(Some(proc_term_field_access))
+        Ok(Some(proc_term_method_chain))
     }
 }

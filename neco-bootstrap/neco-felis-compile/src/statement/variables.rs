@@ -221,7 +221,7 @@ pub fn compile_assign_statement(
 }
 
 pub fn compile_field_assign_statement(
-    field_assign_stmt: &StatementFieldAssign<PhaseParse>,
+    method_chain_assign_stmt: &StatementMethodChainAssign<PhaseParse>,
     variables: &mut HashMap<String, i32>,
     reference_variables: &HashMap<String, String>,
     builtins: &HashMap<String, String>,
@@ -230,8 +230,8 @@ pub fn compile_field_assign_statement(
     output: &mut String,
 ) -> Result<(), CompileError> {
     // Compile the field access to get the address
-    super::memory::compile_proc_field_access(
-        &field_assign_stmt.field_access,
+    super::memory::compile_proc_method_chain(
+        &method_chain_assign_stmt.method_chain,
         variables,
         arrays,
         variable_arrays,
@@ -243,7 +243,7 @@ pub fn compile_field_assign_statement(
 
     // Compile the value to assign
     expressions::compile_proc_term(
-        &field_assign_stmt.value,
+        &method_chain_assign_stmt.value,
         variables,
         reference_variables,
         builtins,
