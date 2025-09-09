@@ -6,7 +6,7 @@
 #use_builtin "f32" #as __f32;
 
 #array Points {
-    #item: #struct {
+    #members {
         x: __f32,
         y: __f32,
         z: __f32,

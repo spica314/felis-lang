@@ -66,7 +66,7 @@ pub fn compile_array(
     for field in array.fields() {
         let field_name = field.keyword.s();
         match field_name {
-            "item" => {
+            "item" | "members" => {
                 // Parse the struct fields from the item definition
                 if let Term::Struct(item_struct) = &*field.value {
                     for struct_field in item_struct.fields() {

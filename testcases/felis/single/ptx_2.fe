@@ -19,7 +19,7 @@
 #use_builtin "tid_x" #as __tid_x;
 
 #array Pixels {
-    #item: #struct {
+    #members {
         r: __u64,
         g: __u64,
         b: __u64,

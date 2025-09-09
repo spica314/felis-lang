@@ -15,6 +15,11 @@ impl TokenKeyword {
         &self.pos
     }
 
+    // Constructor to create a keyword token programmatically
+    pub fn new(pos: Pos, s: impl Into<String>) -> Self {
+        Self { pos, s: s.into() }
+    }
+
     pub fn parse_keyword(
         tokens: &[Token],
         i: &mut usize,

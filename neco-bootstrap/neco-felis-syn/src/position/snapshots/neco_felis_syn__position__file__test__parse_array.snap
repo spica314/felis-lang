@@ -1,5 +1,6 @@
 ---
 source: neco-felis-syn/src/position/file.rs
+assertion_line: 148
 expression: file
 ---
 File {
@@ -295,17 +296,9 @@ File {
                                 line: 9,
                                 column: 5,
                             },
-                            s: "item",
+                            s: "members",
                         },
-                        colon: TokenColon {
-                            pos: Pos {
-                                file_id: FileId(
-                                    0,
-                                ),
-                                line: 9,
-                                column: 10,
-                            },
-                        },
+                        colon: None,
                         value: Struct(
                             TermStruct {
                                 keyword_struct: TokenKeyword {
@@ -314,7 +307,7 @@ File {
                                             0,
                                         ),
                                         line: 9,
-                                        column: 12,
+                                        column: 5,
                                     },
                                     s: "struct",
                                 },
@@ -324,7 +317,7 @@ File {
                                             0,
                                         ),
                                         line: 9,
-                                        column: 20,
+                                        column: 14,
                                     },
                                 },
                                 fields: [
@@ -505,15 +498,17 @@ File {
                             },
                             s: "dimension",
                         },
-                        colon: TokenColon {
-                            pos: Pos {
-                                file_id: FileId(
-                                    0,
-                                ),
-                                line: 14,
-                                column: 15,
+                        colon: Some(
+                            TokenColon {
+                                pos: Pos {
+                                    file_id: FileId(
+                                        0,
+                                    ),
+                                    line: 14,
+                                    column: 15,
+                                },
                             },
-                        },
+                        ),
                         value: Number(
                             TermNumber {
                                 number: TokenNumber {

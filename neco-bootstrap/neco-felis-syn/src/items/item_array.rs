@@ -16,7 +16,7 @@ pub struct ItemArray<P: Phase> {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ItemArrayField<P: Phase> {
     pub keyword: TokenKeyword,
-    pub colon: TokenColon,
+    pub colon: Option<TokenColon>,
     pub value: Box<Term<P>>,
     pub comma: Option<TokenComma>,
 }
@@ -81,33 +81,97 @@ impl Parse for ItemArrayField<PhaseParse> {
         let mut k = *i;
 
         // Try to parse any of the known array field keywords
-        let keyword = if let Some(kw) = TokenKeyword::parse_keyword(tokens, &mut k, "item")? {
-            kw
-        } else if let Some(kw) = TokenKeyword::parse_keyword(tokens, &mut k, "dimension")? {
-            kw
-        } else {
-            return Ok(None);
-        };
+        // Supported:
+        // - #item: <type>
+        // - #dimension: <number>
+        // - #members { x: T, y: U, }
+        if let Some(keyword) = TokenKeyword::parse_keyword(tokens, &mut k, "item")? {
+            let Some(colon) = TokenColon::parse(tokens, &mut k)? else {
+                return Err(ParseError::Unknown("item_array_field_1"));
+            };
 
-        let Some(colon) = TokenColon::parse(tokens, &mut k)? else {
-            return Err(ParseError::Unknown("item_array_field_1"));
-        };
+            let Some(value) = Term::parse(tokens, &mut k)? else {
+                return Err(ParseError::Unknown("item_array_field_2"));
+            };
 
-        let Some(value) = Term::parse(tokens, &mut k)? else {
-            return Err(ParseError::Unknown("item_array_field_2"));
-        };
+            let comma = TokenComma::parse(tokens, &mut k)?;
 
-        let comma = TokenComma::parse(tokens, &mut k)?;
+            let field = ItemArrayField {
+                keyword,
+                colon: Some(colon),
+                value: Box::new(value),
+                comma,
+            };
 
-        let field = ItemArrayField {
-            keyword,
-            colon,
-            value: Box::new(value),
-            comma,
-        };
+            *i = k;
+            return Ok(Some(field));
+        }
 
-        *i = k;
-        Ok(Some(field))
+        if let Some(keyword) = TokenKeyword::parse_keyword(tokens, &mut k, "dimension")? {
+            let Some(colon) = TokenColon::parse(tokens, &mut k)? else {
+                return Err(ParseError::Unknown("item_array_field_1"));
+            };
+
+            let Some(value) = Term::parse(tokens, &mut k)? else {
+                return Err(ParseError::Unknown("item_array_field_2"));
+            };
+
+            let comma = TokenComma::parse(tokens, &mut k)?;
+
+            let field = ItemArrayField {
+                keyword,
+                colon: Some(colon),
+                value: Box::new(value),
+                comma,
+            };
+
+            *i = k;
+            return Ok(Some(field));
+        }
+
+        // New syntax: #members { ... }
+        if let Some(keyword) = TokenKeyword::parse_keyword(tokens, &mut k, "members")? {
+            let Some(brace_l) = TokenBraceL::parse(tokens, &mut k)? else {
+                return Err(ParseError::Unknown("item_array_members_1"));
+            };
+
+            // Reuse TermStructField parsing for members inside braces
+            let mut fields = vec![];
+            while let Some(field) =
+                crate::terms::term_struct::TermStructField::parse(tokens, &mut k)?
+            {
+                fields.push(field);
+            }
+
+            let Some(brace_r) = TokenBraceR::parse(tokens, &mut k)? else {
+                return Err(ParseError::Unknown("item_array_members_2"));
+            };
+
+            // Synthesize a Term::Struct to keep downstream unchanged
+            let term_struct = crate::terms::term_struct::TermStruct {
+                keyword_struct: TokenKeyword::new(keyword.pos().clone(), "struct"),
+                brace_l,
+                fields,
+                brace_r,
+                ext: (),
+            };
+
+            let value = Term::Struct(term_struct);
+            let comma = TokenComma::parse(tokens, &mut k)?;
+
+            let field = ItemArrayField {
+                keyword,
+                colon: None,
+                value: Box::new(value),
+                comma,
+            };
+
+            *i = k;
+            return Ok(Some(field));
+        }
+
+        // Unknown field
+        Ok(None)
     }
 }
 
