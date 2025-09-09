@@ -19,7 +19,7 @@
 #use_builtin "tid_x" #as __tid_x;
 
 #array Pixels {
-    #item: #struct {
+    #members {
         r: u64,
         g: u64,
         b: u64,
@@ -54,9 +54,9 @@
     #let ib_sub = __f32_mul (__f32 255.99) b;
     #let ib = __f32_to_u64 ib_sub;
 
-    ps.r thread_id <- ir;
-    ps.g thread_id <- ig;
-    ps.b thread_id <- ib;
+    ps .r thread_id <- ir;
+    ps .g thread_id <- ig;
+    ps .b thread_id <- ib;
 }
 
 #proc print_c : (x: __u64) -> () {
@@ -130,5 +130,5 @@
         y_ref <- __u64_add i 1;
     };
 
-    __syscall 231 42 0 0 0 0;
+    __syscall 231 0 0 0 0 0;
 }
