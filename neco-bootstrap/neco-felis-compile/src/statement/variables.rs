@@ -18,7 +18,7 @@ pub fn compile_let_statement(
 ) -> Result<(), CompileError> {
     let var_name = let_stmt.variable_name().to_string();
     *stack_offset += 8;
-    let offset = *stack_offset;
+    let mut offset = *stack_offset;
 
     match &*let_stmt.value {
         ProcTerm::ConstructorCall(constructor_call) => {
@@ -33,6 +33,38 @@ pub fn compile_let_statement(
             )?;
 
             // The constructor call handles the variable registration internally
+            Ok(())
+        }
+        ProcTerm::StructValue(struct_value) => {
+            // Expand struct value into per-field stack slots with names var_field
+            let fields = &struct_value.fields;
+            for (idx, field) in fields.iter().enumerate() {
+                if idx > 0 {
+                    *stack_offset += 8;
+                    offset = *stack_offset;
+                }
+                // Compile field value
+                super::expressions::compile_proc_term(
+                    &field.value,
+                    variables,
+                    reference_variables,
+                    builtins,
+                    arrays,
+                    variable_arrays,
+                    output,
+                )?;
+
+                // Store into stack
+                output.push_str(&format!(
+                    "    mov qword ptr [rbp - 8 - {}], rax\n",
+                    offset - 8
+                ));
+
+                // Register variable with combined name
+                let field_var_name = format!("{}_{}", var_name, field.name.s());
+                variables.insert(field_var_name, offset);
+            }
+            // Do not register `var_name` directly; fields are accessible via `var_name_field`
             Ok(())
         }
         ProcTerm::Apply(apply) => {

@@ -263,6 +263,11 @@ cuda_context_ok:
             }
             Item::Proc(proc) => self.compile_proc(proc),
             Item::Array(array) => crate::arrays::compile_array(array, &mut self.arrays),
+            Item::Struct(_struct_def) => {
+                // Struct type definitions are not needed for code generation yet
+                // Accept and ignore them to allow programs with user-defined structs
+                Ok(())
+            }
             _ => Err(CompileError::UnsupportedConstruct(format!("{item:?}"))),
         }
     }

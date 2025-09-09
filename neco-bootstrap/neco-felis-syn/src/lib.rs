@@ -41,6 +41,7 @@ pub mod proc_terms {
     pub mod proc_term_apply;
     pub mod proc_term_constructor_call;
     pub mod proc_term_dereference;
+    pub mod proc_term_field_access;
     pub mod proc_term_if;
     pub mod proc_term_method_chain;
     pub mod proc_term_number;
@@ -105,6 +106,7 @@ pub use proc_terms::proc_term::*;
 pub use proc_terms::proc_term_apply::*;
 pub use proc_terms::proc_term_constructor_call::*;
 pub use proc_terms::proc_term_dereference::*;
+pub use proc_terms::proc_term_field_access::*;
 pub use proc_terms::proc_term_if::*;
 pub use proc_terms::proc_term_method_chain::*;
 pub use proc_terms::proc_term_number::*;

@@ -1021,6 +1021,44 @@ fn test_ptx_3_output() {
 }
 
 #[test]
+fn test_compile_struct_3() {
+    let result = compile_file_to_assembly("../../testcases/felis/single/struct_3.fe");
+    match result {
+        Ok(assembly) => {
+            println!("Generated assembly for struct_3.fe:\n{assembly}");
+
+            // Basic assembly structure checks
+            assert!(assembly.contains(".intel_syntax noprefix"));
+            assert!(assembly.contains("main:"));
+            assert!(assembly.contains("_start:"));
+            assert!(assembly.contains("syscall"));
+        }
+        Err(e) => {
+            panic!("Compilation failed: {e}");
+        }
+    }
+}
+
+#[test]
+fn test_struct_3_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/struct_3.fe");
+
+    match result {
+        Ok(status) => {
+            println!(
+                "struct_3.fe executed successfully with exit code: {:?}",
+                status.code()
+            );
+            // struct_3.fe should exit with code 42 (18 + 14 + 10 = 42)
+            assert_eq!(status.code(), Some(42), "Program should exit with code 42");
+        }
+        Err(e) => {
+            panic!("struct_3.fe integration test failed: {e}");
+        }
+    }
+}
+
+#[test]
 #[cfg(feature = "has-ptx-device")]
 fn test_ptx_4() {
     let result = compile_and_execute_with_ptx("../../testcases/felis/single/ptx_4.fe");

@@ -1,6 +1,6 @@
 use crate::{
-    Parse, ParseError, Phase, PhaseParse, ProcTerm, ProcTermMethodChain, ProcTermNumber,
-    ProcTermParen, ProcTermUnit, ProcTermVariable, token::Token,
+    Parse, ParseError, Phase, PhaseParse, ProcTerm, ProcTermFieldAccess, ProcTermMethodChain,
+    ProcTermNumber, ProcTermParen, ProcTermUnit, ProcTermVariable, token::Token,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -53,6 +53,7 @@ enum ProcTermForApplyElem {
     Variable(ProcTermVariable<PhaseParse>),
     Unit(ProcTermUnit<PhaseParse>),
     Number(ProcTermNumber<PhaseParse>),
+    FieldAccess(ProcTermFieldAccess<PhaseParse>),
     MethodChain(ProcTermMethodChain<PhaseParse>),
 }
 
@@ -65,6 +66,9 @@ impl From<ProcTermForApplyElem> for ProcTerm<PhaseParse> {
             }
             ProcTermForApplyElem::Unit(proc_term_unit) => ProcTerm::Unit(proc_term_unit),
             ProcTermForApplyElem::Number(proc_term_number) => ProcTerm::Number(proc_term_number),
+            ProcTermForApplyElem::FieldAccess(proc_term_field_access) => {
+                ProcTerm::FieldAccess(proc_term_field_access)
+            }
             ProcTermForApplyElem::MethodChain(proc_term_method_chain) => {
                 ProcTerm::MethodChain(proc_term_method_chain)
             }
@@ -82,7 +86,14 @@ impl Parse for ProcTermForApplyElem {
             return Ok(Some(ProcTermForApplyElem::Paren(proc_term_paren)));
         }
 
-        // Try field access first before variable, since field access is more specific
+        // Try field access first (no whitespace before .)
+        if let Some(proc_term_field_access) = ProcTermFieldAccess::parse(tokens, i)? {
+            return Ok(Some(ProcTermForApplyElem::FieldAccess(
+                proc_term_field_access,
+            )));
+        }
+
+        // Then try method chain (whitespace before .)
         if let Some(proc_term_method_chain) = ProcTermMethodChain::parse(tokens, i)? {
             return Ok(Some(ProcTermForApplyElem::MethodChain(
                 proc_term_method_chain,

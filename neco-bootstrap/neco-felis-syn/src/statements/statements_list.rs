@@ -1,4 +1,7 @@
-use crate::{Parse, ParseError, Phase, PhaseParse, Statement, StatementsThen, token::Token};
+use crate::{
+    Parse, ParseError, Phase, PhaseParse, Statement, StatementsThen,
+    token::{Token, TokenSemicolon},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Statements<P: Phase> {
@@ -9,13 +12,27 @@ pub enum Statements<P: Phase> {
 
 impl Parse for Statements<PhaseParse> {
     fn parse(tokens: &[Token], i: &mut usize) -> Result<Option<Self>, ParseError> {
-        if let Some(statements_then) = StatementsThen::parse(tokens, i)? {
-            return Ok(Some(Statements::Then(statements_then)));
+        // Parse a statement if present
+        if let Some(head) = Statement::parse(tokens, i)? {
+            // If a semicolon follows, parse the tail recursively as a Then-chain
+            if let Some(semicolon) = TokenSemicolon::parse(tokens, i)? {
+                let Some(tail) = Statements::parse(tokens, i)? else {
+                    return Err(ParseError::Unknown("expected: Statements after ;"));
+                };
+                let statements_then = StatementsThen {
+                    head: Box::new(head),
+                    semicolon,
+                    tail: Box::new(tail),
+                    ext: (),
+                };
+                return Ok(Some(Statements::Then(statements_then)));
+            }
+
+            // No semicolon -> single statement
+            return Ok(Some(Statements::Statement(Box::new(head))));
         }
 
-        if let Some(statement) = Statement::parse(tokens, i)? {
-            return Ok(Some(Statements::Statement(Box::new(statement))));
-        }
+        // No statement at all
         Ok(Some(Statements::Nil))
     }
 }

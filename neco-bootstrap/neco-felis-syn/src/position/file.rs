@@ -300,4 +300,67 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn test_parse_struct_3() {
+        let mut file_id_generator = FileIdGenerator::new();
+        let file_id = file_id_generator.generate_file_id();
+        let s = std::fs::read_to_string("../../testcases/felis/single/struct_3.fe").unwrap();
+        let tokens = Token::lex(&s, file_id);
+
+        println!("Total tokens for struct_3.fe: {}", tokens.len());
+        for (i, token) in tokens.iter().enumerate() {
+            println!("{i}: {token:?}");
+            if i >= 40 {
+                println!("... (showing first 40 tokens)");
+                break;
+            }
+        }
+
+        let mut i = 0;
+        let result = File::parse(&tokens, &mut i);
+
+        match result {
+            Ok(Some(file)) => {
+                println!("Parsed successfully up to token {i} of {}", tokens.len());
+                if i < tokens.len() {
+                    println!("Remaining unparsed tokens: {:?}", &tokens[i..]);
+                }
+                assert_eq!(i, tokens.len(), "Failed to parse all tokens");
+
+                // Verify the struct definition
+                let mut found_struct = false;
+                let mut found_proc = false;
+
+                for item in &file.items {
+                    match item {
+                        crate::Item::Struct(struct_item) => {
+                            assert_eq!(struct_item.name().s(), "Vec3");
+                            assert_eq!(struct_item.fields().len(), 3);
+                            found_struct = true;
+                        }
+                        crate::Item::Proc(proc_item) => {
+                            if proc_item.name.s() == "main" {
+                                found_proc = true;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                assert!(found_struct, "Vec3 struct not found");
+                assert!(found_proc, "main proc not found");
+            }
+            Ok(None) => {
+                panic!("Parsing returned None at token {i}");
+            }
+            Err(e) => {
+                println!("Parse error at token {i}: {e:?}");
+                if i < tokens.len() {
+                    println!("Token at error position: {:?}", tokens[i]);
+                }
+                panic!("Parse error: {e:?}");
+            }
+        }
+    }
 }

@@ -22,6 +22,17 @@ pub fn compile_proc_term(
         }
         ProcTerm::Variable(var) => compile_proc_variable(var, variables, output),
         ProcTerm::Number(num) => compile_proc_number(num, output),
+        ProcTerm::FieldAccess(field_access) => {
+            // Convert field access to method chain parameters for compilation
+            // (they use the same underlying logic)
+            memory::compile_proc_field_access(
+                field_access,
+                variables,
+                arrays,
+                variable_arrays,
+                output,
+            )
+        }
         ProcTerm::MethodChain(method_chain) => memory::compile_proc_method_chain(
             method_chain,
             variables,

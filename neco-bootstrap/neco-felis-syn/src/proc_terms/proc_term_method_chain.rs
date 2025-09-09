@@ -54,13 +54,30 @@ impl Parse for ProcTermMethodChain<PhaseParse> {
             return Err(ParseError::Unknown("expected field name after '.'"));
         };
 
-        // Try to parse an optional index (e.g., "0" in "points.x 0")
-        // Only support simple terms like numbers to avoid infinite recursion
+        // Try to parse an optional index
+        // - Prefer numeric index
+        // - Allow variable index unless it's clearly the start of the next argument
         let index = if let Some(number) = ProcTermNumber::parse(tokens, &mut k)? {
             Some(Box::new(ProcTerm::Number(number)))
+        } else if k < tokens.len() {
+            let can_take_variable_index = match &tokens[k] {
+                Token::Variable(_) => {
+                    // Peek if the following token is a '.' operator
+                    let mut m = k + 1;
+                    let next_is_dot = m < tokens.len()
+                        && TokenOperator::parse_operator(tokens, &mut m, ".")?.is_some();
+                    !next_is_dot
+                }
+                _ => false,
+            };
+            if can_take_variable_index {
+                ProcTermVariable::parse(tokens, &mut k)?
+                    .map(|variable| Box::new(ProcTerm::Variable(variable)))
+            } else {
+                None
+            }
         } else {
-            ProcTermVariable::parse(tokens, &mut k)?
-                .map(|variable| Box::new(ProcTerm::Variable(variable)))
+            None
         };
 
         let proc_term_method_chain = ProcTermMethodChain {

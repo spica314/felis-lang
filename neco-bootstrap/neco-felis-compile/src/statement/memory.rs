@@ -15,6 +15,28 @@ pub fn load_proc_argument_into_register(
             let number_value = parse_number(num.number.s());
             output.push_str(&format!("    mov {register}, {number_value}\n"));
         }
+        ProcTerm::FieldAccess(field_access) => {
+            // Support local struct-like variables (object_field) or fall back to address load
+            let object_name = field_access.object.s();
+            let field_name = field_access.field.s();
+            let combined = format!("{object_name}_{field_name}");
+            if let Some(&var_offset) = variables.get(&combined) {
+                output.push_str(&format!(
+                    "    mov {register}, qword ptr [rbp - 8 - {}]\n",
+                    var_offset - 8
+                ));
+            } else {
+                // Compute address then load
+                compile_proc_field_access(
+                    field_access,
+                    variables,
+                    &HashMap::new(),
+                    &HashMap::new(),
+                    output,
+                )?;
+                output.push_str(&format!("    mov {register}, qword ptr [rax]\n"));
+            }
+        }
         ProcTerm::Variable(var) => {
             let var_name = var.variable.s();
             if let Some(&var_offset) = variables.get(var_name) {
@@ -79,6 +101,27 @@ pub fn load_f32_proc_argument_into_register(
                 )));
             }
         }
+        ProcTerm::FieldAccess(field_access) => {
+            let object_name = field_access.object.s();
+            let field_name = field_access.field.s();
+            let combined = format!("{object_name}_{field_name}");
+            if let Some(&var_offset) = variables.get(&combined) {
+                output.push_str(&format!(
+                    "    movss {register}, dword ptr [rbp - 8 - {}]\n",
+                    var_offset - 8
+                ));
+            } else {
+                // Compute address then load as f32
+                compile_proc_field_access(
+                    field_access,
+                    variables,
+                    arrays,
+                    variable_arrays,
+                    output,
+                )?;
+                output.push_str(&format!("    movss {register}, dword ptr [rax]\n"));
+            }
+        }
         ProcTerm::Variable(var) => {
             let var_name = var.variable.s();
             if let Some(&var_offset) = variables.get(var_name) {
@@ -131,6 +174,30 @@ pub fn load_f32_proc_argument_into_register(
     Ok(())
 }
 
+pub fn compile_proc_field_access(
+    field_access: &ProcTermFieldAccess<PhaseParse>,
+    variables: &HashMap<String, i32>,
+    arrays: &HashMap<String, ArrayInfo>,
+    variable_arrays: &HashMap<String, String>,
+    output: &mut String,
+) -> Result<(), CompileError> {
+    // Field access is essentially the same as method chain,
+    // just parsed differently (no whitespace before dot)
+    // We can reuse the same logic by extracting the common parts
+    let object_name = field_access.object.s();
+    let field_name = field_access.field.s();
+
+    compile_field_or_method_impl(
+        object_name,
+        field_name,
+        field_access.index.as_deref(),
+        variables,
+        arrays,
+        variable_arrays,
+        output,
+    )
+}
+
 pub fn compile_proc_method_chain(
     method_chain: &ProcTermMethodChain<PhaseParse>,
     variables: &HashMap<String, i32>,
@@ -141,6 +208,35 @@ pub fn compile_proc_method_chain(
     let object_name = method_chain.object.s();
     let field_name = method_chain.field.s();
 
+    compile_field_or_method_impl(
+        object_name,
+        field_name,
+        method_chain.index.as_deref(),
+        variables,
+        arrays,
+        variable_arrays,
+        output,
+    )
+}
+
+fn compile_field_or_method_impl(
+    object_name: &str,
+    field_name: &str,
+    index: Option<&ProcTerm<PhaseParse>>,
+    variables: &HashMap<String, i32>,
+    arrays: &HashMap<String, ArrayInfo>,
+    variable_arrays: &HashMap<String, String>,
+    output: &mut String,
+) -> Result<(), CompileError> {
+    // Support local "struct-like" variables expanded as separate stack slots named object_field
+    let local_field_var = format!("{object_name}_{field_name}");
+    if let Some(&field_offset) = variables.get(&local_field_var) {
+        output.push_str(&format!(
+            "    lea rax, qword ptr [rbp - 8 - {}]\n",
+            field_offset - 8
+        ));
+        return Ok(());
+    }
     // Check if this is the #len method for an array
     if field_name == "#len" {
         // Look up the array size variable
@@ -169,7 +265,7 @@ pub fn compile_proc_method_chain(
         ));
 
         // Handle index if present
-        if let Some(index_term) = &method_chain.index {
+        if let Some(index_term) = index {
             // Get array info for element size calculation
             if let Some(array_type_name) = variable_arrays.get(object_name)
                 && let Some(array_info) = arrays.get(array_type_name)
@@ -180,7 +276,7 @@ pub fn compile_proc_method_chain(
                     field_name,
                 )?;
 
-                match &**index_term {
+                match index_term {
                     ProcTerm::Number(num) => {
                         let index = crate::arrays::parse_number(num.number.s());
                         let offset = index.parse::<usize>().unwrap_or(0) * element_size;

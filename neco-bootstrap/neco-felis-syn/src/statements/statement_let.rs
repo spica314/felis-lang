@@ -23,6 +23,7 @@ impl Parse for StatementLet<PhaseParse> {
 
         // Parse variable name
         let Some(variable) = TokenVariable::parse(tokens, &mut k)? else {
+            // Not a plain let; allow other statement forms (e.g., let mut) to match
             return Ok(None);
         };
 

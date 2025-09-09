@@ -1011,6 +1011,68 @@ impl AssemblyCompiler {
                 // Handle parenthesized expressions
                 self.load_f32_proc_argument_into_register(&paren.proc_term, register)
             }
+            ProcTerm::FieldAccess(field_access) => {
+                // Handle field access like points.x for f32 loading
+                let object_name = field_access.object.s();
+                let field_name = field_access.field.s();
+
+                // Check if this is a Structure of Arrays (SoA) access
+                let soa_ptr_var_name = format!("{object_name}_{field_name}_ptr");
+                if let Some(&ptr_offset) = self.variables.get(&soa_ptr_var_name) {
+                    // This is SoA access - load the field array pointer
+                    self.output.push_str(&format!(
+                        "    mov rax, qword ptr [rbp - 8 - {}]\n",
+                        ptr_offset - 8
+                    ));
+
+                    // Handle index if present
+                    if let Some(index_term) = &field_access.index {
+                        // Get array info for element size calculation
+                        if let Some(array_type_name) = self.variable_arrays.get(object_name)
+                            && let Some(array_info) = self.arrays.get(array_type_name)
+                        {
+                            let element_size = crate::arrays::get_element_size(
+                                &array_info.field_types,
+                                &array_info.field_names,
+                                field_name,
+                            )?;
+
+                            match &**index_term {
+                                ProcTerm::Number(num) => {
+                                    let index = crate::arrays::parse_number(num.number.s());
+                                    let offset = index.parse::<usize>().unwrap_or(0) * element_size;
+                                    if offset > 0 {
+                                        self.output.push_str(&format!("    add rax, {offset}\n"));
+                                    }
+                                }
+                                ProcTerm::Variable(var) => {
+                                    if let Some(&var_offset) = self.variables.get(var.variable.s())
+                                    {
+                                        self.output.push_str(&format!(
+                                            "    mov rbx, qword ptr [rbp - 8 - {}]\n",
+                                            var_offset - 8
+                                        ));
+                                        self.output
+                                            .push_str(&format!("    mov rcx, {element_size}\n"));
+                                        self.output.push_str("    imul rbx, rcx\n");
+                                        self.output.push_str("    add rax, rbx\n");
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+
+                    // At this point, rax should contain the address of the f32 value
+                    // Load the f32 value from that address into an XMM register
+                    self.output.push_str("    movss xmm0, dword ptr [rax]\n");
+                    Ok(())
+                } else {
+                    Err(CompileError::UnsupportedConstruct(format!(
+                        "Field access not supported in f32 context: {object_name}.{field_name}"
+                    )))
+                }
+            }
             ProcTerm::MethodChain(method_chain) => {
                 // Handle field access like points.x 0 for f32 loading
                 let object_name = method_chain.object.s();
