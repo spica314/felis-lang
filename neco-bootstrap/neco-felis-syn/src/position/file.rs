@@ -133,7 +133,7 @@ mod test {
     fn test_parse_array() {
         let mut file_id_generator = FileIdGenerator::new();
         let file_id = file_id_generator.generate_file_id();
-        let s = std::fs::read_to_string("../../testcases/felis/single/array.fe").unwrap();
+        let s = std::fs::read_to_string("../../testcases/felis/single/array_1.fe").unwrap();
         let tokens = Token::lex(&s, file_id);
 
         let mut i = 0;

@@ -594,8 +594,8 @@ fn test_let_mut_integration() {
 
 #[test]
 fn test_compile_array() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/array.fe").unwrap();
-    println!("Generated assembly for array.fe:\n{assembly}");
+    let assembly = compile_file_to_assembly("../../testcases/felis/single/array_1.fe").unwrap();
+    println!("Generated assembly for array_1.fe:\n{assembly}");
 
     assert!(assembly.contains(".intel_syntax noprefix"));
     assert!(assembly.contains("main:"));
@@ -663,19 +663,19 @@ fn test_if_2_integration() {
 
 #[test]
 fn test_array_integration() {
-    let result = compile_and_execute("../../testcases/felis/single/array.fe");
+    let result = compile_and_execute("../../testcases/felis/single/array_1.fe");
 
     match result {
         Ok(status) => {
             println!(
-                "array.fe executed successfully with exit code: {:?}",
+                "array_1.fe executed successfully with exit code: {:?}",
                 status.code()
             );
-            // array.fe should exit with code 42 (10.0 + 14.0 + 18.0 = 42.0)
+            // array_1.fe should exit with code 42 (10.0 + 14.0 + 18.0 = 42.0)
             assert_eq!(status.code(), Some(42), "Program should exit with code 42");
         }
         Err(e) => {
-            panic!("array.fe integration test failed: {e}");
+            panic!("array_1.fe integration test failed: {e}");
         }
     }
 }
@@ -710,7 +710,7 @@ fn test_array_2_integration() {
                 "array_2.fe executed successfully with exit code: {:?}",
                 status.code()
             );
-            // array.fe should exit with code 42 (10.0 + 14.0 + 18.0 = 42.0)
+            // array_1.fe should exit with code 42 (10.0 + 14.0 + 18.0 = 42.0)
             assert_eq!(status.code(), Some(42), "Program should exit with code 42");
         }
         Err(e) => {
@@ -730,7 +730,7 @@ fn test_array_3_integration() {
                 "array_3.fe executed successfully with exit code: {:?}",
                 status.code()
             );
-            // array.fe should exit with code 42 (10.0 + 14.0 + 18.0 = 42.0)
+            // array_1.fe should exit with code 42 (10.0 + 14.0 + 18.0 = 42.0)
             assert_eq!(status.code(), Some(42), "Program should exit with code 42");
         }
         Err(e) => {
