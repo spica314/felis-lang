@@ -1079,6 +1079,7 @@ fn test_ptx_4() {
 }
 
 #[test]
+#[cfg(feature = "has-ptx-device")]
 fn test_ptx_proc_call_compile_only() {
     let assembly =
         compile_file_to_assembly_with_ptx("../../testcases/felis/single/ptx_proc_call.fe")
