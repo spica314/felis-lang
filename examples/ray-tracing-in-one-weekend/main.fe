@@ -18,6 +18,17 @@
 #use_builtin "ntid_x" #as __ntid_x;
 #use_builtin "tid_x" #as __tid_x;
 
+#struct Vec3 {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+#struct Ray {
+    origin: Vec3,
+    dir: Vec3,
+}
+
 #array Pixels {
     #members {
         r: u64,
