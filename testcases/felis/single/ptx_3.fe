@@ -54,9 +54,9 @@
     #let ib_sub = __f32_mul (__f32 255.99) b;
     #let ib = __f32_to_u64 ib_sub;
 
-    ps.r thread_id <- 99;
-    ps.g thread_id <- 88;
-    ps.b thread_id <- 77;
+    ps .r thread_id <- 99;
+    ps .g thread_id <- 88;
+    ps .b thread_id <- 77;
 }
 
 #proc print_c : (x: __u64) -> () {

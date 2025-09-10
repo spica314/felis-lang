@@ -11,6 +11,9 @@ pub struct PtxCompiler {
     pub ptx_next_f32_reg: usize,
     pub variables: HashMap<String, i32>,
     pub builtins: HashMap<String, String>,
+    pub ptx_proc_map: HashMap<String, ItemProc<PhaseParse>>, // available #ptx procs for inlining
+    pub inlining: bool,
+    pub inlined_return_fields: HashMap<String, String>, // field -> reg for struct return
 }
 
 impl Default for PtxCompiler {
@@ -24,6 +27,9 @@ impl Default for PtxCompiler {
             ptx_next_f32_reg: 1,
             variables: HashMap::new(),
             builtins: HashMap::new(),
+            ptx_proc_map: HashMap::new(),
+            inlining: false,
+            inlined_return_fields: HashMap::new(),
         }
     }
 }
@@ -169,12 +175,40 @@ impl PtxCompiler {
             Statement::Let(let_stmt) => {
                 // Compile the let statement for PTX
                 let var_name = let_stmt.variable_name().to_string();
-                let result_reg = self.compile_ptx_proc_term(&let_stmt.value)?;
-
-                // Store the register mapping
-                self.ptx_registers.insert(var_name.clone(), result_reg);
-                self.variables.insert(var_name, self.variables.len() as i32);
-                Ok(())
+                match &*let_stmt.value {
+                    ProcTerm::StructValue(struct_value) => {
+                        // Bind fields of struct literal to registers under var_name.field
+                        for field in &struct_value.fields {
+                            let reg = self.compile_ptx_proc_term(&field.value)?;
+                            self.ptx_registers
+                                .insert(format!("{}.{}", var_name, field.name.s()), reg);
+                        }
+                        self.variables.insert(var_name, self.variables.len() as i32);
+                        Ok(())
+                    }
+                    ProcTerm::Apply(apply) => {
+                        // Inline user PTX procs
+                        if let ProcTerm::Variable(fv) = &*apply.f {
+                            let fname = fv.variable.s();
+                            if !self.builtins.contains_key(fname)
+                                && self.ptx_proc_map.contains_key(fname)
+                            {
+                                self.inline_ptx_proc_call(&var_name, fname, &apply.args)?;
+                                return Ok(());
+                            }
+                        }
+                        let result_reg = self.compile_ptx_proc_term(&let_stmt.value)?;
+                        self.ptx_registers.insert(var_name.clone(), result_reg);
+                        self.variables.insert(var_name, self.variables.len() as i32);
+                        Ok(())
+                    }
+                    _ => {
+                        let result_reg = self.compile_ptx_proc_term(&let_stmt.value)?;
+                        self.ptx_registers.insert(var_name.clone(), result_reg);
+                        self.variables.insert(var_name, self.variables.len() as i32);
+                        Ok(())
+                    }
+                }
             }
             Statement::FieldAssign(field_assign) => {
                 // Generate PTX code for field assignment
@@ -223,6 +257,27 @@ impl PtxCompiler {
 
                 Ok(())
             }
+            Statement::Return(ret) => {
+                if !self.inlining {
+                    return Err(CompileError::UnsupportedConstruct(
+                        "return not supported in PTX kernel".to_string(),
+                    ));
+                }
+                match &*ret.value {
+                    ProcTerm::StructValue(struct_value) => {
+                        self.inlined_return_fields.clear();
+                        for field in &struct_value.fields {
+                            let reg = self.compile_ptx_proc_term(&field.value)?;
+                            self.inlined_return_fields
+                                .insert(field.name.s().to_string(), reg);
+                        }
+                        Ok(())
+                    }
+                    _ => Err(CompileError::UnsupportedConstruct(
+                        "inline PTX return must be a struct value".to_string(),
+                    )),
+                }
+            }
             _ => Err(CompileError::UnsupportedConstruct(format!(
                 "PTX statement not implemented: {statement:?}"
             ))),
@@ -257,6 +312,20 @@ impl PtxCompiler {
 
         match proc_term {
             ProcTerm::Variable(var) => self.compile_ptx_variable(var.variable.s()),
+            ProcTerm::FieldAccess(field_access) => {
+                let key = format!(
+                    "{}.{}",
+                    field_access.object_name(),
+                    field_access.field_name()
+                );
+                if let Some(reg) = self.ptx_registers.get(&key) {
+                    Ok(reg.clone())
+                } else {
+                    Err(CompileError::UnsupportedConstruct(format!(
+                        "Unknown PTX struct field: {key}"
+                    )))
+                }
+            }
             ProcTerm::Number(num) => {
                 // Handle integer literals
                 let value_str = num.number.s();
@@ -802,17 +871,14 @@ impl PtxCompiler {
                             "Unknown PTX builtin: {builtin}"
                         ))),
                     }
+                } else if self.ptx_proc_map.contains_key(func_name) {
+                    Err(CompileError::UnsupportedConstruct(
+                        "PTX user proc call must be in a let-binding to inline".to_string(),
+                    ))
                 } else {
-                    // Regular function application
-                    let f_reg = self.compile_ptx_proc_term(&apply.f)?;
-                    // Compile all arguments
-                    for arg in &apply.args {
-                        let _arg_reg = self.compile_ptx_proc_term(arg)?;
-                    }
-
-                    // For now, just return the function register
-                    // This is a placeholder for actual function call handling
-                    Ok(f_reg)
+                    Err(CompileError::UnsupportedConstruct(format!(
+                        "Unknown PTX function: {func_name}"
+                    )))
                 }
             }
             _ => {
@@ -825,5 +891,81 @@ impl PtxCompiler {
                 Ok(f_reg)
             }
         }
+    }
+
+    fn inline_ptx_proc_call(
+        &mut self,
+        var_name: &str,
+        func_name: &str,
+        args: &[ProcTerm<PhaseParse>],
+    ) -> Result<(), CompileError> {
+        let callee = self
+            .ptx_proc_map
+            .get(func_name)
+            .ok_or_else(|| {
+                CompileError::UnsupportedConstruct(format!("Unknown PTX callee: {func_name}"))
+            })?
+            .clone();
+
+        // Extract parameter names
+        let param_names = self.extract_proc_parameters(&callee.ty);
+        if param_names.len() != args.len() {
+            return Err(CompileError::UnsupportedConstruct(format!(
+                "PTX inline call arity mismatch: expected {}, got {}",
+                param_names.len(),
+                args.len()
+            )));
+        }
+
+        // Prepare a sub-compiler for inlining
+        let mut sub = PtxCompiler::new();
+        sub.builtins = self.builtins.clone();
+        sub.ptx_proc_map = self.ptx_proc_map.clone();
+        sub.inlining = true;
+
+        // Bind param fields: struct literal or variable carrying struct fields
+        for (param_name, arg) in param_names.iter().zip(args.iter()) {
+            match arg {
+                ProcTerm::StructValue(sv) => {
+                    for fld in &sv.fields {
+                        let reg = self.compile_ptx_proc_term(&fld.value)?;
+                        sub.ptx_registers
+                            .insert(format!("{}.{}", param_name, fld.name.s()), reg);
+                    }
+                }
+                ProcTerm::Variable(v) => {
+                    for f in ["x", "y", "z"] {
+                        let src_key = format!("{}.{}", v.variable.s(), f);
+                        if let Some(reg) = self.ptx_registers.get(&src_key) {
+                            sub.ptx_registers
+                                .insert(format!("{param_name}.{f}"), reg.clone());
+                        }
+                    }
+                }
+                _ => {
+                    return Err(CompileError::UnsupportedConstruct(
+                        "PTX inline supports only struct args or struct vars".to_string(),
+                    ));
+                }
+            }
+        }
+
+        // Compile callee body without prologue
+        sub.compile_ptx_statements(&callee.proc_block.statements)?;
+
+        // Append generated code
+        self.ptx_output.push_str(&sub.ptx_output);
+
+        // Expect struct return captured
+        if sub.inlined_return_fields.is_empty() {
+            return Err(CompileError::UnsupportedConstruct(
+                "PTX inline callee did not return a struct".to_string(),
+            ));
+        }
+        for (field, reg) in sub.inlined_return_fields.iter() {
+            self.ptx_registers
+                .insert(format!("{var_name}.{field}"), reg.clone());
+        }
+        Ok(())
     }
 }

@@ -34,6 +34,9 @@ pub struct AssemblyCompiler {
     pub ptx_next_u64_reg: usize,
     pub ptx_next_u32_reg: usize,
     pub ptx_next_f32_reg: usize,
+    // PTX helpers for inlining and selective emission
+    pub ptx_all_procs: HashMap<String, ItemProc<PhaseParse>>, // all #ptx procs by name
+    pub ptx_kernels_to_emit: std::collections::HashSet<String>, // names used by #call_ptx
 }
 
 impl AssemblyCompiler {
@@ -55,6 +58,8 @@ impl AssemblyCompiler {
             ptx_next_u64_reg: 4, // Start from %rd4 (1-3 are for params)
             ptx_next_u32_reg: 1,
             ptx_next_f32_reg: 1,
+            ptx_all_procs: HashMap::new(),
+            ptx_kernels_to_emit: std::collections::HashSet::new(),
         }
     }
 
@@ -121,6 +126,9 @@ __cu_device_ptr:
 
             self.output.push_str(".section .text\n");
             self.output.push_str(".globl main\n\n");
+
+            // Pre-scan: collect PTX procs and determine which ones are launched via #call_ptx
+            self.collect_ptx_context(file);
 
             for item in file.items() {
                 self.compile_item(item)?;
@@ -596,8 +604,22 @@ cuda_context_ok:
             "DEBUG: Starting PTX compilation for function: {}",
             proc.name.s()
         );
+        // Skip emitting PTX for helper procs not launched via #call_ptx
+        if !self.ptx_kernels_to_emit.contains(proc.name.s()) {
+            // Still record in the map for inlining use
+            self.ptx_all_procs
+                .insert(proc.name.s().to_string(), proc.clone());
+            eprintln!(
+                "DEBUG: Skipping PTX emission for helper proc {} (will inline if called)",
+                proc.name.s()
+            );
+            return Ok(());
+        }
+
         let mut ptx_compiler = PtxCompiler::new();
         ptx_compiler.builtins = self.builtins.clone();
+        // Provide all PTX procs for inlining
+        ptx_compiler.ptx_proc_map = self.ptx_all_procs.clone();
 
         ptx_compiler.compile_ptx_proc(proc)?;
 
@@ -919,6 +941,49 @@ cuda_context_ok:
         }
 
         Ok(())
+    }
+
+    fn collect_ptx_context(&mut self, file: &File<PhaseParse>) {
+        self.ptx_all_procs.clear();
+        self.ptx_kernels_to_emit.clear();
+        // Map all PTX procs by name
+        for item in file.items() {
+            if let Item::Proc(p) = item
+                && p.ptx_modifier.is_some()
+            {
+                self.ptx_all_procs
+                    .insert(p.name.s().to_string(), p.as_ref().clone());
+            }
+        }
+        // Collect kernel names used by #call_ptx
+        for item in file.items() {
+            if let Item::Proc(p) = item {
+                self.collect_ptx_calls_in_statements(&p.proc_block.statements);
+            }
+        }
+        eprintln!(
+            "DEBUG: PTX context collected. helpers = {:?}, kernels = {:?}",
+            self.ptx_all_procs.keys().collect::<Vec<_>>(),
+            self.ptx_kernels_to_emit
+        );
+    }
+
+    fn collect_ptx_calls_in_statements(&mut self, statements: &Statements<PhaseParse>) {
+        match statements {
+            Statements::Then(then) => {
+                self.collect_ptx_calls_in_statement(&then.head);
+                self.collect_ptx_calls_in_statements(&then.tail);
+            }
+            Statements::Statement(stmt) => self.collect_ptx_calls_in_statement(stmt),
+            Statements::Nil => {}
+        }
+    }
+
+    fn collect_ptx_calls_in_statement(&mut self, statement: &Statement<PhaseParse>) {
+        if let Statement::CallPtx(call_ptx) = statement {
+            self.ptx_kernels_to_emit
+                .insert(call_ptx.function_name.s().to_string());
+        }
     }
 
     /// Validate PTX code using ptxas

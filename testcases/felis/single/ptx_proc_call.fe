@@ -18,24 +18,19 @@
 #use_builtin "ntid_x" #as __ntid_x;
 #use_builtin "tid_x" #as __tid_x;
 
-#struct Vec3 {
-    x: f32,
-    y: f32,
-    z: f32,
-}
-
-#struct Ray {
-    origin: Vec3,
-    dir: Vec3,
-}
-
 #array Pixels {
     #members {
-        r: u64,
-        g: u64,
-        b: u64,
+        r: __u64,
+        g: __u64,
+        b: __u64,
     },
     #dimension: 1,
+}
+
+#struct Vec3 {
+    x: __f32,
+    y: __f32,
+    z: __f32,
 }
 
 #ptx #proc vec3_mul : (a: Vec3) -> (b: Vec3) -> Vec3 {
@@ -53,8 +48,8 @@
 #ptx #proc f : (ps: Pixels) -> () {
     #let thread_id_sub = __u64_mul __ctaid_x __ntid_x;
     #let thread_id = __u64_add thread_id_sub __tid_x;
-    #let h = 256;
-    #let w = 256;
+    #let h = 2;
+    #let w = 2;
     #let x = __u64_mod thread_id w;
     #let y_sub1 = __u64_div thread_id w;
     #let y_sub2 = __u64_sub h y_sub1;
@@ -130,39 +125,57 @@
 #proc main2 : () -> () {
     #let ps = Pixels::#new_with_size 65536;
 
-    #call_ptx f ps 256 1 1 256 1 1;
+    #call_ptx f ps 2 1 1 2 1 1;
 
     print_c 80;
     print_c 51;
     print_c 10;
-    print_num3 256;
+    print_num3 2;
     print_c 32;
-    print_num3 256;
+    print_num3 2;
     print_c 10;
     print_num3 255;
     print_c 10;
 
-    #let #mut i @ y_ref = 1;
+    #let r0 = ps .r 0 .*;
+    #let g0 = ps .g 0 .*;
+    #let b0 = ps .b 0 .*;
+    print_num3 r0;
+    print_c 32;
+    print_num3 g0;
+    print_c 32;
+    print_num3 b0;
+    print_c 10;
 
-    #loop {
-        #if __u64_eq i 65536 {
-            #break;
-        };
+    #let r1 = ps .r 1 .*;
+    #let g1 = ps .g 1 .*;
+    #let b1 = ps .b 1 .*;
+    print_num3 r1;
+    print_c 32;
+    print_num3 g1;
+    print_c 32;
+    print_num3 b1;
+    print_c 10;
 
-        #let r = (ps .r i .*);
-        print_num3 r;
-        print_c 32;
+    #let r2 = ps .r 2 .*;
+    #let g2 = ps .g 2 .*;
+    #let b2 = ps .b 2 .*;
+    print_num3 r2;
+    print_c 32;
+    print_num3 g2;
+    print_c 32;
+    print_num3 b2;
+    print_c 10;
 
-        #let g = (ps .g i .*);
-        print_num3 g;
-        print_c 32;
+    #let r3 = ps .r 3 .*;
+    #let g3 = ps .g 3 .*;
+    #let b3 = ps .b 3 .*;
+    print_num3 r3;
+    print_c 32;
+    print_num3 g3;
+    print_c 32;
+    print_num3 b3;
+    print_c 10;
 
-        #let b = (ps .b i .*);
-        print_num3 b;
-        print_c 10;
-
-        y_ref <- __u64_add i 1;
-    };
-
-    __syscall 231 0 0 0 0 0;
+    __syscall 231 42 0 0 0 0;
 }

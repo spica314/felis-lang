@@ -1077,3 +1077,15 @@ fn test_ptx_4() {
         }
     }
 }
+
+#[test]
+fn test_ptx_proc_call_compile_only() {
+    let assembly =
+        compile_file_to_assembly_with_ptx("../../testcases/felis/single/ptx_proc_call.fe")
+            .expect("should compile with PTX");
+    // PTX code for kernel 'f' should be embedded
+    assert!(assembly.contains("ptx_code_f:"));
+    assert!(assembly.contains(".visible .entry f("));
+    // Helper PTX proc should not be emitted as a kernel
+    assert!(!assembly.contains("ptx_code_vec3_mul:"));
+}
