@@ -54,9 +54,7 @@
     #let h = 256;
     #let w = 256;
     #let x = __u64_mod thread_id w;
-    #let y_sub1 = __u64_div thread_id w;
-    #let y_sub2 = __u64_sub h y_sub1;
-    #let y = __u64_sub y_sub2 1;
+    #let y = __u64_div thread_id w;
 
     #let r_sub1 = __u64_to_f32 x;
     #let r_sub2 = __u64_to_f32 w;

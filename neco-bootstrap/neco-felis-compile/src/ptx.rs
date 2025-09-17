@@ -2,6 +2,7 @@ use crate::error::CompileError;
 use neco_felis_syn::*;
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct PtxCompiler {
     pub ptx_output: String,
     pub ptx_functions: Vec<String>,
@@ -14,6 +15,7 @@ pub struct PtxCompiler {
     pub ptx_proc_map: HashMap<String, ItemProc<PhaseParse>>, // available #ptx procs for inlining
     pub inlining: bool,
     pub inlined_return_fields: HashMap<String, String>, // field -> reg for struct return
+    pub inlined_return_reg: Option<String>, // single-register return for non-struct
 }
 
 impl Default for PtxCompiler {
@@ -30,6 +32,7 @@ impl Default for PtxCompiler {
             ptx_proc_map: HashMap::new(),
             inlining: false,
             inlined_return_fields: HashMap::new(),
+            inlined_return_reg: None,
         }
     }
 }
@@ -266,6 +269,7 @@ impl PtxCompiler {
                 match &*ret.value {
                     ProcTerm::StructValue(struct_value) => {
                         self.inlined_return_fields.clear();
+                        self.inlined_return_reg = None;
                         for field in &struct_value.fields {
                             let reg = self.compile_ptx_proc_term(&field.value)?;
                             self.inlined_return_fields
@@ -273,9 +277,13 @@ impl PtxCompiler {
                         }
                         Ok(())
                     }
-                    _ => Err(CompileError::UnsupportedConstruct(
-                        "inline PTX return must be a struct value".to_string(),
-                    )),
+                    other => {
+                        // Allow scalar returns when inlining: capture the register
+                        let reg = self.compile_ptx_proc_term(other)?;
+                        self.inlined_return_fields.clear();
+                        self.inlined_return_reg = Some(reg);
+                        Ok(())
+                    }
                 }
             }
             _ => Err(CompileError::UnsupportedConstruct(format!(
@@ -631,6 +639,50 @@ impl PtxCompiler {
                                 ))
                             }
                         }
+                        "f32_sqrt_approx" => {
+                            if apply.args.len() == 1 {
+                                let arg1_reg = self.compile_ptx_term(&apply.args[0])?;
+                                let result_reg = self.allocate_ptx_f32_register();
+                                self.ptx_output.push_str(&format!(
+                                    "    sqrt.approx.f32 {result_reg}, {arg1_reg};\n"
+                                ));
+                                Ok(result_reg)
+                            } else {
+                                Err(CompileError::UnsupportedConstruct(
+                                    "__f32_sqrt_approx requires one argument".to_string(),
+                                ))
+                            }
+                        }
+                        "f32_add" => {
+                            if apply.args.len() == 2 {
+                                let arg1_reg = self.compile_ptx_term(&apply.args[0])?;
+                                let arg2_reg = self.compile_ptx_term(&apply.args[1])?;
+                                let result_reg = self.allocate_ptx_f32_register();
+                                self.ptx_output.push_str(&format!(
+                                    "    add.f32 {result_reg}, {arg1_reg}, {arg2_reg};\n"
+                                ));
+                                Ok(result_reg)
+                            } else {
+                                Err(CompileError::UnsupportedConstruct(
+                                    "__f32_add requires two arguments".to_string(),
+                                ))
+                            }
+                        }
+                        "f32_sub" => {
+                            if apply.args.len() == 2 {
+                                let arg1_reg = self.compile_ptx_term(&apply.args[0])?;
+                                let arg2_reg = self.compile_ptx_term(&apply.args[1])?;
+                                let result_reg = self.allocate_ptx_f32_register();
+                                self.ptx_output.push_str(&format!(
+                                    "    sub.f32 {result_reg}, {arg1_reg}, {arg2_reg};\n"
+                                ));
+                                Ok(result_reg)
+                            } else {
+                                Err(CompileError::UnsupportedConstruct(
+                                    "__f32_sub requires two arguments".to_string(),
+                                ))
+                            }
+                        }
                         "f32_mul" => {
                             if apply.args.len() == 2 {
                                 let arg1_reg = self.compile_ptx_term(&apply.args[0])?;
@@ -837,6 +889,50 @@ impl PtxCompiler {
                                 ))
                             }
                         }
+                        "f32_sqrt_approx" => {
+                            if apply.args.len() == 1 {
+                                let arg1_reg = self.compile_ptx_proc_term(&apply.args[0])?;
+                                let result_reg = self.allocate_ptx_f32_register();
+                                self.ptx_output.push_str(&format!(
+                                    "    sqrt.approx.f32 {result_reg}, {arg1_reg};\n"
+                                ));
+                                Ok(result_reg)
+                            } else {
+                                Err(CompileError::UnsupportedConstruct(
+                                    "__f32_sqrt_approx requires one argument".to_string(),
+                                ))
+                            }
+                        }
+                        "f32_add" => {
+                            if apply.args.len() == 2 {
+                                let arg1_reg = self.compile_ptx_proc_term(&apply.args[0])?;
+                                let arg2_reg = self.compile_ptx_proc_term(&apply.args[1])?;
+                                let result_reg = self.allocate_ptx_f32_register();
+                                self.ptx_output.push_str(&format!(
+                                    "    add.f32 {result_reg}, {arg1_reg}, {arg2_reg};\n"
+                                ));
+                                Ok(result_reg)
+                            } else {
+                                Err(CompileError::UnsupportedConstruct(
+                                    "__f32_add requires two arguments".to_string(),
+                                ))
+                            }
+                        }
+                        "f32_sub" => {
+                            if apply.args.len() == 2 {
+                                let arg1_reg = self.compile_ptx_proc_term(&apply.args[0])?;
+                                let arg2_reg = self.compile_ptx_proc_term(&apply.args[1])?;
+                                let result_reg = self.allocate_ptx_f32_register();
+                                self.ptx_output.push_str(&format!(
+                                    "    sub.f32 {result_reg}, {arg1_reg}, {arg2_reg};\n"
+                                ));
+                                Ok(result_reg)
+                            } else {
+                                Err(CompileError::UnsupportedConstruct(
+                                    "__f32_sub requires two arguments".to_string(),
+                                ))
+                            }
+                        }
                         "f32_mul" => {
                             if apply.args.len() == 2 {
                                 let arg1_reg = self.compile_ptx_proc_term(&apply.args[0])?;
@@ -922,6 +1018,10 @@ impl PtxCompiler {
         sub.builtins = self.builtins.clone();
         sub.ptx_proc_map = self.ptx_proc_map.clone();
         sub.inlining = true;
+        // Share register allocation state to avoid reusing caller's registers
+        sub.ptx_next_u64_reg = self.ptx_next_u64_reg;
+        sub.ptx_next_u32_reg = self.ptx_next_u32_reg;
+        sub.ptx_next_f32_reg = self.ptx_next_f32_reg;
 
         // Bind param fields: struct literal or variable carrying struct fields
         for (param_name, arg) in param_names.iter().zip(args.iter()) {
@@ -934,11 +1034,20 @@ impl PtxCompiler {
                     }
                 }
                 ProcTerm::Variable(v) => {
+                    let mut inserted = false;
                     for f in ["x", "y", "z"] {
                         let src_key = format!("{}.{}", v.variable.s(), f);
                         if let Some(reg) = self.ptx_registers.get(&src_key) {
                             sub.ptx_registers
                                 .insert(format!("{param_name}.{f}"), reg.clone());
+                            inserted = true;
+                        }
+                    }
+                    if !inserted {
+                        let src_key = v.variable.s();
+                        if let Some(reg) = self.ptx_registers.get(src_key) {
+                            sub.ptx_registers
+                                .insert(format!("{param_name}"), reg.clone());
                         }
                     }
                 }
@@ -955,16 +1064,24 @@ impl PtxCompiler {
 
         // Append generated code
         self.ptx_output.push_str(&sub.ptx_output);
+        // Advance caller's register counters to include callee's allocations
+        self.ptx_next_u64_reg = sub.ptx_next_u64_reg;
+        self.ptx_next_u32_reg = sub.ptx_next_u32_reg;
+        self.ptx_next_f32_reg = sub.ptx_next_f32_reg;
 
         // Expect struct return captured
-        if sub.inlined_return_fields.is_empty() {
+        if !sub.inlined_return_fields.is_empty() {
+            for (field, reg) in sub.inlined_return_fields.iter() {
+                self.ptx_registers
+                    .insert(format!("{var_name}.{field}"), reg.clone());
+            }
+        } else if let Some(reg) = sub.inlined_return_reg {
+            // Scalar return: bind directly to LHS variable
+            self.ptx_registers.insert(var_name.to_string(), reg);
+        } else {
             return Err(CompileError::UnsupportedConstruct(
-                "PTX inline callee did not return a struct".to_string(),
+                "PTX inline callee did not produce a return value".to_string(),
             ));
-        }
-        for (field, reg) in sub.inlined_return_fields.iter() {
-            self.ptx_registers
-                .insert(format!("{var_name}.{field}"), reg.clone());
         }
         Ok(())
     }

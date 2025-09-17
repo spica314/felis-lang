@@ -12,3 +12,4 @@ elf.o
 
 *.png
 *.pnm
+*.ptx

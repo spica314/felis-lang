@@ -646,6 +646,7 @@ cuda_context_ok:
             "DEBUG: PTX output first 100 chars: {:?}",
             &self.ptx_output[..self.ptx_output.len().min(100)]
         );
+        std::fs::write("./a.ptx", &self.ptx_output).unwrap();
 
         Ok(())
     }
