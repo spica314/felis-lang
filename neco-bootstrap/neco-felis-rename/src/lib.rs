@@ -131,10 +131,6 @@ fn rename_item(context: &mut RenameContext, item: &Item<PhaseParse>) -> Item<Pha
             // For now, just return the item unchanged since we don't handle builtins in renaming
             unreachable!("Proc items are not yet supported in renaming")
         }
-        Item::Array(_) => {
-            // For now, just return the item unchanged since we don't handle arrays in renaming
-            unreachable!("Array items are not yet supported in renaming")
-        }
         Item::Struct(_) => {
             // For now, just return the item unchanged since we don't handle structs in renaming
             unreachable!("Struct items are not yet supported in renaming")

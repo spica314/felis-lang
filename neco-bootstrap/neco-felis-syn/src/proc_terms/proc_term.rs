@@ -1,7 +1,8 @@
 use crate::{
     ItemStruct, Parse, ParseError, Phase, PhaseParse, ProcTermApply, ProcTermConstructorCall,
     ProcTermDereference, ProcTermFieldAccess, ProcTermIf, ProcTermMethodChain, ProcTermNumber,
-    ProcTermParen, ProcTermStructValue, ProcTermUnit, ProcTermVariable, token::Token,
+    ProcTermParen, ProcTermStructValue, ProcTermUnit, ProcTermVariable, TokenOperator,
+    TokenVariable, token::Token,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -64,7 +65,54 @@ impl Parse for ProcTerm<PhaseParse> {
 
         // Try field access first (no whitespace before dot)
         if let Some(proc_term_field_access) = ProcTermFieldAccess::parse(tokens, i)? {
-            // Check for postfix dereference
+            // Try to parse a following ". get <index>" as sugar for a method-chain with index
+            let mut j = *i;
+            if let Some(dot2) = TokenOperator::parse_operator_after_whitespace(tokens, &mut j, ".")?
+                && let Some(get_name) = TokenVariable::parse(tokens, &mut j)?
+                && get_name.s() == "get"
+            {
+                // Parse index term (number or variable)
+                if let Some(number) = ProcTermNumber::parse(tokens, &mut j)? {
+                    let mc = ProcTermMethodChain {
+                        object: proc_term_field_access.object.clone(),
+                        dot: dot2,
+                        field: proc_term_field_access.field.clone(),
+                        index: Some(Box::new(ProcTerm::Number(number.clone()))),
+                        ext: (),
+                    };
+                    *i = j;
+                    // Allow postfix deref after '.get idx'
+                    if let Some(deref_term) = ProcTermDereference::try_parse_postfix(
+                        ProcTerm::MethodChain(mc.clone()),
+                        tokens,
+                        i,
+                    )? {
+                        return Ok(Some(deref_term));
+                    } else {
+                        return Ok(Some(ProcTerm::MethodChain(mc)));
+                    }
+                } else if let Some(variable) = ProcTermVariable::parse(tokens, &mut j)? {
+                    let mc = ProcTermMethodChain {
+                        object: proc_term_field_access.object.clone(),
+                        dot: dot2,
+                        field: proc_term_field_access.field.clone(),
+                        index: Some(Box::new(ProcTerm::Variable(variable.clone()))),
+                        ext: (),
+                    };
+                    *i = j;
+                    if let Some(deref_term) = ProcTermDereference::try_parse_postfix(
+                        ProcTerm::MethodChain(mc.clone()),
+                        tokens,
+                        i,
+                    )? {
+                        return Ok(Some(deref_term));
+                    } else {
+                        return Ok(Some(ProcTerm::MethodChain(mc)));
+                    }
+                }
+            }
+
+            // Fallback: plain field access
             if let Some(deref_term) = ProcTermDereference::try_parse_postfix(
                 ProcTerm::FieldAccess(proc_term_field_access.clone()),
                 tokens,

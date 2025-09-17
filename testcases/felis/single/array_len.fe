@@ -4,23 +4,29 @@
 #use_builtin "f32_add" #as __f32_add;
 #use_builtin "f32_to_u64" #as __f32_to_u64;
 #use_builtin "f32" #as __f32;
+#use_builtin "Array" #as __Array;
 
-#array Points {
-    #members {
-        x: __f32,
-        y: __f32,
-        z: __f32,
-    },
-    #dimension: 1,
+#struct Points {
+    x: __Array __f32,
+    y: __Array __f32,
+    z: __Array __f32,
 }
 
 #proc main : () -> () {
-    #let points = Points::#new_with_size 42;
-    points .x 41 <- 1.0f32;
-    points .y 41 <- 2.0f32;
-    points .z 41 <- 3.0f32;
+    #let x = __Array::new_with_size 42;
+    #let y = __Array::new_with_size 42;
+    #let z = __Array::new_with_size 42;
+    #let points = Points {
+        x: x,
+        y: y,
+        z: z,
+    };
+
+    points.x .set 41 1.0f32;
+    points.y .set 41 2.0f32;
+    points.z .set 41 3.0f32;
 
     #let syscall_id = 231u64;
-    #let error_code = points .#len ();
+    #let error_code = points .len ();
     __syscall syscall_id error_code 0 0 0 0;
 }

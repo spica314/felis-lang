@@ -53,50 +53,6 @@ pub fn count_array_pointers_in_term(term: &Term<PhaseParse>) -> i32 {
     }
 }
 
-/// Compile an array definition
-pub fn compile_array(
-    array: &ItemArray<PhaseParse>,
-    arrays: &mut HashMap<String, ArrayInfo>,
-) -> Result<(), CompileError> {
-    let array_name = array.name().s().to_string();
-    let mut field_names = Vec::new();
-    let mut field_types = Vec::new();
-    let mut dimension = 1;
-
-    for field in array.fields() {
-        let field_name = field.keyword.s();
-        match field_name {
-            "item" | "members" => {
-                // Parse the struct fields from the item definition
-                if let Term::Struct(item_struct) = &*field.value {
-                    for struct_field in item_struct.fields() {
-                        field_names.push(struct_field.name.s().to_string());
-                        // Extract type from field type (simplified)
-                        field_types.push(extract_type_from_term(&struct_field.ty)?);
-                    }
-                }
-            }
-            "dimension" => {
-                if let Term::Number(num) = &*field.value {
-                    dimension = num.number.s().parse::<usize>().unwrap_or(1);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    let array_info = ArrayInfo {
-        element_type: "struct".to_string(),
-        field_names,
-        field_types,
-        dimension,
-        size: None,
-    };
-
-    arrays.insert(array_name, array_info);
-    Ok(())
-}
-
 /// Extract type information from a term
 pub fn extract_type_from_term(term: &Term<PhaseParse>) -> Result<String, CompileError> {
     match term {
@@ -305,6 +261,66 @@ pub fn parse_number(number_str: &str) -> String {
     } else {
         number_str.to_string()
     }
+}
+
+/// Generate a flat array allocation for builtin Array
+/// Stores:
+/// - `{var_name}_size` = size
+/// - `{var_name}` = base pointer (8-byte element stride by default)
+pub fn generate_builtin_array_allocation_with_var(
+    var_name: &str,
+    size: &str,
+    output: &mut String,
+    stack_offset: &mut i32,
+    variables: &mut HashMap<String, i32>,
+) -> Result<(), CompileError> {
+    // Store size
+    let size_var_name = format!("{var_name}_size");
+    *stack_offset += 8;
+    let size_offset = *stack_offset;
+    variables.insert(size_var_name.clone(), size_offset);
+
+    if size == "rsi" {
+        output.push_str(&format!(
+            "    mov qword ptr [rbp - 8 - {}], rsi  # Store {size_var_name}\n",
+            size_offset - 8
+        ));
+    } else {
+        output.push_str(&format!("    mov rax, {size}        # Load array size\n"));
+        output.push_str(&format!(
+            "    mov qword ptr [rbp - 8 - {}], rax  # Store {size_var_name}\n",
+            size_offset - 8
+        ));
+    }
+
+    // Compute total size = element_size(8) * size
+    if size != "rsi" {
+        output.push_str(&format!("    mov rsi, {size}        # Load array size\n"));
+    }
+    output.push_str("    mov rax, 8               # element size (default)\n");
+    output.push_str("    mul rsi                  # rax = 8 * size\n");
+    output.push_str("    mov rsi, rax             # rsi = total_size\n");
+
+    // mmap(total_size)
+    output.push_str("    mov rax, 9               # sys_mmap\n");
+    output.push_str("    mov rdi, 0               # addr = NULL\n");
+    output.push_str("    mov rdx, 3               # prot = PROT_READ | PROT_WRITE\n");
+    output.push_str("    mov r10, 34              # flags = MAP_PRIVATE | MAP_ANONYMOUS\n");
+    output.push_str("    mov r8, -1               # fd = -1\n");
+    output.push_str("    mov r9, 0                # offset = 0\n");
+    output.push_str("    syscall\n");
+
+    // Store pointer in `{var_name}`
+    *stack_offset += 8;
+    let ptr_offset = *stack_offset;
+    variables.insert(var_name.to_string(), ptr_offset);
+    output.push_str(&format!(
+        "    mov qword ptr [rbp - 8 - {}], rax  # Store {}\n",
+        ptr_offset - 8,
+        var_name
+    ));
+
+    Ok(())
 }
 
 /// Compile field assignment for array elements

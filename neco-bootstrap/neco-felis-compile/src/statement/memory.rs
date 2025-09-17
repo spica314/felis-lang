@@ -231,14 +231,39 @@ fn compile_field_or_method_impl(
     // Support local "struct-like" variables expanded as separate stack slots named object_field
     let local_field_var = format!("{object_name}_{field_name}");
     if let Some(&field_offset) = variables.get(&local_field_var) {
+        // Treat local field slot as holding a pointer to the start of the array
         output.push_str(&format!(
-            "    lea rax, qword ptr [rbp - 8 - {}]\n",
+            "    mov rax, qword ptr [rbp - 8 - {}]\n",
             field_offset - 8
         ));
+
+        // Apply index if present (default 8-byte stride)
+        if let Some(index_term) = index {
+            match index_term {
+                ProcTerm::Number(num) => {
+                    let index = parse_number(num.number.s());
+                    // default element size = 8
+                    output.push_str(&format!("    mov rbx, {index}\n"));
+                    output.push_str("    shl rbx, 3\n");
+                    output.push_str("    add rax, rbx\n");
+                }
+                ProcTerm::Variable(var) => {
+                    if let Some(&var_offset) = variables.get(var.variable.s()) {
+                        output.push_str(&format!(
+                            "    mov rbx, qword ptr [rbp - 8 - {}]\n",
+                            var_offset - 8
+                        ));
+                        output.push_str("    shl rbx, 3\n");
+                        output.push_str("    add rax, rbx\n");
+                    }
+                }
+                _ => {}
+            }
+        }
         return Ok(());
     }
-    // Check if this is the #len method for an array
-    if field_name == "#len" {
+    // Check if this is the len method for an array/struct (accept both `len` and `#len`)
+    if field_name == "#len" || field_name == "len" {
         // Look up the array size variable
         let size_var_name = format!("{object_name}_size");
         if let Some(&size_offset) = variables.get(&size_var_name) {
@@ -382,8 +407,8 @@ pub fn compile_proc_dereference(
         }
     }
 
-    // Default case - assume 8 bytes for unknown types
-    output.push_str("    mov rax, qword ptr [rax]\n");
+    // Default case - load 4 bytes for unknown types (better for f32); integers <=32-bit still work
+    output.push_str("    mov eax, dword ptr [rax]\n");
     Ok(())
 }
 

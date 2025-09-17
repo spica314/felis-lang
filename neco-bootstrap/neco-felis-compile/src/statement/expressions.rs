@@ -137,7 +137,7 @@ pub fn compile_proc_apply(
     // Handle field access apply (e.g., points.#len ())
     if let ProcTerm::MethodChain(method_chain) = &*apply.f {
         // Check if this is an array length operation
-        if method_chain.field.s() == "#len" {
+        if method_chain.field.s() == "#len" || method_chain.field.s() == "len" {
             // Ensure we have no arguments or only unit argument
             if apply.args.len() > 1
                 || (apply.args.len() == 1 && !matches!(apply.args[0], ProcTerm::Unit(_)))
@@ -176,6 +176,13 @@ pub fn compile_proc_apply(
                         "Size variable not found for array: {array_name}"
                     )));
                 }
+            } else if let Some(&size_offset) = variables.get(&format!("{array_name}_size")) {
+                // Fallback for struct objects: use propagated `{object}_size`
+                output.push_str(&format!(
+                    "    mov rax, qword ptr [rbp - 8 - {}]\n",
+                    size_offset - 8
+                ));
+                return Ok(());
             } else {
                 return Err(CompileError::UnsupportedConstruct(format!(
                     "Unknown array variable: {array_name}"

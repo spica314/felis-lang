@@ -8,7 +8,6 @@ pub mod position {
 // Items (top-level language constructs)
 pub mod items {
     pub mod item;
-    pub mod item_array;
     pub mod item_definition;
     pub mod item_entrypoint;
     pub mod item_inductive;
@@ -79,7 +78,6 @@ pub use position::file_id::*;
 pub use position::pos::*;
 
 pub use items::item::*;
-pub use items::item_array::*;
 pub use items::item_definition::*;
 pub use items::item_entrypoint::*;
 pub use items::item_inductive::*;

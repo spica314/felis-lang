@@ -110,7 +110,6 @@ pub trait Phase {
         + PartialOrd
         + Ord
         + std::hash::Hash;
-    type ItemArrayExt: std::fmt::Debug + Clone + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash;
     type ItemStructExt: std::fmt::Debug
         + Clone
         + PartialEq
@@ -294,7 +293,6 @@ impl Phase for PhaseParse {
     type ItemProcExt = ();
     type TermUnitExt = ();
     type TermNumberExt = ();
-    type ItemArrayExt = ();
     type ItemStructExt = ();
     type TermStructExt = ();
     type TermFieldAccessExt = ();

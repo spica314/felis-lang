@@ -26,6 +26,7 @@ pub fn compile_let_statement(
                 constructor_call,
                 &var_name,
                 arrays,
+                builtins,
                 output,
                 stack_offset,
                 variables,
@@ -63,6 +64,48 @@ pub fn compile_let_statement(
                 // Register variable with combined name
                 let field_var_name = format!("{}_{}", var_name, field.name.s());
                 variables.insert(field_var_name, offset);
+
+                // If the field value is a variable that has a corresponding size slot,
+                // also propagate its size into a combined name slot: `{var_name}_{field}_size`.
+                if let ProcTerm::Variable(v) = &*field.value {
+                    let src_name = v.variable.s();
+                    let src_size_name = format!("{src_name}_size");
+                    if let Some(&src_size_off) = variables.get(&src_size_name) {
+                        *stack_offset += 8;
+                        let size_off = *stack_offset;
+                        // Copy size value
+                        output.push_str(&format!(
+                            "    mov rax, qword ptr [rbp - 8 - {}]\n",
+                            src_size_off - 8
+                        ));
+                        output.push_str(&format!(
+                            "    mov qword ptr [rbp - 8 - {}], rax\n",
+                            size_off - 8
+                        ));
+                        // Register size slot
+                        let combined_size_name = format!("{}_{}_size", var_name, field.name.s());
+                        variables.insert(combined_size_name, size_off);
+                    }
+                }
+            }
+            // Also propagate a common size for the struct itself (e.g., `points_size`)
+            for field in fields {
+                let combined_size_name = format!("{}_{}_size", var_name, field.name.s());
+                if let Some(&src_size_off) = variables.get(&combined_size_name) {
+                    *stack_offset += 8;
+                    let size_off = *stack_offset;
+                    output.push_str(&format!(
+                        "    mov rax, qword ptr [rbp - 8 - {}]\n",
+                        src_size_off - 8
+                    ));
+                    output.push_str(&format!(
+                        "    mov qword ptr [rbp - 8 - {}], rax\n",
+                        size_off - 8
+                    ));
+                    let struct_size_name = format!("{var_name}_size");
+                    variables.insert(struct_size_name, size_off);
+                    break;
+                }
             }
             // Do not register `var_name` directly; fields are accessible via `var_name_field`
             Ok(())
@@ -273,7 +316,19 @@ pub fn compile_field_assign_statement(
     // Save the address in rbx
     output.push_str("    mov rbx, rax\n");
 
-    // Compile the value to assign
+    // Fast-path: if the value is an f32 literal, store 4 bytes
+    if let ProcTerm::Number(num) = &*method_chain_assign_stmt.value {
+        let number_str = num.number.s();
+        if let Some(float_value) = number_str.strip_suffix("f32")
+            && let Ok(f) = float_value.parse::<f32>()
+        {
+            output.push_str(&format!("    mov ebx, 0x{:08x}\n", f.to_bits()));
+            output.push_str("    mov dword ptr [rbx], ebx\n");
+            return Ok(());
+        }
+    }
+
+    // Compile the value to assign (generic path -> 8-byte store)
     expressions::compile_proc_term(
         &method_chain_assign_stmt.value,
         variables,
@@ -284,7 +339,7 @@ pub fn compile_field_assign_statement(
         output,
     )?;
 
-    // Store the value at the field address
+    // Store the value at the field address (8 bytes)
     output.push_str("    mov qword ptr [rbx], rax\n");
 
     Ok(())

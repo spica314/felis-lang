@@ -62,10 +62,6 @@ impl TypeChecker {
                 Ok(())
             }
             Item::Proc(_item_proc) => Ok(()),
-            Item::Array(_item_array) => {
-                // TODO: Implement array type checking
-                Ok(())
-            }
             Item::Struct(_item_struct) => {
                 // TODO: Implement struct type checking
                 Ok(())

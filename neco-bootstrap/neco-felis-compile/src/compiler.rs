@@ -270,7 +270,6 @@ cuda_context_ok:
                 Ok(())
             }
             Item::Proc(proc) => self.compile_proc(proc),
-            Item::Array(array) => crate::arrays::compile_array(array, &mut self.arrays),
             Item::Struct(_struct_def) => {
                 // Struct type definitions are not needed for code generation yet
                 // Accept and ignore them to allow programs with user-defined structs
@@ -539,6 +538,7 @@ cuda_context_ok:
             constructor_call,
             var_name,
             &self.arrays,
+            &self.builtins,
             &mut self.output,
             &mut self.stack_offset,
             &mut self.variables,
@@ -677,17 +677,39 @@ cuda_context_ok:
             };
 
             // Get array info
-            let array_type_name = self.variable_arrays.get(array_var_name).ok_or_else(|| {
-                CompileError::UnsupportedConstruct(format!(
-                    "Unknown array variable: {array_var_name}"
-                ))
-            })?;
-
-            let array_info = self.arrays.get(array_type_name).ok_or_else(|| {
-                CompileError::UnsupportedConstruct(format!("Unknown array type: {array_type_name}"))
-            })?;
-
-            (true, array_var_name, array_info.clone())
+            if let Some(array_type_name) = self.variable_arrays.get(array_var_name) {
+                let array_info = self.arrays.get(array_type_name).ok_or_else(|| {
+                    CompileError::UnsupportedConstruct(format!(
+                        "Unknown array type: {array_type_name}"
+                    ))
+                })?;
+                (true, array_var_name, array_info.clone())
+            } else {
+                // Fallback: treat argument as a struct holding builtin Arrays in fields
+                let mut field_names = vec![];
+                for fname in ["r", "g", "b", "x", "y", "z"].iter() {
+                    let k = format!("{array_var_name}_{fname}");
+                    if self.variables.contains_key(&k) {
+                        field_names.push((*fname).to_string());
+                    }
+                }
+                if field_names.is_empty() {
+                    return Err(CompileError::UnsupportedConstruct(format!(
+                        "Unknown array variable: {array_var_name}"
+                    )));
+                }
+                (
+                    true,
+                    array_var_name,
+                    ArrayInfo {
+                        element_type: "u64".to_string(),
+                        field_types: field_names.iter().map(|_| "u64".to_string()).collect(),
+                        field_names,
+                        dimension: 1,
+                        size: None,
+                    },
+                )
+            }
         } else {
             // No arguments - create dummy info
             (
@@ -757,9 +779,25 @@ cuda_context_ok:
                 self.output
                     .push_str(&format!("    lea rdi, device_ptr_{}[rip]\n", i + 1));
 
-                // Calculate size based on array size and element type
-                // For now, assume 65536 elements and 8 bytes per element
-                self.output.push_str("    mov rsi, 524288\n"); // 65536 * 8
+                // Calculate size based on array size (8-byte elements)
+                if let Some(&soff) = self
+                    .variables
+                    .get(&format!("{array_var_name}_{field_name}_size"))
+                {
+                    self.output.push_str(&format!(
+                        "    mov rsi, QWORD PTR [rbp - 8 - {}]\n",
+                        soff - 8
+                    ));
+                    self.output.push_str("    shl rsi, 3\n");
+                } else if let Some(&soff) = self.variables.get(&format!("{array_var_name}_size")) {
+                    self.output.push_str(&format!(
+                        "    mov rsi, QWORD PTR [rbp - 8 - {}]\n",
+                        soff - 8
+                    ));
+                    self.output.push_str("    shl rsi, 3\n");
+                } else {
+                    self.output.push_str("    mov rsi, 524288\n"); // Fallback
+                }
                 self.output.push_str("    call cuMemAlloc_v2@PLT\n");
                 self.output.push_str("    test eax, eax\n");
                 self.output.push_str(&format!("    jz mem_alloc_ok_{i}\n"));
@@ -789,9 +827,35 @@ cuda_context_ok:
                         "    mov rsi, QWORD PTR [rbp - 8 - {}]\n",
                         offset - 8
                     ));
+                } else if let Some(&offset) = self
+                    .variables
+                    .get(&format!("{array_var_name}_{field_name}"))
+                {
+                    self.output.push_str(&format!(
+                        "    mov rsi, QWORD PTR [rbp - 8 - {}]\n",
+                        offset - 8
+                    ));
                 }
 
-                self.output.push_str("    mov rdx, 524288\n"); // Size
+                // Size in bytes
+                if let Some(&soff) = self
+                    .variables
+                    .get(&format!("{array_var_name}_{field_name}_size"))
+                {
+                    self.output.push_str(&format!(
+                        "    mov rdx, QWORD PTR [rbp - 8 - {}]\n",
+                        soff - 8
+                    ));
+                    self.output.push_str("    shl rdx, 3\n");
+                } else if let Some(&soff) = self.variables.get(&format!("{array_var_name}_size")) {
+                    self.output.push_str(&format!(
+                        "    mov rdx, QWORD PTR [rbp - 8 - {}]\n",
+                        soff - 8
+                    ));
+                    self.output.push_str("    shl rdx, 3\n");
+                } else {
+                    self.output.push_str("    mov rdx, 524288\n");
+                }
                 self.output.push_str("    call cuMemcpyHtoD_v2@PLT\n");
                 self.output.push_str("    test eax, eax\n");
                 self.output
@@ -891,9 +955,17 @@ cuda_context_ok:
                 self.output
                     .push_str(&format!("    # Copy {field_name} data back from device\n"));
 
-                // Get host pointer for this field
+                // Get host pointer for this field: prefer *_ptr; fallback to direct field slot
                 let field_ptr_var = format!("{array_var_name}_{field_name}_ptr");
                 if let Some(&offset) = self.variables.get(&field_ptr_var) {
+                    self.output.push_str(&format!(
+                        "    mov rdi, QWORD PTR [rbp - 8 - {}]\n",
+                        offset - 8
+                    ));
+                } else if let Some(&offset) = self
+                    .variables
+                    .get(&format!("{array_var_name}_{field_name}"))
+                {
                     self.output.push_str(&format!(
                         "    mov rdi, QWORD PTR [rbp - 8 - {}]\n",
                         offset - 8
@@ -904,7 +976,25 @@ cuda_context_ok:
                     "    mov rsi, QWORD PTR device_ptr_{}[rip]\n",
                     i + 1
                 ));
-                self.output.push_str("    mov rdx, 524288\n"); // Size
+                // Determine copy size: prefer struct field specific size, then global size
+                if let Some(&soff) = self
+                    .variables
+                    .get(&format!("{array_var_name}_{field_name}_size"))
+                {
+                    self.output.push_str(&format!(
+                        "    mov rdx, QWORD PTR [rbp - 8 - {}]\n",
+                        soff - 8
+                    ));
+                    self.output.push_str("    shl rdx, 3\n");
+                } else if let Some(&soff) = self.variables.get(&format!("{array_var_name}_size")) {
+                    self.output.push_str(&format!(
+                        "    mov rdx, QWORD PTR [rbp - 8 - {}]\n",
+                        soff - 8
+                    ));
+                    self.output.push_str("    shl rdx, 3\n");
+                } else {
+                    self.output.push_str("    mov rdx, 524288\n"); // Fallback
+                }
                 self.output.push_str("    call cuMemcpyDtoH_v2@PLT\n");
                 self.output.push_str("    test eax, eax\n");
                 self.output

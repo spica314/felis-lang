@@ -130,56 +130,6 @@ mod test {
     }
 
     #[test]
-    fn test_parse_array() {
-        let mut file_id_generator = FileIdGenerator::new();
-        let file_id = file_id_generator.generate_file_id();
-        let s = std::fs::read_to_string("../../testcases/felis/single/array_1.fe").unwrap();
-        let tokens = Token::lex(&s, file_id);
-
-        let mut i = 0;
-        let result = File::parse(&tokens, &mut i);
-
-        match result {
-            Ok(Some(file)) => {
-                println!("Parsed successfully up to token {i} of {}", tokens.len());
-                if i < tokens.len() {
-                    println!("Remaining tokens: {:?}", &tokens[i..]);
-                }
-                assert_debug_snapshot!(file);
-
-                // Complete file parsing including #proc block is now working
-                assert_eq!(i, tokens.len()); // Should have parsed all tokens
-
-                // Verify the array was parsed correctly - it should be the 6th item (0-indexed)
-                assert_eq!(file.items.len(), 7);
-                match &file.items[5] {
-                    crate::Item::Array(array) => {
-                        assert_eq!(array.name().s(), "Points");
-                        assert_eq!(array.fields().len(), 2);
-                    }
-                    _ => panic!("Expected 5th item to be an array"),
-                }
-            }
-            Ok(None) => {
-                println!("Parsing returned None at token {i} of {}", tokens.len());
-                println!(
-                    "Tokens around position: {:?}",
-                    &tokens[i.saturating_sub(3)..tokens.len().min(i + 3)]
-                );
-                panic!("Parsing returned None");
-            }
-            Err(e) => {
-                println!("Parse error at token {i} of {}: {:?}", tokens.len(), e);
-                println!(
-                    "Tokens around position: {:?}",
-                    &tokens[i.saturating_sub(3)..tokens.len().min(i + 3)]
-                );
-                panic!("Parse error: {e:?}");
-            }
-        }
-    }
-
-    #[test]
     fn test_parse_struct_1() {
         let mut file_id_generator = FileIdGenerator::new();
         let file_id = file_id_generator.generate_file_id();

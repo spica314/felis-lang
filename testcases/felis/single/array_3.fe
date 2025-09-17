@@ -4,28 +4,34 @@
 #use_builtin "f32_add" #as __f32_add;
 #use_builtin "f32_to_u64" #as __f32_to_u64;
 #use_builtin "f32" #as __f32;
+#use_builtin "Array" #as __Array;
 
-#array Points {
-    #members {
-        x: __f32,
-        y: __f32,
-        z: __f32,
-    },
-    #dimension: 1,
+#struct Points {
+    x: __Array __f32,
+    y: __Array __f32,
+    z: __Arary __f32,
 }
 
 #proc main : () -> () {
-    #let points = Points::#new_with_size 2;
-    points .x 0 <- 5.0f32;
-    points .y 0 <- 7.0f32;
-    points .z 0 <- 9.0f32;
-    points .x 1 <- 10.0f32;
-    points .y 1 <- 14.0f32;
-    points .z 1 <- 18.0f32;
+    #let x = __Array::new_with_size 2;
+    #let y = __Array::new_with_size 2;
+    #let z = __Array::new_with_size 2;
+    #let points = Points {
+        x: x,
+        y: y,
+        z: z,
+    };
 
-    #let a = points .x 1 .*;
-    #let s = __f32_add a (points .y 1 .*);
-    #let t = __f32_add s (points .z 1 .*);
+    points.x .set 0 5.0f32;
+    points.y .set 0 7.0f32;
+    points.z .set 0 9.0f32;
+    points.x .set 1 10.0f32;
+    points.y .set 1 14.0f32;
+    points.z .set 1 18.0f32;
+
+    #let a = points.x .get 1 .*;
+    #let s = __f32_add a (points.y .get 1 .*);
+    #let t = __f32_add s (points.z .get 1 .*);
 
     #let syscall_id = 231u64;
     #let error_code = __f32_to_u64 t;

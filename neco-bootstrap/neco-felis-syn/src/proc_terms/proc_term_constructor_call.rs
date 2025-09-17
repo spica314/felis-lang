@@ -1,13 +1,15 @@
 use crate::{
     Parse, ParseError, Phase, PhaseParse, ProcTerm, ProcTermNumber, ProcTermVariable, TokenColon2,
-    token::{Token, TokenKeyword, TokenVariable},
+    token::{Token, TokenVariable},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ProcTermConstructorCall<P: Phase> {
     pub type_name: TokenVariable,
     pub colon2: TokenColon2,
-    pub method: TokenKeyword, // Changed from TokenVariable to TokenKeyword for #method_name
+    // Accept either a keyword (e.g. #new_with_size) or a plain variable (new_with_size)
+    // Normalize to TokenVariable internally
+    pub method: TokenVariable,
     pub args: Vec<ProcTerm<P>>,
     pub ext: P::ProcTermConstructorCallExt,
 }
@@ -26,17 +28,20 @@ impl Parse for ProcTermConstructorCall<PhaseParse> {
             return Ok(None);
         };
 
-        // Parse method name (now expects #method_name as a keyword)
-        // Check if next token is a keyword (starts with #)
+        // Parse method name: allow either keyword (e.g., #new_with_size) or plain variable (new_with_size)
         if k >= tokens.len() {
-            return Err(ParseError::Unknown("expected #method_name after '::'"));
+            return Err(ParseError::Unknown("expected method name after '::'"));
         }
 
-        let method = if let Token::Keyword(keyword) = &tokens[k] {
+        let method: TokenVariable = if let Some(var) = TokenVariable::parse(tokens, &mut k)? {
+            var
+        } else if let Token::Keyword(keyword) = &tokens[k] {
+            // Convert keyword into a variable token using the same position and string
+            let v = TokenVariable::new(keyword.pos().clone(), keyword.s().to_string());
             k += 1;
-            keyword.clone()
+            v
         } else {
-            return Err(ParseError::Unknown("expected #method_name after '::'"));
+            return Err(ParseError::Unknown("expected method name after '::'"));
         };
 
         // Parse arguments (simple terms only to avoid infinite recursion)

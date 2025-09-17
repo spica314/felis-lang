@@ -17,14 +17,12 @@
 #use_builtin "ctaid_x" #as __ctaid_x;
 #use_builtin "ntid_x" #as __ntid_x;
 #use_builtin "tid_x" #as __tid_x;
+#use_builtin "Array" #as __Array;
 
-#array Pixels {
-    #members {
-        r: __u64,
-        g: __u64,
-        b: __u64,
-    },
-    #dimension: 1,
+#struct Pixels {
+    r: __Array __u64,
+    g: __Array __u64,
+    b: __Array __u64,
 }
 
 #proc print_c : (x: __u64) -> () {
@@ -62,19 +60,27 @@
 }
 
 #proc main2 : () -> () {
-    #let ps = Pixels::#new_with_size 4;
-    ps .r 0 <- 0;
-    ps .g 0 <- 1;
-    ps .b 0 <- 2;
-    ps .r 1 <- 3;
-    ps .g 1 <- 4;
-    ps .b 1 <- 5;
-    ps .r 2 <- 6;
-    ps .g 2 <- 7;
-    ps .b 2 <- 8;
-    ps .r 3 <- 9;
-    ps .g 3 <- 10;
-    ps .b 3 <- 11;
+    #let r = __Array::new_with_size 4;
+    #let g = __Array::new_with_size 4;
+    #let b = __Array::new_with_size 4;
+    #let ps = Pixels {
+        r: r,
+        g: g,
+        b: b,
+    };
+
+    ps.r .set 0 0;
+    ps.g .set 0 1;
+    ps.b .set 0 2;
+    ps.r .set 1 3;
+    ps.g .set 1 4;
+    ps.b .set 1 5;
+    ps.r .set 2 6;
+    ps.g .set 2 7;
+    ps.b .set 2 8;
+    ps.r .set 3 9;
+    ps.g .set 3 10;
+    ps.b .set 3 11;
 
     #let #mut i @ y_ref = 0;
 
@@ -93,15 +99,15 @@
             #break;
         };
 
-        #let r = (ps .r i .*);
+        #let r = (ps.r .get i .*);
         print_num3 r;
         print_c 32;
 
-        #let g = (ps .g i .*);
+        #let g = (ps.g .get i .*);
         print_num3 g;
         print_c 32;
 
-        #let b = (ps .b i .*);
+        #let b = (ps.b .get i .*);
         print_num3 b;
         print_c 10;
 

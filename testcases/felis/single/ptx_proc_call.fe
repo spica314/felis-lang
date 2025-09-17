@@ -17,14 +17,12 @@
 #use_builtin "ctaid_x" #as __ctaid_x;
 #use_builtin "ntid_x" #as __ntid_x;
 #use_builtin "tid_x" #as __tid_x;
+#use_builtin "Array" #as __Array;
 
-#array Pixels {
-    #members {
-        r: __u64,
-        g: __u64,
-        b: __u64,
-    },
-    #dimension: 1,
+#struct Pixels {
+    r: __Array __u64,
+    g: __Array __u64,
+    b: __Array __u64,
 }
 
 #struct Vec3 {
@@ -83,9 +81,9 @@
     #let ig = __f32_to_u64 v.y;
     #let ib = __f32_to_u64 v.z;
 
-    ps .r thread_id <- ir;
-    ps .g thread_id <- ig;
-    ps .b thread_id <- ib;
+    ps.r .set thread_id ir;
+    ps.g .set thread_id ig;
+    ps.b .set thread_id ib;
 }
 
 #proc print_c : (x: __u64) -> () {
@@ -123,7 +121,14 @@
 }
 
 #proc main2 : () -> () {
-    #let ps = Pixels::#new_with_size 65536;
+    #let r = __Array::new_with_size 65536;
+    #let g = __Array::new_with_size 65536;
+    #let b = __Array::new_with_size 65536;
+    #let ps = Pixels {
+        r: r,
+        g: g,
+        b: b,
+    };
 
     #call_ptx f ps 2 1 1 2 1 1;
 
@@ -137,9 +142,9 @@
     print_num3 255;
     print_c 10;
 
-    #let r0 = ps .r 0 .*;
-    #let g0 = ps .g 0 .*;
-    #let b0 = ps .b 0 .*;
+    #let r0 = ps.r .get 0 .*;
+    #let g0 = ps.g .get 0 .*;
+    #let b0 = ps.b .get 0 .*;
     print_num3 r0;
     print_c 32;
     print_num3 g0;
@@ -147,9 +152,9 @@
     print_num3 b0;
     print_c 10;
 
-    #let r1 = ps .r 1 .*;
-    #let g1 = ps .g 1 .*;
-    #let b1 = ps .b 1 .*;
+    #let r1 = ps.r .get 1 .*;
+    #let g1 = ps.g .get 1 .*;
+    #let b1 = ps.b .get 1 .*;
     print_num3 r1;
     print_c 32;
     print_num3 g1;
@@ -157,9 +162,9 @@
     print_num3 b1;
     print_c 10;
 
-    #let r2 = ps .r 2 .*;
-    #let g2 = ps .g 2 .*;
-    #let b2 = ps .b 2 .*;
+    #let r2 = ps.r .get 2 .*;
+    #let g2 = ps.g .get 2 .*;
+    #let b2 = ps.b .get 2 .*;
     print_num3 r2;
     print_c 32;
     print_num3 g2;
@@ -167,9 +172,9 @@
     print_num3 b2;
     print_c 10;
 
-    #let r3 = ps .r 3 .*;
-    #let g3 = ps .g 3 .*;
-    #let b3 = ps .b 3 .*;
+    #let r3 = ps.r .get 3 .*;
+    #let g3 = ps.g .get 3 .*;
+    #let b3 = ps.b .get 3 .*;
     print_num3 r3;
     print_c 32;
     print_num3 g3;

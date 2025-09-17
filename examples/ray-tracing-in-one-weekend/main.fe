@@ -17,6 +17,7 @@
 #use_builtin "ctaid_x" #as __ctaid_x;
 #use_builtin "ntid_x" #as __ntid_x;
 #use_builtin "tid_x" #as __tid_x;
+#use_builtin "Array" #as __Array;
 
 #struct Vec3 {
     x: f32,
@@ -29,13 +30,10 @@
     dir: Vec3,
 }
 
-#array Pixels {
-    #members {
-        r: u64,
-        g: u64,
-        b: u64,
-    },
-    #dimension: 1,
+#struct Pixels {
+    r: __Array __u64,
+    g: __Array __u64,
+    b: __Array __u64,
 }
 
 #ptx #proc vec3_mul : (a: Vec3) -> (b: Vec3) -> Vec3 {
@@ -88,9 +86,9 @@
     #let ig = __f32_to_u64 v.y;
     #let ib = __f32_to_u64 v.z;
 
-    ps .r thread_id <- ir;
-    ps .g thread_id <- ig;
-    ps .b thread_id <- ib;
+    ps.r .set thread_id ir;
+    ps.g .set thread_id ig;
+    ps.b .set thread_id ib;
 }
 
 #proc print_c : (x: __u64) -> () {
@@ -128,7 +126,14 @@
 }
 
 #proc main2 : () -> () {
-    #let ps = Pixels::#new_with_size 65536;
+    #let r = __Array::new_with_size 65536;
+    #let g = __Array::new_with_size 65536;
+    #let b = __Array::new_with_size 65536;
+    #let ps = Pixels {
+        r: r,
+        g: g,
+        b: b,
+    };
 
     #call_ptx f ps 256 1 1 256 1 1;
 
@@ -149,15 +154,15 @@
             #break;
         };
 
-        #let r = (ps .r i .*);
+        #let r = (ps.r .get i .*);
         print_num3 r;
         print_c 32;
 
-        #let g = (ps .g i .*);
+        #let g = (ps.g .get i .*);
         print_num3 g;
         print_c 32;
 
-        #let b = (ps .b i .*);
+        #let b = (ps.b .get i .*);
         print_num3 b;
         print_c 10;
 
