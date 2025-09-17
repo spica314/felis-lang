@@ -15,7 +15,7 @@ pub struct PtxCompiler {
     pub ptx_proc_map: HashMap<String, ItemProc<PhaseParse>>, // available #ptx procs for inlining
     pub inlining: bool,
     pub inlined_return_fields: HashMap<String, String>, // field -> reg for struct return
-    pub inlined_return_reg: Option<String>, // single-register return for non-struct
+    pub inlined_return_reg: Option<String>,             // single-register return for non-struct
 }
 
 impl Default for PtxCompiler {
@@ -1047,7 +1047,7 @@ impl PtxCompiler {
                         let src_key = v.variable.s();
                         if let Some(reg) = self.ptx_registers.get(src_key) {
                             sub.ptx_registers
-                                .insert(format!("{param_name}"), reg.clone());
+                                .insert(param_name.to_string(), reg.clone());
                         }
                     }
                 }
