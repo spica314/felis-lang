@@ -1025,6 +1025,36 @@ fn test_ptx_4() {
 }
 
 #[test]
+fn test_ptx_f32_zero_compile_only() {
+    let assembly =
+        compile_file_to_assembly_with_ptx("../../testcases/felis/single/ptx_f32_zero.fe")
+            .expect("should compile with PTX");
+    // Kernel should be embedded and contain f32 subtraction with 42.0 - 0.0
+    assert!(assembly.contains("ptx_code_kernel:"));
+    assert!(assembly.contains(".visible .entry kernel("));
+    // Check the immediate bits for 42.0f32 and 0.0f32, and the sub.f32 op
+    assert!(assembly.contains("0x42280000"));
+    assert!(assembly.contains("0x00000000"));
+    assert!(assembly.contains("sub.f32"));
+}
+
+#[test]
+#[cfg(feature = "has-ptx-device")]
+fn test_ptx_f32_zero_execute() {
+    let result = compile_and_execute_with_ptx("../../testcases/felis/single/ptx_f32_zero.fe");
+
+    match result {
+        Ok(status) => {
+            // Program should exit with code 42 (42.0 - 0.0)
+            assert_eq!(status.code(), Some(42), "Program should exit with code 42");
+        }
+        Err(e) => {
+            panic!("ptx_f32_zero.fe integration test failed: {e}");
+        }
+    }
+}
+
+#[test]
 #[cfg(feature = "has-ptx-device")]
 fn test_ptx_proc_call_compile_only() {
     let assembly =

@@ -1,0 +1,31 @@
+#entrypoint main2;
+
+#use_builtin "syscall" #as __syscall;
+#use_builtin "f32" #as __f32;
+#use_builtin "f32_sub" #as __f32_sub;
+#use_builtin "f32_to_u64" #as __f32_to_u64;
+#use_builtin "Array" #as __Array;
+
+#struct Pixels {
+    r: __Array __u64,
+    g: __Array __u64,
+    b: __Array __u64,
+}
+
+#ptx #proc kernel : (ps: Pixels) -> () {
+    #let zero = __f32 0.0;
+    #let c42 = __f32 42.0;
+    #let v = __f32_sub c42 zero;
+    #let u = __f32_to_u64 v;
+    ps.r .set 0 u;
+}
+
+#proc main2 : () -> () {
+    #let r = __Array::new_with_size 1;
+    #let g = __Array::new_with_size 1;
+    #let b = __Array::new_with_size 1;
+    #let ps = Pixels { r: r, g: g, b: b };
+    #call_ptx kernel ps 1 1 1 1 1 1;
+    #let v = ps.r .get 0 .*;
+    __syscall 231 v 0 0 0 0;
+}
