@@ -1025,6 +1025,7 @@ fn test_ptx_4() {
 }
 
 #[test]
+#[cfg(feature = "has-ptx-device")]
 fn test_ptx_f32_zero_compile_only() {
     let assembly =
         compile_file_to_assembly_with_ptx("../../testcases/felis/single/ptx_f32_zero.fe")
