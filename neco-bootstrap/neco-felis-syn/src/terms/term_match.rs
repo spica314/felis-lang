@@ -48,17 +48,6 @@ impl Parse for TermMatch<PhaseParse> {
         let mut branches = vec![];
         while let Some(branch) = TermMatchBranch::parse(tokens, &mut k)? {
             branches.push(branch);
-
-            // Check for optional comma
-            if let Some(Token::Comma(_)) = tokens.get(k) {
-                k += 1;
-            }
-        }
-
-        if branches.is_empty() {
-            return Err(ParseError::Unknown(
-                "match expression must have at least one branch",
-            ));
         }
 
         // Parse closing brace

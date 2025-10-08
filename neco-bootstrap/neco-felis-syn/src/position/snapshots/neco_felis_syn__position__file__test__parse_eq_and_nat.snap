@@ -946,6 +946,15 @@ File {
                                         ext: (),
                                     },
                                 ),
+                                comma: TokenComma {
+                                    pos: Pos {
+                                        file_id: FileId(
+                                            0,
+                                        ),
+                                        line: 12,
+                                        column: 15,
+                                    },
+                                },
                                 ext: (),
                             },
                             TermMatchBranch {
@@ -1081,6 +1090,15 @@ File {
                                         ext: (),
                                     },
                                 ),
+                                comma: TokenComma {
+                                    pos: Pos {
+                                        file_id: FileId(
+                                            0,
+                                        ),
+                                        line: 13,
+                                        column: 27,
+                                    },
+                                },
                                 ext: (),
                             },
                         ],

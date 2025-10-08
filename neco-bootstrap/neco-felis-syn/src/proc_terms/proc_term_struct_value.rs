@@ -17,7 +17,7 @@ pub struct ProcTermStructField<P: Phase> {
     pub name: TokenVariable,
     pub colon: TokenColon,
     pub value: Box<ProcTerm<P>>,
-    pub comma: Option<TokenComma>,
+    pub comma: TokenComma,
 }
 
 impl Parse for ProcTermStructValue<PhaseParse> {
@@ -59,7 +59,9 @@ impl Parse for ProcTermStructValue<PhaseParse> {
             };
 
             // Optional comma
-            let comma = TokenComma::parse(tokens, &mut k)?;
+            let Some(comma) = TokenComma::parse(tokens, &mut k)? else {
+                return Err(ParseError::Unknown("expected , after ProcTerm"));
+            };
 
             fields.push(ProcTermStructField {
                 name,
@@ -67,11 +69,6 @@ impl Parse for ProcTermStructValue<PhaseParse> {
                 value: Box::new(value),
                 comma: comma.clone(),
             });
-
-            // If there was no comma, we're done with fields
-            if comma.is_none() {
-                break;
-            }
         }
 
         // Parse closing brace
@@ -104,7 +101,7 @@ mod tests {
         let s = r#"Vec3 {
             x: 18,
             y: 14,
-            z: 10
+            z: 10,
         }"#;
         let tokens = Token::lex(s, file_id);
 
@@ -144,7 +141,7 @@ mod tests {
         let s = r#"Vec3 {
         x: 18,
         y: 14,
-        z: 10
+        z: 10,
     }"#;
         let tokens = Token::lex(s, file_id);
 
@@ -178,10 +175,5 @@ mod tests {
             ProcTerm::Number(num) => assert_eq!(num.number.s(), "10"),
             _ => panic!("Expected number for z field"),
         }
-
-        // Verify commas
-        assert!(struct_value.fields[0].comma.is_some());
-        assert!(struct_value.fields[1].comma.is_some());
-        assert!(struct_value.fields[2].comma.is_none()); // Last field has no comma
     }
 }

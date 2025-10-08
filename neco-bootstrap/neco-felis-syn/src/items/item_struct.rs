@@ -18,7 +18,8 @@ pub struct ItemStructField<P: Phase> {
     pub name: TokenVariable,
     pub colon: TokenColon,
     pub ty: Box<Term<P>>,
-    pub comma: Option<TokenComma>,
+    pub comma: TokenComma,
+    pub ext: P::ItemStructFieldExt,
 }
 
 impl<P: Phase> ItemStruct<P> {
@@ -92,13 +93,16 @@ impl Parse for ItemStructField<PhaseParse> {
             return Err(ParseError::Unknown("item_struct_field_2"));
         };
 
-        let comma = TokenComma::parse(tokens, &mut k)?;
+        let Some(comma) = TokenComma::parse(tokens, &mut k)? else {
+            return Err(ParseError::Unknown("expected , after Term"));
+        };
 
         let field = ItemStructField {
             name,
             colon,
             ty: Box::new(ty),
             comma,
+            ext: (),
         };
 
         *i = k;
@@ -175,7 +179,7 @@ mod tests {
         let mut file_id_generator = FileIdGenerator::new();
         let file_id = file_id_generator.generate_file_id();
         let s = r#"#struct Counter {
-    value: u64
+    value: u64,
 }"#;
         let tokens = Token::lex(s, file_id);
 

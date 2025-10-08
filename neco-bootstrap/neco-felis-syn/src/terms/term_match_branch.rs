@@ -1,5 +1,5 @@
 use crate::{
-    Parse, ParseError, Phase, PhaseParse, Term,
+    Parse, ParseError, Phase, PhaseParse, Term, TokenComma,
     token::{Token, TokenOperator, TokenVariable},
 };
 
@@ -49,6 +49,7 @@ pub struct TermMatchBranch<P: Phase> {
     pub pattern: Pattern,
     pub arrow: TokenOperator,
     pub body: Box<Term<P>>,
+    pub comma: TokenComma,
     pub ext: P::TermMatchBranchExt,
 }
 
@@ -83,10 +84,15 @@ impl Parse for TermMatchBranch<PhaseParse> {
             return Err(ParseError::Unknown("expected term after =>"));
         };
 
+        let Some(comma) = TokenComma::parse(tokens, &mut k)? else {
+            return Err(ParseError::Unknown("expected , after term"));
+        };
+
         let branch = TermMatchBranch {
             pattern,
             arrow,
             body: Box::new(body),
+            comma,
             ext: (),
         };
 

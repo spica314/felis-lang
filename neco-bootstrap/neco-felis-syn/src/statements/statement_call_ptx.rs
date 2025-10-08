@@ -1,5 +1,5 @@
 use crate::{
-    Parse, ParseError, Phase, PhaseParse, ProcTerm, ProcTermVariable,
+    Parse, ParseError, Phase, PhaseParse,
     token::{Token, TokenKeyword, TokenNumber, TokenVariable},
 };
 
@@ -7,7 +7,7 @@ use crate::{
 pub struct StatementCallPtx<P: Phase> {
     pub keyword_call_ptx: TokenKeyword,
     pub function_name: TokenVariable,
-    pub args: Vec<ProcTerm<P>>,
+    pub arg: TokenVariable,
     pub grid_dim_x: TokenNumber,
     pub grid_dim_y: TokenNumber,
     pub grid_dim_z: TokenNumber,
@@ -30,12 +30,9 @@ impl Parse for StatementCallPtx<PhaseParse> {
             return Ok(None);
         };
 
-        // Parse arguments (only one array argument expected)
-        let mut args = Vec::new();
-        if let Some(variable) = TokenVariable::parse(tokens, &mut k)? {
-            let proc_term_variable = ProcTermVariable { variable, ext: () };
-            args.push(ProcTerm::Variable(proc_term_variable));
-        }
+        let Some(arg) = TokenVariable::parse(tokens, &mut k)? else {
+            return Ok(None);
+        };
 
         // Parse the 6 dimension parameters
         let Some(grid_dim_x) = TokenNumber::parse(tokens, &mut k)? else {
@@ -60,7 +57,7 @@ impl Parse for StatementCallPtx<PhaseParse> {
         let statement = StatementCallPtx {
             keyword_call_ptx,
             function_name,
-            args,
+            arg,
             grid_dim_x,
             grid_dim_y,
             grid_dim_z,

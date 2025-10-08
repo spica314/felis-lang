@@ -397,17 +397,16 @@ File {
                                 ext: (),
                             },
                         ),
-                        comma: Some(
-                            TokenComma {
-                                pos: Pos {
-                                    file_id: FileId(
-                                        0,
-                                    ),
-                                    line: 10,
-                                    column: 21,
-                                },
+                        comma: TokenComma {
+                            pos: Pos {
+                                file_id: FileId(
+                                    0,
+                                ),
+                                line: 10,
+                                column: 21,
                             },
-                        ),
+                        },
+                        ext: (),
                     },
                     ItemStructField {
                         name: TokenVariable {
@@ -466,17 +465,16 @@ File {
                                 ext: (),
                             },
                         ),
-                        comma: Some(
-                            TokenComma {
-                                pos: Pos {
-                                    file_id: FileId(
-                                        0,
-                                    ),
-                                    line: 11,
-                                    column: 21,
-                                },
+                        comma: TokenComma {
+                            pos: Pos {
+                                file_id: FileId(
+                                    0,
+                                ),
+                                line: 11,
+                                column: 21,
                             },
-                        ),
+                        },
+                        ext: (),
                     },
                     ItemStructField {
                         name: TokenVariable {
@@ -535,17 +533,16 @@ File {
                                 ext: (),
                             },
                         ),
-                        comma: Some(
-                            TokenComma {
-                                pos: Pos {
-                                    file_id: FileId(
-                                        0,
-                                    ),
-                                    line: 12,
-                                    column: 21,
-                                },
+                        comma: TokenComma {
+                            pos: Pos {
+                                file_id: FileId(
+                                    0,
+                                ),
+                                line: 12,
+                                column: 21,
                             },
-                        ),
+                        },
+                        ext: (),
                     },
                 ],
                 brace_r: TokenBraceR {
@@ -1050,17 +1047,15 @@ File {
                                                                                     ext: (),
                                                                                 },
                                                                             ),
-                                                                            comma: Some(
-                                                                                TokenComma {
-                                                                                    pos: Pos {
-                                                                                        file_id: FileId(
-                                                                                            0,
-                                                                                        ),
-                                                                                        line: 20,
-                                                                                        column: 13,
-                                                                                    },
+                                                                            comma: TokenComma {
+                                                                                pos: Pos {
+                                                                                    file_id: FileId(
+                                                                                        0,
+                                                                                    ),
+                                                                                    line: 20,
+                                                                                    column: 13,
                                                                                 },
-                                                                            ),
+                                                                            },
                                                                         },
                                                                         ProcTermStructField {
                                                                             name: TokenVariable {
@@ -1097,17 +1092,15 @@ File {
                                                                                     ext: (),
                                                                                 },
                                                                             ),
-                                                                            comma: Some(
-                                                                                TokenComma {
-                                                                                    pos: Pos {
-                                                                                        file_id: FileId(
-                                                                                            0,
-                                                                                        ),
-                                                                                        line: 21,
-                                                                                        column: 13,
-                                                                                    },
+                                                                            comma: TokenComma {
+                                                                                pos: Pos {
+                                                                                    file_id: FileId(
+                                                                                        0,
+                                                                                    ),
+                                                                                    line: 21,
+                                                                                    column: 13,
                                                                                 },
-                                                                            ),
+                                                                            },
                                                                         },
                                                                         ProcTermStructField {
                                                                             name: TokenVariable {
@@ -1144,17 +1137,15 @@ File {
                                                                                     ext: (),
                                                                                 },
                                                                             ),
-                                                                            comma: Some(
-                                                                                TokenComma {
-                                                                                    pos: Pos {
-                                                                                        file_id: FileId(
-                                                                                            0,
-                                                                                        ),
-                                                                                        line: 22,
-                                                                                        column: 13,
-                                                                                    },
+                                                                            comma: TokenComma {
+                                                                                pos: Pos {
+                                                                                    file_id: FileId(
+                                                                                        0,
+                                                                                    ),
+                                                                                    line: 22,
+                                                                                    column: 13,
                                                                                 },
-                                                                            ),
+                                                                            },
                                                                         },
                                                                     ],
                                                                     brace_r: TokenBraceR {

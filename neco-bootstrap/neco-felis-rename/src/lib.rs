@@ -263,6 +263,7 @@ fn rename_match_branch(
         pattern: branch.pattern.clone(),
         arrow: branch.arrow.clone(),
         body: Box::new(rename_term(context, branch.body())),
+        comma: branch.comma.clone(),
         ext: (),
     };
 
@@ -363,7 +364,7 @@ mod tests {
         let file_id = file_id_generator.generate_file_id();
 
         // Simple match expression
-        let source = "#definition test : nat { #match x { y => y } }";
+        let source = "#definition test : nat { #match x { y => y, } }";
         let tokens = Token::lex(source, file_id);
 
         let mut i = 0;

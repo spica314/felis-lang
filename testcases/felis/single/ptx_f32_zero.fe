@@ -24,7 +24,7 @@
     #let r = __Array::new_with_size 1;
     #let g = __Array::new_with_size 1;
     #let b = __Array::new_with_size 1;
-    #let ps = Pixels { r: r, g: g, b: b };
+    #let ps = Pixels { r: r, g: g, b: b, };
     #call_ptx kernel ps 1 1 1 1 1 1;
     #let v = ps.r .get 0 .*;
     __syscall 231 v 0 0 0 0;

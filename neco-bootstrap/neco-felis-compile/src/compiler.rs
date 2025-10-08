@@ -666,16 +666,9 @@ cuda_context_ok:
         }
 
         // Handle arguments
-        let (has_array, array_var_name, array_info) = if !call_ptx.args.is_empty() {
+        let (has_array, array_var_name, array_info) = {
             // Extract array name from the argument
-            let array_var_name = match &call_ptx.args[0] {
-                ProcTerm::Variable(var) => var.variable.s(),
-                _ => {
-                    return Err(CompileError::UnsupportedConstruct(
-                        "call_ptx expects array variable as argument".to_string(),
-                    ));
-                }
-            };
+            let array_var_name = call_ptx.arg.s();
 
             // Get array info
             if let Some(array_type_name) = self.variable_arrays.get(array_var_name) {
@@ -711,19 +704,6 @@ cuda_context_ok:
                     },
                 )
             }
-        } else {
-            // No arguments - create dummy info
-            (
-                false,
-                "",
-                ArrayInfo {
-                    element_type: String::new(),
-                    field_names: vec![],
-                    field_types: vec![],
-                    dimension: 1,
-                    size: None,
-                },
-            )
         };
 
         // Generate CUDA API calls

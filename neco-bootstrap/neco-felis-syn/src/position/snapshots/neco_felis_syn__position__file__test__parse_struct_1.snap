@@ -267,17 +267,16 @@ File {
                                 ext: (),
                             },
                         ),
-                        comma: Some(
-                            TokenComma {
-                                pos: Pos {
-                                    file_id: FileId(
-                                        0,
-                                    ),
-                                    line: 8,
-                                    column: 13,
-                                },
+                        comma: TokenComma {
+                            pos: Pos {
+                                file_id: FileId(
+                                    0,
+                                ),
+                                line: 8,
+                                column: 13,
                             },
-                        ),
+                        },
+                        ext: (),
                     },
                     ItemStructField {
                         name: TokenVariable {
@@ -314,17 +313,16 @@ File {
                                 ext: (),
                             },
                         ),
-                        comma: Some(
-                            TokenComma {
-                                pos: Pos {
-                                    file_id: FileId(
-                                        0,
-                                    ),
-                                    line: 9,
-                                    column: 13,
-                                },
+                        comma: TokenComma {
+                            pos: Pos {
+                                file_id: FileId(
+                                    0,
+                                ),
+                                line: 9,
+                                column: 13,
                             },
-                        ),
+                        },
+                        ext: (),
                     },
                     ItemStructField {
                         name: TokenVariable {
@@ -361,17 +359,16 @@ File {
                                 ext: (),
                             },
                         ),
-                        comma: Some(
-                            TokenComma {
-                                pos: Pos {
-                                    file_id: FileId(
-                                        0,
-                                    ),
-                                    line: 10,
-                                    column: 13,
-                                },
+                        comma: TokenComma {
+                            pos: Pos {
+                                file_id: FileId(
+                                    0,
+                                ),
+                                line: 10,
+                                column: 13,
                             },
-                        ),
+                        },
+                        ext: (),
                     },
                 ],
                 brace_r: TokenBraceR {
