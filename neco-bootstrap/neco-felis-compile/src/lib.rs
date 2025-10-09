@@ -1,7 +1,6 @@
 use neco_felis_syn::*;
 
 // Module declarations
-pub mod arithmetic;
 pub mod arrays;
 pub mod compile_options;
 pub mod compiler;
