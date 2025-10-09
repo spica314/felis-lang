@@ -1,6 +1,179 @@
 use crate::error::CompileError;
 use neco_felis_syn::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+#[derive(Debug, Clone)]
+struct ParamLoad {
+    key: String,
+    param_symbol: String,
+}
+
+fn sanitize_ptx_identifier(raw: &str) -> String {
+    let mut s = String::with_capacity(raw.len());
+    for ch in raw.chars() {
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            s.push(ch);
+        } else {
+            s.push('_');
+        }
+    }
+    if s.is_empty()
+        || !(s
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_alphabetic() || c == '_')
+            .unwrap_or(false))
+    {
+        s.insert(0, '_');
+    }
+    s
+}
+
+fn compose_param_symbol(object: &str, field: Option<&str>) -> String {
+    match field {
+        Some(field_name) => {
+            format!(
+                "{}_{}",
+                sanitize_ptx_identifier(object),
+                sanitize_ptx_identifier(field_name)
+            )
+        }
+        None => sanitize_ptx_identifier(object),
+    }
+}
+
+fn add_param_field_usage(usage: &mut HashMap<String, Vec<String>>, object: &str, field: &str) {
+    let entry = usage.entry(object.to_string()).or_default();
+    if !entry.iter().any(|existing| existing == field) {
+        entry.push(field.to_string());
+    }
+}
+
+fn collect_param_fields_from_proc_term(
+    proc_term: &ProcTerm<PhaseParse>,
+    param_set: &HashSet<&str>,
+    usage: &mut HashMap<String, Vec<String>>,
+) {
+    match proc_term {
+        ProcTerm::FieldAccess(field_access) => {
+            let object = field_access.object_name();
+            if param_set.contains(object) {
+                add_param_field_usage(usage, object, field_access.field_name());
+            }
+        }
+        ProcTerm::MethodChain(method_chain) => {
+            let object = method_chain.object_name();
+            if param_set.contains(object) {
+                add_param_field_usage(usage, object, method_chain.field_name());
+            }
+            if let Some(index) = &method_chain.index {
+                collect_param_fields_from_proc_term(index, param_set, usage);
+            }
+        }
+        ProcTerm::Apply(apply) => {
+            collect_param_fields_from_proc_term(&apply.f, param_set, usage);
+            for arg in &apply.args {
+                collect_param_fields_from_proc_term(arg, param_set, usage);
+            }
+        }
+        ProcTerm::StructValue(struct_value) => {
+            for field in &struct_value.fields {
+                collect_param_fields_from_proc_term(&field.value, param_set, usage);
+            }
+        }
+        ProcTerm::Paren(paren) => {
+            collect_param_fields_from_proc_term(&paren.proc_term, param_set, usage);
+        }
+        ProcTerm::If(proc_if) => {
+            collect_param_fields_from_statements(&proc_if.condition, param_set, usage);
+            collect_param_fields_from_statements(&proc_if.then_body, param_set, usage);
+            if let Some(else_clause) = &proc_if.else_clause {
+                collect_param_fields_from_statements(&else_clause.else_body, param_set, usage);
+            }
+        }
+        ProcTerm::ConstructorCall(constructor_call) => {
+            for arg in &constructor_call.args {
+                collect_param_fields_from_proc_term(arg, param_set, usage);
+            }
+        }
+        ProcTerm::Dereference(deref) => {
+            collect_param_fields_from_proc_term(&deref.term, param_set, usage);
+        }
+        ProcTerm::Ext(_)
+        | ProcTerm::Variable(_)
+        | ProcTerm::Unit(_)
+        | ProcTerm::Number(_)
+        | ProcTerm::Struct(_) => {}
+    }
+}
+
+fn collect_param_fields_from_statement(
+    statement: &Statement<PhaseParse>,
+    param_set: &HashSet<&str>,
+    usage: &mut HashMap<String, Vec<String>>,
+) {
+    match statement {
+        Statement::FieldAssign(assign) => {
+            let object = assign.method_chain.object_name();
+            if param_set.contains(object) {
+                add_param_field_usage(usage, object, assign.method_chain.field_name());
+            }
+            if let Some(index) = &assign.method_chain.index {
+                collect_param_fields_from_proc_term(index, param_set, usage);
+            }
+            collect_param_fields_from_proc_term(&assign.value, param_set, usage);
+        }
+        Statement::Let(let_stmt) => {
+            collect_param_fields_from_proc_term(&let_stmt.value, param_set, usage);
+        }
+        Statement::LetMut(let_mut_stmt) => {
+            collect_param_fields_from_proc_term(&let_mut_stmt.value, param_set, usage);
+        }
+        Statement::Assign(assign_stmt) => {
+            collect_param_fields_from_proc_term(&assign_stmt.value, param_set, usage);
+        }
+        Statement::Loop(loop_stmt) => {
+            collect_param_fields_from_statements(&loop_stmt.body, param_set, usage);
+        }
+        Statement::Return(return_stmt) => {
+            collect_param_fields_from_proc_term(&return_stmt.value, param_set, usage);
+        }
+        Statement::Expr(proc_term) => {
+            collect_param_fields_from_proc_term(proc_term, param_set, usage);
+        }
+        Statement::CallPtx(_) | Statement::Break(_) | Statement::Ext(_) => {}
+    }
+}
+
+fn collect_param_fields_from_statements(
+    statements: &Statements<PhaseParse>,
+    param_set: &HashSet<&str>,
+    usage: &mut HashMap<String, Vec<String>>,
+) {
+    match statements {
+        Statements::Then(then) => {
+            collect_param_fields_from_statement(&then.head, param_set, usage);
+            collect_param_fields_from_statements(&then.tail, param_set, usage);
+        }
+        Statements::Statement(statement) => {
+            collect_param_fields_from_statement(statement, param_set, usage);
+        }
+        Statements::Nil => {}
+    }
+}
+
+fn collect_param_field_usage(
+    statements: &Statements<PhaseParse>,
+    param_names: &[String],
+) -> HashMap<String, Vec<String>> {
+    if param_names.is_empty() {
+        return HashMap::new();
+    }
+    let param_set: HashSet<&str> = param_names.iter().map(|s| s.as_str()).collect();
+    let mut usage: HashMap<String, Vec<String>> = HashMap::new();
+    collect_param_fields_from_statements(statements, &param_set, &mut usage);
+    usage
+}
 
 #[derive(Debug)]
 pub struct PtxCompiler {
@@ -60,26 +233,60 @@ impl PtxCompiler {
         // Extract parameter names and types
         let param_names = self.extract_proc_parameters(&proc.ty);
 
-        // Handle parameters
-        if param_names.is_empty() {
-            // No parameters
+        let param_loads = if param_names.is_empty() {
+            Vec::new()
         } else if param_names.len() == 1 {
-            // For now, assume single array parameter with struct elements
-            // Generate parameter declarations for SoA fields
-            self.ptx_output.push_str("    .param .u64 ps_r,\n");
-            self.ptx_output.push_str("    .param .u64 ps_g,\n");
-            self.ptx_output.push_str("    .param .u64 ps_b\n");
+            let mut loads = Vec::new();
+            let field_usage = collect_param_field_usage(&proc.proc_block.statements, &param_names);
+            let param = &param_names[0];
+            if let Some(fields) = field_usage.get(param) {
+                if fields.is_empty() {
+                    let symbol = compose_param_symbol(param, None);
+                    loads.push(ParamLoad {
+                        key: param.clone(),
+                        param_symbol: symbol,
+                    });
+                } else {
+                    for field in fields {
+                        let symbol = compose_param_symbol(param, Some(field));
+                        loads.push(ParamLoad {
+                            key: format!("{param}.{field}"),
+                            param_symbol: symbol,
+                        });
+                    }
+                }
+            } else {
+                let symbol = compose_param_symbol(param, None);
+                loads.push(ParamLoad {
+                    key: param.clone(),
+                    param_symbol: symbol,
+                });
+            }
+            loads
         } else {
             return Err(CompileError::UnsupportedConstruct(
                 "PTX kernels with multiple parameters not yet supported".to_string(),
             ));
+        };
+
+        if !param_loads.is_empty() {
+            for (idx, load) in param_loads.iter().enumerate() {
+                let suffix = if idx + 1 == param_loads.len() {
+                    ""
+                } else {
+                    ","
+                };
+                self.ptx_output.push_str(&format!(
+                    "    .param .u64 {}{}\n",
+                    load.param_symbol, suffix
+                ));
+            }
         }
 
         self.ptx_output.push_str(")\n{\n");
 
         // Generate PTX body
-        let has_params = !param_names.is_empty();
-        self.compile_ptx_proc_block(&proc.proc_block, has_params)?;
+        self.compile_ptx_proc_block(&proc.proc_block, &param_loads)?;
 
         self.ptx_output.push_str("    ret;\n");
         self.ptx_output.push_str("}\n\n");
@@ -122,10 +329,10 @@ impl PtxCompiler {
         }
     }
 
-    pub fn compile_ptx_proc_block(
+    fn compile_ptx_proc_block(
         &mut self,
         block: &ItemProcBlock<PhaseParse>,
-        has_params: bool,
+        param_loads: &[ParamLoad],
     ) -> Result<(), CompileError> {
         // Initialize PTX registers for parameters with higher limit
         self.ptx_output.push_str("    .reg .b64 %rd<100>;\n");
@@ -134,16 +341,17 @@ impl PtxCompiler {
         self.ptx_output.push('\n');
 
         // Load parameters only if there are any
-        if has_params {
-            self.ptx_output.push_str("    ld.param.u64 %rd1, [ps_r];\n");
-            self.ptx_output.push_str("    ld.param.u64 %rd2, [ps_g];\n");
-            self.ptx_output.push_str("    ld.param.u64 %rd3, [ps_b];\n");
-            self.ptx_output
-                .push_str("    cvta.to.global.u64 %rd1, %rd1;\n");
-            self.ptx_output
-                .push_str("    cvta.to.global.u64 %rd2, %rd2;\n");
-            self.ptx_output
-                .push_str("    cvta.to.global.u64 %rd3, %rd3;\n");
+        if !param_loads.is_empty() {
+            for load in param_loads {
+                let reg = self.allocate_ptx_u64_register();
+                self.ptx_output.push_str(&format!(
+                    "    ld.param.u64 {reg}, [{}];\n",
+                    load.param_symbol
+                ));
+                self.ptx_output
+                    .push_str(&format!("    cvta.to.global.u64 {reg}, {reg};\n"));
+                self.ptx_registers.insert(load.key.clone(), reg);
+            }
             self.ptx_output.push('\n');
         }
 
@@ -216,7 +424,7 @@ impl PtxCompiler {
             Statement::FieldAssign(field_assign) => {
                 // Generate PTX code for field assignment
                 // Format: array.field index <- value
-                let _array_var = field_assign.method_chain.object_name();
+                let object_name = field_assign.method_chain.object_name();
                 let field_name = field_assign.method_chain.field_name();
 
                 // Get index register if there's an index
@@ -231,16 +439,10 @@ impl PtxCompiler {
                 let value_reg = self.compile_ptx_proc_term(&field_assign.value)?;
 
                 // Map field names to device pointers
-                let field_ptr = match field_name {
-                    "r" => "%rd1",
-                    "g" => "%rd2",
-                    "b" => "%rd3",
-                    _ => {
-                        return Err(CompileError::UnsupportedConstruct(format!(
-                            "Unknown field: {field_name}"
-                        )));
-                    }
-                };
+                let key = format!("{object_name}.{field_name}");
+                let field_ptr = self.ptx_registers.get(&key).cloned().ok_or_else(|| {
+                    CompileError::UnsupportedConstruct(format!("Unknown PTX field pointer: {key}"))
+                })?;
 
                 // Calculate address and store
                 // mul.lo.u64 %rd_temp, %index_reg, 8;  // index * sizeof(u64)
@@ -703,21 +905,28 @@ impl PtxCompiler {
                     }
                 }
                 ProcTerm::Variable(v) => {
+                    let var_name = v.variable.s();
+                    let prefix = format!("{var_name}.");
                     let mut inserted = false;
-                    for f in ["x", "y", "z"] {
-                        let src_key = format!("{}.{}", v.variable.s(), f);
-                        if let Some(reg) = self.ptx_registers.get(&src_key) {
+                    for (key, reg) in self.ptx_registers.iter() {
+                        if let Some(field_name) = key.strip_prefix(&prefix) {
+                            if field_name.is_empty() || field_name.contains('.') {
+                                continue;
+                            }
                             sub.ptx_registers
-                                .insert(format!("{param_name}.{f}"), reg.clone());
+                                .insert(format!("{param_name}.{field_name}"), reg.clone());
                             inserted = true;
                         }
                     }
+                    if !inserted && let Some(reg) = self.ptx_registers.get(var_name) {
+                        sub.ptx_registers
+                            .insert(param_name.to_string(), reg.clone());
+                        inserted = true;
+                    }
                     if !inserted {
-                        let src_key = v.variable.s();
-                        if let Some(reg) = self.ptx_registers.get(src_key) {
-                            sub.ptx_registers
-                                .insert(param_name.to_string(), reg.clone());
-                        }
+                        return Err(CompileError::UnsupportedConstruct(
+                            "PTX inline supports only struct args or struct vars".to_string(),
+                        ));
                     }
                 }
                 _ => {

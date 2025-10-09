@@ -3,7 +3,7 @@ use crate::{
     statement::StatementCompiler,
 };
 use neco_felis_syn::*;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 #[derive(Debug, Clone)]
 pub struct ArrayInfo {
@@ -37,6 +37,7 @@ pub struct AssemblyCompiler {
     // PTX helpers for inlining and selective emission
     pub ptx_all_procs: HashMap<String, ItemProc<PhaseParse>>, // all #ptx procs by name
     pub ptx_kernels_to_emit: std::collections::HashSet<String>, // names used by #call_ptx
+    pub struct_fields: HashMap<String, Vec<String>>, // Tracks struct literal field order by variable
 }
 
 impl AssemblyCompiler {
@@ -60,6 +61,7 @@ impl AssemblyCompiler {
             ptx_next_f32_reg: 1,
             ptx_all_procs: HashMap::new(),
             ptx_kernels_to_emit: std::collections::HashSet::new(),
+            struct_fields: HashMap::new(),
         }
     }
 
@@ -373,6 +375,7 @@ cuda_context_ok:
 
         self.output.push_str("    ret\n\n");
         self.variables.clear();
+        self.struct_fields.clear();
 
         Ok(())
     }
@@ -424,6 +427,8 @@ cuda_context_ok:
     ) -> Result<(), CompileError> {
         match statements {
             Statements::Then(then) => {
+                self.scan_statement_for_structs(&then.head);
+
                 // Handle CallPtx statements directly in AssemblyCompiler
                 if let Statement::CallPtx(call_ptx) = then.head.as_ref() {
                     self.compile_call_ptx(call_ptx)?;
@@ -445,6 +450,8 @@ cuda_context_ok:
                 }
             }
             Statements::Statement(statement) => {
+                self.scan_statement_for_structs(statement);
+
                 // Handle CallPtx statements directly in AssemblyCompiler
                 if let Statement::CallPtx(call_ptx) = statement.as_ref() {
                     self.compile_call_ptx(call_ptx)
@@ -463,6 +470,129 @@ cuda_context_ok:
             }
             Statements::Nil => Ok(()),
         }
+    }
+
+    fn record_struct_literal_fields(
+        &mut self,
+        var_name: &str,
+        struct_value: &ProcTermStructValue<PhaseParse>,
+    ) {
+        let field_names = struct_value
+            .fields
+            .iter()
+            .map(|field| field.name.s().to_string())
+            .collect::<Vec<_>>();
+        self.struct_fields.insert(var_name.to_string(), field_names);
+    }
+
+    fn scan_statement_for_structs(&mut self, statement: &Statement<PhaseParse>) {
+        match statement {
+            Statement::Let(let_stmt) => {
+                if let ProcTerm::StructValue(struct_value) = &*let_stmt.value {
+                    self.record_struct_literal_fields(let_stmt.variable_name(), struct_value);
+                }
+            }
+            Statement::Loop(loop_stmt) => {
+                self.scan_statements_for_structs(&loop_stmt.body);
+            }
+            Statement::Expr(proc_term) => self.scan_proc_term_for_structs(proc_term),
+            Statement::Return(return_stmt) => self.scan_proc_term_for_structs(&return_stmt.value),
+            Statement::Assign(assign_stmt) => self.scan_proc_term_for_structs(&assign_stmt.value),
+            Statement::FieldAssign(field_assign) => {
+                self.scan_proc_term_for_structs(&field_assign.value);
+                if let Some(index) = &field_assign.method_chain.index {
+                    self.scan_proc_term_for_structs(index);
+                }
+            }
+            Statement::CallPtx(_)
+            | Statement::LetMut(_)
+            | Statement::Break(_)
+            | Statement::Ext(_) => {}
+        }
+    }
+
+    fn scan_statements_for_structs(&mut self, statements: &Statements<PhaseParse>) {
+        match statements {
+            Statements::Then(then) => {
+                self.scan_statement_for_structs(&then.head);
+                self.scan_statements_for_structs(&then.tail);
+            }
+            Statements::Statement(statement) => self.scan_statement_for_structs(statement),
+            Statements::Nil => {}
+        }
+    }
+
+    fn scan_proc_term_for_structs(&mut self, proc_term: &ProcTerm<PhaseParse>) {
+        match proc_term {
+            ProcTerm::If(if_expr) => {
+                self.scan_statements_for_structs(&if_expr.condition);
+                self.scan_statements_for_structs(&if_expr.then_body);
+                if let Some(else_clause) = &if_expr.else_clause {
+                    self.scan_statements_for_structs(&else_clause.else_body);
+                }
+            }
+            ProcTerm::Apply(apply) => {
+                self.scan_proc_term_for_structs(&apply.f);
+                for arg in &apply.args {
+                    self.scan_proc_term_for_structs(arg);
+                }
+            }
+            ProcTerm::ConstructorCall(constructor_call) => {
+                for arg in &constructor_call.args {
+                    self.scan_proc_term_for_structs(arg);
+                }
+            }
+            ProcTerm::MethodChain(method_chain) => {
+                if let Some(index) = &method_chain.index {
+                    self.scan_proc_term_for_structs(index);
+                }
+            }
+            ProcTerm::Paren(paren) => self.scan_proc_term_for_structs(&paren.proc_term),
+            ProcTerm::Dereference(deref) => self.scan_proc_term_for_structs(&deref.term),
+            ProcTerm::StructValue(_)
+            | ProcTerm::Struct(_)
+            | ProcTerm::Variable(_)
+            | ProcTerm::Unit(_)
+            | ProcTerm::Number(_)
+            | ProcTerm::FieldAccess(_)
+            | ProcTerm::Ext(_) => {}
+        }
+    }
+
+    fn struct_field_has_array_metadata(&self, base: &str, field: &str) -> bool {
+        let size_key = format!("{base}_{field}_size");
+        let ptr_key = format!("{base}_{field}_ptr");
+        self.variables.contains_key(&size_key) || self.variables.contains_key(&ptr_key)
+    }
+
+    fn collect_struct_array_fields(&self, base: &str) -> Vec<String> {
+        if let Some(ordered) = self.struct_fields.get(base) {
+            let filtered = ordered
+                .iter()
+                .filter(|field| self.struct_field_has_array_metadata(base, field))
+                .cloned()
+                .collect::<Vec<_>>();
+            if !filtered.is_empty() {
+                return filtered;
+            }
+        }
+
+        let prefix = format!("{base}_");
+        let mut candidates = BTreeSet::new();
+        for key in self.variables.keys() {
+            if let Some(rest) = key.strip_prefix(&prefix) {
+                if rest.is_empty() {
+                    continue;
+                }
+                if rest.ends_with("_size") || rest.ends_with("_ptr") {
+                    continue;
+                }
+                if self.struct_field_has_array_metadata(base, rest) {
+                    candidates.insert(rest.to_string());
+                }
+            }
+        }
+        candidates.into_iter().collect()
     }
 
     pub fn compile_proc_term(
@@ -680,13 +810,7 @@ cuda_context_ok:
                 (true, array_var_name, array_info.clone())
             } else {
                 // Fallback: treat argument as a struct holding builtin Arrays in fields
-                let mut field_names = vec![];
-                for fname in ["r", "g", "b", "x", "y", "z"].iter() {
-                    let k = format!("{array_var_name}_{fname}");
-                    if self.variables.contains_key(&k) {
-                        field_names.push((*fname).to_string());
-                    }
-                }
+                let field_names = self.collect_struct_array_fields(array_var_name);
                 if field_names.is_empty() {
                     return Err(CompileError::UnsupportedConstruct(format!(
                         "Unknown array variable: {array_var_name}"
@@ -750,9 +874,16 @@ cuda_context_ok:
         self.output.push_str("    syscall\n");
         self.output.push_str("function_get_ok:\n");
 
+        let field_count = array_info.field_names.len();
+
         if has_array {
+            if field_count > 10 {
+                return Err(CompileError::UnsupportedConstruct(
+                    "PTX kernel argument struct exceeds supported field count (10)".to_string(),
+                ));
+            }
+
             // Allocate device memory for each field
-            let field_count = array_info.field_names.len();
             for (i, field_name) in array_info.field_names.iter().enumerate() {
                 self.output.push_str(&format!(
                     "    # Allocate device memory for field {field_name}\n"
@@ -891,8 +1022,10 @@ cuda_context_ok:
         self.output.push_str("    push 0\n");
 
         // Kernel params (reverse stack order)
-        if has_array && !array_info.field_names.is_empty() {
-            self.output.push_str("    lea rax, [rbp - 8 -  216]\n");
+        if has_array && field_count > 0 {
+            let params_base_offset = 200 + (field_count.saturating_sub(1) * 8);
+            self.output
+                .push_str(&format!("    lea rax, [rbp - 8 - {params_base_offset}]\n"));
             self.output.push_str("    push rax\n");
         } else {
             self.output.push_str("    push 0\n"); // NULL params
