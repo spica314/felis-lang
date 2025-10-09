@@ -51,6 +51,10 @@ impl TokenVariable {
         &self.s
     }
 
+    pub fn pos(&self) -> &Pos {
+        &self.pos
+    }
+
     pub fn new(pos: Pos, s: String) -> Self {
         Self { pos, s }
     }

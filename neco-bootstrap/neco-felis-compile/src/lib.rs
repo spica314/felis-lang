@@ -8,6 +8,7 @@ pub mod control_flow;
 pub mod error;
 pub mod ptx;
 pub mod statement;
+mod symbol_rewriter;
 pub mod syscall;
 
 // Re-exports
@@ -21,8 +22,14 @@ pub fn compile_to_assembly(
     file: &File<PhaseParse>,
     compile_options: CompileOptions,
 ) -> Result<String, CompileError> {
+    let renamed_file = neco_felis_rename::rename_file(file)
+        .map_err(|err| CompileError::NameResolution(err.to_string()))?;
+
+    let mut lowered = file.clone();
+    symbol_rewriter::apply_symbol_ids(&mut lowered, &renamed_file)?;
+
     let mut compiler = AssemblyCompiler::new(compile_options);
-    compiler.compile_file(file)
+    compiler.compile_file(&lowered)
 }
 
 pub fn compile_file_to_assembly(file_path: &str) -> Result<String, Box<dyn std::error::Error>> {

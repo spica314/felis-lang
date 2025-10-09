@@ -3,6 +3,7 @@ pub enum CompileError {
     UnsupportedConstruct(String),
     EntrypointNotFound,
     InvalidSyscall,
+    NameResolution(String),
 }
 
 impl std::fmt::Display for CompileError {
@@ -11,6 +12,7 @@ impl std::fmt::Display for CompileError {
             CompileError::UnsupportedConstruct(msg) => write!(f, "Unsupported construct: {msg}"),
             CompileError::EntrypointNotFound => write!(f, "Entrypoint not found"),
             CompileError::InvalidSyscall => write!(f, "Invalid syscall"),
+            CompileError::NameResolution(msg) => write!(f, "Name resolution failed: {msg}"),
         }
     }
 }
