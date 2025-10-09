@@ -1,8 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "neco-cic", "neco-felis-compile", "neco-felis-rename",
-    "neco-felis-syn", "neco-felis-type-check", "neco-scope",
+    "neco-felis-compile",
+    "neco-felis-rename",
+    "neco-felis-syn",
+    "neco-scope",
 ]
 
 [workspace.dependencies]
