@@ -36,6 +36,10 @@
 - Run `ci-scripts/check.sh` locally before pushing.
 - PRs: clear description, test coverage notes, how to reproduce, and any perf/compat implications. Add screenshots or artifacts for example outputs when helpful (e.g., `image.png`).
 
+## Implementation Playbooks
+- Each crate or major source directory should grow a `docs/how_to_implement.md` (e.g., `neco-felis-syn/docs/how_to_implement.md`) that records how the actual implementation should proceed.
+- Treat these files as living prompts for implementation work: capture intent, constraints, and step-by-step outlines so contributors and tooling can reproduce or extend the code confidently.
+
 ## Notes
 - CI uses Rust nightly; keep code compatible with the pinned nightly where possible.
 - PTX/GPU paths are optional and auto-detected in scripts; prefer CPU paths for portability.
