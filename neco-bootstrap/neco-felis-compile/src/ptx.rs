@@ -8,6 +8,89 @@ struct ParamLoad {
     param_symbol: String,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn sanitize_ptx_identifier_rewrites_invalid_sequences() {
+        assert_eq!(sanitize_ptx_identifier("thread.id"), "thread_id");
+        assert_eq!(sanitize_ptx_identifier("1alpha"), "_1alpha");
+        assert_eq!(sanitize_ptx_identifier("__ok__"), "__ok__");
+        assert_eq!(sanitize_ptx_identifier(""), "_");
+        assert_eq!(
+            sanitize_ptx_identifier("pixel data/with-hyphen"),
+            "pixel_data_with_hyphen"
+        );
+    }
+
+    #[test]
+    fn compose_param_symbol_sanitizes_components() {
+        assert_eq!(
+            compose_param_symbol("pixel data", Some("first-field!")),
+            "pixel_data_first_field_"
+        );
+        assert_eq!(compose_param_symbol("pixel data", None), "pixel_data");
+    }
+
+    #[test]
+    fn collect_param_field_usage_extracts_unique_fields() {
+        let mut file_id_generator = FileIdGenerator::new();
+        let file_id = file_id_generator.generate_file_id();
+        let source = std::fs::read_to_string("../../testcases/felis/single/ptx_proc_call.fe")
+            .expect("read sample felis file");
+        let tokens = Token::lex(&source, file_id);
+
+        let mut idx = 0;
+        let file = File::parse(&tokens, &mut idx)
+            .expect("parse file")
+            .expect("ast from file");
+        assert_eq!(idx, tokens.len(), "parser should consume all tokens");
+
+        let ptx_proc = file
+            .items()
+            .iter()
+            .find_map(|item| match item {
+                Item::Proc(proc_item)
+                    if proc_item.ptx_modifier.is_some() && proc_item.name.s() == "f" =>
+                {
+                    Some(proc_item)
+                }
+                _ => None,
+            })
+            .expect("locate #ptx proc f");
+
+        let compiler = PtxCompiler::new();
+        let params = compiler.extract_proc_parameters(&ptx_proc.ty);
+        assert_eq!(params, vec!["ps".to_string()]);
+
+        let usage = collect_param_field_usage(&ptx_proc.proc_block.statements, &params);
+        assert_eq!(
+            usage.len(),
+            1,
+            "only ps parameter should have tracked fields"
+        );
+
+        let fields = usage.get("ps").expect("fields for ps");
+        assert_eq!(fields.len(), 3, "expected unique field entries for ps");
+
+        let mut sorted_fields = fields.clone();
+        sorted_fields.sort();
+        assert_eq!(
+            sorted_fields,
+            vec!["b".to_string(), "g".to_string(), "r".to_string()]
+        );
+
+        let unique: HashSet<_> = fields.iter().collect();
+        assert_eq!(
+            unique.len(),
+            fields.len(),
+            "duplicate field names should be eliminated"
+        );
+    }
+}
+
 fn sanitize_ptx_identifier(raw: &str) -> String {
     let mut s = String::with_capacity(raw.len());
     for ch in raw.chars() {
