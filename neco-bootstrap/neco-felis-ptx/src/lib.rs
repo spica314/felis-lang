@@ -1,4 +1,3 @@
-use crate::error::CompileError;
 use neco_felis_syn::*;
 use std::collections::{HashMap, HashSet};
 
@@ -7,6 +6,23 @@ struct ParamLoad {
     key: String,
     param_symbol: String,
 }
+
+#[derive(Debug, Clone)]
+pub enum PtxCompileError {
+    UnsupportedConstruct(String),
+}
+
+impl std::fmt::Display for PtxCompileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PtxCompileError::UnsupportedConstruct(msg) => {
+                write!(f, "PTX unsupported construct: {msg}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for PtxCompileError {}
 
 #[cfg(test)]
 mod tests {
@@ -258,6 +274,23 @@ fn collect_param_field_usage(
     usage
 }
 
+pub struct PtxCompileEnv<'a> {
+    pub builtins: &'a HashMap<String, String>,
+    pub available_procs: &'a HashMap<String, ItemProc<PhaseParse>>,
+}
+
+impl<'a> PtxCompileEnv<'a> {
+    pub fn new(
+        builtins: &'a HashMap<String, String>,
+        available_procs: &'a HashMap<String, ItemProc<PhaseParse>>,
+    ) -> Self {
+        Self {
+            builtins,
+            available_procs,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct PtxCompiler {
     pub ptx_output: String,
@@ -267,8 +300,8 @@ pub struct PtxCompiler {
     pub ptx_next_u32_reg: usize,
     pub ptx_next_f32_reg: usize,
     pub variables: HashMap<String, i32>,
-    pub builtins: HashMap<String, String>,
-    pub ptx_proc_map: HashMap<String, ItemProc<PhaseParse>>, // available #ptx procs for inlining
+    builtins: HashMap<String, String>,
+    ptx_proc_map: HashMap<String, ItemProc<PhaseParse>>, // available #ptx procs for inlining
     pub inlining: bool,
     pub inlined_return_fields: HashMap<String, String>, // field -> reg for struct return
     pub inlined_return_reg: Option<String>,             // single-register return for non-struct
@@ -298,7 +331,18 @@ impl PtxCompiler {
         Self::default()
     }
 
-    pub fn compile_ptx_proc(&mut self, proc: &ItemProc<PhaseParse>) -> Result<(), CompileError> {
+    fn configure_from_env(&mut self, env: &PtxCompileEnv<'_>) {
+        self.builtins = env.builtins.clone();
+        self.ptx_proc_map = env.available_procs.clone();
+    }
+
+    pub fn compile_ptx_proc(
+        &mut self,
+        proc: &ItemProc<PhaseParse>,
+        env: &PtxCompileEnv<'_>,
+    ) -> Result<(), PtxCompileError> {
+        self.configure_from_env(env);
+
         // Reset PTX state for this function
         self.ptx_registers.clear();
         self.ptx_next_u64_reg = 4; // Start from %rd4 (1-3 are for params)
@@ -347,7 +391,7 @@ impl PtxCompiler {
             }
             loads
         } else {
-            return Err(CompileError::UnsupportedConstruct(
+            return Err(PtxCompileError::UnsupportedConstruct(
                 "PTX kernels with multiple parameters not yet supported".to_string(),
             ));
         };
@@ -416,7 +460,7 @@ impl PtxCompiler {
         &mut self,
         block: &ItemProcBlock<PhaseParse>,
         param_loads: &[ParamLoad],
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), PtxCompileError> {
         // Initialize PTX registers for parameters with higher limit
         self.ptx_output.push_str("    .reg .b64 %rd<100>;\n");
         self.ptx_output.push_str("    .reg .b32 %r<100>;\n");
@@ -447,7 +491,7 @@ impl PtxCompiler {
     pub fn compile_ptx_statements(
         &mut self,
         statements: &Statements<PhaseParse>,
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), PtxCompileError> {
         match statements {
             Statements::Then(then) => {
                 self.compile_ptx_statement(&then.head)?;
@@ -464,7 +508,7 @@ impl PtxCompiler {
     pub fn compile_ptx_statement(
         &mut self,
         statement: &Statement<PhaseParse>,
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), PtxCompileError> {
         match statement {
             Statement::Let(let_stmt) => {
                 // Compile the let statement for PTX
@@ -514,7 +558,7 @@ impl PtxCompiler {
                 let index_reg = if let Some(index) = &field_assign.method_chain.index {
                     self.compile_ptx_proc_term(index)?
                 } else {
-                    return Err(CompileError::UnsupportedConstruct(
+                    return Err(PtxCompileError::UnsupportedConstruct(
                         "Field assignment without index not supported".to_string(),
                     ));
                 };
@@ -524,7 +568,9 @@ impl PtxCompiler {
                 // Map field names to device pointers
                 let key = format!("{object_name}.{field_name}");
                 let field_ptr = self.ptx_registers.get(&key).cloned().ok_or_else(|| {
-                    CompileError::UnsupportedConstruct(format!("Unknown PTX field pointer: {key}"))
+                    PtxCompileError::UnsupportedConstruct(format!(
+                        "Unknown PTX field pointer: {key}"
+                    ))
                 })?;
 
                 // Calculate address and store
@@ -547,7 +593,7 @@ impl PtxCompiler {
             }
             Statement::Return(ret) => {
                 if !self.inlining {
-                    return Err(CompileError::UnsupportedConstruct(
+                    return Err(PtxCompileError::UnsupportedConstruct(
                         "return not supported in PTX kernel".to_string(),
                     ));
                 }
@@ -571,7 +617,7 @@ impl PtxCompiler {
                     }
                 }
             }
-            _ => Err(CompileError::UnsupportedConstruct(format!(
+            _ => Err(PtxCompileError::UnsupportedConstruct(format!(
                 "PTX statement not implemented: {statement:?}"
             ))),
         }
@@ -600,7 +646,7 @@ impl PtxCompiler {
     pub fn compile_ptx_proc_term(
         &mut self,
         proc_term: &ProcTerm<PhaseParse>,
-    ) -> Result<String, CompileError> {
+    ) -> Result<String, PtxCompileError> {
         use neco_felis_syn::ProcTerm;
 
         match proc_term {
@@ -614,7 +660,7 @@ impl PtxCompiler {
                 if let Some(reg) = self.ptx_registers.get(&key) {
                     Ok(reg.clone())
                 } else {
-                    Err(CompileError::UnsupportedConstruct(format!(
+                    Err(PtxCompileError::UnsupportedConstruct(format!(
                         "Unknown PTX struct field: {key}"
                     )))
                 }
@@ -623,7 +669,7 @@ impl PtxCompiler {
                 // Handle integer literals
                 let value_str = num.number.s();
                 let value: u64 = value_str.parse().map_err(|_| {
-                    CompileError::UnsupportedConstruct(format!("Invalid number: {value_str}"))
+                    PtxCompileError::UnsupportedConstruct(format!("Invalid number: {value_str}"))
                 })?;
                 let reg = self.allocate_ptx_u64_register();
                 self.ptx_output
@@ -635,14 +681,14 @@ impl PtxCompiler {
                 // Handle parenthesized expressions
                 self.compile_ptx_proc_term(&paren.proc_term)
             }
-            _ => Err(CompileError::UnsupportedConstruct(format!(
+            _ => Err(PtxCompileError::UnsupportedConstruct(format!(
                 "PTX proc term not implemented: {proc_term:?}"
             ))),
         }
     }
 
     // Helper to compile a variable reference
-    pub fn compile_ptx_variable(&mut self, var_name: &str) -> Result<String, CompileError> {
+    pub fn compile_ptx_variable(&mut self, var_name: &str) -> Result<String, PtxCompileError> {
         // Check if this is a PTX builtin function
         if let Some(builtin) = self.builtins.get(var_name) {
             match builtin.as_str() {
@@ -681,7 +727,7 @@ impl PtxCompiler {
                     if let Some(reg) = self.ptx_registers.get(var_name) {
                         Ok(reg.clone())
                     } else {
-                        Err(CompileError::UnsupportedConstruct(format!(
+                        Err(PtxCompileError::UnsupportedConstruct(format!(
                             "Unknown PTX variable: {var_name}"
                         )))
                     }
@@ -690,7 +736,7 @@ impl PtxCompiler {
         } else if let Some(reg) = self.ptx_registers.get(var_name) {
             Ok(reg.clone())
         } else {
-            Err(CompileError::UnsupportedConstruct(format!(
+            Err(PtxCompileError::UnsupportedConstruct(format!(
                 "Undefined PTX variable: {var_name}"
             )))
         }
@@ -699,7 +745,7 @@ impl PtxCompiler {
     pub fn compile_ptx_proc_apply(
         &mut self,
         apply: &ProcTermApply<PhaseParse>,
-    ) -> Result<String, CompileError> {
+    ) -> Result<String, PtxCompileError> {
         use neco_felis_syn::ProcTerm;
 
         // Handle PTX builtin function applications
@@ -720,7 +766,7 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__u64_add requires two arguments".to_string(),
                                 ))
                             }
@@ -735,7 +781,7 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__u64_sub requires two arguments".to_string(),
                                 ))
                             }
@@ -750,7 +796,7 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__u64_mul requires two arguments".to_string(),
                                 ))
                             }
@@ -765,7 +811,7 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__u64_div requires two arguments".to_string(),
                                 ))
                             }
@@ -780,7 +826,7 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__u64_mod requires two arguments".to_string(),
                                 ))
                             }
@@ -794,7 +840,7 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__u64_to_f32 requires one argument".to_string(),
                                 ))
                             }
@@ -808,7 +854,7 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__f32_to_u64 requires one argument".to_string(),
                                 ))
                             }
@@ -833,12 +879,12 @@ impl PtxCompiler {
                                     ));
                                     Ok(result_reg)
                                 } else {
-                                    Err(CompileError::UnsupportedConstruct(
+                                    Err(PtxCompileError::UnsupportedConstruct(
                                         "f32 requires a number literal".to_string(),
                                     ))
                                 }
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "f32 requires one argument".to_string(),
                                 ))
                             }
@@ -852,7 +898,7 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__f32_sqrt_approx requires one argument".to_string(),
                                 ))
                             }
@@ -867,7 +913,7 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__f32_add requires two arguments".to_string(),
                                 ))
                             }
@@ -882,7 +928,7 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__f32_sub requires two arguments".to_string(),
                                 ))
                             }
@@ -897,7 +943,7 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__f32_mul requires two arguments".to_string(),
                                 ))
                             }
@@ -912,21 +958,21 @@ impl PtxCompiler {
                                 ));
                                 Ok(result_reg)
                             } else {
-                                Err(CompileError::UnsupportedConstruct(
+                                Err(PtxCompileError::UnsupportedConstruct(
                                     "__f32_div requires two arguments".to_string(),
                                 ))
                             }
                         }
-                        _ => Err(CompileError::UnsupportedConstruct(format!(
+                        _ => Err(PtxCompileError::UnsupportedConstruct(format!(
                             "Unknown PTX builtin: {builtin}"
                         ))),
                     }
                 } else if self.ptx_proc_map.contains_key(func_name) {
-                    Err(CompileError::UnsupportedConstruct(
+                    Err(PtxCompileError::UnsupportedConstruct(
                         "PTX user proc call must be in a let-binding to inline".to_string(),
                     ))
                 } else {
-                    Err(CompileError::UnsupportedConstruct(format!(
+                    Err(PtxCompileError::UnsupportedConstruct(format!(
                         "Unknown PTX function: {func_name}"
                     )))
                 }
@@ -948,19 +994,19 @@ impl PtxCompiler {
         var_name: &str,
         func_name: &str,
         args: &[ProcTerm<PhaseParse>],
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), PtxCompileError> {
         let callee = self
             .ptx_proc_map
             .get(func_name)
             .ok_or_else(|| {
-                CompileError::UnsupportedConstruct(format!("Unknown PTX callee: {func_name}"))
+                PtxCompileError::UnsupportedConstruct(format!("Unknown PTX callee: {func_name}"))
             })?
             .clone();
 
         // Extract parameter names
         let param_names = self.extract_proc_parameters(&callee.ty);
         if param_names.len() != args.len() {
-            return Err(CompileError::UnsupportedConstruct(format!(
+            return Err(PtxCompileError::UnsupportedConstruct(format!(
                 "PTX inline call arity mismatch: expected {}, got {}",
                 param_names.len(),
                 args.len()
@@ -969,8 +1015,8 @@ impl PtxCompiler {
 
         // Prepare a sub-compiler for inlining
         let mut sub = PtxCompiler::new();
-        sub.builtins = self.builtins.clone();
-        sub.ptx_proc_map = self.ptx_proc_map.clone();
+        let env = PtxCompileEnv::new(&self.builtins, &self.ptx_proc_map);
+        sub.configure_from_env(&env);
         sub.inlining = true;
         // Share register allocation state to avoid reusing caller's registers
         sub.ptx_next_u64_reg = self.ptx_next_u64_reg;
@@ -1007,13 +1053,13 @@ impl PtxCompiler {
                         inserted = true;
                     }
                     if !inserted {
-                        return Err(CompileError::UnsupportedConstruct(
+                        return Err(PtxCompileError::UnsupportedConstruct(
                             "PTX inline supports only struct args or struct vars".to_string(),
                         ));
                     }
                 }
                 _ => {
-                    return Err(CompileError::UnsupportedConstruct(
+                    return Err(PtxCompileError::UnsupportedConstruct(
                         "PTX inline supports only struct args or struct vars".to_string(),
                     ));
                 }
@@ -1040,7 +1086,7 @@ impl PtxCompiler {
             // Scalar return: bind directly to LHS variable
             self.ptx_registers.insert(var_name.to_string(), reg);
         } else {
-            return Err(CompileError::UnsupportedConstruct(
+            return Err(PtxCompileError::UnsupportedConstruct(
                 "PTX inline callee did not produce a return value".to_string(),
             ));
         }

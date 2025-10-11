@@ -1,9 +1,7 @@
-use crate::{
-    compile_options::CompileOptions, error::CompileError, ptx::PtxCompiler,
-    statement::StatementCompiler,
-};
+use crate::{compile_options::CompileOptions, error::CompileError, statement::StatementCompiler};
+use neco_felis_ptx::{PtxCompileEnv, PtxCompiler};
 use neco_felis_syn::*;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct ArrayInfo {
@@ -17,6 +15,52 @@ pub struct ArrayInfo {
     pub size: Option<usize>,
 }
 
+#[derive(Debug, Clone)]
+pub struct PtxContext {
+    pub output: String,
+    pub functions: Vec<String>,
+    pub all_procs: HashMap<String, ItemProc<PhaseParse>>, // all #ptx procs by name
+    pub kernels_to_emit: HashSet<String>,                 // names used by #call_ptx
+}
+
+impl Default for PtxContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PtxContext {
+    pub fn new() -> Self {
+        Self {
+            output: String::new(),
+            functions: Vec::new(),
+            all_procs: HashMap::new(),
+            kernels_to_emit: HashSet::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PtxKernelFieldBinding {
+    name: String,
+    ptr_offset: i32,
+    size_offset: Option<i32>,
+}
+
+#[derive(Debug, Clone)]
+struct PtxArrayBinding {
+    total_size_offset: Option<i32>,
+    fields: Vec<PtxKernelFieldBinding>,
+}
+
+#[derive(Debug, Clone)]
+struct PtxKernelLaunchPlan {
+    function_name: String,
+    array: Option<PtxArrayBinding>,
+    grid_dims: [String; 3],
+    block_dims: [String; 3],
+}
+
 pub struct AssemblyCompiler {
     pub output: String,
     pub entrypoint: Option<String>,
@@ -28,15 +72,7 @@ pub struct AssemblyCompiler {
     pub variable_arrays: HashMap<String, String>,
     pub loop_stack: Vec<String>,
     pub compile_options: CompileOptions,
-    pub ptx_output: String,
-    pub ptx_functions: Vec<String>,
-    pub ptx_registers: HashMap<String, String>, // Maps variable names to PTX registers
-    pub ptx_next_u64_reg: usize,
-    pub ptx_next_u32_reg: usize,
-    pub ptx_next_f32_reg: usize,
-    // PTX helpers for inlining and selective emission
-    pub ptx_all_procs: HashMap<String, ItemProc<PhaseParse>>, // all #ptx procs by name
-    pub ptx_kernels_to_emit: std::collections::HashSet<String>, // names used by #call_ptx
+    pub ptx: PtxContext,
     pub struct_fields: HashMap<String, Vec<String>>, // Tracks struct literal field order by variable
 }
 
@@ -53,14 +89,7 @@ impl AssemblyCompiler {
             variable_arrays: HashMap::new(),
             loop_stack: Vec::new(),
             compile_options,
-            ptx_output: String::new(),
-            ptx_functions: Vec::new(),
-            ptx_registers: HashMap::new(),
-            ptx_next_u64_reg: 4, // Start from %rd4 (1-3 are for params)
-            ptx_next_u32_reg: 1,
-            ptx_next_f32_reg: 1,
-            ptx_all_procs: HashMap::new(),
-            ptx_kernels_to_emit: std::collections::HashSet::new(),
+            ptx: PtxContext::new(),
             struct_fields: HashMap::new(),
         }
     }
@@ -214,7 +243,7 @@ cuda_context_ok:
                 .push_str("    .asciz \"PTX kernel launch failed\\n\"\n");
 
             // Add PTX code as data
-            if !self.ptx_output.is_empty() {
+            if !self.ptx.output.is_empty() {
                 // Validate PTX code with ptxas before including it
                 if let Err(e) = self.validate_ptx_code() {
                     eprintln!("PTX validation failed: {e}");
@@ -223,7 +252,7 @@ cuda_context_ok:
                     )));
                 }
                 // Add PTX function names
-                for func_name in &self.ptx_functions {
+                for func_name in &self.ptx.functions {
                     self.output
                         .push_str(&format!("ptx_function_name_{func_name}:\n"));
                     self.output
@@ -231,12 +260,12 @@ cuda_context_ok:
                 }
 
                 // Add PTX code
-                for func_name in &self.ptx_functions {
+                for func_name in &self.ptx.functions {
                     self.output.push_str(&format!("ptx_code_{func_name}:\n"));
                     self.output.push_str("    .asciz \"");
 
                     // Escape the PTX code for assembly string literal
-                    let ptx_lines: Vec<&str> = self.ptx_output.lines().collect();
+                    let ptx_lines: Vec<&str> = self.ptx.output.lines().collect();
                     for line in ptx_lines {
                         self.output.push_str(&format!("{line}\\n"));
                     }
@@ -595,6 +624,27 @@ cuda_context_ok:
         candidates.into_iter().collect()
     }
 
+    fn emit_load_stack_qword(&mut self, reg: &str, offset: i32) {
+        self.output.push_str(&format!(
+            "    mov {reg}, QWORD PTR [rbp - 8 - {}]\n",
+            offset - 8
+        ));
+    }
+
+    fn emit_load_size_bytes(
+        &mut self,
+        reg: &str,
+        field_size_offset: Option<i32>,
+        total_size_offset: Option<i32>,
+    ) {
+        if let Some(offset) = field_size_offset.or(total_size_offset) {
+            self.emit_load_stack_qword(reg, offset);
+            self.output.push_str(&format!("    shl {reg}, 3\n"));
+        } else {
+            self.output.push_str(&format!("    mov {reg}, 524288\n"));
+        }
+    }
+
     pub fn compile_proc_term(
         &mut self,
         proc_term: &ProcTerm<PhaseParse>,
@@ -735,9 +785,10 @@ cuda_context_ok:
             proc.name.s()
         );
         // Skip emitting PTX for helper procs not launched via #call_ptx
-        if !self.ptx_kernels_to_emit.contains(proc.name.s()) {
+        if !self.ptx.kernels_to_emit.contains(proc.name.s()) {
             // Still record in the map for inlining use
-            self.ptx_all_procs
+            self.ptx
+                .all_procs
                 .insert(proc.name.s().to_string(), proc.clone());
             eprintln!(
                 "DEBUG: Skipping PTX emission for helper proc {} (will inline if called)",
@@ -747,11 +798,10 @@ cuda_context_ok:
         }
 
         let mut ptx_compiler = PtxCompiler::new();
-        ptx_compiler.builtins = self.builtins.clone();
-        // Provide all PTX procs for inlining
-        ptx_compiler.ptx_proc_map = self.ptx_all_procs.clone();
-
-        ptx_compiler.compile_ptx_proc(proc)?;
+        let env = PtxCompileEnv::new(&self.builtins, &self.ptx.all_procs);
+        ptx_compiler
+            .compile_ptx_proc(proc, &env)
+            .map_err(CompileError::from)?;
 
         eprintln!(
             "DEBUG: PTX compilation successful. PTX output length: {}",
@@ -760,85 +810,132 @@ cuda_context_ok:
         eprintln!("DEBUG: PTX functions: {:?}", ptx_compiler.ptx_functions);
 
         // Add PTX header directives if this is the first PTX function
-        if self.ptx_output.is_empty() {
-            self.ptx_output.push_str(".version 8.8\n");
-            self.ptx_output.push_str(".target sm_52\n");
-            self.ptx_output.push_str(".address_size 64\n\n");
+        if self.ptx.output.is_empty() {
+            self.ptx.output.push_str(".version 8.8\n");
+            self.ptx.output.push_str(".target sm_52\n");
+            self.ptx.output.push_str(".address_size 64\n\n");
             eprintln!("DEBUG: Added PTX header directives");
         }
 
         // Update our state with PTX compiler results
-        self.ptx_output.push_str(&ptx_compiler.ptx_output);
-        self.ptx_functions.extend(ptx_compiler.ptx_functions);
+        self.ptx.output.push_str(&ptx_compiler.ptx_output);
+        self.ptx.functions.extend(ptx_compiler.ptx_functions);
 
-        eprintln!("DEBUG: Final PTX output length: {}", self.ptx_output.len());
+        eprintln!("DEBUG: Final PTX output length: {}", self.ptx.output.len());
         eprintln!(
             "DEBUG: PTX output first 100 chars: {:?}",
-            &self.ptx_output[..self.ptx_output.len().min(100)]
+            &self.ptx.output[..self.ptx.output.len().min(100)]
         );
-        std::fs::write("./a.ptx", &self.ptx_output).unwrap();
+        std::fs::write("./a.ptx", &self.ptx.output).unwrap();
 
         Ok(())
     }
 
-    /// Compile a #call_ptx statement
-    pub fn compile_call_ptx(
-        &mut self,
-        call_ptx: &StatementCallPtx<PhaseParse>,
-    ) -> Result<(), CompileError> {
-        let function_name = call_ptx.function_name.s();
+    fn plan_ptx_array_binding(
+        &self,
+        array_var_name: &str,
+    ) -> Result<PtxArrayBinding, CompileError> {
+        let field_names = if let Some(array_type_name) = self.variable_arrays.get(array_var_name) {
+            let array_info = self.arrays.get(array_type_name).ok_or_else(|| {
+                CompileError::UnsupportedConstruct(format!("Unknown array type: {array_type_name}"))
+            })?;
+            array_info.field_names.clone()
+        } else {
+            self.collect_struct_array_fields(array_var_name)
+        };
 
-        // Ensure this is a known PTX function
-        if !self.ptx_functions.contains(&function_name.to_string()) {
+        if field_names.is_empty() {
+            return Err(CompileError::UnsupportedConstruct(format!(
+                "Unknown array variable: {array_var_name}"
+            )));
+        }
+
+        if field_names.len() > 10 {
+            return Err(CompileError::UnsupportedConstruct(
+                "PTX kernel argument struct exceeds supported field count (10)".to_string(),
+            ));
+        }
+
+        let total_size_offset = self
+            .variables
+            .get(&format!("{array_var_name}_size"))
+            .copied();
+
+        let mut fields = Vec::with_capacity(field_names.len());
+        for field_name in field_names {
+            let ptr_offset = self
+                .variables
+                .get(&format!("{array_var_name}_{field_name}_ptr"))
+                .or_else(|| {
+                    self.variables
+                        .get(&format!("{array_var_name}_{field_name}"))
+                })
+                .copied()
+                .ok_or_else(|| {
+                    CompileError::UnsupportedConstruct(format!(
+                        "Unknown array field pointer: {array_var_name}.{field_name}"
+                    ))
+                })?;
+
+            let size_offset = self
+                .variables
+                .get(&format!("{array_var_name}_{field_name}_size"))
+                .copied();
+
+            fields.push(PtxKernelFieldBinding {
+                name: field_name,
+                ptr_offset,
+                size_offset,
+            });
+        }
+
+        Ok(PtxArrayBinding {
+            total_size_offset,
+            fields,
+        })
+    }
+
+    fn plan_ptx_launch(
+        &self,
+        call_ptx: &StatementCallPtx<PhaseParse>,
+    ) -> Result<PtxKernelLaunchPlan, CompileError> {
+        let function_name = call_ptx.function_name.s().to_string();
+        if !self.ptx.functions.contains(&function_name) {
             return Err(CompileError::UnsupportedConstruct(format!(
                 "Unknown PTX function: {function_name}"
             )));
         }
 
-        // Handle arguments
-        let (has_array, array_var_name, array_info) = {
-            // Extract array name from the argument
-            let array_var_name = call_ptx.arg.s();
+        let array_binding = self.plan_ptx_array_binding(call_ptx.arg.s())?;
 
-            // Get array info
-            if let Some(array_type_name) = self.variable_arrays.get(array_var_name) {
-                let array_info = self.arrays.get(array_type_name).ok_or_else(|| {
-                    CompileError::UnsupportedConstruct(format!(
-                        "Unknown array type: {array_type_name}"
-                    ))
-                })?;
-                (true, array_var_name, array_info.clone())
-            } else {
-                // Fallback: treat argument as a struct holding builtin Arrays in fields
-                let field_names = self.collect_struct_array_fields(array_var_name);
-                if field_names.is_empty() {
-                    return Err(CompileError::UnsupportedConstruct(format!(
-                        "Unknown array variable: {array_var_name}"
-                    )));
-                }
-                (
-                    true,
-                    array_var_name,
-                    ArrayInfo {
-                        element_type: "u64".to_string(),
-                        field_types: field_names.iter().map(|_| "u64".to_string()).collect(),
-                        field_names,
-                        dimension: 1,
-                        size: None,
-                    },
-                )
-            }
-        };
+        let grid_dims = [
+            call_ptx.grid_dim_x.s().to_string(),
+            call_ptx.grid_dim_y.s().to_string(),
+            call_ptx.grid_dim_z.s().to_string(),
+        ];
+        let block_dims = [
+            call_ptx.block_dim_x.s().to_string(),
+            call_ptx.block_dim_y.s().to_string(),
+            call_ptx.block_dim_z.s().to_string(),
+        ];
 
-        // Generate CUDA API calls
+        Ok(PtxKernelLaunchPlan {
+            function_name,
+            array: Some(array_binding),
+            grid_dims,
+            block_dims,
+        })
+    }
+
+    fn emit_ptx_launch(&mut self, plan: &PtxKernelLaunchPlan) {
+        let function_name = &plan.function_name;
+        let array_binding = plan.array.as_ref();
+        let field_count = array_binding.map(|array| array.fields.len()).unwrap_or(0);
+
         self.output.push_str("    # call_ptx implementation\n");
 
-        // self.output.push_str("    sub rsp, 8\n");
-
-        // Load PTX module if not already loaded
+        // Load PTX module
         self.output.push_str("    # Load PTX module\n");
-        // self.output.push_str(&format!("    mov rax, QWORD PTR ptx_code_{function_name}[rip]\n"));
-        // self.output.push_str("    mov rsi, rax\n");
         self.output
             .push_str(&format!("    lea rsi, ptx_code_{function_name}[rip]\n"));
         self.output.push_str("    lea rdi, __cu_module[rip]\n");
@@ -874,42 +971,15 @@ cuda_context_ok:
         self.output.push_str("    syscall\n");
         self.output.push_str("function_get_ok:\n");
 
-        let field_count = array_info.field_names.len();
-
-        if has_array {
-            if field_count > 10 {
-                return Err(CompileError::UnsupportedConstruct(
-                    "PTX kernel argument struct exceeds supported field count (10)".to_string(),
-                ));
-            }
-
-            // Allocate device memory for each field
-            for (i, field_name) in array_info.field_names.iter().enumerate() {
+        if let Some(array) = array_binding {
+            for (i, field) in array.fields.iter().enumerate() {
                 self.output.push_str(&format!(
-                    "    # Allocate device memory for field {field_name}\n"
+                    "    # Allocate device memory for field {}\n",
+                    field.name
                 ));
                 self.output
                     .push_str(&format!("    lea rdi, device_ptr_{}[rip]\n", i + 1));
-
-                // Calculate size based on array size (8-byte elements)
-                if let Some(&soff) = self
-                    .variables
-                    .get(&format!("{array_var_name}_{field_name}_size"))
-                {
-                    self.output.push_str(&format!(
-                        "    mov rsi, QWORD PTR [rbp - 8 - {}]\n",
-                        soff - 8
-                    ));
-                    self.output.push_str("    shl rsi, 3\n");
-                } else if let Some(&soff) = self.variables.get(&format!("{array_var_name}_size")) {
-                    self.output.push_str(&format!(
-                        "    mov rsi, QWORD PTR [rbp - 8 - {}]\n",
-                        soff - 8
-                    ));
-                    self.output.push_str("    shl rsi, 3\n");
-                } else {
-                    self.output.push_str("    mov rsi, 524288\n"); // Fallback
-                }
+                self.emit_load_size_bytes("rsi", field.size_offset, array.total_size_offset);
                 self.output.push_str("    call cuMemAlloc_v2@PLT\n");
                 self.output.push_str("    test eax, eax\n");
                 self.output.push_str(&format!("    jz mem_alloc_ok_{i}\n"));
@@ -923,51 +993,15 @@ cuda_context_ok:
                 self.output.push_str(&format!("mem_alloc_ok_{i}:\n"));
             }
 
-            // Copy data to device
-            for (i, field_name) in array_info.field_names.iter().enumerate() {
+            for (i, field) in array.fields.iter().enumerate() {
                 self.output
-                    .push_str(&format!("    # Copy {field_name} data to device\n"));
+                    .push_str(&format!("    # Copy {} data to device\n", field.name));
                 self.output.push_str(&format!(
                     "    mov rdi, QWORD PTR device_ptr_{}[rip]\n",
                     i + 1
                 ));
-
-                // Get host pointer for this field
-                let field_ptr_var = format!("{array_var_name}_{field_name}_ptr");
-                if let Some(&offset) = self.variables.get(&field_ptr_var) {
-                    self.output.push_str(&format!(
-                        "    mov rsi, QWORD PTR [rbp - 8 - {}]\n",
-                        offset - 8
-                    ));
-                } else if let Some(&offset) = self
-                    .variables
-                    .get(&format!("{array_var_name}_{field_name}"))
-                {
-                    self.output.push_str(&format!(
-                        "    mov rsi, QWORD PTR [rbp - 8 - {}]\n",
-                        offset - 8
-                    ));
-                }
-
-                // Size in bytes
-                if let Some(&soff) = self
-                    .variables
-                    .get(&format!("{array_var_name}_{field_name}_size"))
-                {
-                    self.output.push_str(&format!(
-                        "    mov rdx, QWORD PTR [rbp - 8 - {}]\n",
-                        soff - 8
-                    ));
-                    self.output.push_str("    shl rdx, 3\n");
-                } else if let Some(&soff) = self.variables.get(&format!("{array_var_name}_size")) {
-                    self.output.push_str(&format!(
-                        "    mov rdx, QWORD PTR [rbp - 8 - {}]\n",
-                        soff - 8
-                    ));
-                    self.output.push_str("    shl rdx, 3\n");
-                } else {
-                    self.output.push_str("    mov rdx, 524288\n");
-                }
+                self.emit_load_stack_qword("rsi", field.ptr_offset);
+                self.emit_load_size_bytes("rdx", field.size_offset, array.total_size_offset);
                 self.output.push_str("    call cuMemcpyHtoD_v2@PLT\n");
                 self.output.push_str("    test eax, eax\n");
                 self.output
@@ -982,7 +1016,6 @@ cuda_context_ok:
                 self.output.push_str(&format!("mem_copy_htod_ok_{i}:\n"));
             }
 
-            // Set up kernel parameters
             self.output.push_str("    # Set up kernel parameters\n");
             for i in 1..=field_count {
                 self.output.push_str(&format!(
@@ -996,49 +1029,38 @@ cuda_context_ok:
             }
         }
 
-        // Launch kernel
         self.output.push_str("    # Launch kernel\n");
-
         self.output.push_str("    sub rsp, 8\n");
-
         self.output
             .push_str("    mov rdi, QWORD PTR __cu_function[rip]\n");
+        self.output
+            .push_str(&format!("    mov rsi, {}\n", plan.grid_dims[0]));
+        self.output
+            .push_str(&format!("    mov rdx, {}\n", plan.grid_dims[1]));
+        self.output
+            .push_str(&format!("    mov rcx, {}\n", plan.grid_dims[2]));
+        self.output
+            .push_str(&format!("    mov r8, {}\n", plan.block_dims[0]));
+        self.output
+            .push_str(&format!("    mov r9, {}\n", plan.block_dims[1]));
+        self.output.push_str("    push 0\n"); // Extra (reverse stack order)
 
-        // Grid dimensions
-        self.output
-            .push_str(&format!("    mov rsi, {}\n", call_ptx.grid_dim_x.s()));
-        self.output
-            .push_str(&format!("    mov rdx, {}\n", call_ptx.grid_dim_y.s()));
-        self.output
-            .push_str(&format!("    mov rcx, {}\n", call_ptx.grid_dim_z.s()));
-
-        // Block dimensions
-        self.output
-            .push_str(&format!("    mov r8, {}\n", call_ptx.block_dim_x.s()));
-        self.output
-            .push_str(&format!("    mov r9, {}\n", call_ptx.block_dim_y.s()));
-
-        // Extra (reverse stack order)
-        self.output.push_str("    push 0\n");
-
-        // Kernel params (reverse stack order)
-        if has_array && field_count > 0 {
+        if field_count > 0 {
             let params_base_offset = 200 + (field_count.saturating_sub(1) * 8);
             self.output
                 .push_str(&format!("    lea rax, [rbp - 8 - {params_base_offset}]\n"));
             self.output.push_str("    push rax\n");
         } else {
-            self.output.push_str("    push 0\n"); // NULL params
+            self.output.push_str("    push 0\n");
         }
 
-        // Shared memory and stream (reverse stack order)
         self.output.push_str("    push 0\n"); // sharedMemBytes
         self.output.push_str("    push 0\n"); // stream
         self.output
-            .push_str(&format!("    push {}\n", call_ptx.block_dim_z.s()));
+            .push_str(&format!("    push {}\n", plan.block_dims[2]));
 
         self.output.push_str("    call cuLaunchKernel@PLT\n");
-        self.output.push_str("    add rsp, 48\n"); // Clean up stack
+        self.output.push_str("    add rsp, 48\n");
         self.output.push_str("    test eax, eax\n");
         self.output.push_str("    jz kernel_launch_ok\n");
         self.output
@@ -1050,7 +1072,6 @@ cuda_context_ok:
         self.output.push_str("    syscall\n");
         self.output.push_str("kernel_launch_ok:\n");
 
-        // Synchronize
         self.output.push_str("    call cuCtxSynchronize@PLT\n");
         self.output.push_str("    test eax, eax\n");
         self.output.push_str("    jz ctx_sync_ok\n");
@@ -1063,52 +1084,18 @@ cuda_context_ok:
         self.output.push_str("    syscall\n");
         self.output.push_str("ctx_sync_ok:\n");
 
-        if has_array {
-            // Copy results back
-            for (i, field_name) in array_info.field_names.iter().enumerate() {
-                self.output
-                    .push_str(&format!("    # Copy {field_name} data back from device\n"));
-
-                // Get host pointer for this field: prefer *_ptr; fallback to direct field slot
-                let field_ptr_var = format!("{array_var_name}_{field_name}_ptr");
-                if let Some(&offset) = self.variables.get(&field_ptr_var) {
-                    self.output.push_str(&format!(
-                        "    mov rdi, QWORD PTR [rbp - 8 - {}]\n",
-                        offset - 8
-                    ));
-                } else if let Some(&offset) = self
-                    .variables
-                    .get(&format!("{array_var_name}_{field_name}"))
-                {
-                    self.output.push_str(&format!(
-                        "    mov rdi, QWORD PTR [rbp - 8 - {}]\n",
-                        offset - 8
-                    ));
-                }
-
+        if let Some(array) = array_binding {
+            for (i, field) in array.fields.iter().enumerate() {
+                self.output.push_str(&format!(
+                    "    # Copy {} data back from device\n",
+                    field.name
+                ));
+                self.emit_load_stack_qword("rdi", field.ptr_offset);
                 self.output.push_str(&format!(
                     "    mov rsi, QWORD PTR device_ptr_{}[rip]\n",
                     i + 1
                 ));
-                // Determine copy size: prefer struct field specific size, then global size
-                if let Some(&soff) = self
-                    .variables
-                    .get(&format!("{array_var_name}_{field_name}_size"))
-                {
-                    self.output.push_str(&format!(
-                        "    mov rdx, QWORD PTR [rbp - 8 - {}]\n",
-                        soff - 8
-                    ));
-                    self.output.push_str("    shl rdx, 3\n");
-                } else if let Some(&soff) = self.variables.get(&format!("{array_var_name}_size")) {
-                    self.output.push_str(&format!(
-                        "    mov rdx, QWORD PTR [rbp - 8 - {}]\n",
-                        soff - 8
-                    ));
-                    self.output.push_str("    shl rdx, 3\n");
-                } else {
-                    self.output.push_str("    mov rdx, 524288\n"); // Fallback
-                }
+                self.emit_load_size_bytes("rdx", field.size_offset, array.total_size_offset);
                 self.output.push_str("    call cuMemcpyDtoH_v2@PLT\n");
                 self.output.push_str("    test eax, eax\n");
                 self.output
@@ -1123,8 +1110,6 @@ cuda_context_ok:
                 self.output.push_str(&format!("mem_copy_dtoh_ok_{i}:\n"));
             }
 
-            // Free device memory
-            let field_count = array_info.field_names.len();
             for i in 1..=field_count {
                 self.output
                     .push_str(&format!("    # Free device memory {i}\n"));
@@ -1143,19 +1128,28 @@ cuda_context_ok:
                 self.output.push_str(&format!("mem_free_ok_{i}:\n"));
             }
         }
+    }
 
+    /// Compile a #call_ptx statement
+    pub fn compile_call_ptx(
+        &mut self,
+        call_ptx: &StatementCallPtx<PhaseParse>,
+    ) -> Result<(), CompileError> {
+        let plan = self.plan_ptx_launch(call_ptx)?;
+        self.emit_ptx_launch(&plan);
         Ok(())
     }
 
     fn collect_ptx_context(&mut self, file: &File<PhaseParse>) {
-        self.ptx_all_procs.clear();
-        self.ptx_kernels_to_emit.clear();
+        self.ptx.all_procs.clear();
+        self.ptx.kernels_to_emit.clear();
         // Map all PTX procs by name
         for item in file.items() {
             if let Item::Proc(p) = item
                 && p.ptx_modifier.is_some()
             {
-                self.ptx_all_procs
+                self.ptx
+                    .all_procs
                     .insert(p.name.s().to_string(), p.as_ref().clone());
             }
         }
@@ -1167,8 +1161,8 @@ cuda_context_ok:
         }
         eprintln!(
             "DEBUG: PTX context collected. helpers = {:?}, kernels = {:?}",
-            self.ptx_all_procs.keys().collect::<Vec<_>>(),
-            self.ptx_kernels_to_emit
+            self.ptx.all_procs.keys().collect::<Vec<_>>(),
+            self.ptx.kernels_to_emit
         );
     }
 
@@ -1185,7 +1179,8 @@ cuda_context_ok:
 
     fn collect_ptx_calls_in_statement(&mut self, statement: &Statement<PhaseParse>) {
         if let Statement::CallPtx(call_ptx) = statement {
-            self.ptx_kernels_to_emit
+            self.ptx
+                .kernels_to_emit
                 .insert(call_ptx.function_name.s().to_string());
         }
     }
@@ -1202,7 +1197,7 @@ cuda_context_ok:
 
         // Write PTX code to temporary file
         temp_file
-            .write_all(self.ptx_output.as_bytes())
+            .write_all(self.ptx.output.as_bytes())
             .map_err(|e| format!("Failed to write PTX code to temporary file: {e}"))?;
 
         // Get the path to the temporary file

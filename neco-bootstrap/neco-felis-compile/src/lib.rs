@@ -6,7 +6,6 @@ pub mod compile_options;
 pub mod compiler;
 pub mod control_flow;
 pub mod error;
-pub mod ptx;
 pub mod statement;
 mod symbol_rewriter;
 pub mod syscall;

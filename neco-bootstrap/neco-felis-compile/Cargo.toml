@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 neco-felis-syn = { path = "../neco-felis-syn" }
 neco-felis-rename = { path = "../neco-felis-rename" }
+neco-felis-ptx = { path = "../neco-felis-ptx" }
 tempfile = { workspace = true }
 
 [dev-dependencies]
