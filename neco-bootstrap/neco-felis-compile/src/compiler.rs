@@ -195,8 +195,7 @@ cuda_init_ok:
     syscall
 cuda_device_ok:
     # cuCtxCreate_v2(&cu_context, 0, cu_device)
-    mov	    eax, DWORD PTR __cu_device[rip]
-    mov	    edx, eax
+    mov	    edx, DWORD PTR __cu_device[rip]
     mov	    esi, 0
     lea	    rdi, __cu_context[rip]
     call    cuCtxCreate_v2@PLT
