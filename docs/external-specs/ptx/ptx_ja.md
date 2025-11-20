@@ -105,7 +105,7 @@ __cu_context:
 呼び出し処理
 ```asm
     mov     edx, DWORD PTR __cu_device[rip]
-    ov      esi, 0
+    mov     esi, 0
     lea     rdi, __cu_context[rip]
     call    cuCtxCreate_v2@PLT
     test    eax, eax
@@ -167,9 +167,9 @@ __cu_function:
     lea     rdi, __cu_function[rip]
     call    cuModuleGetFunction@PLT
     test    eax, eax
-    jz      cu_module_get_function # ?
+    jz      cu_module_get_function_ok
     # エラー時の処理 #
-cu_module_load_data_ok:
+cu_module_get_function_ok:
     # 正常終了時の処理 #
 ```
 
@@ -183,11 +183,11 @@ CUdeviceptrが指す先に指定したサイズの領域を確保した領域へ
 
 グローバルに定義
 ```asm
-    .globl	__cu_device_ptr
+    .globl	device_ptr
     .align 8
-    .type	__cu_device_ptr, @object
-    .size	__cu_device_ptr, 8
-__cu_device_ptr:
+    .type	device_ptr, @object
+    .size	device_ptr, 8
+device_ptr:
     .zero	8
 ```
 
@@ -196,7 +196,7 @@ __cu_device_ptr:
     lea     rdi, device_ptr[rip]
     call    cuMemAlloc_v2@PLT
     test    eax, eax
-    jz      cu_mem_alloc_v2_ok:
+    jz      cu_mem_alloc_v2_ok
     # エラー時の処理 #
 cu_mem_alloc_v2_ok:
     # 正常終了時の処理 #
@@ -208,14 +208,71 @@ doc: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MEM.html#group__C
 なおdefineされていてcuMemcpyHtoD_v2が本体
 ホスト上のメモリからdstDeviceが指す領域にコピー
 
+```asm
+    lea     rdi, device_ptr[rip]
+    mov     rsi, QWORD PTR [rbp - 8 - 0]
+    mov     rdx, 65536
+    call    cuMemcpyHtoD_v2@PLT
+    test    eax, eax
+    jz      cu_memcpy_h_to_d_v2_ok:
+    # エラー時の処理 #
+cu_memcpy_h_to_d_v2_ok:
+    # 正常終了時の処理 #
+```
+
 ### `CUresult cuLaunchKernel ( CUfunction f, unsigned int  gridDimX, unsigned int  gridDimY, unsigned int  gridDimZ, unsigned int  blockDimX, unsigned int  blockDimY, unsigned int  blockDimZ, unsigned int  sharedMemBytes, CUstream hStream, void** kernelParams, void** extra )`
 doc: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXEC.html#group__CUDA__EXEC_1gb8f3dc3031b40da29d5f9a7139e52e15
 
 基本的にsharedMemBytes, hStream, extraは0(NULL)にしておけばOK。
 kernelParamsはCUdeviceptrの参照の配列への参照
 
+```asm
+    mov     rdi, QWORD PTR __cu_function[rip]
+    mov     rsi, 256 # gridDimX
+    mov     rdx, 1   # gridDimY
+    mov     rcx, 1   # gridDimZ
+    mov     r8,  256 # blockDimX
+    mov     r9, 1    # blockDimY
+    push    0        # void** extra
+    lea     rax, [rbp - 8 - 0]
+    push    rax      # kernelParams
+    push    0        # hStream
+    push    0        # sharedMemBytes
+    push    1        # blockDimZ
+```
+
 ### `CUresult cuMemcpyDtoH ( void* dstHost, CUdeviceptr srcDevice, size_t ByteCount )`
 doc: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MEM.html#group__CUDA__MEM_1g3480368ee0208a98f75019c9a8450893
 
 なおdefineされていてcuMemcpyDtoH_v2が本体
-dstDeviceからホスト上のメモリにコピー
+srcDeviceからホスト上のメモリにコピー
+
+```asm
+    mov     rdi, QWORD PTR [rbp - 8 - 0]
+    mov     rsi, QWORD PTR device_ptr[rip]
+    mov     rdx, 65536
+    call    cuMemcpyDtoH_v2@PLT
+    test    eax, eax
+    jz      cu_memcpy_d_to_h_v2_ok:
+    # エラー時の処理 #
+cu_memcpy_d_to_h_v2_ok:
+    # 正常終了時の処理 #
+```
+
+### `CUresult cuMemFree ( CUdevicept dptr )`
+doc: https://developer.download.nvidia.com/compute/DevZone/docs/html/C/doc/html/group__CUDA__MEM_g89b3f154e17cc89b6eea277dbdf5c93a.html
+
+なおdefineされていてcuMemFree_v2が本体
+dptrが指す先のデバイス上のメモリを解放
+
+```asm
+    mov     rdi, QWORD PTR [rbp - 8 - 0]
+    mov     rsi, QWORD PTR device_ptr[rip]
+    mov     rdx, 65536
+    call    cuMemFree_v2@PLT
+    test    eax, eax
+    jz      cu_mem_free_v2_ok:
+    # エラー時の処理 #
+cu_mem_free_v2_ok:
+    # 正常終了時の処理 #
+```
