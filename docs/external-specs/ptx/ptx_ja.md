@@ -32,6 +32,13 @@ extern "C" {
 }
 ```
 
+## PTXコードのバリデーション
+
+```
+ptxas --compile-only --gpu-name=sm_52 {PTXファイル名}
+```
+が正常に終わればOK
+
 ## CUDA Driver API
 
 ### `CUresult cuInit ( unsigned int  Flags )`
