@@ -1,4 +1,4 @@
-use neco_felis_compile::{compile_file_to_assembly, compile_file_to_assembly_with_ptx};
+use neco_felis_compile::compile_file_to_assembly;
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -6,14 +6,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().collect();
 
     if args.len() < 2 {
-        eprintln!("Usage: {} <source.fe> [-o <output>] [--ptx]", args[0]);
+        eprintln!("Usage: {} <source.fe> [-o <output>]", args[0]);
         std::process::exit(1);
     }
 
     // Parse command line arguments
     let mut source_file = None;
     let mut output_file = None;
-    let mut use_ptx = false;
     let mut i = 1;
 
     while i < args.len() {
@@ -26,10 +25,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     eprintln!("Error: -o requires an argument");
                     std::process::exit(1);
                 }
-            }
-            "--ptx" => {
-                use_ptx = true;
-                i += 1;
             }
             _ => {
                 if source_file.is_none() {
@@ -46,11 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let source_file = source_file.ok_or("No source file specified")?;
 
     // Compile to assembly
-    let assembly = if use_ptx {
-        compile_file_to_assembly_with_ptx(&source_file)?
-    } else {
-        compile_file_to_assembly(&source_file)?
-    };
+    let assembly = compile_file_to_assembly(&source_file)?;
 
     // If no output file specified, print assembly to stdout
     if output_file.is_none() {
@@ -60,16 +51,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Generate binary
     let output_file = output_file.unwrap();
-    generate_binary(&assembly, &output_file, use_ptx)?;
+    generate_binary(&assembly, &output_file)?;
 
     Ok(())
 }
 
-fn generate_binary(
-    assembly: &str,
-    output_file: &str,
-    use_ptx: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn generate_binary(assembly: &str, output_file: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Create temporary directory for build artifacts
     let temp_dir = TempDir::new()?;
     let asm_file = temp_dir.path().join("program.s");
@@ -93,30 +80,12 @@ fn generate_binary(
     }
 
     // Step 3: Link to executable
-    if use_ptx {
-        // For PTX, use gcc with CUDA libraries
-        let ld_status = Command::new("gcc")
-            .args([
-                "-no-pie",
-                obj_file.to_string_lossy().as_ref(),
-                "-o",
-                output_file,
-                "/opt/cuda/lib64/stubs/libcuda.so",
-            ])
-            .status()?;
+    let ld_status = Command::new("ld")
+        .args([obj_file.to_string_lossy().as_ref(), "-o", output_file])
+        .status()?;
 
-        if !ld_status.success() {
-            return Err("Linking failed".into());
-        }
-    } else {
-        // For regular programs, use ld
-        let ld_status = Command::new("ld")
-            .args([obj_file.to_string_lossy().as_ref(), "-o", output_file])
-            .status()?;
-
-        if !ld_status.success() {
-            return Err("Linking failed".into());
-        }
+    if !ld_status.success() {
+        return Err("Linking failed".into());
     }
 
     eprintln!("Binary generated: {output_file}");

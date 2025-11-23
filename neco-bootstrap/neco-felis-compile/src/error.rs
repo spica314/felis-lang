@@ -1,5 +1,3 @@
-use neco_felis_ptx::PtxCompileError;
-
 #[derive(Debug, Clone)]
 pub enum CompileError {
     UnsupportedConstruct(String),
@@ -20,11 +18,3 @@ impl std::fmt::Display for CompileError {
 }
 
 impl std::error::Error for CompileError {}
-
-impl From<PtxCompileError> for CompileError {
-    fn from(value: PtxCompileError) -> Self {
-        match value {
-            PtxCompileError::UnsupportedConstruct(msg) => CompileError::UnsupportedConstruct(msg),
-        }
-    }
-}

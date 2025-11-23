@@ -39,6 +39,18 @@ ptxas --compile-only --gpu-name=sm_52 {PTXファイル名}
 ```
 が正常に終わればOK
 
+## 実行ファイル作成（&リンク）
+
+```
+gcc -no-pie {objファイル} -o {実行ファイル名} /opt/cuda/lib64/stubs/libcuda.so
+```
+
+## Nvidia GPUがあるかどうかのコマンドラインでの判定方法
+
+```
+command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L 2>/dev/null | grep -qE '^GPU [0-9]+'
+```
+
 ## CUDA Driver API
 
 ### `CUresult cuInit ( unsigned int  Flags )`

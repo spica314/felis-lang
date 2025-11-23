@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "neco-felis-compile", "neco-felis-ptx",
+    "neco-felis-compile",
     "neco-felis-rename",
     "neco-felis-syn",
     "neco-scope",

@@ -14,10 +14,9 @@
 - Format check: `neco-bootstrap/ci-scripts/check.sh` or `cargo fmt --all -- --check`.
 - Lint: `cargo clippy --all-targets --all-features -- -D warnings`.
 - Test (CPU): `cargo test --workspace --offline`.
-- Test (GPU/PTX): `cargo test --workspace --offline --features neco-felis-compile/has-ptx-device`.
 - Full repo checks: `ci-scripts/check.sh [--fix]`.
 - Coverage (HTML): `neco-bootstrap/ci-scripts/generate-coverage-report.sh`.
-- Run compiler example: `cargo run -p neco-felis-compile -- ./examples/ray-tracing-in-one-weekend/main.fe -o a.out --ptx`.
+- Run compiler example: `cargo run -p neco-felis-compile -- ./examples/ray-tracing-in-one-weekend/main.fe -o a.out`.
 
 ## Coding Style & Naming Conventions
 - Rustfmt enforced; 4-space indentation; max line length per default rustfmt.
@@ -42,4 +41,4 @@
 
 ## Notes
 - CI uses Rust nightly; keep code compatible with the pinned nightly where possible.
-- PTX/GPU paths are optional and auto-detected in scripts; prefer CPU paths for portability.
+- PTX/GPU code generation is removed; prefer CPU paths for portability.
