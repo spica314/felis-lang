@@ -9,7 +9,7 @@ pub struct NameId(pub usize, pub usize);
 pub struct TermId(pub usize, pub usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PhaseRenamed;
+pub struct PhaseElaborated;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StatementLetMutIds {
@@ -143,7 +143,7 @@ pub struct ProcTermStructValueIds {
     pub term_id: TermId,
 }
 
-impl Phase for PhaseRenamed {
+impl Phase for PhaseElaborated {
     type FileExt = ();
     type ItemDefinitionExt = NameId;
     type ItemInductiveExt = NameId;

@@ -1,8 +1,8 @@
 use neco_felis_syn::*;
 use neco_scope::ScopeStack;
 
-pub use crate::phase_renamed::{
-    NameId, PhaseRenamed, ProcTermApplyIds, ProcTermConstructorCallIds, ProcTermDereferenceIds,
+pub use crate::phase_elaborated::{
+    NameId, PhaseElaborated, ProcTermApplyIds, ProcTermConstructorCallIds, ProcTermDereferenceIds,
     ProcTermFieldAccessIds, ProcTermIds, ProcTermIfIds, ProcTermNumberIds, ProcTermParenIds,
     ProcTermStructValueIds, ProcTermUnitIds, ProcTermVariableIds, StatementCallPtxIds,
     StatementLetMutIds, TermApplyIds, TermArrowDepIds, TermArrowNodepIds, TermConstructorCallIds,
@@ -10,35 +10,35 @@ pub use crate::phase_renamed::{
     TermStructIds, TermUnitIds, TermVariableIds,
 };
 
-pub mod phase_renamed;
+pub mod phase_elaborated;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RenameError {
+pub enum ElaborationError {
     UnboundVariable { name: String },
 }
 
-impl std::fmt::Display for RenameError {
+impl std::fmt::Display for ElaborationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RenameError::UnboundVariable { name } => {
+            ElaborationError::UnboundVariable { name } => {
                 write!(f, "unbound variable: {name}")
             }
         }
     }
 }
 
-impl std::error::Error for RenameError {}
+impl std::error::Error for ElaborationError {}
 
-type RenameResult<T> = Result<T, RenameError>;
+type ElaborationResult<T> = Result<T, ElaborationError>;
 
-struct RenameContext {
+struct ElaborationContext {
     file_id: usize,
     next_name_id: usize,
     next_term_id: usize,
     scope: ScopeStack<String, NameId>,
 }
 
-impl RenameContext {
+impl ElaborationContext {
     fn new(file_id: usize) -> Self {
         Self {
             file_id,
@@ -75,9 +75,9 @@ impl RenameContext {
         self.scope.get(&name.to_string()).cloned()
     }
 
-    fn expect_variable(&self, name: &str) -> RenameResult<NameId> {
+    fn expect_variable(&self, name: &str) -> ElaborationResult<NameId> {
         self.lookup_variable(name)
-            .ok_or_else(|| RenameError::UnboundVariable {
+            .ok_or_else(|| ElaborationError::UnboundVariable {
                 name: name.to_string(),
             })
     }
@@ -100,54 +100,54 @@ impl RenameContext {
     }
 }
 
-pub fn rename_file(file: &File<PhaseParse>) -> RenameResult<File<PhaseRenamed>> {
-    rename_file_with_id(file, 0)
+pub fn elaborate_file(file: &File<PhaseParse>) -> ElaborationResult<File<PhaseElaborated>> {
+    elaborate_file_with_id(file, 0)
 }
 
-pub fn rename_file_with_id(
+pub fn elaborate_file_with_id(
     file: &File<PhaseParse>,
     file_id: usize,
-) -> RenameResult<File<PhaseRenamed>> {
-    let mut context = RenameContext::new(file_id);
+) -> ElaborationResult<File<PhaseElaborated>> {
+    let mut context = ElaborationContext::new(file_id);
 
     let mut items = Vec::with_capacity(file.items().len());
     for item in file.items() {
-        items.push(rename_item(&mut context, item)?);
+        items.push(elaborate_item(&mut context, item)?);
     }
 
     Ok(File { items, ext: () })
 }
 
-fn rename_item(
-    context: &mut RenameContext,
+fn elaborate_item(
+    context: &mut ElaborationContext,
     item: &Item<PhaseParse>,
-) -> RenameResult<Item<PhaseRenamed>> {
+) -> ElaborationResult<Item<PhaseElaborated>> {
     match item {
         Item::Definition(definition) => {
-            rename_definition(context, definition).map(Item::Definition)
+            elaborate_definition(context, definition).map(Item::Definition)
         }
-        Item::Inductive(inductive) => rename_inductive(context, inductive).map(Item::Inductive),
-        Item::Theorem(theorem) => rename_theorem(context, theorem).map(Item::Theorem),
+        Item::Inductive(inductive) => elaborate_inductive(context, inductive).map(Item::Inductive),
+        Item::Theorem(theorem) => elaborate_theorem(context, theorem).map(Item::Theorem),
         Item::Entrypoint(entrypoint) => {
-            rename_entrypoint(context, entrypoint).map(Item::Entrypoint)
+            elaborate_entrypoint(context, entrypoint).map(Item::Entrypoint)
         }
         Item::UseBuiltin(use_builtin) => {
-            rename_use_builtin(context, use_builtin).map(Item::UseBuiltin)
+            elaborate_use_builtin(context, use_builtin).map(Item::UseBuiltin)
         }
-        Item::Proc(proc) => rename_proc(context, proc).map(|p| Item::Proc(Box::new(p))),
-        Item::Struct(struct_item) => rename_struct(context, struct_item).map(Item::Struct),
+        Item::Proc(proc) => elaborate_proc(context, proc).map(|p| Item::Proc(Box::new(p))),
+        Item::Struct(struct_item) => elaborate_struct(context, struct_item).map(Item::Struct),
     }
 }
 
-fn rename_definition(
-    context: &mut RenameContext,
+fn elaborate_definition(
+    context: &mut ElaborationContext,
     definition: &ItemDefinition<PhaseParse>,
-) -> RenameResult<ItemDefinition<PhaseRenamed>> {
+) -> ElaborationResult<ItemDefinition<PhaseElaborated>> {
     let def_id = context.bind_variable(definition.name().s());
 
     context.enter_scope();
-    let ty = rename_term(context, definition.type_())?;
-    let body = rename_term(context, definition.body())?;
+    let ty = elaborate_term(context, definition.type_())?;
+    let body = elaborate_term(context, definition.body())?;
     context.leave_scope();
 
     Ok(ItemDefinition {
@@ -162,19 +162,19 @@ fn rename_definition(
     })
 }
 
-fn rename_inductive(
-    context: &mut RenameContext,
+fn elaborate_inductive(
+    context: &mut ElaborationContext,
     inductive: &ItemInductive<PhaseParse>,
-) -> RenameResult<ItemInductive<PhaseRenamed>> {
+) -> ElaborationResult<ItemInductive<PhaseElaborated>> {
     let ind_id = context.bind_variable(inductive.name().s());
 
     context.enter_scope();
-    let ty = rename_term(context, inductive.ty())?;
+    let ty = elaborate_term(context, inductive.ty())?;
     let branches = inductive
         .branches()
         .iter()
-        .map(|branch| rename_inductive_branch(context, branch))
-        .collect::<RenameResult<Vec<_>>>()?;
+        .map(|branch| elaborate_inductive_branch(context, branch))
+        .collect::<ElaborationResult<Vec<_>>>()?;
     context.leave_scope();
 
     Ok(ItemInductive {
@@ -189,13 +189,13 @@ fn rename_inductive(
     })
 }
 
-fn rename_inductive_branch(
-    context: &mut RenameContext,
+fn elaborate_inductive_branch(
+    context: &mut ElaborationContext,
     branch: &ItemInductiveBranch<PhaseParse>,
-) -> RenameResult<ItemInductiveBranch<PhaseRenamed>> {
+) -> ElaborationResult<ItemInductiveBranch<PhaseElaborated>> {
     context.enter_scope();
     let _ctor_id = context.bind_variable(branch.name().s());
-    let ty = rename_term(context, branch.ty())?;
+    let ty = elaborate_term(context, branch.ty())?;
     context.leave_scope();
 
     Ok(ItemInductiveBranch {
@@ -207,15 +207,15 @@ fn rename_inductive_branch(
     })
 }
 
-fn rename_theorem(
-    context: &mut RenameContext,
+fn elaborate_theorem(
+    context: &mut ElaborationContext,
     theorem: &ItemTheorem<PhaseParse>,
-) -> RenameResult<ItemTheorem<PhaseRenamed>> {
+) -> ElaborationResult<ItemTheorem<PhaseElaborated>> {
     let thm_id = context.bind_variable(theorem.name().s());
 
     context.enter_scope();
-    let ty = rename_term(context, theorem.type_())?;
-    let body = rename_term(context, theorem.body())?;
+    let ty = elaborate_term(context, theorem.type_())?;
+    let body = elaborate_term(context, theorem.body())?;
     context.leave_scope();
 
     Ok(ItemTheorem {
@@ -230,10 +230,10 @@ fn rename_theorem(
     })
 }
 
-fn rename_entrypoint(
-    context: &mut RenameContext,
+fn elaborate_entrypoint(
+    context: &mut ElaborationContext,
     entrypoint: &ItemEntrypoint<PhaseParse>,
-) -> RenameResult<ItemEntrypoint<PhaseRenamed>> {
+) -> ElaborationResult<ItemEntrypoint<PhaseElaborated>> {
     let target_id = context.get_or_placeholder(entrypoint.name.s());
 
     Ok(ItemEntrypoint {
@@ -244,10 +244,10 @@ fn rename_entrypoint(
     })
 }
 
-fn rename_use_builtin(
-    context: &mut RenameContext,
+fn elaborate_use_builtin(
+    context: &mut ElaborationContext,
     use_builtin: &ItemUseBuiltin<PhaseParse>,
-) -> RenameResult<ItemUseBuiltin<PhaseRenamed>> {
+) -> ElaborationResult<ItemUseBuiltin<PhaseElaborated>> {
     let alias_id = context.bind_variable(use_builtin.name.s());
 
     Ok(ItemUseBuiltin {
@@ -260,22 +260,22 @@ fn rename_use_builtin(
     })
 }
 
-fn rename_proc(
-    context: &mut RenameContext,
+fn elaborate_proc(
+    context: &mut ElaborationContext,
     proc: &ItemProc<PhaseParse>,
-) -> RenameResult<ItemProc<PhaseRenamed>> {
+) -> ElaborationResult<ItemProc<PhaseElaborated>> {
     let proc_id = context.bind_variable(proc.name.s());
 
-    // Rename type with existing context (arrow scopes are handled inside rename_term)
-    let ty = rename_term(context, proc.ty.as_ref())?;
+    // Elaborate type with existing context (arrow scopes are handled inside elaborate_term)
+    let ty = elaborate_term(context, proc.ty.as_ref())?;
     let params = collect_proc_parameters(&ty);
 
-    // Rename procedure body in a new scope with parameters bound to their IDs
+    // Elaborate procedure body in a new scope with parameters bound to their IDs
     context.enter_scope();
     for (name, id) in &params {
         context.bind_variable_with_id(name, id.clone());
     }
-    let proc_block = rename_proc_block(context, &proc.proc_block)?;
+    let proc_block = elaborate_proc_block(context, &proc.proc_block)?;
     context.leave_scope();
 
     Ok(ItemProc {
@@ -289,8 +289,8 @@ fn rename_proc(
     })
 }
 
-fn collect_proc_parameters(term: &Term<PhaseRenamed>) -> Vec<(String, NameId)> {
-    fn collect(term: &Term<PhaseRenamed>, out: &mut Vec<(String, NameId)>) {
+fn collect_proc_parameters(term: &Term<PhaseElaborated>) -> Vec<(String, NameId)> {
+    fn collect(term: &Term<PhaseElaborated>, out: &mut Vec<(String, NameId)>) {
         match term {
             Term::ArrowDep(arrow) => {
                 out.push((
@@ -311,11 +311,11 @@ fn collect_proc_parameters(term: &Term<PhaseRenamed>) -> Vec<(String, NameId)> {
     params
 }
 
-fn rename_proc_block(
-    context: &mut RenameContext,
+fn elaborate_proc_block(
+    context: &mut ElaborationContext,
     block: &ItemProcBlock<PhaseParse>,
-) -> RenameResult<ItemProcBlock<PhaseRenamed>> {
-    let statements = rename_statements(context, &block.statements)?;
+) -> ElaborationResult<ItemProcBlock<PhaseElaborated>> {
+    let statements = elaborate_statements(context, &block.statements)?;
 
     Ok(ItemProcBlock {
         brace_l: block.brace_l.clone(),
@@ -325,17 +325,17 @@ fn rename_proc_block(
     })
 }
 
-fn rename_struct(
-    context: &mut RenameContext,
+fn elaborate_struct(
+    context: &mut ElaborationContext,
     struct_item: &ItemStruct<PhaseParse>,
-) -> RenameResult<ItemStruct<PhaseRenamed>> {
+) -> ElaborationResult<ItemStruct<PhaseElaborated>> {
     let struct_id = context.bind_variable(struct_item.name.s());
 
     let fields = struct_item
         .fields()
         .iter()
         .map(|field| {
-            let ty = rename_term(context, field.ty.as_ref())?;
+            let ty = elaborate_term(context, field.ty.as_ref())?;
             Ok(ItemStructField {
                 name: field.name.clone(),
                 colon: field.colon.clone(),
@@ -344,7 +344,7 @@ fn rename_struct(
                 ext: (),
             })
         })
-        .collect::<RenameResult<Vec<_>>>()?;
+        .collect::<ElaborationResult<Vec<_>>>()?;
 
     Ok(ItemStruct {
         keyword_struct: struct_item.keyword_struct.clone(),
@@ -356,19 +356,19 @@ fn rename_struct(
     })
 }
 
-fn rename_statements(
-    context: &mut RenameContext,
+fn elaborate_statements(
+    context: &mut ElaborationContext,
     statements: &Statements<PhaseParse>,
-) -> RenameResult<Statements<PhaseRenamed>> {
+) -> ElaborationResult<Statements<PhaseElaborated>> {
     match statements {
         Statements::Nil => Ok(Statements::Nil),
         Statements::Statement(statement) => {
-            let stmt = rename_statement(context, statement)?;
+            let stmt = elaborate_statement(context, statement)?;
             Ok(Statements::Statement(Box::new(stmt)))
         }
         Statements::Then(then) => {
-            let head = rename_statement(context, &then.head)?;
-            let tail = rename_statements(context, &then.tail)?;
+            let head = elaborate_statement(context, &then.head)?;
+            let tail = elaborate_statements(context, &then.tail)?;
             Ok(Statements::Then(StatementsThen {
                 head: Box::new(head),
                 semicolon: then.semicolon.clone(),
@@ -379,13 +379,13 @@ fn rename_statements(
     }
 }
 
-fn rename_statement(
-    context: &mut RenameContext,
+fn elaborate_statement(
+    context: &mut ElaborationContext,
     statement: &Statement<PhaseParse>,
-) -> RenameResult<Statement<PhaseRenamed>> {
+) -> ElaborationResult<Statement<PhaseElaborated>> {
     match statement {
         Statement::Let(let_stmt) => {
-            let value = rename_proc_term(context, &let_stmt.value)?;
+            let value = elaborate_proc_term(context, &let_stmt.value)?;
             let var_id = context.bind_variable(let_stmt.variable.s());
             Ok(Statement::Let(StatementLet {
                 let_keyword: let_stmt.let_keyword.clone(),
@@ -396,7 +396,7 @@ fn rename_statement(
             }))
         }
         Statement::LetMut(let_mut_stmt) => {
-            let value = rename_proc_term(context, &let_mut_stmt.value)?;
+            let value = elaborate_proc_term(context, &let_mut_stmt.value)?;
             let value_id = context.bind_variable(let_mut_stmt.variable.s());
             let reference_id = context.bind_variable(let_mut_stmt.reference_variable.s());
             Ok(Statement::LetMut(StatementLetMut {
@@ -415,7 +415,7 @@ fn rename_statement(
         }
         Statement::Assign(assign_stmt) => {
             let target_id = context.expect_variable(assign_stmt.variable.s())?;
-            let value = rename_proc_term(context, &assign_stmt.value)?;
+            let value = elaborate_proc_term(context, &assign_stmt.value)?;
             Ok(Statement::Assign(StatementAssign {
                 variable: assign_stmt.variable.clone(),
                 equals: assign_stmt.equals.clone(),
@@ -424,8 +424,9 @@ fn rename_statement(
             }))
         }
         Statement::FieldAssign(field_assign_stmt) => {
-            let method_chain = rename_proc_method_chain(context, &field_assign_stmt.method_chain)?;
-            let value = rename_proc_term(context, &field_assign_stmt.value)?;
+            let method_chain =
+                elaborate_proc_method_chain(context, &field_assign_stmt.method_chain)?;
+            let value = elaborate_proc_term(context, &field_assign_stmt.value)?;
             Ok(Statement::FieldAssign(StatementMethodChainAssign {
                 method_chain,
                 equals: field_assign_stmt.equals.clone(),
@@ -435,7 +436,7 @@ fn rename_statement(
         }
         Statement::Loop(loop_stmt) => {
             context.enter_scope();
-            let body = rename_statements(context, &loop_stmt.body)?;
+            let body = elaborate_statements(context, &loop_stmt.body)?;
             context.leave_scope();
             Ok(Statement::Loop(StatementLoop {
                 keyword_loop: loop_stmt.keyword_loop.clone(),
@@ -451,7 +452,7 @@ fn rename_statement(
             ext: (),
         })),
         Statement::Return(return_stmt) => {
-            let value = rename_proc_term(context, &return_stmt.value)?;
+            let value = elaborate_proc_term(context, &return_stmt.value)?;
             Ok(Statement::Return(StatementReturn {
                 keyword_return: return_stmt.keyword_return.clone(),
                 value: Box::new(value),
@@ -479,26 +480,26 @@ fn rename_statement(
             }))
         }
         Statement::Expr(proc_term) => {
-            let renamed = rename_proc_term(context, proc_term)?;
-            Ok(Statement::Expr(renamed))
+            let elaborated = elaborate_proc_term(context, proc_term)?;
+            Ok(Statement::Expr(elaborated))
         }
         Statement::Ext(_) => unreachable!("Ext statements are not supported in PhaseParse"),
     }
 }
 
-fn rename_proc_term(
-    context: &mut RenameContext,
+fn elaborate_proc_term(
+    context: &mut ElaborationContext,
     proc_term: &ProcTerm<PhaseParse>,
-) -> RenameResult<ProcTerm<PhaseRenamed>> {
+) -> ElaborationResult<ProcTerm<PhaseElaborated>> {
     match proc_term {
         ProcTerm::Apply(apply) => {
             let term_id = context.generate_term_id();
-            let f = rename_proc_term(context, &apply.f)?;
+            let f = elaborate_proc_term(context, &apply.f)?;
             let args = apply
                 .args
                 .iter()
-                .map(|arg| rename_proc_term(context, arg))
-                .collect::<RenameResult<Vec<_>>>()?;
+                .map(|arg| elaborate_proc_term(context, arg))
+                .collect::<ElaborationResult<Vec<_>>>()?;
             Ok(ProcTerm::Apply(ProcTermApply {
                 f: Box::new(f),
                 args,
@@ -532,7 +533,7 @@ fn rename_proc_term(
             let term_id = context.generate_term_id();
             let object_id = context.get_or_placeholder(field_access.object.s());
             let index = match &field_access.index {
-                Some(idx) => Some(Box::new(rename_proc_term(context, idx)?)),
+                Some(idx) => Some(Box::new(elaborate_proc_term(context, idx)?)),
                 None => None,
             };
             Ok(ProcTerm::FieldAccess(ProcTermFieldAccess {
@@ -544,16 +545,16 @@ fn rename_proc_term(
             }))
         }
         ProcTerm::MethodChain(method_chain) => {
-            let renamed = rename_proc_method_chain(context, method_chain)?;
-            Ok(ProcTerm::MethodChain(renamed))
+            let elaborated = elaborate_proc_method_chain(context, method_chain)?;
+            Ok(ProcTerm::MethodChain(elaborated))
         }
         ProcTerm::ConstructorCall(constructor_call) => {
             let term_id = context.generate_term_id();
             let args = constructor_call
                 .args
                 .iter()
-                .map(|arg| rename_proc_term(context, arg))
-                .collect::<RenameResult<Vec<_>>>()?;
+                .map(|arg| elaborate_proc_term(context, arg))
+                .collect::<ElaborationResult<Vec<_>>>()?;
             Ok(ProcTerm::ConstructorCall(ProcTermConstructorCall {
                 type_name: constructor_call.type_name.clone(),
                 colon2: constructor_call.colon2.clone(),
@@ -571,7 +572,7 @@ fn rename_proc_term(
                 .fields
                 .iter()
                 .map(|field| {
-                    let value = rename_proc_term(context, &field.value)?;
+                    let value = elaborate_proc_term(context, &field.value)?;
                     Ok(ProcTermStructField {
                         name: field.name.clone(),
                         colon: field.colon.clone(),
@@ -579,7 +580,7 @@ fn rename_proc_term(
                         comma: field.comma.clone(),
                     })
                 })
-                .collect::<RenameResult<Vec<_>>>()?;
+                .collect::<ElaborationResult<Vec<_>>>()?;
             Ok(ProcTerm::StructValue(ProcTermStructValue {
                 struct_name: struct_value.struct_name.clone(),
                 brace_l: struct_value.brace_l.clone(),
@@ -591,16 +592,16 @@ fn rename_proc_term(
         ProcTerm::If(if_expr) => {
             let term_id = context.generate_term_id();
             context.enter_scope();
-            let condition = rename_statements(context, &if_expr.condition)?;
+            let condition = elaborate_statements(context, &if_expr.condition)?;
             context.leave_scope();
 
             context.enter_scope();
-            let then_body = rename_statements(context, &if_expr.then_body)?;
+            let then_body = elaborate_statements(context, &if_expr.then_body)?;
             context.leave_scope();
 
             let else_clause = if let Some(else_clause) = &if_expr.else_clause {
                 context.enter_scope();
-                let else_body = rename_statements(context, &else_clause.else_body)?;
+                let else_body = elaborate_statements(context, &else_clause.else_body)?;
                 context.leave_scope();
                 Some(ProcTermIfElse {
                     keyword_else: else_clause.keyword_else.clone(),
@@ -623,7 +624,7 @@ fn rename_proc_term(
             }))
         }
         ProcTerm::Dereference(deref) => {
-            let term = rename_proc_term(context, &deref.term)?;
+            let term = elaborate_proc_term(context, &deref.term)?;
             let term_id = context.generate_term_id();
             Ok(ProcTerm::Dereference(ProcTermDereference {
                 term: Box::new(term),
@@ -632,7 +633,7 @@ fn rename_proc_term(
             }))
         }
         ProcTerm::Paren(paren) => {
-            let inner = rename_proc_term(context, &paren.proc_term)?;
+            let inner = elaborate_proc_term(context, &paren.proc_term)?;
             let term_id = context.generate_term_id();
             Ok(ProcTerm::Paren(ProcTermParen {
                 paren_l: paren.paren_l.clone(),
@@ -645,14 +646,14 @@ fn rename_proc_term(
     }
 }
 
-fn rename_proc_method_chain(
-    context: &mut RenameContext,
+fn elaborate_proc_method_chain(
+    context: &mut ElaborationContext,
     method_chain: &ProcTermMethodChain<PhaseParse>,
-) -> RenameResult<ProcTermMethodChain<PhaseRenamed>> {
+) -> ElaborationResult<ProcTermMethodChain<PhaseElaborated>> {
     let term_id = context.generate_term_id();
     let object_id = context.get_or_placeholder(method_chain.object.s());
     let index = match &method_chain.index {
-        Some(idx) => Some(Box::new(rename_proc_term(context, idx)?)),
+        Some(idx) => Some(Box::new(elaborate_proc_term(context, idx)?)),
         None => None,
     };
     Ok(ProcTermMethodChain {
@@ -664,10 +665,10 @@ fn rename_proc_method_chain(
     })
 }
 
-fn rename_term(
-    context: &mut RenameContext,
+fn elaborate_term(
+    context: &mut ElaborationContext,
     term: &Term<PhaseParse>,
-) -> RenameResult<Term<PhaseRenamed>> {
+) -> ElaborationResult<Term<PhaseElaborated>> {
     match term {
         Term::Variable(var) => {
             let term_id = context.generate_term_id();
@@ -679,12 +680,12 @@ fn rename_term(
         }
         Term::Apply(apply) => {
             let term_id = context.generate_term_id();
-            let f = rename_term(context, apply.f())?;
+            let f = elaborate_term(context, apply.f())?;
             let args = apply
                 .args()
                 .iter()
-                .map(|arg| rename_term(context, arg))
-                .collect::<RenameResult<Vec<_>>>()?;
+                .map(|arg| elaborate_term(context, arg))
+                .collect::<ElaborationResult<Vec<_>>>()?;
             Ok(Term::Apply(TermApply {
                 f: Box::new(f),
                 args,
@@ -702,8 +703,8 @@ fn rename_term(
                     name_id: param_id.clone(),
                 },
             };
-            let from_ty = rename_term(context, arrow.from_ty())?;
-            let to = rename_term(context, arrow.to())?;
+            let from_ty = elaborate_term(context, arrow.from_ty())?;
+            let to = elaborate_term(context, arrow.to())?;
             context.leave_scope();
             Ok(Term::ArrowDep(TermArrowDep {
                 paren_l: arrow.paren_l.clone(),
@@ -718,8 +719,8 @@ fn rename_term(
         }
         Term::ArrowNodep(arrow) => {
             let term_id = context.generate_term_id();
-            let from = rename_term(context, arrow.from())?;
-            let to = rename_term(context, arrow.to())?;
+            let from = elaborate_term(context, arrow.from())?;
+            let to = elaborate_term(context, arrow.to())?;
             Ok(Term::ArrowNodep(TermArrowNodep {
                 from: Box::new(from),
                 arrow: arrow.arrow.clone(),
@@ -733,8 +734,8 @@ fn rename_term(
             let branches = match_term
                 .branches()
                 .iter()
-                .map(|branch| rename_match_branch(context, branch))
-                .collect::<RenameResult<Vec<_>>>()?;
+                .map(|branch| elaborate_match_branch(context, branch))
+                .collect::<ElaborationResult<Vec<_>>>()?;
             Ok(Term::Match(TermMatch {
                 keyword_match: match_term.keyword_match.clone(),
                 scrutinee: match_term.scrutinee.clone(),
@@ -748,7 +749,7 @@ fn rename_term(
             }))
         }
         Term::Paren(paren) => {
-            let inner = rename_term(context, paren.term())?;
+            let inner = elaborate_term(context, paren.term())?;
             let term_id = context.generate_term_id();
             Ok(Term::Paren(TermParen {
                 paren_l: paren.paren_l.clone(),
@@ -778,7 +779,7 @@ fn rename_term(
                 .fields()
                 .iter()
                 .map(|field| {
-                    let ty = rename_term(context, field.ty.as_ref())?;
+                    let ty = elaborate_term(context, field.ty.as_ref())?;
                     Ok(TermStructField {
                         name: field.name.clone(),
                         colon: field.colon.clone(),
@@ -786,7 +787,7 @@ fn rename_term(
                         comma: field.comma.clone(),
                     })
                 })
-                .collect::<RenameResult<Vec<_>>>()?;
+                .collect::<ElaborationResult<Vec<_>>>()?;
             Ok(Term::Struct(TermStruct {
                 keyword_struct: struct_term.keyword_struct.clone(),
                 brace_l: struct_term.brace_l.clone(),
@@ -798,13 +799,13 @@ fn rename_term(
     }
 }
 
-fn rename_match_branch(
-    context: &mut RenameContext,
+fn elaborate_match_branch(
+    context: &mut ElaborationContext,
     branch: &TermMatchBranch<PhaseParse>,
-) -> RenameResult<TermMatchBranch<PhaseRenamed>> {
+) -> ElaborationResult<TermMatchBranch<PhaseElaborated>> {
     context.enter_scope();
-    rename_pattern_bindings(context, &branch.pattern)?;
-    let body = rename_term(context, branch.body())?;
+    elaborate_pattern_bindings(context, &branch.pattern)?;
+    let body = elaborate_term(context, branch.body())?;
     context.leave_scope();
 
     Ok(TermMatchBranch {
@@ -816,7 +817,10 @@ fn rename_match_branch(
     })
 }
 
-fn rename_pattern_bindings(context: &mut RenameContext, pattern: &Pattern) -> RenameResult<()> {
+fn elaborate_pattern_bindings(
+    context: &mut ElaborationContext,
+    pattern: &Pattern,
+) -> ElaborationResult<()> {
     match pattern {
         Pattern::Variable(var) => {
             context.bind_variable(var.s());
@@ -836,7 +840,7 @@ mod tests {
     use neco_felis_syn::{FileIdGenerator, Parse, token::Token};
 
     #[test]
-    fn test_rename_simple_variable() {
+    fn test_elaborate_simple_variable() {
         let mut file_id_generator = FileIdGenerator::new();
         let file_id = file_id_generator.generate_file_id();
 
@@ -846,11 +850,11 @@ mod tests {
         let mut i = 0;
         let parsed_file = File::parse(&tokens, &mut i).unwrap().unwrap();
 
-        let renamed_file = rename_file(&parsed_file).unwrap();
+        let elaborated_file = elaborate_file(&parsed_file).unwrap();
 
-        assert_eq!(renamed_file.items.len(), 1);
+        assert_eq!(elaborated_file.items.len(), 1);
 
-        if let Item::Definition(def) = &renamed_file.items[0] {
+        if let Item::Definition(def) = &elaborated_file.items[0] {
             if let Term::Variable(var) = def.body.as_ref() {
                 let TermVariableIds {
                     term_id: TermId(file_id, _),

@@ -1,8 +1,8 @@
-use neco_felis_elaboration::{PhaseRenamed, TermVariableIds, rename_file};
+use neco_felis_elaboration::{PhaseElaborated, TermVariableIds, elaborate_file};
 use neco_felis_syn::{File, FileIdGenerator, Item, Parse, PhaseParse, Term, TermVariable, Token};
 use neco_felis_typing::{BuiltinTypes, Type, TypeChecker};
 
-fn parse_and_rename(src: &str) -> File<PhaseRenamed> {
+fn parse_and_elaborate(src: &str) -> File<PhaseElaborated> {
     let mut file_id_gen = FileIdGenerator::new();
     let file_id = file_id_gen.generate_file_id();
     let tokens = Token::lex(src, file_id);
@@ -10,12 +10,12 @@ fn parse_and_rename(src: &str) -> File<PhaseRenamed> {
     let parsed = File::<PhaseParse>::parse(&tokens, &mut i)
         .expect("parse failed")
         .expect("no file parsed");
-    rename_file(&parsed).expect("rename failed")
+    elaborate_file(&parsed).expect("elaboration failed")
 }
 
 #[test]
 fn infers_simple_arrow_and_body() {
-    let file = parse_and_rename("#definition main: () -> () { () }");
+    let file = parse_and_elaborate("#definition main: () -> () { () }");
     let Item::Definition(def) = &file.items[0] else {
         panic!("expected definition");
     };
@@ -44,7 +44,7 @@ fn infers_simple_arrow_and_body() {
 
 #[test]
 fn infers_dependent_arrow_parameter() {
-    let mut file = parse_and_rename("#definition id: (x: ()) -> () { x }");
+    let mut file = parse_and_elaborate("#definition id: (x: ()) -> () { x }");
     let Item::Definition(def) = &mut file.items[0] else {
         panic!("expected definition");
     };
@@ -57,7 +57,7 @@ fn infers_dependent_arrow_parameter() {
         Term::Variable(var) => var.ext.term_id.clone(),
         other => panic!("expected variable body, got {other:?}"),
     };
-    // Renaming inserts a placeholder for the body variable; align it with the parameter id.
+    // Elaboration inserts a placeholder for the body variable; align it with the parameter id.
     if let Term::Variable(var) = def.body.as_mut() {
         let term_id = var.ext.term_id.clone();
         let updated = TermVariable {
@@ -85,7 +85,7 @@ fn infers_dependent_arrow_parameter() {
 
 #[test]
 fn binds_builtin_types_from_outside() {
-    let mut file = parse_and_rename(
+    let mut file = parse_and_elaborate(
         r#"
 #use_builtin "u64" #as u64;
 #definition forty_two: u64 { 42 }

@@ -1,25 +1,25 @@
 use crate::error::CompileError;
-use neco_felis_elaboration::{NameId, PhaseRenamed, StatementCallPtxIds, StatementLetMutIds};
+use neco_felis_elaboration::{NameId, PhaseElaborated, StatementCallPtxIds, StatementLetMutIds};
 use neco_felis_syn::*;
 use std::collections::HashSet;
 
 pub fn apply_symbol_ids(
     original: &mut File<PhaseParse>,
-    renamed: &File<PhaseRenamed>,
+    elaborated: &File<PhaseElaborated>,
 ) -> Result<(), CompileError> {
-    if original.items.len() != renamed.items.len() {
+    if original.items.len() != elaborated.items.len() {
         return Err(CompileError::UnsupportedConstruct(
-            "mismatched item count during renaming".to_string(),
+            "mismatched item count during elaboration".to_string(),
         ));
     }
 
-    let preserve_ids = collect_preserve_ids(renamed);
+    let preserve_ids = collect_preserve_ids(elaborated);
     let ctx = RewriteContext {
         preserve: &preserve_ids,
     };
 
-    for (orig_item, ren_item) in original.items.iter_mut().zip(renamed.items.iter()) {
-        update_item(&ctx, orig_item, ren_item)?;
+    for (orig_item, elab_item) in original.items.iter_mut().zip(elaborated.items.iter()) {
+        update_item(&ctx, orig_item, elab_item)?;
     }
 
     Ok(())
@@ -30,7 +30,7 @@ struct RewriteContext<'a> {
 }
 
 impl<'a> RewriteContext<'a> {
-    fn rename_token(&self, token: &mut TokenVariable, id: &NameId) {
+    fn apply_elaborated_token(&self, token: &mut TokenVariable, id: &NameId) {
         if id.1 == usize::MAX || self.preserve.contains(id) {
             return;
         }
@@ -39,7 +39,7 @@ impl<'a> RewriteContext<'a> {
     }
 }
 
-fn collect_preserve_ids(file: &File<PhaseRenamed>) -> HashSet<NameId> {
+fn collect_preserve_ids(file: &File<PhaseElaborated>) -> HashSet<NameId> {
     let mut set = HashSet::new();
     for item in &file.items {
         match item {
@@ -56,7 +56,7 @@ fn collect_preserve_ids(file: &File<PhaseRenamed>) -> HashSet<NameId> {
 }
 
 fn collect_statements_preserve_ids(
-    statements: &Statements<PhaseRenamed>,
+    statements: &Statements<PhaseElaborated>,
     set: &mut HashSet<NameId>,
 ) {
     match statements {
@@ -69,7 +69,10 @@ fn collect_statements_preserve_ids(
     }
 }
 
-fn collect_statement_preserve_ids(statement: &Statement<PhaseRenamed>, set: &mut HashSet<NameId>) {
+fn collect_statement_preserve_ids(
+    statement: &Statement<PhaseElaborated>,
+    set: &mut HashSet<NameId>,
+) {
     if let Statement::CallPtx(call) = statement {
         set.insert(call.ext.function_id.clone());
     }
@@ -78,9 +81,9 @@ fn collect_statement_preserve_ids(statement: &Statement<PhaseRenamed>, set: &mut
 fn update_item(
     ctx: &RewriteContext,
     original: &mut Item<PhaseParse>,
-    renamed: &Item<PhaseRenamed>,
+    elaborated: &Item<PhaseElaborated>,
 ) -> Result<(), CompileError> {
-    match (original, renamed) {
+    match (original, elaborated) {
         (Item::Definition(orig), Item::Definition(ren)) => {
             update_term(ctx, orig.type_.as_mut(), ren.type_.as_ref())?;
             update_term(ctx, orig.body.as_mut(), ren.body.as_ref())
@@ -113,17 +116,17 @@ fn update_item(
 fn update_proc_block(
     ctx: &RewriteContext,
     original: &mut ItemProcBlock<PhaseParse>,
-    renamed: &ItemProcBlock<PhaseRenamed>,
+    elaborated: &ItemProcBlock<PhaseElaborated>,
 ) -> Result<(), CompileError> {
-    update_statements(ctx, &mut original.statements, &renamed.statements)
+    update_statements(ctx, &mut original.statements, &elaborated.statements)
 }
 
 fn update_statements(
     ctx: &RewriteContext,
     original: &mut Statements<PhaseParse>,
-    renamed: &Statements<PhaseRenamed>,
+    elaborated: &Statements<PhaseElaborated>,
 ) -> Result<(), CompileError> {
-    match (original, renamed) {
+    match (original, elaborated) {
         (Statements::Nil, Statements::Nil) => Ok(()),
         (Statements::Statement(orig_stmt), Statements::Statement(ren_stmt)) => {
             update_statement(ctx, orig_stmt, ren_stmt)
@@ -133,7 +136,7 @@ fn update_statements(
             update_statements(ctx, &mut orig_then.tail, &ren_then.tail)
         }
         _ => Err(CompileError::UnsupportedConstruct(
-            "statement shape mismatch during renaming".to_string(),
+            "statement shape mismatch during elaboration".to_string(),
         )),
     }
 }
@@ -141,11 +144,11 @@ fn update_statements(
 fn update_statement(
     ctx: &RewriteContext,
     original: &mut Statement<PhaseParse>,
-    renamed: &Statement<PhaseRenamed>,
+    elaborated: &Statement<PhaseElaborated>,
 ) -> Result<(), CompileError> {
-    match (original, renamed) {
+    match (original, elaborated) {
         (Statement::Let(orig), Statement::Let(ren)) => {
-            ctx.rename_token(&mut orig.variable, &ren.ext);
+            ctx.apply_elaborated_token(&mut orig.variable, &ren.ext);
             update_proc_term(ctx, orig.value.as_mut(), ren.value.as_ref())
         }
         (Statement::LetMut(orig), Statement::LetMut(ren)) => {
@@ -153,12 +156,12 @@ fn update_statement(
                 value_id,
                 reference_id,
             } = &ren.ext;
-            ctx.rename_token(&mut orig.variable, value_id);
-            ctx.rename_token(&mut orig.reference_variable, reference_id);
+            ctx.apply_elaborated_token(&mut orig.variable, value_id);
+            ctx.apply_elaborated_token(&mut orig.reference_variable, reference_id);
             update_proc_term(ctx, orig.value.as_mut(), ren.value.as_ref())
         }
         (Statement::Assign(orig), Statement::Assign(ren)) => {
-            ctx.rename_token(&mut orig.variable, &ren.ext);
+            ctx.apply_elaborated_token(&mut orig.variable, &ren.ext);
             update_proc_term(ctx, orig.value.as_mut(), ren.value.as_ref())
         }
         (Statement::FieldAssign(orig), Statement::FieldAssign(ren)) => {
@@ -173,14 +176,14 @@ fn update_statement(
         }
         (Statement::CallPtx(orig), Statement::CallPtx(ren)) => {
             let StatementCallPtxIds { arg_id, .. } = &ren.ext;
-            ctx.rename_token(&mut orig.arg, arg_id);
+            ctx.apply_elaborated_token(&mut orig.arg, arg_id);
             Ok(())
         }
         (Statement::Expr(orig), Statement::Expr(ren)) => update_proc_term(ctx, orig, ren),
         (Statement::Break(_), Statement::Break(_)) => Ok(()),
         (Statement::Ext(_), Statement::Ext(_)) => Ok(()),
         _ => Err(CompileError::UnsupportedConstruct(
-            "statement variant mismatch during renaming".to_string(),
+            "statement variant mismatch during elaboration".to_string(),
         )),
     }
 }
@@ -188,11 +191,11 @@ fn update_statement(
 fn update_proc_term(
     ctx: &RewriteContext,
     original: &mut ProcTerm<PhaseParse>,
-    renamed: &ProcTerm<PhaseRenamed>,
+    elaborated: &ProcTerm<PhaseElaborated>,
 ) -> Result<(), CompileError> {
-    match (original, renamed) {
+    match (original, elaborated) {
         (ProcTerm::Variable(orig), ProcTerm::Variable(ren)) => {
-            ctx.rename_token(&mut orig.variable, &ren.ext.name_id);
+            ctx.apply_elaborated_token(&mut orig.variable, &ren.ext.name_id);
             Ok(())
         }
         (ProcTerm::Apply(orig), ProcTerm::Apply(ren)) => {
@@ -203,7 +206,7 @@ fn update_proc_term(
             Ok(())
         }
         (ProcTerm::FieldAccess(orig), ProcTerm::FieldAccess(ren)) => {
-            ctx.rename_token(&mut orig.object, &ren.ext.object_id);
+            ctx.apply_elaborated_token(&mut orig.object, &ren.ext.object_id);
             if let (Some(orig_idx), Some(ren_idx)) = (orig.index.as_mut(), ren.index.as_ref()) {
                 update_proc_term(ctx, orig_idx, ren_idx)?;
             }
@@ -237,7 +240,7 @@ fn update_proc_term(
                 ),
                 (None, None) => Ok(()),
                 _ => Err(CompileError::UnsupportedConstruct(
-                    "if-else clause mismatch during renaming".to_string(),
+                    "if-else clause mismatch during elaboration".to_string(),
                 )),
             }
         }
@@ -250,7 +253,7 @@ fn update_proc_term(
         (ProcTerm::Number(_), ProcTerm::Number(_)) => Ok(()),
         (ProcTerm::Unit(_), ProcTerm::Unit(_)) => Ok(()),
         _ => Err(CompileError::UnsupportedConstruct(format!(
-            "unsupported proc term combination: {renamed:?}"
+            "unsupported proc term combination: {elaborated:?}"
         ))),
     }
 }
@@ -258,10 +261,10 @@ fn update_proc_term(
 fn update_method_chain(
     ctx: &RewriteContext,
     original: &mut ProcTermMethodChain<PhaseParse>,
-    renamed: &ProcTermMethodChain<PhaseRenamed>,
+    elaborated: &ProcTermMethodChain<PhaseElaborated>,
 ) -> Result<(), CompileError> {
-    ctx.rename_token(&mut original.object, &renamed.ext.object_id);
-    if let (Some(orig_idx), Some(ren_idx)) = (original.index.as_mut(), renamed.index.as_ref()) {
+    ctx.apply_elaborated_token(&mut original.object, &elaborated.ext.object_id);
+    if let (Some(orig_idx), Some(ren_idx)) = (original.index.as_mut(), elaborated.index.as_ref()) {
         update_proc_term(ctx, orig_idx, ren_idx)?;
     }
     Ok(())
@@ -270,15 +273,15 @@ fn update_method_chain(
 fn update_term(
     ctx: &RewriteContext,
     original: &mut Term<PhaseParse>,
-    renamed: &Term<PhaseRenamed>,
+    elaborated: &Term<PhaseElaborated>,
 ) -> Result<(), CompileError> {
-    match (original, renamed) {
+    match (original, elaborated) {
         (Term::Variable(orig), Term::Variable(ren)) => {
-            ctx.rename_token(&mut orig.variable, &ren.ext.name_id);
+            ctx.apply_elaborated_token(&mut orig.variable, &ren.ext.name_id);
             Ok(())
         }
         (Term::ArrowDep(orig), Term::ArrowDep(ren)) => {
-            ctx.rename_token(&mut orig.from.variable, &ren.ext.param_id);
+            ctx.apply_elaborated_token(&mut orig.from.variable, &ren.ext.param_id);
             update_term(ctx, orig.from_ty.as_mut(), ren.from_ty.as_ref())?;
             update_term(ctx, orig.to.as_mut(), ren.to.as_ref())
         }
@@ -294,7 +297,7 @@ fn update_term(
             Ok(())
         }
         (Term::Match(orig), Term::Match(ren)) => {
-            ctx.rename_token(&mut orig.scrutinee, &ren.ext.scrutinee_id);
+            ctx.apply_elaborated_token(&mut orig.scrutinee, &ren.ext.scrutinee_id);
             for (orig_branch, ren_branch) in orig.branches.iter_mut().zip(&ren.branches) {
                 update_term(ctx, orig_branch.body.as_mut(), ren_branch.body.as_ref())?;
             }
