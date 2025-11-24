@@ -55,7 +55,10 @@ fn collect_preserve_ids(file: &File<PhaseRenamed>) -> HashSet<NameId> {
     set
 }
 
-fn collect_statements_preserve_ids(statements: &Statements<PhaseRenamed>, set: &mut HashSet<NameId>) {
+fn collect_statements_preserve_ids(
+    statements: &Statements<PhaseRenamed>,
+    set: &mut HashSet<NameId>,
+) {
     match statements {
         Statements::Then(then) => {
             collect_statement_preserve_ids(&then.head, set);
@@ -66,10 +69,7 @@ fn collect_statements_preserve_ids(statements: &Statements<PhaseRenamed>, set: &
     }
 }
 
-fn collect_statement_preserve_ids(
-    statement: &Statement<PhaseRenamed>,
-    set: &mut HashSet<NameId>,
-) {
+fn collect_statement_preserve_ids(statement: &Statement<PhaseRenamed>, set: &mut HashSet<NameId>) {
     if let Statement::CallPtx(call) = statement {
         set.insert(call.ext.function_id.clone());
     }

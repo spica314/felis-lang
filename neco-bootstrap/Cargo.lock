@@ -108,6 +108,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "neco-felis-typing"
+version = "0.1.0"
+dependencies = [
+ "neco-felis-elaboration",
+ "neco-felis-syn",
+ "neco-scope",
+]
+
+[[package]]
 name = "neco-scope"
 version = "0.1.0"
 

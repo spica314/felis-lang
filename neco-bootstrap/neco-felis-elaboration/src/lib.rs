@@ -6,8 +6,8 @@ pub use crate::phase_renamed::{
     ProcTermFieldAccessIds, ProcTermIds, ProcTermIfIds, ProcTermNumberIds, ProcTermParenIds,
     ProcTermStructValueIds, ProcTermUnitIds, ProcTermVariableIds, StatementCallPtxIds,
     StatementLetMutIds, TermApplyIds, TermArrowDepIds, TermArrowNodepIds, TermConstructorCallIds,
-    TermFieldAccessIds, TermMatchIds, TermNumberIds, TermParenIds, TermStringIds, TermStructIds,
-    TermUnitIds, TermVariableIds, TermId,
+    TermFieldAccessIds, TermId, TermMatchIds, TermNumberIds, TermParenIds, TermStringIds,
+    TermStructIds, TermUnitIds, TermVariableIds,
 };
 
 pub mod phase_renamed;
@@ -660,10 +660,7 @@ fn rename_proc_method_chain(
         dot: method_chain.dot.clone(),
         field: method_chain.field.clone(),
         index,
-        ext: ProcTermFieldAccessIds {
-            term_id,
-            object_id,
-        },
+        ext: ProcTermFieldAccessIds { term_id, object_id },
     })
 }
 
