@@ -1,5 +1,5 @@
 use crate::error::CompileError;
-use neco_felis_rename::{PhaseRenamed, StatementCallPtxIds, StatementLetMutIds, VariableId};
+use neco_felis_elaboration::{NameId, PhaseRenamed, StatementCallPtxIds, StatementLetMutIds};
 use neco_felis_syn::*;
 use std::collections::HashSet;
 
@@ -26,11 +26,11 @@ pub fn apply_symbol_ids(
 }
 
 struct RewriteContext<'a> {
-    preserve: &'a HashSet<VariableId>,
+    preserve: &'a HashSet<NameId>,
 }
 
 impl<'a> RewriteContext<'a> {
-    fn rename_token(&self, token: &mut TokenVariable, id: &VariableId) {
+    fn rename_token(&self, token: &mut TokenVariable, id: &NameId) {
         if id.1 == usize::MAX || self.preserve.contains(id) {
             return;
         }
@@ -39,7 +39,7 @@ impl<'a> RewriteContext<'a> {
     }
 }
 
-fn collect_preserve_ids(file: &File<PhaseRenamed>) -> HashSet<VariableId> {
+fn collect_preserve_ids(file: &File<PhaseRenamed>) -> HashSet<NameId> {
     let mut set = HashSet::new();
     for item in &file.items {
         match item {
@@ -55,10 +55,7 @@ fn collect_preserve_ids(file: &File<PhaseRenamed>) -> HashSet<VariableId> {
     set
 }
 
-fn collect_statements_preserve_ids(
-    statements: &Statements<PhaseRenamed>,
-    set: &mut HashSet<VariableId>,
-) {
+fn collect_statements_preserve_ids(statements: &Statements<PhaseRenamed>, set: &mut HashSet<NameId>) {
     match statements {
         Statements::Then(then) => {
             collect_statement_preserve_ids(&then.head, set);
@@ -71,7 +68,7 @@ fn collect_statements_preserve_ids(
 
 fn collect_statement_preserve_ids(
     statement: &Statement<PhaseRenamed>,
-    set: &mut HashSet<VariableId>,
+    set: &mut HashSet<NameId>,
 ) {
     if let Statement::CallPtx(call) = statement {
         set.insert(call.ext.function_id.clone());
@@ -195,7 +192,7 @@ fn update_proc_term(
 ) -> Result<(), CompileError> {
     match (original, renamed) {
         (ProcTerm::Variable(orig), ProcTerm::Variable(ren)) => {
-            ctx.rename_token(&mut orig.variable, &ren.ext);
+            ctx.rename_token(&mut orig.variable, &ren.ext.name_id);
             Ok(())
         }
         (ProcTerm::Apply(orig), ProcTerm::Apply(ren)) => {
@@ -206,7 +203,7 @@ fn update_proc_term(
             Ok(())
         }
         (ProcTerm::FieldAccess(orig), ProcTerm::FieldAccess(ren)) => {
-            ctx.rename_token(&mut orig.object, &ren.ext);
+            ctx.rename_token(&mut orig.object, &ren.ext.object_id);
             if let (Some(orig_idx), Some(ren_idx)) = (orig.index.as_mut(), ren.index.as_ref()) {
                 update_proc_term(ctx, orig_idx, ren_idx)?;
             }
@@ -263,7 +260,7 @@ fn update_method_chain(
     original: &mut ProcTermMethodChain<PhaseParse>,
     renamed: &ProcTermMethodChain<PhaseRenamed>,
 ) -> Result<(), CompileError> {
-    ctx.rename_token(&mut original.object, &renamed.ext);
+    ctx.rename_token(&mut original.object, &renamed.ext.object_id);
     if let (Some(orig_idx), Some(ren_idx)) = (original.index.as_mut(), renamed.index.as_ref()) {
         update_proc_term(ctx, orig_idx, ren_idx)?;
     }
@@ -277,11 +274,11 @@ fn update_term(
 ) -> Result<(), CompileError> {
     match (original, renamed) {
         (Term::Variable(orig), Term::Variable(ren)) => {
-            ctx.rename_token(&mut orig.variable, &ren.ext);
+            ctx.rename_token(&mut orig.variable, &ren.ext.name_id);
             Ok(())
         }
         (Term::ArrowDep(orig), Term::ArrowDep(ren)) => {
-            ctx.rename_token(&mut orig.from.variable, &ren.ext);
+            ctx.rename_token(&mut orig.from.variable, &ren.ext.param_id);
             update_term(ctx, orig.from_ty.as_mut(), ren.from_ty.as_ref())?;
             update_term(ctx, orig.to.as_mut(), ren.to.as_ref())
         }
@@ -297,7 +294,7 @@ fn update_term(
             Ok(())
         }
         (Term::Match(orig), Term::Match(ren)) => {
-            ctx.rename_token(&mut orig.scrutinee, &ren.ext);
+            ctx.rename_token(&mut orig.scrutinee, &ren.ext.scrutinee_id);
             for (orig_branch, ren_branch) in orig.branches.iter_mut().zip(&ren.branches) {
                 update_term(ctx, orig_branch.body.as_mut(), ren_branch.body.as_ref())?;
             }

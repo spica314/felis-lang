@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "neco-felis-compile",
-    "neco-felis-rename",
+    "neco-felis-elaboration",
     "neco-felis-syn",
     "neco-scope",
 ]
@@ -13,3 +13,4 @@ tempfile = "3.20.0"
 
 neco-felis-syn = { path = "./neco-felis-syn" }
 neco-scope = { path = "./neco-scope" }
+neco-felis-elaboration = { path = "./neco-felis-elaboration" }

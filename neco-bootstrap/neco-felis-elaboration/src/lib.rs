@@ -1,13 +1,16 @@
 use neco_felis_syn::*;
 use neco_scope::ScopeStack;
 
-pub use crate::phase_renamed::{PhaseRenamed, StatementCallPtxIds, StatementLetMutIds};
+pub use crate::phase_renamed::{
+    NameId, PhaseRenamed, ProcTermApplyIds, ProcTermConstructorCallIds, ProcTermDereferenceIds,
+    ProcTermFieldAccessIds, ProcTermIds, ProcTermIfIds, ProcTermNumberIds, ProcTermParenIds,
+    ProcTermStructValueIds, ProcTermUnitIds, ProcTermVariableIds, StatementCallPtxIds,
+    StatementLetMutIds, TermApplyIds, TermArrowDepIds, TermArrowNodepIds, TermConstructorCallIds,
+    TermFieldAccessIds, TermMatchIds, TermNumberIds, TermParenIds, TermStringIds, TermStructIds,
+    TermUnitIds, TermVariableIds, TermId,
+};
 
 pub mod phase_renamed;
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// (file_id, variable_id_in_the_file)
-pub struct VariableId(pub usize, pub usize);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RenameError {
@@ -30,52 +33,60 @@ type RenameResult<T> = Result<T, RenameError>;
 
 struct RenameContext {
     file_id: usize,
-    next_variable_id: usize,
-    scope: ScopeStack<String, VariableId>,
+    next_name_id: usize,
+    next_term_id: usize,
+    scope: ScopeStack<String, NameId>,
 }
 
 impl RenameContext {
     fn new(file_id: usize) -> Self {
         Self {
             file_id,
-            next_variable_id: 0,
+            next_name_id: 0,
+            next_term_id: 0,
             scope: ScopeStack::new(),
         }
     }
 
-    fn generate_variable_id(&mut self) -> VariableId {
-        let id = VariableId(self.file_id, self.next_variable_id);
-        self.next_variable_id += 1;
+    fn generate_name_id(&mut self) -> NameId {
+        let id = NameId(self.file_id, self.next_name_id);
+        self.next_name_id += 1;
         id
     }
 
-    fn bind_variable(&mut self, name: &str) -> VariableId {
-        let id = self.generate_variable_id();
+    fn generate_term_id(&mut self) -> TermId {
+        let id = TermId(self.file_id, self.next_term_id);
+        self.next_term_id += 1;
+        id
+    }
+
+    fn bind_variable(&mut self, name: &str) -> NameId {
+        let id = self.generate_name_id();
         self.scope.set(name.to_string(), id.clone());
         id
     }
 
-    fn bind_variable_with_id(&mut self, name: &str, id: VariableId) {
-        self.next_variable_id = self.next_variable_id.max(id.1 + 1);
+    fn bind_variable_with_id(&mut self, name: &str, id: NameId) {
+        self.next_name_id = self.next_name_id.max(id.1 + 1);
         self.scope.set(name.to_string(), id);
     }
 
-    fn lookup_variable(&self, name: &str) -> Option<VariableId> {
+    fn lookup_variable(&self, name: &str) -> Option<NameId> {
         self.scope.get(&name.to_string()).cloned()
     }
 
-    fn expect_variable(&self, name: &str) -> RenameResult<VariableId> {
+    fn expect_variable(&self, name: &str) -> RenameResult<NameId> {
         self.lookup_variable(name)
             .ok_or_else(|| RenameError::UnboundVariable {
                 name: name.to_string(),
             })
     }
 
-    fn placeholder_id(&self) -> VariableId {
-        VariableId(self.file_id, usize::MAX)
+    fn placeholder_id(&self) -> NameId {
+        NameId(self.file_id, usize::MAX)
     }
 
-    fn get_or_placeholder(&self, name: &str) -> VariableId {
+    fn get_or_placeholder(&self, name: &str) -> NameId {
         self.lookup_variable(name)
             .unwrap_or_else(|| self.placeholder_id())
     }
@@ -223,9 +234,7 @@ fn rename_entrypoint(
     context: &mut RenameContext,
     entrypoint: &ItemEntrypoint<PhaseParse>,
 ) -> RenameResult<ItemEntrypoint<PhaseRenamed>> {
-    let target_id = context
-        .lookup_variable(entrypoint.name.s())
-        .unwrap_or(VariableId(context.file_id, usize::MAX));
+    let target_id = context.get_or_placeholder(entrypoint.name.s());
 
     Ok(ItemEntrypoint {
         keyword_entrypoint: entrypoint.keyword_entrypoint.clone(),
@@ -280,11 +289,14 @@ fn rename_proc(
     })
 }
 
-fn collect_proc_parameters(term: &Term<PhaseRenamed>) -> Vec<(String, VariableId)> {
-    fn collect(term: &Term<PhaseRenamed>, out: &mut Vec<(String, VariableId)>) {
+fn collect_proc_parameters(term: &Term<PhaseRenamed>) -> Vec<(String, NameId)> {
+    fn collect(term: &Term<PhaseRenamed>, out: &mut Vec<(String, NameId)>) {
         match term {
             Term::ArrowDep(arrow) => {
-                out.push((arrow.from.variable.s().to_string(), arrow.ext.clone()));
+                out.push((
+                    arrow.from.variable.s().to_string(),
+                    arrow.ext.param_id.clone(),
+                ));
                 collect(&arrow.to, out);
             }
             Term::ArrowNodep(arrow) => {
@@ -480,6 +492,7 @@ fn rename_proc_term(
 ) -> RenameResult<ProcTerm<PhaseRenamed>> {
     match proc_term {
         ProcTerm::Apply(apply) => {
+            let term_id = context.generate_term_id();
             let f = rename_proc_term(context, &apply.f)?;
             let args = apply
                 .args
@@ -489,26 +502,34 @@ fn rename_proc_term(
             Ok(ProcTerm::Apply(ProcTermApply {
                 f: Box::new(f),
                 args,
-                ext: (),
+                ext: ProcTermApplyIds { term_id },
             }))
         }
         ProcTerm::Variable(var) => {
-            let id = context.get_or_placeholder(var.variable.s());
+            let term_id = context.generate_term_id();
+            let name_id = context.get_or_placeholder(var.variable.s());
             Ok(ProcTerm::Variable(ProcTermVariable {
                 variable: var.variable.clone(),
-                ext: id,
+                ext: ProcTermVariableIds { term_id, name_id },
             }))
         }
-        ProcTerm::Unit(unit) => Ok(ProcTerm::Unit(ProcTermUnit {
-            paren_l: unit.paren_l.clone(),
-            paren_r: unit.paren_r.clone(),
-            ext: (),
-        })),
-        ProcTerm::Number(number) => Ok(ProcTerm::Number(ProcTermNumber {
-            number: number.number.clone(),
-            ext: (),
-        })),
+        ProcTerm::Unit(unit) => {
+            let term_id = context.generate_term_id();
+            Ok(ProcTerm::Unit(ProcTermUnit {
+                paren_l: unit.paren_l.clone(),
+                paren_r: unit.paren_r.clone(),
+                ext: ProcTermUnitIds { term_id },
+            }))
+        }
+        ProcTerm::Number(number) => {
+            let term_id = context.generate_term_id();
+            Ok(ProcTerm::Number(ProcTermNumber {
+                number: number.number.clone(),
+                ext: ProcTermNumberIds { term_id },
+            }))
+        }
         ProcTerm::FieldAccess(field_access) => {
+            let term_id = context.generate_term_id();
             let object_id = context.get_or_placeholder(field_access.object.s());
             let index = match &field_access.index {
                 Some(idx) => Some(Box::new(rename_proc_term(context, idx)?)),
@@ -519,7 +540,7 @@ fn rename_proc_term(
                 dot: field_access.dot.clone(),
                 field: field_access.field.clone(),
                 index,
-                ext: object_id,
+                ext: ProcTermFieldAccessIds { term_id, object_id },
             }))
         }
         ProcTerm::MethodChain(method_chain) => {
@@ -527,6 +548,7 @@ fn rename_proc_term(
             Ok(ProcTerm::MethodChain(renamed))
         }
         ProcTerm::ConstructorCall(constructor_call) => {
+            let term_id = context.generate_term_id();
             let args = constructor_call
                 .args
                 .iter()
@@ -537,13 +559,14 @@ fn rename_proc_term(
                 colon2: constructor_call.colon2.clone(),
                 method: constructor_call.method.clone(),
                 args,
-                ext: (),
+                ext: ProcTermConstructorCallIds { term_id },
             }))
         }
         ProcTerm::Struct(_item_struct) => {
             unreachable!("Struct definitions are not supported inside proc terms")
         }
         ProcTerm::StructValue(struct_value) => {
+            let term_id = context.generate_term_id();
             let fields = struct_value
                 .fields
                 .iter()
@@ -562,10 +585,11 @@ fn rename_proc_term(
                 brace_l: struct_value.brace_l.clone(),
                 fields,
                 brace_r: struct_value.brace_r.clone(),
-                ext: (),
+                ext: ProcTermStructValueIds { term_id },
             }))
         }
         ProcTerm::If(if_expr) => {
+            let term_id = context.generate_term_id();
             context.enter_scope();
             let condition = rename_statements(context, &if_expr.condition)?;
             context.leave_scope();
@@ -595,24 +619,26 @@ fn rename_proc_term(
                 then_body: Box::new(then_body),
                 brace_r: if_expr.brace_r.clone(),
                 else_clause,
-                ext: (),
+                ext: ProcTermIfIds { term_id },
             }))
         }
         ProcTerm::Dereference(deref) => {
             let term = rename_proc_term(context, &deref.term)?;
+            let term_id = context.generate_term_id();
             Ok(ProcTerm::Dereference(ProcTermDereference {
                 term: Box::new(term),
                 dot_star: deref.dot_star.clone(),
-                ext: (),
+                ext: ProcTermDereferenceIds { term_id },
             }))
         }
         ProcTerm::Paren(paren) => {
             let inner = rename_proc_term(context, &paren.proc_term)?;
+            let term_id = context.generate_term_id();
             Ok(ProcTerm::Paren(ProcTermParen {
                 paren_l: paren.paren_l.clone(),
                 proc_term: Box::new(inner),
                 paren_r: paren.paren_r.clone(),
-                ext: (),
+                ext: ProcTermParenIds { term_id },
             }))
         }
         ProcTerm::Ext(_) => unreachable!("Ext proc terms are not supported in PhaseParse"),
@@ -623,6 +649,7 @@ fn rename_proc_method_chain(
     context: &mut RenameContext,
     method_chain: &ProcTermMethodChain<PhaseParse>,
 ) -> RenameResult<ProcTermMethodChain<PhaseRenamed>> {
+    let term_id = context.generate_term_id();
     let object_id = context.get_or_placeholder(method_chain.object.s());
     let index = match &method_chain.index {
         Some(idx) => Some(Box::new(rename_proc_term(context, idx)?)),
@@ -633,7 +660,10 @@ fn rename_proc_method_chain(
         dot: method_chain.dot.clone(),
         field: method_chain.field.clone(),
         index,
-        ext: object_id,
+        ext: ProcTermFieldAccessIds {
+            term_id,
+            object_id,
+        },
     })
 }
 
@@ -643,13 +673,15 @@ fn rename_term(
 ) -> RenameResult<Term<PhaseRenamed>> {
     match term {
         Term::Variable(var) => {
-            let variable_id = context.get_or_placeholder(var.variable().s());
+            let term_id = context.generate_term_id();
+            let name_id = context.get_or_placeholder(var.variable().s());
             Ok(Term::Variable(TermVariable {
                 variable: var.variable.clone(),
-                ext: variable_id,
+                ext: TermVariableIds { term_id, name_id },
             }))
         }
         Term::Apply(apply) => {
+            let term_id = context.generate_term_id();
             let f = rename_term(context, apply.f())?;
             let args = apply
                 .args()
@@ -659,15 +691,19 @@ fn rename_term(
             Ok(Term::Apply(TermApply {
                 f: Box::new(f),
                 args,
-                ext: (),
+                ext: TermApplyIds { term_id },
             }))
         }
         Term::ArrowDep(arrow) => {
+            let term_id = context.generate_term_id();
             context.enter_scope();
             let param_id = context.bind_variable(arrow.from().variable().s());
             let from = TermVariable {
                 variable: arrow.from.variable.clone(),
-                ext: param_id.clone(),
+                ext: TermVariableIds {
+                    term_id: context.generate_term_id(),
+                    name_id: param_id.clone(),
+                },
             };
             let from_ty = rename_term(context, arrow.from_ty())?;
             let to = rename_term(context, arrow.to())?;
@@ -680,20 +716,22 @@ fn rename_term(
                 paren_r: arrow.paren_r.clone(),
                 arrow: arrow.arrow.clone(),
                 to: Box::new(to),
-                ext: param_id,
+                ext: TermArrowDepIds { term_id, param_id },
             }))
         }
         Term::ArrowNodep(arrow) => {
+            let term_id = context.generate_term_id();
             let from = rename_term(context, arrow.from())?;
             let to = rename_term(context, arrow.to())?;
             Ok(Term::ArrowNodep(TermArrowNodep {
                 from: Box::new(from),
                 arrow: arrow.arrow.clone(),
                 to: Box::new(to),
-                ext: (),
+                ext: TermArrowNodepIds { term_id },
             }))
         }
         Term::Match(match_term) => {
+            let term_id = context.generate_term_id();
             let scrutinee_id = context.get_or_placeholder(match_term.scrutinee().s());
             let branches = match_term
                 .branches()
@@ -706,28 +744,39 @@ fn rename_term(
                 brace_l: match_term.brace_l.clone(),
                 branches,
                 brace_r: match_term.brace_r.clone(),
-                ext: scrutinee_id,
+                ext: TermMatchIds {
+                    term_id,
+                    scrutinee_id,
+                },
             }))
         }
         Term::Paren(paren) => {
             let inner = rename_term(context, paren.term())?;
+            let term_id = context.generate_term_id();
             Ok(Term::Paren(TermParen {
                 paren_l: paren.paren_l.clone(),
                 term: Box::new(inner),
                 paren_r: paren.paren_r.clone(),
-                ext: (),
+                ext: TermParenIds { term_id },
             }))
         }
-        Term::Unit(unit) => Ok(Term::Unit(TermUnit {
-            paren_l: unit.paren_l.clone(),
-            paren_r: unit.paren_r.clone(),
-            ext: (),
-        })),
-        Term::Number(number) => Ok(Term::Number(TermNumber {
-            number: number.number.clone(),
-            ext: (),
-        })),
+        Term::Unit(unit) => {
+            let term_id = context.generate_term_id();
+            Ok(Term::Unit(TermUnit {
+                paren_l: unit.paren_l.clone(),
+                paren_r: unit.paren_r.clone(),
+                ext: TermUnitIds { term_id },
+            }))
+        }
+        Term::Number(number) => {
+            let term_id = context.generate_term_id();
+            Ok(Term::Number(TermNumber {
+                number: number.number.clone(),
+                ext: TermNumberIds { term_id },
+            }))
+        }
         Term::Struct(struct_term) => {
+            let term_id = context.generate_term_id();
             let fields = struct_term
                 .fields()
                 .iter()
@@ -746,7 +795,7 @@ fn rename_term(
                 brace_l: struct_term.brace_l.clone(),
                 fields,
                 brace_r: struct_term.brace_r.clone(),
-                ext: (),
+                ext: TermStructIds { term_id },
             }))
         }
     }
@@ -806,8 +855,12 @@ mod tests {
 
         if let Item::Definition(def) = &renamed_file.items[0] {
             if let Term::Variable(var) = def.body.as_ref() {
-                let VariableId(file_id, _var_id) = var.ext;
-                assert_eq!(file_id, 0);
+                let TermVariableIds {
+                    term_id: TermId(file_id, _),
+                    name_id: NameId(name_file_id, _),
+                } = &var.ext;
+                assert_eq!(*file_id, 0);
+                assert_eq!(*name_file_id, 0);
                 assert_eq!(var.variable.s(), "y");
             } else {
                 panic!("Expected variable in apply function position");

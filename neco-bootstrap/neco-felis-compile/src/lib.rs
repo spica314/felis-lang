@@ -15,7 +15,7 @@ pub use error::CompileError;
 
 /// Main public API function to compile a file to assembly
 pub fn compile_to_assembly(file: &File<PhaseParse>) -> Result<String, CompileError> {
-    let renamed_file = neco_felis_rename::rename_file(file)
+    let renamed_file = neco_felis_elaboration::rename_file(file)
         .map_err(|err| CompileError::NameResolution(err.to_string()))?;
 
     let mut lowered = file.clone();
