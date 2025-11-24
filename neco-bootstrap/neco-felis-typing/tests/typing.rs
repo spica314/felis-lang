@@ -67,7 +67,7 @@ fn infers_dependent_arrow_parameter() {
                 name_id: param_id.clone(),
             },
         };
-        def.body = Box::new(Term::Variable(updated));
+        *def.body = Term::Variable(updated);
     }
 
     let result = TypeChecker::new(BuiltinTypes::default())
@@ -119,7 +119,7 @@ fn binds_builtin_types_from_outside() {
                 name_id: alias_id,
             },
         };
-        def.type_ = Box::new(Term::Variable(updated));
+        *def.type_ = Term::Variable(updated);
     }
 
     let builtins = BuiltinTypes::new([("u64", Type::Number)]);
