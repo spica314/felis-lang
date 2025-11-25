@@ -46,7 +46,8 @@ impl TypeSolutions {
                     .collect(),
             ),
             Type::Unit => Type::Unit,
-            Type::Number => Type::Number,
+            Type::Integer(int) => Type::Integer(*int),
+            Type::F32 => Type::F32,
         }
     }
 
@@ -69,7 +70,7 @@ impl TypeSolutions {
                     false
                 }
             }
-            Type::Variable(_) | Type::Unit | Type::Number => false,
+            Type::Variable(_) | Type::Unit | Type::Integer(_) | Type::F32 => false,
             Type::Arrow { param, result, .. } => {
                 self.occurs(hole, param) || self.occurs(hole, result)
             }
@@ -160,7 +161,8 @@ impl<'a> UnificationCtx<'a> {
                 }
                 Ok(())
             }
-            (Type::Unit, Type::Unit) | (Type::Number, Type::Number) => Ok(()),
+            (Type::Unit, Type::Unit) | (Type::F32, Type::F32) => Ok(()),
+            (Type::Integer(lhs), Type::Integer(rhs)) if lhs == rhs => Ok(()),
             (expected, actual) => Err(UnificationError::TypeMismatch { expected, actual }),
         }
     }

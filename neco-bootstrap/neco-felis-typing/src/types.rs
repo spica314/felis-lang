@@ -19,7 +19,20 @@ pub enum Type {
     },
     Struct(Vec<StructFieldType>),
     Unit,
-    Number,
+    Integer(IntegerType),
+    F32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum IntegerType {
+    I8,
+    I16,
+    I32,
+    I64,
+    U8,
+    U16,
+    U32,
+    U64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -38,6 +51,30 @@ impl Type {
             param: Box::new(param),
             param_name: None,
             result: Box::new(result),
+        }
+    }
+
+    pub fn from_number_literal(literal: &str) -> Self {
+        if literal.ends_with("i8") {
+            Type::Integer(IntegerType::I8)
+        } else if literal.ends_with("i16") {
+            Type::Integer(IntegerType::I16)
+        } else if literal.ends_with("i32") {
+            Type::Integer(IntegerType::I32)
+        } else if literal.ends_with("i64") {
+            Type::Integer(IntegerType::I64)
+        } else if literal.ends_with("u8") {
+            Type::Integer(IntegerType::U8)
+        } else if literal.ends_with("u16") {
+            Type::Integer(IntegerType::U16)
+        } else if literal.ends_with("u32") {
+            Type::Integer(IntegerType::U32)
+        } else if literal.ends_with("u64") {
+            Type::Integer(IntegerType::U64)
+        } else if literal.ends_with("f32") || literal.contains('.') {
+            Type::F32
+        } else {
+            Type::Integer(IntegerType::U64)
         }
     }
 }
@@ -70,7 +107,23 @@ impl fmt::Display for Type {
                 write!(f, " }}")
             }
             Type::Unit => write!(f, "()"),
-            Type::Number => write!(f, "Number"),
+            Type::Integer(int) => write!(f, "{int}"),
+            Type::F32 => write!(f, "f32"),
+        }
+    }
+}
+
+impl fmt::Display for IntegerType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IntegerType::I8 => write!(f, "i8"),
+            IntegerType::I16 => write!(f, "i16"),
+            IntegerType::I32 => write!(f, "i32"),
+            IntegerType::I64 => write!(f, "i64"),
+            IntegerType::U8 => write!(f, "u8"),
+            IntegerType::U16 => write!(f, "u16"),
+            IntegerType::U32 => write!(f, "u32"),
+            IntegerType::U64 => write!(f, "u64"),
         }
     }
 }

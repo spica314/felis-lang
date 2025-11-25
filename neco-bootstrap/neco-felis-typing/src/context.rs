@@ -1,5 +1,6 @@
 use crate::{
-    BuiltinTypes, StructFieldType, Type, TypeHole, TypeSolutions, TypingError, UnificationCtx,
+    BuiltinTypes, IntegerType, StructFieldType, Type, TypeHole, TypeSolutions, TypingError,
+    UnificationCtx,
 };
 use neco_felis_elaboration::{NameId, PhaseElaborated, TermId};
 use neco_felis_syn::*;
@@ -282,7 +283,7 @@ impl TypeChecker {
         if let Some(index) = &chain.index {
             let idx_ty = self.visit_proc_term(index)?;
             let mut ctx = UnificationCtx::new(&mut self.solutions);
-            ctx.unify(&Type::Number, &idx_ty)
+            ctx.unify(&Type::Integer(IntegerType::U64), &idx_ty)
                 .map_err(TypingError::UnificationFailed)?;
         }
 
@@ -293,7 +294,9 @@ impl TypeChecker {
     fn visit_proc_term(&mut self, term: &ProcTerm<PhaseElaborated>) -> Result<Type, TypingError> {
         match term {
             ProcTerm::Unit(unit) => self.assign_type(&unit.ext.term_id, Type::Unit),
-            ProcTerm::Number(num) => self.assign_type(&num.ext.term_id, Type::Number),
+            ProcTerm::Number(num) => {
+                self.assign_type(&num.ext.term_id, Type::from_number_literal(num.number.s()))
+            }
             ProcTerm::Variable(var) => {
                 let ty = self.env.get(&var.ext.name_id).cloned().ok_or_else(|| {
                     TypingError::UnboundName {
@@ -406,7 +409,9 @@ impl TypeChecker {
     fn visit_term(&mut self, term: &Term<PhaseElaborated>) -> Result<Type, TypingError> {
         match term {
             Term::Unit(unit) => self.assign_type(&unit.ext.term_id, Type::Unit),
-            Term::Number(num) => self.assign_type(&num.ext.term_id, Type::Number),
+            Term::Number(num) => {
+                self.assign_type(&num.ext.term_id, Type::from_number_literal(num.number.s()))
+            }
             Term::Variable(var) => {
                 let ty = self.env.get(&var.ext.name_id).cloned().ok_or_else(|| {
                     TypingError::UnboundName {

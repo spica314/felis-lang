@@ -14,5 +14,5 @@ mod unify;
 pub use builtin::BuiltinTypes;
 pub use context::{TypeChecker, TypingResult};
 pub use error::{TypingError, UnificationError};
-pub use types::{StructFieldType, Type, TypeHole};
+pub use types::{IntegerType, StructFieldType, Type, TypeHole};
 pub use unify::{TypeSolutions, UnificationCtx};

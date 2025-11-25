@@ -21,6 +21,7 @@ pub fn compile_to_assembly(file: &File<PhaseParse>) -> Result<String, CompileErr
 
     if let Err(err) = typing::check_types(&elaborated_file) {
         eprintln!("type error: {err}");
+        panic!()
     }
 
     let mut lowered = file.clone();

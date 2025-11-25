@@ -1,6 +1,6 @@
 use neco_felis_elaboration::{PhaseElaborated, TermVariableIds, elaborate_file};
 use neco_felis_syn::{File, FileIdGenerator, Item, Parse, PhaseParse, Term, TermVariable, Token};
-use neco_felis_typing::{BuiltinTypes, Type, TypeChecker};
+use neco_felis_typing::{BuiltinTypes, IntegerType, Type, TypeChecker};
 
 fn parse_and_elaborate(src: &str) -> File<PhaseElaborated> {
     let mut file_id_gen = FileIdGenerator::new();
@@ -122,11 +122,54 @@ fn binds_builtin_types_from_outside() {
         *def.type_ = Term::Variable(updated);
     }
 
-    let builtins = BuiltinTypes::new([("u64", Type::Number)]);
+    let builtins = BuiltinTypes::new([("u64", Type::Integer(IntegerType::U64))]);
     let result = TypeChecker::new(builtins)
         .check_file(&file)
         .expect("typing failed");
 
-    assert_eq!(result.resolved_type(&type_id), Some(Type::Number));
-    assert_eq!(result.resolved_type(&body_id), Some(Type::Number));
+    assert_eq!(
+        result.resolved_type(&type_id),
+        Some(Type::Integer(IntegerType::U64))
+    );
+    assert_eq!(
+        result.resolved_type(&body_id),
+        Some(Type::Integer(IntegerType::U64))
+    );
+}
+
+fn literal_body_type(src: &str) -> Type {
+    let file = parse_and_elaborate(src);
+    let Item::Definition(def) = &file.items[0] else {
+        panic!("expected definition");
+    };
+    let body_id = match def.body.as_ref() {
+        Term::Number(num) => num.ext.term_id.clone(),
+        other => panic!("expected number body, got {other:?}"),
+    };
+
+    TypeChecker::new(BuiltinTypes::default())
+        .check_file(&file)
+        .expect("typing failed")
+        .resolved_type(&body_id)
+        .expect("body type missing")
+}
+
+#[test]
+fn infers_integer_literal_default_to_u64() {
+    let ty = literal_body_type("#definition main: () -> () { 42 }");
+    assert_eq!(ty, Type::Integer(IntegerType::U64));
+}
+
+#[test]
+fn infers_integer_literal_suffixes() {
+    let i32_ty = literal_body_type("#definition main: () -> () { 1i32 }");
+    let u8_ty = literal_body_type("#definition main: () -> () { 255u8 }");
+    assert_eq!(i32_ty, Type::Integer(IntegerType::I32));
+    assert_eq!(u8_ty, Type::Integer(IntegerType::U8));
+}
+
+#[test]
+fn infers_float_literal() {
+    let f32_ty = literal_body_type("#definition main: () -> () { 1.0f32 }");
+    assert_eq!(f32_ty, Type::F32);
 }
