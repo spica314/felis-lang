@@ -89,6 +89,7 @@ version = "0.1.0"
 dependencies = [
  "neco-felis-elaboration",
  "neco-felis-syn",
+ "neco-felis-typing",
  "tempfile",
 ]
 

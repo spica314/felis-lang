@@ -8,6 +8,7 @@ pub mod error;
 pub mod statement;
 mod symbol_rewriter;
 pub mod syscall;
+mod typing;
 
 // Re-exports
 pub use compiler::{ArrayInfo, AssemblyCompiler};
@@ -17,6 +18,10 @@ pub use error::CompileError;
 pub fn compile_to_assembly(file: &File<PhaseParse>) -> Result<String, CompileError> {
     let elaborated_file = neco_felis_elaboration::elaborate_file(file)
         .map_err(|err| CompileError::NameResolution(err.to_string()))?;
+
+    if let Err(err) = typing::check_types(&elaborated_file) {
+        eprintln!("type error: {err}");
+    }
 
     let mut lowered = file.clone();
     symbol_rewriter::apply_symbol_ids(&mut lowered, &elaborated_file)?;

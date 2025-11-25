@@ -40,11 +40,13 @@ struct ElaborationContext {
 
 impl ElaborationContext {
     fn new(file_id: usize) -> Self {
+        let mut scope = ScopeStack::new();
+        scope.enter_scope(); // Ensure top-level bindings (e.g., builtins) have a scope.
         Self {
             file_id,
             next_name_id: 0,
             next_term_id: 0,
-            scope: ScopeStack::new(),
+            scope,
         }
     }
 
