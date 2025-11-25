@@ -26,7 +26,10 @@ pub fn builtin_types() -> BuiltinTypes {
         ("f32_sub", binary_f32.clone()),
         ("f32_mul", binary_f32.clone()),
         ("f32_div", binary_f32.clone()),
-        ("f32_sqrt_approx", arrow_chain(vec![f32.clone()], f32.clone())),
+        (
+            "f32_sqrt_approx",
+            arrow_chain(vec![f32.clone()], f32.clone()),
+        ),
         ("u64_to_f32", arrow_chain(vec![u64.clone()], f32.clone())),
         ("f32_to_u64", arrow_chain(vec![f32.clone()], u64.clone())),
         ("u64", u64.clone()),
