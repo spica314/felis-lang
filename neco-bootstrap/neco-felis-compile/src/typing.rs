@@ -7,9 +7,7 @@ use neco_felis_typing::{
 pub fn builtin_types() -> BuiltinTypes {
     let u64 = Type::Integer(IntegerType::U64);
     let f32 = Type::F32;
-    let unary_u64 = arrow_chain(vec![u64.clone()], u64.clone());
     let binary_u64 = arrow_chain(vec![u64.clone(), u64.clone()], u64.clone());
-    let unary_f32 = arrow_chain(vec![f32.clone()], f32.clone());
     let binary_f32 = arrow_chain(vec![f32.clone(), f32.clone()], f32.clone());
     let syscall = arrow_chain(vec![u64.clone(); 6], u64.clone());
     let array_param = Type::Hole(TypeHole(0));
@@ -28,11 +26,11 @@ pub fn builtin_types() -> BuiltinTypes {
         ("f32_sub", binary_f32.clone()),
         ("f32_mul", binary_f32.clone()),
         ("f32_div", binary_f32.clone()),
-        ("f32_sqrt_approx", unary_f32.clone()),
+        ("f32_sqrt_approx", arrow_chain(vec![f32.clone()], f32.clone())),
         ("u64_to_f32", arrow_chain(vec![u64.clone()], f32.clone())),
         ("f32_to_u64", arrow_chain(vec![f32.clone()], u64.clone())),
-        ("u64", unary_u64.clone()),
-        ("f32", unary_f32.clone()),
+        ("u64", u64.clone()),
+        ("f32", f32.clone()),
         ("ctaid_x", u64.clone()),
         ("ntid_x", u64.clone()),
         ("tid_x", u64.clone()),
