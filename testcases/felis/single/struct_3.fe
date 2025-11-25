@@ -5,9 +5,9 @@
 #use_builtin "u64" #as __u64;
 
 #struct Vec3 {
-    x: u64,
-    y: u64,
-    z: u64,
+    x: __u64,
+    y: __u64,
+    z: __u64,
 }
 
 #proc main : () -> () {

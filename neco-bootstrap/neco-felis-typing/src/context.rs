@@ -354,7 +354,15 @@ impl TypeChecker {
                 if let Some(index) = &field_access.index {
                     self.visit_proc_term(index)?;
                 }
-                self.assign_type(&field_access.ext.term_id, object_ty)
+                let result_ty = match self.solutions.resolve(&object_ty) {
+                    Type::Struct(fields) => fields
+                        .iter()
+                        .find(|field| field.name == field_access.field.s())
+                        .map(|field| field.ty.clone())
+                        .unwrap_or_else(|| Type::Hole(self.fresh_hole())),
+                    _ => Type::Hole(self.fresh_hole()),
+                };
+                self.assign_type(&field_access.ext.term_id, result_ty)
             }
             ProcTerm::MethodChain(chain) => self.visit_proc_method_chain(chain),
             ProcTerm::ConstructorCall(constructor_call) => {

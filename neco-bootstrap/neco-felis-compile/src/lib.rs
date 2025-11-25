@@ -20,7 +20,7 @@ pub fn compile_to_assembly(file: &File<PhaseParse>) -> Result<String, CompileErr
         .map_err(|err| CompileError::NameResolution(err.to_string()))?;
 
     if let Err(err) = typing::check_types(&elaborated_file) {
-        eprintln!("type error: {err}");
+        panic!("type error: {err}");
     }
 
     let mut lowered = file.clone();
