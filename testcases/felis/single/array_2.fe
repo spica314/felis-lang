@@ -9,7 +9,7 @@
 #struct Points {
     x: __Array __f32,
     y: __Array __f32,
-    z: __Arary __f32,
+    z: __Array __f32,
 }
 
 #proc main : () -> () {

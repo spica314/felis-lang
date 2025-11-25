@@ -510,7 +510,7 @@ File {
                                                 line: 12,
                                                 column: 8,
                                             },
-                                            s: "__Arary",
+                                            s: "__Array",
                                         },
                                         ext: (),
                                     },

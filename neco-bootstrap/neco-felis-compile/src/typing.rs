@@ -1,6 +1,8 @@
 use neco_felis_elaboration::PhaseElaborated;
 use neco_felis_syn::File;
-use neco_felis_typing::{BuiltinTypes, IntegerType, Type, TypeChecker, TypingError, TypingResult};
+use neco_felis_typing::{
+    BuiltinTypes, IntegerType, Type, TypeChecker, TypeHole, TypingError, TypingResult,
+};
 
 pub fn builtin_types() -> BuiltinTypes {
     let u64 = Type::Integer(IntegerType::U64);
@@ -10,6 +12,9 @@ pub fn builtin_types() -> BuiltinTypes {
     let unary_f32 = arrow_chain(vec![f32.clone()], f32.clone());
     let binary_f32 = arrow_chain(vec![f32.clone(), f32.clone()], f32.clone());
     let syscall = arrow_chain(vec![u64.clone(); 6], u64.clone());
+    let array_param = Type::Hole(TypeHole(0));
+    let array_elem = Type::Struct(Vec::new());
+    let array = Type::arrow(array_param, array_elem);
 
     BuiltinTypes::new([
         ("syscall", syscall),
@@ -31,7 +36,7 @@ pub fn builtin_types() -> BuiltinTypes {
         ("ctaid_x", u64.clone()),
         ("ntid_x", u64.clone()),
         ("tid_x", u64.clone()),
-        ("Array", Type::Struct(Vec::new())),
+        ("Array", array),
     ])
 }
 

@@ -33,12 +33,13 @@ impl TypeChecker {
     pub fn new(builtins: BuiltinTypes) -> Self {
         let mut env = ScopeStack::new();
         env.enter_scope();
+        let next_hole = builtins.max_type_hole_id().map_or(0, |max_id| max_id + 1);
         Self {
             builtins,
             env,
             term_types: HashMap::new(),
             solutions: TypeSolutions::new(),
-            next_hole: 0,
+            next_hole,
         }
     }
 
@@ -274,11 +275,13 @@ impl TypeChecker {
         &mut self,
         chain: &ProcTermMethodChain<PhaseElaborated>,
     ) -> Result<Type, TypingError> {
-        let object_ty = self.env.get(&chain.ext.object_id).cloned().ok_or_else(|| {
-            TypingError::UnboundName {
+        // Ensure the receiver is in scope even if we don't yet model its fields/methods precisely.
+        self.env
+            .get(&chain.ext.object_id)
+            .cloned()
+            .ok_or_else(|| TypingError::UnboundName {
                 name_id: chain.ext.object_id.clone(),
-            }
-        })?;
+            })?;
 
         if let Some(index) = &chain.index {
             let idx_ty = self.visit_proc_term(index)?;
@@ -287,8 +290,14 @@ impl TypeChecker {
                 .map_err(TypingError::UnificationFailed)?;
         }
 
-        let result_ty = self.assign_type(&chain.ext.term_id, object_ty.clone())?;
-        Ok(result_ty)
+        // Basic shaping for common array helpers; otherwise fall back to a fresh hole.
+        let result_ty = match chain.field.s() {
+            "#len" => Type::Integer(IntegerType::U64),
+            _ => Type::Hole(self.fresh_hole()),
+        };
+
+        let assigned = self.assign_type(&chain.ext.term_id, result_ty)?;
+        Ok(assigned)
     }
 
     fn visit_proc_term(&mut self, term: &ProcTerm<PhaseElaborated>) -> Result<Type, TypingError> {
