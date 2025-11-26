@@ -156,7 +156,7 @@ ItemInductive     <- #inductive Variable ":" Term "{" ItemInductiveBranch* "}"
 ItemInductiveBranch <- Variable ":" Term ","              // trailing comma required
 ItemDefinition    <- #definition Variable ":" Term "{" Term "}"
 ItemTheorem       <- #theorem    Variable ":" Term "{" Term "}"
-ItemProc          <- "#ptx"? "#proc" Variable ":" Term ItemProcBlock
+ItemProc          <- ""#proc" Variable ":" Term ItemProcBlock
 ItemProcBlock     <- "{" Statements "}"
 ItemStruct        <- "#struct" Variable "{" ItemStructField* "}"
 ItemStructField   <- Variable ":" Term ","
@@ -171,7 +171,6 @@ Statement         <- StatementLetMut
                    / StatementLoop
                    / StatementBreak
                    / StatementReturn
-                   / StatementCallPtx
                    / ProcTerm                            // expression statement
 
 StatementLetMut   <- "#let" "#mut" Variable "@" Variable "=" ProcTerm
@@ -183,7 +182,6 @@ StatementMethodChainAssign
 StatementLoop     <- "#loop" "{" Statements "}"
 StatementBreak    <- "#break" ";"
 StatementReturn   <- "#return" ProcTerm ";"
-StatementCallPtx  <- "#call_ptx" TokenVariable TokenVariable Number Number Number Number Number Number
 
 NumberOrVariable <- Number / Variable
 

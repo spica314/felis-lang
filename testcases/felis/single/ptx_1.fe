@@ -1,7 +1,0 @@
-#entrypoint main2;
-
-#use_builtin "syscall" #as __syscall;
-
-#proc main2 : () -> () {
-    __syscall 231 42 0 0 0 0;
-}

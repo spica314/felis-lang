@@ -5,7 +5,6 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ItemProc<P: Phase> {
-    pub ptx_modifier: Option<TokenKeyword>,
     pub keyword_proc: TokenKeyword,
     pub name: TokenVariable,
     pub colon: TokenColon,
@@ -17,9 +16,6 @@ pub struct ItemProc<P: Phase> {
 impl Parse for ItemProc<PhaseParse> {
     fn parse(tokens: &[Token], i: &mut usize) -> Result<Option<Self>, ParseError> {
         let mut k = *i;
-
-        // Check for optional #ptx modifier
-        let ptx_modifier = TokenKeyword::parse_keyword(tokens, &mut k, "ptx")?;
 
         let Some(keyword_proc) = TokenKeyword::parse_keyword(tokens, &mut k, "proc")? else {
             return Ok(None);
@@ -43,7 +39,6 @@ impl Parse for ItemProc<PhaseParse> {
         };
 
         let item_proc = ItemProc {
-            ptx_modifier,
             keyword_proc,
             name,
             colon,

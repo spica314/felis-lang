@@ -1,5 +1,5 @@
 use crate::error::CompileError;
-use neco_felis_elaboration::{NameId, PhaseElaborated, StatementCallPtxIds, StatementLetMutIds};
+use neco_felis_elaboration::{NameId, PhaseElaborated, StatementLetMutIds};
 use neco_felis_syn::*;
 use std::collections::HashSet;
 
@@ -47,7 +47,7 @@ fn collect_preserve_ids(file: &File<PhaseElaborated>) -> HashSet<NameId> {
                 set.insert(alias.ext.clone());
             }
             Item::Proc(proc) => {
-                collect_statements_preserve_ids(&proc.proc_block.statements, &mut set);
+                collect_statements_preserve_ids(&proc.proc_block.statements);
             }
             _ => {}
         }
@@ -55,26 +55,13 @@ fn collect_preserve_ids(file: &File<PhaseElaborated>) -> HashSet<NameId> {
     set
 }
 
-fn collect_statements_preserve_ids(
-    statements: &Statements<PhaseElaborated>,
-    set: &mut HashSet<NameId>,
-) {
+fn collect_statements_preserve_ids(statements: &Statements<PhaseElaborated>) {
     match statements {
         Statements::Then(then) => {
-            collect_statement_preserve_ids(&then.head, set);
-            collect_statements_preserve_ids(&then.tail, set);
+            collect_statements_preserve_ids(&then.tail);
         }
-        Statements::Statement(stmt) => collect_statement_preserve_ids(stmt, set),
+        Statements::Statement(_) => {}
         Statements::Nil => {}
-    }
-}
-
-fn collect_statement_preserve_ids(
-    statement: &Statement<PhaseElaborated>,
-    set: &mut HashSet<NameId>,
-) {
-    if let Statement::CallPtx(call) = statement {
-        set.insert(call.ext.function_id.clone());
     }
 }
 
@@ -173,11 +160,6 @@ fn update_statement(
         }
         (Statement::Return(orig), Statement::Return(ren)) => {
             update_proc_term(ctx, orig.value.as_mut(), ren.value.as_ref())
-        }
-        (Statement::CallPtx(orig), Statement::CallPtx(ren)) => {
-            let StatementCallPtxIds { arg_id, .. } = &ren.ext;
-            ctx.apply_elaborated_token(&mut orig.arg, arg_id);
-            Ok(())
         }
         (Statement::Expr(orig), Statement::Expr(ren)) => update_proc_term(ctx, orig, ren),
         (Statement::Break(_), Statement::Break(_)) => Ok(()),

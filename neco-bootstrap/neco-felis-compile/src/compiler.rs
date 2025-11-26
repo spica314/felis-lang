@@ -94,11 +94,6 @@ impl AssemblyCompiler {
     }
 
     pub fn compile_proc(&mut self, proc: &ItemProc<PhaseParse>) -> Result<(), CompileError> {
-        if proc.ptx_modifier.is_some() {
-            return Err(CompileError::UnsupportedConstruct(
-                "PTX procedures are no longer supported".to_string(),
-            ));
-        }
         eprintln!("DEBUG: Compiling procedure: {}", proc.name.s());
 
         // Extract parameter names from the function type
@@ -297,10 +292,7 @@ impl AssemblyCompiler {
                     self.scan_proc_term_for_structs(index);
                 }
             }
-            Statement::CallPtx(_)
-            | Statement::LetMut(_)
-            | Statement::Break(_)
-            | Statement::Ext(_) => {}
+            Statement::LetMut(_) | Statement::Break(_) | Statement::Ext(_) => {}
         }
     }
 

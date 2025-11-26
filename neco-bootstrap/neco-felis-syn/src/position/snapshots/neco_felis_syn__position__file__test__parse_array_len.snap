@@ -559,7 +559,6 @@ File {
         ),
         Proc(
             ItemProc {
-                ptx_modifier: None,
                 keyword_proc: TokenKeyword {
                     pos: Pos {
                         file_id: FileId(

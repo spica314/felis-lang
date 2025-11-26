@@ -55,7 +55,6 @@ pub mod statements {
     pub mod statement;
     pub mod statement_assign;
     pub mod statement_break;
-    pub mod statement_call_ptx;
     pub mod statement_let;
     pub mod statement_let_mut;
     pub mod statement_loop;
@@ -116,7 +115,6 @@ pub use proc_terms::proc_term_variable::*;
 pub use statements::statement::*;
 pub use statements::statement_assign::*;
 pub use statements::statement_break::*;
-pub use statements::statement_call_ptx::*;
 pub use statements::statement_let::*;
 pub use statements::statement_let_mut::*;
 pub use statements::statement_loop::*;

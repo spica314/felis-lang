@@ -94,9 +94,6 @@ impl StatementCompiler {
             Statement::Break(_) => Err(CompileError::UnsupportedConstruct(
                 "Break statement outside of loop context".to_string(),
             )),
-            Statement::CallPtx(_call_ptx) => Err(CompileError::UnsupportedConstruct(
-                "PTX kernel launches are not supported".to_string(),
-            )),
             _ => Err(CompileError::UnsupportedConstruct(format!("{statement:?}"))),
         }
     }

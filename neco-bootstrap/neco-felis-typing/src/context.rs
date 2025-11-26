@@ -248,19 +248,6 @@ impl TypeChecker {
                 self.visit_proc_term(&stmt.value)?;
                 Ok(())
             }
-            Statement::CallPtx(stmt) => {
-                if self.env.get(&stmt.ext.function_id).is_none() {
-                    return Err(TypingError::UnboundName {
-                        name_id: stmt.ext.function_id.clone(),
-                    });
-                }
-                if self.env.get(&stmt.ext.arg_id).is_none() {
-                    return Err(TypingError::UnboundName {
-                        name_id: stmt.ext.arg_id.clone(),
-                    });
-                }
-                Ok(())
-            }
             Statement::Expr(term) => {
                 self.visit_proc_term(term)?;
                 Ok(())

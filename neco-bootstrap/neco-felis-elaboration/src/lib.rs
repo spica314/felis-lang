@@ -281,7 +281,6 @@ fn elaborate_proc(
     context.leave_scope();
 
     Ok(ItemProc {
-        ptx_modifier: proc.ptx_modifier.clone(),
         keyword_proc: proc.keyword_proc.clone(),
         name: proc.name.clone(),
         colon: proc.colon.clone(),
@@ -460,25 +459,6 @@ fn elaborate_statement(
                 value: Box::new(value),
                 semicolon: return_stmt.semicolon.clone(),
                 ext: (),
-            }))
-        }
-        Statement::CallPtx(call_ptx) => {
-            let function_id = context.get_or_placeholder(call_ptx.function_name.s());
-            let arg_id = context.get_or_placeholder(call_ptx.arg.s());
-            Ok(Statement::CallPtx(StatementCallPtx {
-                keyword_call_ptx: call_ptx.keyword_call_ptx.clone(),
-                function_name: call_ptx.function_name.clone(),
-                arg: call_ptx.arg.clone(),
-                grid_dim_x: call_ptx.grid_dim_x.clone(),
-                grid_dim_y: call_ptx.grid_dim_y.clone(),
-                grid_dim_z: call_ptx.grid_dim_z.clone(),
-                block_dim_x: call_ptx.block_dim_x.clone(),
-                block_dim_y: call_ptx.block_dim_y.clone(),
-                block_dim_z: call_ptx.block_dim_z.clone(),
-                ext: StatementCallPtxIds {
-                    function_id,
-                    arg_id,
-                },
             }))
         }
         Statement::Expr(proc_term) => {
