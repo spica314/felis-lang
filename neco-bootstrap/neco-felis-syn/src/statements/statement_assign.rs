@@ -41,9 +41,3 @@ impl Parse for StatementAssign<PhaseParse> {
         Ok(Some(statement_assign))
     }
 }
-
-impl<P: Phase> StatementAssign<P> {
-    pub fn variable_name(&self) -> &str {
-        self.variable.s()
-    }
-}
