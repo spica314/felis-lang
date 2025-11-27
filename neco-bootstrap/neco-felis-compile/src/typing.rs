@@ -34,9 +34,6 @@ pub fn builtin_types() -> BuiltinTypes {
         ("f32_to_u64", arrow_chain(vec![f32.clone()], u64.clone())),
         ("u64", u64.clone()),
         ("f32", f32.clone()),
-        ("ctaid_x", u64.clone()),
-        ("ntid_x", u64.clone()),
-        ("tid_x", u64.clone()),
         ("Array", array),
     ])
 }

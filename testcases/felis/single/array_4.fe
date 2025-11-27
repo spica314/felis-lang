@@ -14,9 +14,6 @@
 #use_builtin "f32_div" #as __f32_div;
 #use_builtin "u64_to_f32" #as __u64_to_f32;
 #use_builtin "f32_to_u64" #as __f32_to_u64;
-#use_builtin "ctaid_x" #as __ctaid_x;
-#use_builtin "ntid_x" #as __ntid_x;
-#use_builtin "tid_x" #as __tid_x;
 #use_builtin "Array" #as __Array;
 
 #struct Pixels {
