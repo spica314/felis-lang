@@ -14,8 +14,8 @@ fn test_compile_exit_42() {
 }
 
 #[test]
-fn test_compile_add() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/add.fe").unwrap();
+fn test_compile_u64_add() {
+    let assembly = compile_file_to_assembly("../../testcases/felis/single/u64_add.fe").unwrap();
     println!("Generated assembly for add.fe:\n{assembly}");
 
     // Update expectations based on the new #let syntax
@@ -32,8 +32,8 @@ fn test_compile_add() {
 }
 
 #[test]
-fn test_compile_sub() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/sub.fe").unwrap();
+fn test_compile_u64_sub() {
+    let assembly = compile_file_to_assembly("../../testcases/felis/single/u64_sub.fe").unwrap();
     assert!(assembly.contains(".intel_syntax noprefix"));
     assert!(assembly.contains("mov rax, 50"));
     assert!(assembly.contains("mov rbx, 8"));
@@ -45,8 +45,8 @@ fn test_compile_sub() {
 }
 
 #[test]
-fn test_compile_mul() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/mul.fe").unwrap();
+fn test_compile_u64_mul() {
+    let assembly = compile_file_to_assembly("../../testcases/felis/single/u64_mul.fe").unwrap();
     assert!(assembly.contains(".intel_syntax noprefix"));
     assert!(assembly.contains("mov rax, 6"));
     assert!(assembly.contains("mov rbx, 7"));
@@ -58,8 +58,8 @@ fn test_compile_mul() {
 }
 
 #[test]
-fn test_compile_div() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/div.fe").unwrap();
+fn test_compile_u64_div() {
+    let assembly = compile_file_to_assembly("../../testcases/felis/single/u64_div.fe").unwrap();
     assert!(assembly.contains(".intel_syntax noprefix"));
     assert!(assembly.contains("mov rax, 84"));
     assert!(assembly.contains("mov rbx, 2"));
@@ -72,8 +72,8 @@ fn test_compile_div() {
 }
 
 #[test]
-fn test_compile_mod() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/mod.fe").unwrap();
+fn test_compile_u64_mod() {
+    let assembly = compile_file_to_assembly("../../testcases/felis/single/u64_mod.fe").unwrap();
     assert!(assembly.contains(".intel_syntax noprefix"));
     assert!(assembly.contains("mov rax, 142"));
     assert!(assembly.contains("mov rbx, 100"));
@@ -219,8 +219,8 @@ fn test_let_integration() {
 }
 
 #[test]
-fn test_add_integration() {
-    let result = compile_and_execute("../../testcases/felis/single/add.fe");
+fn test_u64_add_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/u64_add.fe");
 
     match result {
         Ok(status) => {
@@ -238,8 +238,8 @@ fn test_add_integration() {
 }
 
 #[test]
-fn test_sub_integration() {
-    let result = compile_and_execute("../../testcases/felis/single/sub.fe");
+fn test_u64_sub_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/u64_sub.fe");
 
     match result {
         Ok(status) => {
@@ -257,8 +257,8 @@ fn test_sub_integration() {
 }
 
 #[test]
-fn test_mul_integration() {
-    let result = compile_and_execute("../../testcases/felis/single/mul.fe");
+fn test_u64_mul_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/u64_mul.fe");
 
     match result {
         Ok(status) => {
@@ -276,8 +276,8 @@ fn test_mul_integration() {
 }
 
 #[test]
-fn test_div_integration() {
-    let result = compile_and_execute("../../testcases/felis/single/div.fe");
+fn test_u64_div_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/u64_div.fe");
 
     match result {
         Ok(status) => {
@@ -295,8 +295,8 @@ fn test_div_integration() {
 }
 
 #[test]
-fn test_mod_integration() {
-    let result = compile_and_execute("../../testcases/felis/single/mod.fe");
+fn test_u64_mod_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/u64_mod.fe");
 
     match result {
         Ok(status) => {
@@ -314,8 +314,8 @@ fn test_mod_integration() {
 }
 
 #[test]
-fn test_compile_add_f32() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/add_f32.fe").unwrap();
+fn test_compile_f32_add() {
+    let assembly = compile_file_to_assembly("../../testcases/felis/single/f32_add.fe").unwrap();
     assert!(assembly.contains(".intel_syntax noprefix"));
     assert!(assembly.contains("mov eax, 0x42200000")); // 40.0f32
     assert!(assembly.contains("movd xmm0, eax"));
@@ -330,8 +330,8 @@ fn test_compile_add_f32() {
 }
 
 #[test]
-fn test_compile_sub_f32() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/sub_f32.fe").unwrap();
+fn test_compile_f32_sub() {
+    let assembly = compile_file_to_assembly("../../testcases/felis/single/f32_sub.fe").unwrap();
     assert!(assembly.contains(".intel_syntax noprefix"));
     assert!(assembly.contains("mov eax, 0x42480000")); // 50.0f32
     assert!(assembly.contains("movd xmm0, eax"));
@@ -346,8 +346,8 @@ fn test_compile_sub_f32() {
 }
 
 #[test]
-fn test_compile_mul_f32() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/mul_f32.fe").unwrap();
+fn test_compile_f32_mul() {
+    let assembly = compile_file_to_assembly("../../testcases/felis/single/f32_mul.fe").unwrap();
     assert!(assembly.contains(".intel_syntax noprefix"));
     assert!(assembly.contains("mov eax, 0x40c00000")); // 6.0f32
     assert!(assembly.contains("movd xmm0, eax"));
@@ -362,8 +362,8 @@ fn test_compile_mul_f32() {
 }
 
 #[test]
-fn test_compile_div_f32() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/div_f32.fe").unwrap();
+fn test_compile_f32_div() {
+    let assembly = compile_file_to_assembly("../../testcases/felis/single/f32_div.fe").unwrap();
     assert!(assembly.contains(".intel_syntax noprefix"));
     assert!(assembly.contains("mov eax, 0x42a80000")); // 84.0f32
     assert!(assembly.contains("movd xmm0, eax"));
@@ -378,8 +378,8 @@ fn test_compile_div_f32() {
 }
 
 #[test]
-fn test_add_f32_integration() {
-    let result = compile_and_execute("../../testcases/felis/single/add_f32.fe");
+fn test_f32_add_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/f32_add.fe");
 
     match result {
         Ok(status) => {
@@ -397,8 +397,8 @@ fn test_add_f32_integration() {
 }
 
 #[test]
-fn test_sub_f32_integration() {
-    let result = compile_and_execute("../../testcases/felis/single/sub_f32.fe");
+fn test_f32_sub_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/f32_sub.fe");
 
     match result {
         Ok(status) => {
@@ -416,8 +416,8 @@ fn test_sub_f32_integration() {
 }
 
 #[test]
-fn test_mul_f32_integration() {
-    let result = compile_and_execute("../../testcases/felis/single/mul_f32.fe");
+fn test_f32_mul_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/f32_mul.fe");
 
     match result {
         Ok(status) => {
@@ -435,8 +435,8 @@ fn test_mul_f32_integration() {
 }
 
 #[test]
-fn test_div_f32_integration() {
-    let result = compile_and_execute("../../testcases/felis/single/div_f32.fe");
+fn test_f32_div_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/f32_div.fe");
 
     match result {
         Ok(status) => {
