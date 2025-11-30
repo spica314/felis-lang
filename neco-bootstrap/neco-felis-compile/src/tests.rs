@@ -4,7 +4,8 @@ use tempfile::TempDir;
 
 #[test]
 fn test_compile_syscall_group_exit_42() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/syscall_group_exit_42.fe").unwrap();
+    let assembly =
+        compile_file_to_assembly("../../testcases/felis/single/syscall_group_exit_42.fe").unwrap();
     assert!(assembly.contains(".intel_syntax noprefix"));
     assert!(assembly.contains("mov rax, 231"));
     assert!(assembly.contains("mov rdi, 42"));

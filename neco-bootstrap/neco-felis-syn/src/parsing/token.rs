@@ -668,7 +668,8 @@ mod test {
     fn test_lex_syscall_group_exit_42() {
         let mut file_id_generator = FileIdGenerator::new();
         let file_id = file_id_generator.generate_file_id();
-        let s = std::fs::read_to_string("../../testcases/felis/single/syscall_group_exit_42.fe").unwrap();
+        let s = std::fs::read_to_string("../../testcases/felis/single/syscall_group_exit_42.fe")
+            .unwrap();
         let tokens = Token::lex(&s, file_id);
 
         assert_debug_snapshot!(tokens);
