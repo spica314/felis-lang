@@ -707,13 +707,25 @@ File {
                                                 },
                                                 s: "__Array",
                                             },
+                                            type_args: [
+                                                TokenVariable {
+                                                    pos: Pos {
+                                                        file_id: FileId(
+                                                            0,
+                                                        ),
+                                                        line: 16,
+                                                        column: 22,
+                                                    },
+                                                    s: "__f32",
+                                                },
+                                            ],
                                             colon2: TokenColon2 {
                                                 pos: Pos {
                                                     file_id: FileId(
                                                         0,
                                                     ),
                                                     line: 16,
-                                                    column: 21,
+                                                    column: 28,
                                                 },
                                             },
                                             method: TokenVariable {
@@ -722,7 +734,7 @@ File {
                                                         0,
                                                     ),
                                                     line: 16,
-                                                    column: 23,
+                                                    column: 30,
                                                 },
                                                 s: "new_with_size",
                                             },
@@ -735,7 +747,7 @@ File {
                                                                     0,
                                                                 ),
                                                                 line: 16,
-                                                                column: 37,
+                                                                column: 44,
                                                             },
                                                             s: "42",
                                                         },
@@ -755,7 +767,7 @@ File {
                                         0,
                                     ),
                                     line: 16,
-                                    column: 39,
+                                    column: 46,
                                 },
                             },
                             tail: Then(
@@ -805,13 +817,25 @@ File {
                                                         },
                                                         s: "__Array",
                                                     },
+                                                    type_args: [
+                                                        TokenVariable {
+                                                            pos: Pos {
+                                                                file_id: FileId(
+                                                                    0,
+                                                                ),
+                                                                line: 17,
+                                                                column: 22,
+                                                            },
+                                                            s: "__f32",
+                                                        },
+                                                    ],
                                                     colon2: TokenColon2 {
                                                         pos: Pos {
                                                             file_id: FileId(
                                                                 0,
                                                             ),
                                                             line: 17,
-                                                            column: 21,
+                                                            column: 28,
                                                         },
                                                     },
                                                     method: TokenVariable {
@@ -820,7 +844,7 @@ File {
                                                                 0,
                                                             ),
                                                             line: 17,
-                                                            column: 23,
+                                                            column: 30,
                                                         },
                                                         s: "new_with_size",
                                                     },
@@ -833,7 +857,7 @@ File {
                                                                             0,
                                                                         ),
                                                                         line: 17,
-                                                                        column: 37,
+                                                                        column: 44,
                                                                     },
                                                                     s: "42",
                                                                 },
@@ -853,7 +877,7 @@ File {
                                                 0,
                                             ),
                                             line: 17,
-                                            column: 39,
+                                            column: 46,
                                         },
                                     },
                                     tail: Then(
@@ -903,13 +927,25 @@ File {
                                                                 },
                                                                 s: "__Array",
                                                             },
+                                                            type_args: [
+                                                                TokenVariable {
+                                                                    pos: Pos {
+                                                                        file_id: FileId(
+                                                                            0,
+                                                                        ),
+                                                                        line: 18,
+                                                                        column: 22,
+                                                                    },
+                                                                    s: "__f32",
+                                                                },
+                                                            ],
                                                             colon2: TokenColon2 {
                                                                 pos: Pos {
                                                                     file_id: FileId(
                                                                         0,
                                                                     ),
                                                                     line: 18,
-                                                                    column: 21,
+                                                                    column: 28,
                                                                 },
                                                             },
                                                             method: TokenVariable {
@@ -918,7 +954,7 @@ File {
                                                                         0,
                                                                     ),
                                                                     line: 18,
-                                                                    column: 23,
+                                                                    column: 30,
                                                                 },
                                                                 s: "new_with_size",
                                                             },
@@ -931,7 +967,7 @@ File {
                                                                                     0,
                                                                                 ),
                                                                                 line: 18,
-                                                                                column: 37,
+                                                                                column: 44,
                                                                             },
                                                                             s: "42",
                                                                         },
@@ -951,7 +987,7 @@ File {
                                                         0,
                                                     ),
                                                     line: 18,
-                                                    column: 39,
+                                                    column: 46,
                                                 },
                                             },
                                             tail: Then(

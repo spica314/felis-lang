@@ -237,15 +237,24 @@ fn compile_field_or_method_impl(
             field_offset - 8
         ));
 
+        let element_size =
+            resolve_array_element_size(&local_field_var, field_name, variable_arrays, arrays)
+                .or_else(|| {
+                    resolve_array_element_size(object_name, field_name, variable_arrays, arrays)
+                })
+                .unwrap_or(8);
+
         // Apply index if present (default 8-byte stride)
         if let Some(index_term) = index {
             match index_term {
                 ProcTerm::Number(num) => {
                     let index = parse_number(num.number.s());
-                    // default element size = 8
-                    output.push_str(&format!("    mov rbx, {index}\n"));
-                    output.push_str("    shl rbx, 3\n");
-                    output.push_str("    add rax, rbx\n");
+                    if let Ok(idx_val) = index.parse::<usize>() {
+                        let offset = idx_val.saturating_mul(element_size);
+                        if offset > 0 {
+                            output.push_str(&format!("    add rax, {offset}\n"));
+                        }
+                    }
                 }
                 ProcTerm::Variable(var) => {
                     if let Some(&var_offset) = variables.get(var.variable.s()) {
@@ -253,7 +262,12 @@ fn compile_field_or_method_impl(
                             "    mov rbx, qword ptr [rbp - 8 - {}]\n",
                             var_offset - 8
                         ));
-                        output.push_str("    shl rbx, 3\n");
+                        if element_size.is_power_of_two() {
+                            let shift = element_size.trailing_zeros();
+                            output.push_str(&format!("    shl rbx, {shift}\n"));
+                        } else {
+                            output.push_str(&format!("    imul rbx, {}\n", element_size));
+                        }
                         output.push_str("    add rax, rbx\n");
                     }
                 }
@@ -405,11 +419,75 @@ pub fn compile_proc_dereference(
                 }
             }
         }
+
+        // Try to infer element type from variable metadata when no structured array info exists
+        let combined = format!("{object_name}_{field_name}");
+        if let Some(field_type) =
+            resolve_array_element_type(&combined, field_name, variable_arrays, arrays).or_else(
+                || resolve_array_element_type(object_name, field_name, variable_arrays, arrays),
+            )
+        {
+            match field_type.as_str() {
+                "f32" => {
+                    output.push_str("    mov eax, dword ptr [rax]\n");
+                    return Ok(());
+                }
+                "f64" | "u64" | "i64" => {
+                    output.push_str("    mov rax, qword ptr [rax]\n");
+                    return Ok(());
+                }
+                "u32" | "i32" => {
+                    output.push_str("    mov eax, dword ptr [rax]\n");
+                    return Ok(());
+                }
+                "u16" | "i16" => {
+                    output.push_str("    movzx rax, word ptr [rax]\n");
+                    return Ok(());
+                }
+                "u8" | "i8" => {
+                    output.push_str("    movzx rax, byte ptr [rax]\n");
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
     }
 
     // Default case - load 4 bytes for unknown types (better for f32); integers <=32-bit still work
     output.push_str("    mov eax, dword ptr [rax]\n");
     Ok(())
+}
+
+fn resolve_array_element_type(
+    key: &str,
+    field_name: &str,
+    variable_arrays: &HashMap<String, String>,
+    arrays: &HashMap<String, ArrayInfo>,
+) -> Option<String> {
+    if let Some(info) = variable_arrays.get(key) {
+        if let Some(elem) = info.strip_prefix("builtin:") {
+            return Some(elem.to_string());
+        }
+        if let Some(array_info) = arrays.get(info) {
+            return crate::arrays::get_field_type(
+                &array_info.field_types,
+                &array_info.field_names,
+                field_name,
+            )
+            .ok();
+        }
+    }
+    None
+}
+
+fn resolve_array_element_size(
+    key: &str,
+    field_name: &str,
+    variable_arrays: &HashMap<String, String>,
+    arrays: &HashMap<String, ArrayInfo>,
+) -> Option<usize> {
+    resolve_array_element_type(key, field_name, variable_arrays, arrays)
+        .map(|ty| crate::arrays::get_type_size(&ty))
 }
 
 fn parse_number(number_str: &str) -> String {

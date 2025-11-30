@@ -65,6 +65,14 @@ pub fn compile_let_statement(
                 let field_var_name = format!("{}_{}", var_name, field.name.s());
                 variables.insert(field_var_name, offset);
 
+                // Propagate array metadata if the source value is an array variable
+                if let ProcTerm::Variable(src_var) = &*field.value
+                    && let Some(array_info) = variable_arrays.get(src_var.variable.s()).cloned()
+                {
+                    let combined_name = format!("{}_{}", var_name, field.name.s());
+                    variable_arrays.insert(combined_name, array_info);
+                }
+
                 // If the field value is a variable that has a corresponding size slot,
                 // also propagate its size into a combined name slot: `{var_name}_{field}_size`.
                 if let ProcTerm::Variable(v) = &*field.value {

@@ -539,6 +539,7 @@ fn elaborate_proc_term(
                 .collect::<ElaborationResult<Vec<_>>>()?;
             Ok(ProcTerm::ConstructorCall(ProcTermConstructorCall {
                 type_name: constructor_call.type_name.clone(),
+                type_args: constructor_call.type_args.clone(),
                 colon2: constructor_call.colon2.clone(),
                 method: constructor_call.method.clone(),
                 args,

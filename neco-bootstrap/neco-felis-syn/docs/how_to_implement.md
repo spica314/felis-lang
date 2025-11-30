@@ -224,7 +224,7 @@ ProcTerm          <- ProcTermIf
                    / ProcTermParen
 ProcTermIf        <- "#if" Statements "{" Statements "}" ProcTermIfPartElse?
 ProcTermIfPartElse <- #else "{" Statements "}"
-ProcTermConstructorCall <- Variable "::" VariableOrKeyword ProcTermSimple*
+ProcTermConstructorCall <- Variable TypeArg* "::" VariableOrKeyword ProcTermSimple*
 ProcTermApply     <- ProcTermApplyElem+
 ProcTermApplyElem <- ProcTermUnit / ProcTermParen / ProcTermVariable / ProcTermNumber
 ProcTermFieldAccess <- Variable "." Variable ProcTermSimple?       // no whitespace allowed before '.'
@@ -233,6 +233,7 @@ ProcTermStructValue <- Variable "{" ProcTermStructField* "}"
 ProcTermStructField <- Variable ":" ProcTerm ","
 ProcTermDereference <- ProcTerm ".*"
 
+TypeArg           <- Variable
 VariableOrKeyword <- Variable / #keyword
 
 ProcTermSimple    <- ProcTermNumber / ProcTermVariable
@@ -243,6 +244,7 @@ ProcTermSimple    <- ProcTermNumber / ProcTermVariable
 - **Recursion in `Statements`:** `Statements::parse` reads one `Statement`, checks the semicolon, and builds the linked list (`StatementsThen`). If there is no trailing semicolon, terminate with a single node.
 - **Trailing commas in struct fields:** When trailing commas are allowed, define the field type with `Option<TokenComma>` and store the result of `TokenComma::parse` directly. When the comma is mandatory (for example `ItemInductiveBranch`), keep `TokenComma` as a required field.
 - **Field access vs. method chains:** Use `TokenOperator::parse_operator_after_non_whitespace` and `parse_operator_after_whitespace` to differentiate `a.b` from `a . b`. Reuse these helpers when you add new dotted syntax.
+- **Constructor calls with type arguments:** For `Type Arg1 Arg2 ::method ...`, greedily parse zero or more `TypeArg` (variables) before `::`, then allow the method token to come from either a variable or a keyword.
 - **Handling postfix operators:** After parsing the primary node (as in `ProcTerm::parse`), call `try_parse_postfix` to combine shared postfix operators such as `.*`. Provide similar helpers when you add new postfix operators.
 - **Extension points (`Ext` variants):** `Statement::Ext(P::StatementExt)` and `ProcTerm::Ext(P::ProcTermExt)` let you attach phase-specific information without changing the grammar. Prefer filling the `Ext` variants over adding new enum variants whenever possible.
 

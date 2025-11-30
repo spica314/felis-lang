@@ -269,6 +269,7 @@ pub fn parse_number(number_str: &str) -> String {
 pub fn generate_builtin_array_allocation_with_var(
     var_name: &str,
     size: &str,
+    element_size: usize,
     output: &mut String,
     stack_offset: &mut i32,
     variables: &mut HashMap<String, i32>,
@@ -296,7 +297,10 @@ pub fn generate_builtin_array_allocation_with_var(
     if size != "rsi" {
         output.push_str(&format!("    mov rsi, {size}        # Load array size\n"));
     }
-    output.push_str("    mov rax, 8               # element size (default)\n");
+    output.push_str(&format!(
+        "    mov rax, {}               # element size\n",
+        element_size
+    ));
     output.push_str("    mul rsi                  # rax = 8 * size\n");
     output.push_str("    mov rsi, rax             # rsi = total_size\n");
 

@@ -21,6 +21,9 @@ pub fn compile_proc_constructor_call_with_var(
         && bi == "Array"
         && method_name == "new_with_size"
     {
+        let element_type = resolve_element_type(constructor_call, builtins);
+        let element_size = crate::arrays::get_type_size(&element_type);
+
         // Get the size argument
         let size_arg = if !constructor_call.args.is_empty()
             && let Some(arg) = constructor_call.args.first()
@@ -53,14 +56,18 @@ pub fn compile_proc_constructor_call_with_var(
             ));
         };
 
-        // Allocate a flat array (8-byte element stride by default)
+        // Allocate a flat array with the requested element size
         crate::arrays::generate_builtin_array_allocation_with_var(
             var_name,
             &size_arg,
+            element_size,
             output,
             stack_offset,
             variables,
         )?;
+
+        // Track element type for later loads/stores
+        variable_arrays.insert(var_name.to_string(), format!("builtin:{element_type}"));
         return Ok(());
     }
 
@@ -197,4 +204,23 @@ pub fn compile_proc_constructor_call(
             "Constructor call not yet implemented: {constructor_name}"
         )))
     }
+}
+
+/// Resolve the element type for a constructor call like `Array T::new_with_size`.
+/// Falls back to the raw name when the builtin alias is unknown.
+fn resolve_element_type(
+    constructor_call: &ProcTermConstructorCall<PhaseParse>,
+    builtins: &HashMap<String, String>,
+) -> String {
+    constructor_call
+        .type_args
+        .first()
+        .map(|arg| {
+            builtins
+                .get(arg.s())
+                .cloned()
+                .unwrap_or_else(|| arg.s().to_string())
+        })
+        // Default to u64-sized elements when no type argument is present
+        .unwrap_or_else(|| "u64".to_string())
 }

@@ -13,9 +13,9 @@
 }
 
 #proc main : () -> () {
-    #let x = __Array::new_with_size 2;
-    #let y = __Array::new_with_size 2;
-    #let z = __Array::new_with_size 2;
+    #let x = __Array __f32 ::new_with_size 2;
+    #let y = __Array __f32 ::new_with_size 2;
+    #let z = __Array __f32 ::new_with_size 2;
     #let points = Points {
         x: x,
         y: y,
