@@ -39,7 +39,7 @@ mod test {
     fn test_parse_inductive_eq() {
         let mut file_id_generator = FileIdGenerator::new();
         let file_id = file_id_generator.generate_file_id();
-        let s = std::fs::read_to_string("../../testcases/felis/single/inductive_eq.fe").unwrap();
+        let s = std::fs::read_to_string("../../testcases/felis/single/wip/inductive_eq.fe").unwrap();
         let tokens = Token::lex(&s, file_id);
 
         let mut i = 0;
@@ -53,7 +53,7 @@ mod test {
     fn test_parse_inductive_nat() {
         let mut file_id_generator = FileIdGenerator::new();
         let file_id = file_id_generator.generate_file_id();
-        let s = std::fs::read_to_string("../../testcases/felis/single/inductive_nat.fe").unwrap();
+        let s = std::fs::read_to_string("../../testcases/felis/single/wip/inductive_nat.fe").unwrap();
         let tokens = Token::lex(&s, file_id);
 
         let mut i = 0;
@@ -67,7 +67,7 @@ mod test {
     fn test_parse_eq_and_nat() {
         let mut file_id_generator = FileIdGenerator::new();
         let file_id = file_id_generator.generate_file_id();
-        let s = std::fs::read_to_string("../../testcases/felis/single/eq_and_nat.fe").unwrap();
+        let s = std::fs::read_to_string("../../testcases/felis/single/wip/eq_and_nat.fe").unwrap();
         let tokens = Token::lex(&s, file_id);
 
         let mut i = 0;
