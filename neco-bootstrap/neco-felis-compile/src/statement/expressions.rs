@@ -18,7 +18,15 @@ pub fn compile_proc_term(
 ) -> Result<(), CompileError> {
     match proc_term {
         ProcTerm::Apply(apply) => {
-            compile_proc_apply(apply, variables, builtins, arrays, variable_arrays, output)
+            compile_proc_apply(
+                apply,
+                variables,
+                reference_variables,
+                builtins,
+                arrays,
+                variable_arrays,
+                output,
+            )
         }
         ProcTerm::Variable(var) => compile_proc_variable(var, variables, output),
         ProcTerm::Number(num) => compile_proc_number(num, output),
@@ -129,6 +137,7 @@ fn parse_number(number_str: &str) -> String {
 pub fn compile_proc_apply(
     apply: &ProcTermApply<PhaseParse>,
     variables: &HashMap<String, i32>,
+    reference_variables: &HashMap<String, String>,
     builtins: &HashMap<String, String>,
     arrays: &HashMap<String, ArrayInfo>,
     variable_arrays: &HashMap<String, String>,
@@ -310,7 +319,35 @@ pub fn compile_proc_apply(
             }
 
             // Generate code to get array length
-            if let Some(array_info) = arrays.get(object_name) {
+            let mut array_key = object_name.to_string();
+            if let Some((base, _)) = object_name.rsplit_once('#')
+                && (variable_arrays.contains_key(base) || arrays.contains_key(base))
+            {
+                array_key = base.to_string();
+            }
+
+            let mut size_owner = array_key.clone();
+            if let Some(info) = variable_arrays.get(&array_key) && info.starts_with("ref:") {
+                if let Some(target) = reference_variables
+                    .get(object_name)
+                    .or_else(|| reference_variables.get(&array_key))
+                    .cloned()
+                    .or_else(|| {
+                        object_name
+                            .rsplit_once('#')
+                            .and_then(|(base, _)| reference_variables.get(base).cloned())
+                    })
+                    .or_else(|| {
+                        array_key
+                            .rsplit_once('#')
+                            .and_then(|(base, _)| reference_variables.get(base).cloned())
+                    })
+                {
+                    size_owner = target;
+                }
+            }
+
+            if let Some(array_info) = arrays.get(&array_key) {
                 // Static array - use compile-time size if available
                 if let Some(size) = array_info.size {
                     output.push_str(&format!("    mov rax, {size}\n"));
@@ -320,11 +357,18 @@ pub fn compile_proc_apply(
                         "Static array {object_name} has no size information"
                     )));
                 }
-            } else if let Some(_array_type) = variable_arrays.get(object_name) {
+            } else if let Some(_array_type) = variable_arrays.get(&array_key) {
                 // This is a variable that holds a dynamically allocated array
                 // The size is stored in a variable named "{array_name}_size"
-                let size_var_name = format!("{object_name}_size");
-                if let Some(&size_offset) = variables.get(&size_var_name) {
+                let candidates = [
+                    format!("{size_owner}_size"),
+                    format!("{array_key}_size"),
+                    format!("{object_name}_size"),
+                ];
+                if let Some(&size_offset) = candidates
+                    .iter()
+                    .find_map(|name| variables.get(name))
+                {
                     // Load the array size from memory into rax
                     output.push_str(&format!(
                         "    mov rax, qword ptr [rbp - 8 - {}]\n",
@@ -336,7 +380,11 @@ pub fn compile_proc_apply(
                         "Size variable not found for array: {object_name}"
                     )));
                 }
-            } else if let Some(&size_offset) = variables.get(&format!("{object_name}_size")) {
+            } else if let Some(&size_offset) = variables
+                .get(&format!("{size_owner}_size"))
+                .or_else(|| variables.get(&format!("{array_key}_size")))
+                .or_else(|| variables.get(&format!("{object_name}_size")))
+            {
                 // Fallback for struct objects: use propagated `{object}_size`
                 output.push_str(&format!(
                     "    mov rax, qword ptr [rbp - 8 - {}]\n",

@@ -373,6 +373,7 @@ impl AssemblyCompiler {
         crate::statement::expressions::compile_proc_apply(
             apply,
             &self.variables,
+            &self.reference_variables,
             &self.builtins,
             &self.arrays,
             &self.variable_arrays,

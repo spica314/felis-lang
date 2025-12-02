@@ -252,7 +252,22 @@ pub fn compile_let_mut_statement(
 
         // Register both variables
         variables.insert(ref_var_name.clone(), ref_offset);
-        reference_variables.insert(ref_var_name, var_name);
+        reference_variables.insert(ref_var_name.clone(), var_name.clone());
+
+        if let Some((base, _)) = var_name.rsplit_once('#') {
+            variables.entry(base.to_string()).or_insert(value_offset);
+        }
+        if let Some((base, _)) = ref_var_name.rsplit_once('#') {
+            variables.entry(base.to_string()).or_insert(ref_offset);
+        }
+
+        if let Some(array_info) = variable_arrays.get(&var_name).cloned() {
+            let entry = format!("ref:{array_info}");
+            variable_arrays.insert(ref_var_name.to_string(), entry.clone());
+            if let Some((base, _)) = ref_var_name.rsplit_once('#') {
+                variable_arrays.entry(base.to_string()).or_insert(entry);
+            }
+        }
 
         return Ok(());
     }
