@@ -15,11 +15,12 @@ pub fn compile_proc_constructor_call_with_var(
 ) -> Result<(), CompileError> {
     let type_name = constructor_call.type_name.s();
     let method_name = constructor_call.method.s();
+    let normalized_method_name = method_name.trim_start_matches('_');
 
     // Handle builtin Array::new_with_size
     if let Some(bi) = builtins.get(type_name)
         && bi == "Array"
-        && method_name == "new_with_size"
+        && normalized_method_name == "new_with_size"
     {
         let element_type = resolve_element_type(constructor_call, builtins);
         let element_size = crate::arrays::get_type_size(&element_type);
@@ -67,17 +68,24 @@ pub fn compile_proc_constructor_call_with_var(
         )?;
 
         // Track element type for later loads/stores
-        variable_arrays.insert(var_name.to_string(), format!("builtin:{element_type}"));
+        let entry = format!("builtin:{element_type}");
+        variable_arrays.insert(var_name.to_string(), entry.clone());
+        if let Some((base, _)) = var_name.rsplit_once('#') {
+            variable_arrays.entry(base.to_string()).or_insert(entry);
+        }
         return Ok(());
     }
 
     let constructor_name = format!("{type_name}::{method_name}");
 
-    if constructor_name.contains("::new_with_size") {
+    if normalized_method_name == "new_with_size" {
         // Look up array information
         if let Some(array_info) = arrays.get(type_name).cloned() {
             // Register the variable to array type mapping
             variable_arrays.insert(var_name.to_string(), type_name.to_string());
+            if let Some((base, _)) = var_name.rsplit_once('#') {
+                variable_arrays.entry(base.to_string()).or_insert_with(|| type_name.to_string());
+            }
             // Get the size argument
             let size_arg = if !constructor_call.args.is_empty()
                 && let Some(arg) = constructor_call.args.first()
@@ -144,9 +152,10 @@ pub fn compile_proc_constructor_call(
 ) -> Result<(), CompileError> {
     let type_name = constructor_call.type_name.s();
     let method_name = constructor_call.method.s();
+    let normalized_method_name = method_name.trim_start_matches('_');
     let constructor_name = format!("{type_name}::{method_name}");
 
-    if constructor_name.contains("::new_with_size") {
+    if normalized_method_name == "new_with_size" {
         // Look up array information
         if let Some(array_info) = arrays.get(type_name).cloned() {
             // Get the size argument

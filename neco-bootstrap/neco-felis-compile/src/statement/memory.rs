@@ -228,6 +228,13 @@ fn compile_field_or_method_impl(
     variable_arrays: &HashMap<String, String>,
     output: &mut String,
 ) -> Result<(), CompileError> {
+    let lookup_offset = |name: &str| {
+        variables
+            .get(name)
+            .copied()
+            .or_else(|| name.rsplit_once('#').and_then(|(base, _)| variables.get(base).copied()))
+    };
+
     // Support local "struct-like" variables expanded as separate stack slots named object_field
     let local_field_var = format!("{object_name}_{field_name}");
     if let Some(&field_offset) = variables.get(&local_field_var) {
@@ -257,7 +264,7 @@ fn compile_field_or_method_impl(
                     }
                 }
                 ProcTerm::Variable(var) => {
-                    if let Some(&var_offset) = variables.get(var.variable.s()) {
+                    if let Some(var_offset) = lookup_offset(var.variable.s()) {
                         output.push_str(&format!(
                             "    mov rbx, qword ptr [rbp - 8 - {}]\n",
                             var_offset - 8
@@ -276,6 +283,95 @@ fn compile_field_or_method_impl(
         }
         return Ok(());
     }
+    // Handle builtin/flat arrays accessed via `.get` / `.set`
+    if (field_name == "get" || field_name == "set")
+        && (variables.contains_key(object_name)
+            || variables.contains_key(&local_field_var)
+            || variable_arrays.contains_key(object_name)
+            || variable_arrays.contains_key(&local_field_var))
+    {
+        // Normalize key for elaborated names
+        let array_key = if variable_arrays.contains_key(object_name) {
+            object_name
+        } else if let Some((base, _)) = object_name.rsplit_once('#')
+            && variable_arrays.contains_key(base)
+        {
+            base
+        } else if variables.contains_key(object_name) {
+            object_name
+        } else {
+            &local_field_var
+        };
+
+        // Load base pointer
+        let Some(ptr_offset) = lookup_offset(array_key) else {
+            return Err(CompileError::UnsupportedConstruct(format!(
+                "Unknown array variable: {object_name}"
+            )));
+        };
+        output.push_str(&format!(
+            "    mov rax, qword ptr [rbp - 8 - {}]\n",
+            ptr_offset - 8
+        ));
+
+        // If this is a reference to an array, dereference once to get the real base pointer
+        if let Some(info) = variable_arrays.get(array_key)
+            && info.starts_with("ref:")
+        {
+            output.push_str("    mov rax, qword ptr [rax]\n");
+        }
+
+        // Determine element size (fallback to 8 bytes)
+        let element_size =
+            resolve_array_element_size(array_key, field_name, variable_arrays, arrays)
+                .unwrap_or(8);
+
+        // Apply index (required)
+        let Some(index_term) = index else {
+            return Err(CompileError::UnsupportedConstruct(
+                "Array element access missing index".to_string(),
+            ));
+        };
+        match index_term {
+            ProcTerm::Number(num) => {
+                let idx = parse_number(num.number.s());
+                if let Ok(idx_val) = idx.parse::<usize>() {
+                    let offset = idx_val.saturating_mul(element_size);
+                    if offset > 0 {
+                        output.push_str(&format!("    add rax, {offset}\n"));
+                    }
+                }
+            }
+            ProcTerm::Variable(var) => {
+                if let Some(&var_offset) = variables.get(var.variable.s()) {
+                    output.push_str(&format!(
+                        "    mov rbx, qword ptr [rbp - 8 - {}]\n",
+                        var_offset - 8
+                    ));
+                    if element_size.is_power_of_two() {
+                        let shift = element_size.trailing_zeros();
+                        output.push_str(&format!("    shl rbx, {shift}\n"));
+                    } else {
+                        output.push_str(&format!("    imul rbx, {}\n", element_size));
+                    }
+                    output.push_str("    add rax, rbx\n");
+                } else {
+                    return Err(CompileError::UnsupportedConstruct(format!(
+                        "Unknown index variable: {}",
+                        var.variable.s()
+                    )));
+                }
+            }
+            _ => {
+                return Err(CompileError::UnsupportedConstruct(format!(
+                    "Unsupported index type: {index_term:?}"
+                )));
+            }
+        }
+
+        return Ok(());
+    }
+
     // Check if this is the len method for an array/struct (accept both `len` and `#len`)
     if field_name == "#len" || field_name == "len" {
         // Look up the array size variable
@@ -345,8 +441,9 @@ fn compile_field_or_method_impl(
         // rax now contains the address of the field element in the SoA
         Ok(())
     } else {
+        let available: Vec<_> = variables.keys().cloned().collect();
         Err(CompileError::UnsupportedConstruct(format!(
-            "Unknown variable: {object_name}"
+            "Unknown variable: {object_name} (candidates: {available:?})"
         )))
     }
 }
@@ -458,13 +555,14 @@ pub fn compile_proc_dereference(
     Ok(())
 }
 
-fn resolve_array_element_type(
+pub fn resolve_array_element_type(
     key: &str,
     field_name: &str,
     variable_arrays: &HashMap<String, String>,
     arrays: &HashMap<String, ArrayInfo>,
 ) -> Option<String> {
     if let Some(info) = variable_arrays.get(key) {
+        let info = info.strip_prefix("ref:").unwrap_or(info.as_str());
         if let Some(elem) = info.strip_prefix("builtin:") {
             return Some(elem.to_string());
         }
@@ -480,7 +578,7 @@ fn resolve_array_element_type(
     None
 }
 
-fn resolve_array_element_size(
+pub fn resolve_array_element_size(
     key: &str,
     field_name: &str,
     variable_arrays: &HashMap<String, String>,

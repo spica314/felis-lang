@@ -1,0 +1,15 @@
+#entrypoint main;
+
+#use_builtin "syscall" #as __syscall;
+#use_builtin "u64" #as __u64;
+#use_builtin "Array" #as __Array;
+
+#proc main : () -> () {
+    #let #mut xs @ xs_ref = __Array __u64 ::__new_with_size 1;
+
+    xs_ref .set 0 42;
+
+    #let syscall_id = 231u64;
+    #let error_code = xs_ref .get 0 .*;
+    __syscall syscall_id error_code 0 0 0 0;
+}

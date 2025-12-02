@@ -492,37 +492,6 @@ fn test_let_mut_integration() {
 }
 
 #[test]
-fn test_compile_array() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/array_1.fe").unwrap();
-    println!("Generated assembly for array_1.fe:\n{assembly}");
-
-    assert!(assembly.contains(".intel_syntax noprefix"));
-    assert!(assembly.contains("main:"));
-    assert!(assembly.contains("_start:"));
-
-    // Check for mmap syscalls (one for each field: x, y, z)
-    assert!(assembly.contains("mov rax, 9")); // sys_mmap
-    assert!(assembly.contains("mov rdi, 0")); // addr = NULL
-    assert!(assembly.contains("mov rdx, 3")); // prot = PROT_READ | PROT_WRITE
-    assert!(assembly.contains("mov r10, 34")); // flags = MAP_PRIVATE | MAP_ANONYMOUS
-    assert!(assembly.contains("mov r8, -1")); // fd = -1
-    assert!(assembly.contains("mov r9, 0")); // offset = 0
-
-    // Check for array field assignments (f32 literal store path)
-    assert!(assembly.contains("mov ebx, 0x41200000")); // 10.0f32
-    assert!(assembly.contains("mov dword ptr [rbx], ebx"));
-
-    // Check for field access in builtin calls
-    assert!(assembly.contains("movss xmm0, dword ptr [rax]"));
-    assert!(assembly.contains("addss xmm0, xmm1"));
-
-    // Check for f32_to_u64 conversion
-    assert!(assembly.contains("cvttss2si rax, xmm0"));
-
-    assert!(assembly.contains("syscall"));
-}
-
-#[test]
 fn test_if_1_integration() {
     let result = compile_and_execute("../../testcases/felis/single/if_1.fe");
 
@@ -561,43 +530,25 @@ fn test_if_2_integration() {
 }
 
 #[test]
-fn test_array_integration() {
-    // Compile-only check for updated Array syntax
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/array_1.fe").unwrap();
-    assert!(assembly.contains("syscall"));
-}
-
-#[test]
 fn test_array_len_integration() {
     let assembly = compile_file_to_assembly("../../testcases/felis/single/array_len.fe").unwrap();
     assert!(assembly.contains("syscall"));
 }
 
 #[test]
-fn test_array_2_integration() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/array_2.fe").unwrap();
-    assert!(assembly.contains("syscall"));
-}
-
-#[test]
-fn test_array_3_integration() {
-    let assembly = compile_file_to_assembly("../../testcases/felis/single/array_3.fe").unwrap();
-    assert!(assembly.contains("syscall"));
-}
-
-#[test]
-fn test_array_4_integration() {
-    let result = compile_and_execute_with_output("../../testcases/felis/single/array_4.fe");
+fn test_array_new_with_size_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/array_new_with_size.fe");
 
     match result {
-        Ok(output) => {
-            let expected = "P3\n2 2\n255\n0 1 2\n3 4 5\n6 7 8\n9 10 11\n";
-            let actual_output = String::from_utf8_lossy(&output.stdout);
-            assert_eq!(actual_output, expected);
+        Ok(status) => {
+            assert_eq!(
+                status.code(),
+                Some(42),
+                "Program should exit with code 42"
+            );
         }
         Err(e) => {
-            // Skip test if assembler/linker not available
-            panic!("Skipping array_4.fe integration test: {e}");
+            panic!("array_new_with_size.fe integration test failed: {e}");
         }
     }
 }

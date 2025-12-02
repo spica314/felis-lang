@@ -217,6 +217,46 @@ pub fn compile_let_mut_statement(
     let var_name = let_mut_stmt.variable_name().to_string();
     let ref_var_name = let_mut_stmt.reference_variable_name().to_string();
 
+    // Handle constructor calls specially so we can reuse array allocation logic
+    if let ProcTerm::ConstructorCall(constructor_call) = &*let_mut_stmt.value {
+        super::constructors::compile_proc_constructor_call_with_var(
+            constructor_call,
+            &var_name,
+            arrays,
+            builtins,
+            output,
+            stack_offset,
+            variables,
+            variable_arrays,
+        )?;
+
+        let value_offset = *variables.get(&var_name).ok_or_else(|| {
+            CompileError::UnsupportedConstruct(format!(
+                "Failed to register variable for constructor call: {var_name}"
+            ))
+        })?;
+
+        // Allocate space for the reference (8 bytes) - pointer to the value
+        *stack_offset += 8;
+        let ref_offset = *stack_offset;
+
+        // Calculate the address of the value and store it as the reference
+        output.push_str(&format!(
+            "    lea rax, qword ptr [rbp - 8 - {}]\n",
+            value_offset - 8
+        ));
+        output.push_str(&format!(
+            "    mov qword ptr [rbp - 8 - {}], rax\n",
+            ref_offset - 8
+        ));
+
+        // Register both variables
+        variables.insert(ref_var_name.clone(), ref_offset);
+        reference_variables.insert(ref_var_name, var_name);
+
+        return Ok(());
+    }
+
     // Allocate space for the value (8 bytes)
     *stack_offset += 8;
     let value_offset = *stack_offset;
@@ -247,17 +287,32 @@ pub fn compile_let_mut_statement(
         "    lea rax, qword ptr [rbp - 8 - {}]\n",
         value_offset - 8
     ));
-    output.push_str(&format!(
-        "    mov qword ptr [rbp - 8 - {}], rax\n",
-        ref_offset - 8
-    ));
+        output.push_str(&format!(
+            "    mov qword ptr [rbp - 8 - {}], rax\n",
+            ref_offset - 8
+        ));
 
     // Register both variables
     variables.insert(var_name.clone(), value_offset);
     variables.insert(ref_var_name.clone(), ref_offset);
+    if let Some((base, _)) = var_name.rsplit_once('#') {
+        variables.entry(base.to_string()).or_insert(value_offset);
+    }
+    if let Some((base, _)) = ref_var_name.rsplit_once('#') {
+        variables.entry(base.to_string()).or_insert(ref_offset);
+    }
 
     // Track that ref_var_name is a reference to var_name
-    reference_variables.insert(ref_var_name, var_name);
+    reference_variables.insert(ref_var_name.clone(), var_name.clone());
+
+    // Propagate array metadata so references to arrays can be used directly
+    if let Some(array_info) = variable_arrays.get(&var_name).cloned() {
+        let entry = format!("ref:{array_info}");
+        variable_arrays.insert(ref_var_name.clone(), entry.clone());
+        if let Some((base, _)) = ref_var_name.rsplit_once('#') {
+            variable_arrays.entry(base.to_string()).or_insert(entry);
+        }
+    }
 
     Ok(())
 }
