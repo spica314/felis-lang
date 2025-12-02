@@ -12,7 +12,9 @@ pub fn builtin_types() -> BuiltinTypes {
     let syscall = arrow_chain(vec![u64.clone(); 6], u64.clone());
     let array_param = Type::Hole(TypeHole(0));
     let array_elem = Type::Struct(Vec::new());
-    let array = Type::arrow(array_param, array_elem);
+    let array = Type::arrow(array_param.clone(), array_elem);
+    let array_new_with_size =
+        arrow_chain(vec![array_param, u64.clone()], Type::Hole(TypeHole(1)));
 
     BuiltinTypes::new([
         ("syscall", syscall),
@@ -35,6 +37,7 @@ pub fn builtin_types() -> BuiltinTypes {
         ("u64", u64.clone()),
         ("f32", f32.clone()),
         ("Array", array),
+        ("array_new_with_size", array_new_with_size),
     ])
 }
 

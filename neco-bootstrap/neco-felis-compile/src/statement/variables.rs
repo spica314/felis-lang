@@ -119,6 +119,22 @@ pub fn compile_let_statement(
             Ok(())
         }
         ProcTerm::Apply(apply) => {
+            if let ProcTerm::Variable(var) = &*apply.f
+                && let Some(builtin) = builtins.get(var.variable.s())
+                && builtin == "array_new_with_size"
+            {
+                super::constructors::compile_builtin_array_new_with_size_apply(
+                    apply,
+                    &var_name,
+                    builtins,
+                    output,
+                    stack_offset,
+                    variables,
+                    variable_arrays,
+                )?;
+                return Ok(());
+            }
+
             // Check if this is a f32 arithmetic operation that should store f32 result
             if let ProcTerm::Variable(var) = &*apply.f
                 && let Some(builtin) = builtins.get(var.variable.s())
@@ -217,6 +233,8 @@ pub fn compile_let_mut_statement(
     let var_name = let_mut_stmt.variable_name().to_string();
     let ref_var_name = let_mut_stmt.reference_variable_name().to_string();
 
+    let mut value_offset: Option<i32> = None;
+
     // Handle constructor calls specially so we can reuse array allocation logic
     if let ProcTerm::ConstructorCall(constructor_call) = &*let_mut_stmt.value {
         super::constructors::compile_proc_constructor_call_with_var(
@@ -230,12 +248,35 @@ pub fn compile_let_mut_statement(
             variable_arrays,
         )?;
 
-        let value_offset = *variables.get(&var_name).ok_or_else(|| {
+        value_offset = Some(*variables.get(&var_name).ok_or_else(|| {
             CompileError::UnsupportedConstruct(format!(
                 "Failed to register variable for constructor call: {var_name}"
             ))
-        })?;
+        })?);
+    } else if let ProcTerm::Apply(apply) = &*let_mut_stmt.value {
+        if let ProcTerm::Variable(var) = &*apply.f
+            && let Some(builtin) = builtins.get(var.variable.s())
+            && builtin == "array_new_with_size"
+        {
+            super::constructors::compile_builtin_array_new_with_size_apply(
+                apply,
+                &var_name,
+                builtins,
+                output,
+                stack_offset,
+                variables,
+                variable_arrays,
+            )?;
 
+            value_offset = Some(*variables.get(&var_name).ok_or_else(|| {
+                CompileError::UnsupportedConstruct(format!(
+                    "Failed to register variable for array allocation: {var_name}"
+                ))
+            })?);
+        }
+    }
+
+    if let Some(value_offset) = value_offset {
         // Allocate space for the reference (8 bytes) - pointer to the value
         *stack_offset += 8;
         let ref_offset = *stack_offset;
