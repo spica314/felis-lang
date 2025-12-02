@@ -14,7 +14,10 @@ fn resolve_size_argument(
             let offset = variables
                 .get(name)
                 .copied()
-                .or_else(|| name.rsplit_once('#').and_then(|(base, _)| variables.get(base).copied()))
+                .or_else(|| {
+                    name.rsplit_once('#')
+                        .and_then(|(base, _)| variables.get(base).copied())
+                })
                 .ok_or_else(|| {
                     CompileError::UnsupportedConstruct(format!(
                         "Unknown variable in array size: {name}"
@@ -76,12 +79,10 @@ fn resolve_element_type_from_arg(
     builtins: &HashMap<String, String>,
 ) -> Result<String, CompileError> {
     match arg {
-        ProcTerm::Variable(var) => Ok(
-            builtins
-                .get(var.variable.s())
-                .cloned()
-                .unwrap_or_else(|| var.variable.s().to_string()),
-        ),
+        ProcTerm::Variable(var) => Ok(builtins
+            .get(var.variable.s())
+            .cloned()
+            .unwrap_or_else(|| var.variable.s().to_string())),
         _ => Err(CompileError::UnsupportedConstruct(format!(
             "Unsupported element type argument for array_new_with_size: {arg:?}"
         ))),
@@ -164,7 +165,9 @@ pub fn compile_proc_constructor_call_with_var(
             // Register the variable to array type mapping
             variable_arrays.insert(var_name.to_string(), type_name.to_string());
             if let Some((base, _)) = var_name.rsplit_once('#') {
-                variable_arrays.entry(base.to_string()).or_insert_with(|| type_name.to_string());
+                variable_arrays
+                    .entry(base.to_string())
+                    .or_insert_with(|| type_name.to_string());
             }
             // Get the size argument
             let size_arg = if !constructor_call.args.is_empty()

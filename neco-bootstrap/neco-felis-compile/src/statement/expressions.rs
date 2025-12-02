@@ -17,17 +17,15 @@ pub fn compile_proc_term(
     output: &mut String,
 ) -> Result<(), CompileError> {
     match proc_term {
-        ProcTerm::Apply(apply) => {
-            compile_proc_apply(
-                apply,
-                variables,
-                reference_variables,
-                builtins,
-                arrays,
-                variable_arrays,
-                output,
-            )
-        }
+        ProcTerm::Apply(apply) => compile_proc_apply(
+            apply,
+            variables,
+            reference_variables,
+            builtins,
+            arrays,
+            variable_arrays,
+            output,
+        ),
         ProcTerm::Variable(var) => compile_proc_variable(var, variables, output),
         ProcTerm::Number(num) => compile_proc_number(num, output),
         ProcTerm::FieldAccess(field_access) => {
@@ -153,7 +151,7 @@ pub fn compile_proc_apply(
             let index_term = if let Some(idx) = method_chain.index.as_deref() {
                 idx
             } else {
-                apply.args.get(0).ok_or_else(|| {
+                apply.args.first().ok_or_else(|| {
                     CompileError::UnsupportedConstruct(
                         "Array element access missing index".to_string(),
                     )
@@ -169,23 +167,21 @@ pub fn compile_proc_apply(
 
             let value_term = if field_name == "set" {
                 let arg_idx = if method_chain.index.is_some() { 0 } else { 1 };
-                Some(
-                    apply.args.get(arg_idx).ok_or_else(|| {
-                        CompileError::UnsupportedConstruct(
-                            "Array set missing value argument".to_string(),
-                        )
-                    })?,
-                )
+                Some(apply.args.get(arg_idx).ok_or_else(|| {
+                    CompileError::UnsupportedConstruct(
+                        "Array set missing value argument".to_string(),
+                    )
+                })?)
             } else {
                 None
             };
 
             // Helper to handle elaborated names with suffixes
             let lookup_offset = |name: &str| {
-                variables
-                    .get(name)
-                    .copied()
-                    .or_else(|| name.rsplit_once('#').and_then(|(base, _)| variables.get(base).copied()))
+                variables.get(name).copied().or_else(|| {
+                    name.rsplit_once('#')
+                        .and_then(|(base, _)| variables.get(base).copied())
+                })
             };
 
             // Resolve array metadata key (accept elaborated names)
@@ -327,8 +323,9 @@ pub fn compile_proc_apply(
             }
 
             let mut size_owner = array_key.clone();
-            if let Some(info) = variable_arrays.get(&array_key) && info.starts_with("ref:") {
-                if let Some(target) = reference_variables
+            if let Some(info) = variable_arrays.get(&array_key)
+                && info.starts_with("ref:")
+                && let Some(target) = reference_variables
                     .get(object_name)
                     .or_else(|| reference_variables.get(&array_key))
                     .cloned()
@@ -342,9 +339,8 @@ pub fn compile_proc_apply(
                             .rsplit_once('#')
                             .and_then(|(base, _)| reference_variables.get(base).cloned())
                     })
-                {
-                    size_owner = target;
-                }
+            {
+                size_owner = target;
             }
 
             if let Some(array_info) = arrays.get(&array_key) {
@@ -365,10 +361,7 @@ pub fn compile_proc_apply(
                     format!("{array_key}_size"),
                     format!("{object_name}_size"),
                 ];
-                if let Some(&size_offset) = candidates
-                    .iter()
-                    .find_map(|name| variables.get(name))
-                {
+                if let Some(&size_offset) = candidates.iter().find_map(|name| variables.get(name)) {
                     // Load the array size from memory into rax
                     output.push_str(&format!(
                         "    mov rax, qword ptr [rbp - 8 - {}]\n",

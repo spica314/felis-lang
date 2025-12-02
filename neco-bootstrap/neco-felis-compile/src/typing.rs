@@ -13,8 +13,7 @@ pub fn builtin_types() -> BuiltinTypes {
     let array_param = Type::Hole(TypeHole(0));
     let array_elem = Type::Struct(Vec::new());
     let array = Type::arrow(array_param.clone(), array_elem);
-    let array_new_with_size =
-        arrow_chain(vec![array_param, u64.clone()], Type::Hole(TypeHole(1)));
+    let array_new_with_size = arrow_chain(vec![array_param, u64.clone()], Type::Hole(TypeHole(1)));
 
     BuiltinTypes::new([
         ("syscall", syscall),

@@ -18,13 +18,7 @@ fi
 ERRORS_FOUND=false
 
 # Find all text files (excluding binary files and build artifacts)
-find . -type f \
-  -not -path './target/*' \
-  -not -path './.git/*' \
-  -not -path './node_modules/*' \
-  -not -path './neco-bootstrap/target/*' \
-  \( -name '*.rs' -o -name '*.toml' -o -name '*.md' -o -name '*.sh' -o -name '*.fe' -o -name '*.yml' -o -name '*.yaml' \) \
-  -print0 | while IFS= read -r -d '' file; do
+while IFS= read -r -d '' file; do
 
     # Check if file ends with newline
     if [[ -s "$file" ]] && [[ $(tail -c1 "$file" | wc -l) -eq 0 ]]; then
@@ -36,7 +30,13 @@ find . -type f \
             ERRORS_FOUND=true
         fi
     fi
-done
+done < <(find . -type f \
+  -not -path './target/*' \
+  -not -path './.git/*' \
+  -not -path './node_modules/*' \
+  -not -path './neco-bootstrap/target/*' \
+  \( -name '*.rs' -o -name '*.toml' -o -name '*.md' -o -name '*.sh' -o -name '*.fe' -o -name '*.yml' -o -name '*.yaml' \) \
+  -print0)
 
 # Exit with appropriate status
 if $FIX_MODE; then

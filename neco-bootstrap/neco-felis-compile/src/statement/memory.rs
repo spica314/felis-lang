@@ -229,10 +229,10 @@ fn compile_field_or_method_impl(
     output: &mut String,
 ) -> Result<(), CompileError> {
     let lookup_offset = |name: &str| {
-        variables
-            .get(name)
-            .copied()
-            .or_else(|| name.rsplit_once('#').and_then(|(base, _)| variables.get(base).copied()))
+        variables.get(name).copied().or_else(|| {
+            name.rsplit_once('#')
+                .and_then(|(base, _)| variables.get(base).copied())
+        })
     };
 
     // Support local "struct-like" variables expanded as separate stack slots named object_field
@@ -323,8 +323,7 @@ fn compile_field_or_method_impl(
 
         // Determine element size (fallback to 8 bytes)
         let element_size =
-            resolve_array_element_size(array_key, field_name, variable_arrays, arrays)
-                .unwrap_or(8);
+            resolve_array_element_size(array_key, field_name, variable_arrays, arrays).unwrap_or(8);
 
         // Apply index (required)
         let Some(index_term) = index else {

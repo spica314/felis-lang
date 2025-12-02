@@ -253,27 +253,26 @@ pub fn compile_let_mut_statement(
                 "Failed to register variable for constructor call: {var_name}"
             ))
         })?);
-    } else if let ProcTerm::Apply(apply) = &*let_mut_stmt.value {
-        if let ProcTerm::Variable(var) = &*apply.f
-            && let Some(builtin) = builtins.get(var.variable.s())
-            && builtin == "array_new_with_size"
-        {
-            super::constructors::compile_builtin_array_new_with_size_apply(
-                apply,
-                &var_name,
-                builtins,
-                output,
-                stack_offset,
-                variables,
-                variable_arrays,
-            )?;
+    } else if let ProcTerm::Apply(apply) = &*let_mut_stmt.value
+        && let ProcTerm::Variable(var) = &*apply.f
+        && let Some(builtin) = builtins.get(var.variable.s())
+        && builtin == "array_new_with_size"
+    {
+        super::constructors::compile_builtin_array_new_with_size_apply(
+            apply,
+            &var_name,
+            builtins,
+            output,
+            stack_offset,
+            variables,
+            variable_arrays,
+        )?;
 
-            value_offset = Some(*variables.get(&var_name).ok_or_else(|| {
-                CompileError::UnsupportedConstruct(format!(
-                    "Failed to register variable for array allocation: {var_name}"
-                ))
-            })?);
-        }
+        value_offset = Some(*variables.get(&var_name).ok_or_else(|| {
+            CompileError::UnsupportedConstruct(format!(
+                "Failed to register variable for array allocation: {var_name}"
+            ))
+        })?);
     }
 
     if let Some(value_offset) = value_offset {
@@ -343,10 +342,10 @@ pub fn compile_let_mut_statement(
         "    lea rax, qword ptr [rbp - 8 - {}]\n",
         value_offset - 8
     ));
-        output.push_str(&format!(
-            "    mov qword ptr [rbp - 8 - {}], rax\n",
-            ref_offset - 8
-        ));
+    output.push_str(&format!(
+        "    mov qword ptr [rbp - 8 - {}], rax\n",
+        ref_offset - 8
+    ));
 
     // Register both variables
     variables.insert(var_name.clone(), value_offset);

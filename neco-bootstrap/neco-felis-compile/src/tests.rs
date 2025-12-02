@@ -541,11 +541,7 @@ fn test_array_new_with_size_integration() {
 
     match result {
         Ok(status) => {
-            assert_eq!(
-                status.code(),
-                Some(42),
-                "Program should exit with code 42"
-            );
+            assert_eq!(status.code(), Some(42), "Program should exit with code 42");
         }
         Err(e) => {
             panic!("array_new_with_size.fe integration test failed: {e}");
