@@ -322,11 +322,6 @@ impl AssemblyCompiler {
                     self.scan_proc_term_for_structs(arg);
                 }
             }
-            ProcTerm::ConstructorCall(constructor_call) => {
-                for arg in &constructor_call.args {
-                    self.scan_proc_term_for_structs(arg);
-                }
-            }
             ProcTerm::MethodChain(method_chain) => {
                 if let Some(index) = &method_chain.index {
                     self.scan_proc_term_for_structs(index);
@@ -390,36 +385,6 @@ impl AssemblyCompiler {
             &self.arrays,
             &self.variable_arrays,
             &mut self.output,
-        )
-    }
-
-    pub fn compile_proc_constructor_call_with_var(
-        &mut self,
-        constructor_call: &ProcTermConstructorCall<PhaseParse>,
-        var_name: &str,
-    ) -> Result<(), CompileError> {
-        crate::statement::constructors::compile_proc_constructor_call_with_var(
-            constructor_call,
-            var_name,
-            &self.arrays,
-            &self.builtins,
-            &mut self.output,
-            &mut self.stack_offset,
-            &mut self.variables,
-            &mut self.variable_arrays,
-        )
-    }
-
-    pub fn compile_proc_constructor_call(
-        &mut self,
-        constructor_call: &ProcTermConstructorCall<PhaseParse>,
-    ) -> Result<(), CompileError> {
-        crate::statement::constructors::compile_proc_constructor_call(
-            constructor_call,
-            &self.arrays,
-            &mut self.output,
-            &mut self.stack_offset,
-            &mut self.variables,
         )
     }
 

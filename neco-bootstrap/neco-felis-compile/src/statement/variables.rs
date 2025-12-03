@@ -21,21 +21,6 @@ pub fn compile_let_statement(
     let mut offset = *stack_offset;
 
     match &*let_stmt.value {
-        ProcTerm::ConstructorCall(constructor_call) => {
-            super::constructors::compile_proc_constructor_call_with_var(
-                constructor_call,
-                &var_name,
-                arrays,
-                builtins,
-                output,
-                stack_offset,
-                variables,
-                variable_arrays,
-            )?;
-
-            // The constructor call handles the variable registration internally
-            Ok(())
-        }
         ProcTerm::StructValue(struct_value) => {
             // Expand struct value into per-field stack slots with names var_field
             let fields = &struct_value.fields;
@@ -236,24 +221,7 @@ pub fn compile_let_mut_statement(
     let mut value_offset: Option<i32> = None;
 
     // Handle constructor calls specially so we can reuse array allocation logic
-    if let ProcTerm::ConstructorCall(constructor_call) = &*let_mut_stmt.value {
-        super::constructors::compile_proc_constructor_call_with_var(
-            constructor_call,
-            &var_name,
-            arrays,
-            builtins,
-            output,
-            stack_offset,
-            variables,
-            variable_arrays,
-        )?;
-
-        value_offset = Some(*variables.get(&var_name).ok_or_else(|| {
-            CompileError::UnsupportedConstruct(format!(
-                "Failed to register variable for constructor call: {var_name}"
-            ))
-        })?);
-    } else if let ProcTerm::Apply(apply) = &*let_mut_stmt.value
+    if let ProcTerm::Apply(apply) = &*let_mut_stmt.value
         && let ProcTerm::Variable(var) = &*apply.f
         && let Some(builtin) = builtins.get(var.variable.s())
         && builtin == "array_new_with_size"

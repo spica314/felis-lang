@@ -352,13 +352,6 @@ impl TypeChecker {
                 self.assign_type(&field_access.ext.term_id, result_ty)
             }
             ProcTerm::MethodChain(chain) => self.visit_proc_method_chain(chain),
-            ProcTerm::ConstructorCall(constructor_call) => {
-                for arg in &constructor_call.args {
-                    self.visit_proc_term(arg)?;
-                }
-                let hole = Type::Hole(self.fresh_hole());
-                self.assign_type(&constructor_call.ext.term_id, hole)
-            }
             ProcTerm::StructValue(struct_value) => {
                 let mut fields = Vec::with_capacity(struct_value.fields.len());
                 for field in &struct_value.fields {

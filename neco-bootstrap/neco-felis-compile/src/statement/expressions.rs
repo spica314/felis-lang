@@ -3,7 +3,6 @@ use neco_felis_syn::*;
 use std::collections::HashMap;
 
 use super::arithmetic;
-use super::constructors;
 use super::control_flow;
 use super::memory;
 
@@ -45,13 +44,6 @@ pub fn compile_proc_term(
             arrays,
             variable_arrays,
             output,
-        ),
-        ProcTerm::ConstructorCall(constructor_call) => constructors::compile_proc_constructor_call(
-            constructor_call,
-            arrays,
-            output,
-            &mut 0,
-            &mut HashMap::new(),
         ),
         ProcTerm::If(if_expr) => control_flow::compile_proc_if(
             if_expr,

@@ -197,12 +197,6 @@ fn update_proc_term(
         (ProcTerm::MethodChain(orig), ProcTerm::MethodChain(ren)) => {
             update_method_chain(ctx, orig, ren)
         }
-        (ProcTerm::ConstructorCall(orig), ProcTerm::ConstructorCall(ren)) => {
-            for (orig_arg, ren_arg) in orig.args.iter_mut().zip(&ren.args) {
-                update_proc_term(ctx, orig_arg, ren_arg)?;
-            }
-            Ok(())
-        }
         (ProcTerm::StructValue(orig), ProcTerm::StructValue(ren)) => {
             for (orig_field, ren_field) in orig.fields.iter_mut().zip(&ren.fields) {
                 update_proc_term(ctx, orig_field.value.as_mut(), ren_field.value.as_ref())?;

@@ -1,7 +1,7 @@
 use crate::{
-    ItemStruct, Parse, ParseError, Phase, PhaseParse, ProcTermApply, ProcTermConstructorCall,
-    ProcTermFieldAccess, ProcTermIf, ProcTermMethodChain, ProcTermNumber, ProcTermParen,
-    ProcTermStructValue, ProcTermUnit, ProcTermVariable, token::Token,
+    ItemStruct, Parse, ParseError, Phase, PhaseParse, ProcTermApply, ProcTermFieldAccess,
+    ProcTermIf, ProcTermMethodChain, ProcTermNumber, ProcTermParen, ProcTermStructValue,
+    ProcTermUnit, ProcTermVariable, token::Token,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -13,7 +13,6 @@ pub enum ProcTerm<P: Phase> {
     Number(ProcTermNumber<P>),
     FieldAccess(ProcTermFieldAccess<P>),
     MethodChain(ProcTermMethodChain<P>),
-    ConstructorCall(ProcTermConstructorCall<P>),
     Struct(ItemStruct<P>),
     StructValue(ProcTermStructValue<P>),
     If(ProcTermIf<P>),
@@ -24,10 +23,6 @@ impl Parse for ProcTerm<PhaseParse> {
     fn parse(tokens: &[Token], i: &mut usize) -> Result<Option<Self>, ParseError> {
         if let Some(proc_term_if) = ProcTermIf::parse(tokens, i)? {
             return Ok(Some(ProcTerm::If(proc_term_if)));
-        }
-
-        if let Some(proc_term_constructor_call) = ProcTermConstructorCall::parse(tokens, i)? {
-            return Ok(Some(ProcTerm::ConstructorCall(proc_term_constructor_call)));
         }
 
         if let Some(proc_term_apply) = ProcTermApply::parse(tokens, i)? {

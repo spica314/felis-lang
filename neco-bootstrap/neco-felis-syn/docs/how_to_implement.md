@@ -212,7 +212,6 @@ TermNumber        <- Number
 TermVariable      <- Variable
 
 ProcTerm          <- ProcTermIf
-                   / ProcTermConstructorCall
                    / ProcTermApply
                    / ProcTermFieldAccess
                    / ProcTermMethodChain
@@ -224,7 +223,6 @@ ProcTerm          <- ProcTermIf
                    / ProcTermParen
 ProcTermIf        <- "#if" Statements "{" Statements "}" ProcTermIfPartElse?
 ProcTermIfPartElse <- #else "{" Statements "}"
-ProcTermConstructorCall <- Variable TypeArg* "::" VariableOrKeyword ProcTermSimple*
 ProcTermApply     <- ProcTermApplyElem+
 ProcTermApplyElem <- ProcTermUnit / ProcTermParen / ProcTermVariable / ProcTermNumber
 ProcTermFieldAccess <- Variable "." Variable ProcTermSimple?       // no whitespace allowed before '.'

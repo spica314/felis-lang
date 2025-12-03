@@ -530,22 +530,6 @@ fn elaborate_proc_term(
             let elaborated = elaborate_proc_method_chain(context, method_chain)?;
             Ok(ProcTerm::MethodChain(elaborated))
         }
-        ProcTerm::ConstructorCall(constructor_call) => {
-            let term_id = context.generate_term_id();
-            let args = constructor_call
-                .args
-                .iter()
-                .map(|arg| elaborate_proc_term(context, arg))
-                .collect::<ElaborationResult<Vec<_>>>()?;
-            Ok(ProcTerm::ConstructorCall(ProcTermConstructorCall {
-                type_name: constructor_call.type_name.clone(),
-                type_args: constructor_call.type_args.clone(),
-                colon2: constructor_call.colon2.clone(),
-                method: constructor_call.method.clone(),
-                args,
-                ext: ProcTermConstructorCallIds { term_id },
-            }))
-        }
         ProcTerm::Struct(_item_struct) => {
             unreachable!("Struct definitions are not supported inside proc terms")
         }
