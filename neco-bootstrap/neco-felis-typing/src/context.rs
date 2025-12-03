@@ -389,14 +389,6 @@ impl TypeChecker {
                 let hole = Type::Hole(self.fresh_hole());
                 self.assign_type(&if_term.ext.term_id, hole)
             }
-            ProcTerm::Dereference(deref) => {
-                let inner_ty = self.visit_proc_term(&deref.term)?;
-                let result_ty = Type::Hole(self.fresh_hole());
-                let mut ctx = UnificationCtx::new(&mut self.solutions);
-                ctx.unify(&inner_ty, &result_ty)
-                    .map_err(TypingError::UnificationFailed)?;
-                self.assign_type(&deref.ext.term_id, result_ty)
-            }
             ProcTerm::Paren(paren) => {
                 let inner_ty = self.visit_proc_term(&paren.proc_term)?;
                 self.assign_type(&paren.ext.term_id, inner_ty)

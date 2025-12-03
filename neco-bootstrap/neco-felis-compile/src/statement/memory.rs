@@ -2,8 +2,6 @@ use crate::{ArrayInfo, error::CompileError};
 use neco_felis_syn::*;
 use std::collections::HashMap;
 
-use super::expressions;
-
 pub fn load_proc_argument_into_register(
     arg: &ProcTerm<PhaseParse>,
     register: &str,
@@ -53,22 +51,6 @@ pub fn load_proc_argument_into_register(
         ProcTerm::Paren(paren) => {
             // Handle parenthesized expressions by delegating to the inner term
             load_proc_argument_into_register(&paren.proc_term, register, variables, output)?;
-        }
-        ProcTerm::Dereference(dereference) => {
-            // Handle dereference operation: expr.*
-            // First, compile the term that produces a reference/address
-            expressions::compile_proc_term(
-                &dereference.term,
-                variables,
-                &HashMap::new(),
-                &HashMap::new(),
-                &HashMap::new(),
-                &mut HashMap::new(),
-                output,
-            )?;
-
-            // Then dereference it - rax contains the address, we need to load the value
-            output.push_str(&format!("    mov {register}, qword ptr [rax]\n"));
         }
         _ => {
             return Err(CompileError::UnsupportedConstruct(format!(
@@ -147,23 +129,6 @@ pub fn load_f32_proc_argument_into_register(
                 variable_arrays,
                 output,
             )?;
-        }
-        ProcTerm::Dereference(dereference) => {
-            // Handle dereference operation: expr.*
-            // First, compile the term that produces a reference/address
-            expressions::compile_proc_term(
-                &dereference.term,
-                variables,
-                &HashMap::new(),
-                &HashMap::new(),
-                arrays,
-                &mut variable_arrays.clone(),
-                output,
-            )?;
-
-            // At this point, rax should contain the address of the f32 value
-            // Load the f32 value from that address into the XMM register
-            output.push_str(&format!("    movss {register}, dword ptr [rax]\n"));
         }
         _ => {
             return Err(CompileError::UnsupportedConstruct(format!(
@@ -283,112 +248,6 @@ fn compile_field_or_method_impl(
         }
         return Ok(());
     }
-    // Handle builtin/flat arrays accessed via `.get` / `.set`
-    if (field_name == "get" || field_name == "set")
-        && (variables.contains_key(object_name)
-            || variables.contains_key(&local_field_var)
-            || variable_arrays.contains_key(object_name)
-            || variable_arrays.contains_key(&local_field_var))
-    {
-        // Normalize key for elaborated names
-        let array_key = if variable_arrays.contains_key(object_name) {
-            object_name
-        } else if let Some((base, _)) = object_name.rsplit_once('#')
-            && variable_arrays.contains_key(base)
-        {
-            base
-        } else if variables.contains_key(object_name) {
-            object_name
-        } else {
-            &local_field_var
-        };
-
-        // Load base pointer
-        let Some(ptr_offset) = lookup_offset(array_key) else {
-            return Err(CompileError::UnsupportedConstruct(format!(
-                "Unknown array variable: {object_name}"
-            )));
-        };
-        output.push_str(&format!(
-            "    mov rax, qword ptr [rbp - 8 - {}]\n",
-            ptr_offset - 8
-        ));
-
-        // If this is a reference to an array, dereference once to get the real base pointer
-        if let Some(info) = variable_arrays.get(array_key)
-            && info.starts_with("ref:")
-        {
-            output.push_str("    mov rax, qword ptr [rax]\n");
-        }
-
-        // Determine element size (fallback to 8 bytes)
-        let element_size =
-            resolve_array_element_size(array_key, field_name, variable_arrays, arrays).unwrap_or(8);
-
-        // Apply index (required)
-        let Some(index_term) = index else {
-            return Err(CompileError::UnsupportedConstruct(
-                "Array element access missing index".to_string(),
-            ));
-        };
-        match index_term {
-            ProcTerm::Number(num) => {
-                let idx = parse_number(num.number.s());
-                if let Ok(idx_val) = idx.parse::<usize>() {
-                    let offset = idx_val.saturating_mul(element_size);
-                    if offset > 0 {
-                        output.push_str(&format!("    add rax, {offset}\n"));
-                    }
-                }
-            }
-            ProcTerm::Variable(var) => {
-                if let Some(&var_offset) = variables.get(var.variable.s()) {
-                    output.push_str(&format!(
-                        "    mov rbx, qword ptr [rbp - 8 - {}]\n",
-                        var_offset - 8
-                    ));
-                    if element_size.is_power_of_two() {
-                        let shift = element_size.trailing_zeros();
-                        output.push_str(&format!("    shl rbx, {shift}\n"));
-                    } else {
-                        output.push_str(&format!("    imul rbx, {}\n", element_size));
-                    }
-                    output.push_str("    add rax, rbx\n");
-                } else {
-                    return Err(CompileError::UnsupportedConstruct(format!(
-                        "Unknown index variable: {}",
-                        var.variable.s()
-                    )));
-                }
-            }
-            _ => {
-                return Err(CompileError::UnsupportedConstruct(format!(
-                    "Unsupported index type: {index_term:?}"
-                )));
-            }
-        }
-
-        return Ok(());
-    }
-
-    // Check if this is the len method for an array/struct (accept both `len` and `#len`)
-    if field_name == "#len" || field_name == "len" {
-        // Look up the array size variable
-        let size_var_name = format!("{object_name}_size");
-        if let Some(&size_offset) = variables.get(&size_var_name) {
-            // Load the array size
-            output.push_str(&format!(
-                "    mov rax, qword ptr [rbp - 8 - {}]\n",
-                size_offset - 8
-            ));
-            return Ok(());
-        } else {
-            return Err(CompileError::UnsupportedConstruct(format!(
-                "Array size not found for: {object_name}"
-            )));
-        }
-    }
-
     // Check if this is a Structure of Arrays (SoA) access
     let soa_ptr_var_name = format!("{object_name}_{field_name}_ptr");
     if let Some(&ptr_offset) = variables.get(&soa_ptr_var_name) {
@@ -445,113 +304,6 @@ fn compile_field_or_method_impl(
             "Unknown variable: {object_name} (candidates: {available:?})"
         )))
     }
-}
-
-pub fn compile_proc_dereference(
-    dereference: &ProcTermDereference<PhaseParse>,
-    variables: &HashMap<String, i32>,
-    reference_variables: &HashMap<String, String>,
-    builtins: &HashMap<String, String>,
-    arrays: &HashMap<String, ArrayInfo>,
-    variable_arrays: &mut HashMap<String, String>,
-    output: &mut String,
-) -> Result<(), CompileError> {
-    // First compile the term that produces a reference
-    expressions::compile_proc_term(
-        &dereference.term,
-        variables,
-        reference_variables,
-        builtins,
-        arrays,
-        variable_arrays,
-        output,
-    )?;
-
-    // Determine the type being dereferenced to use the correct instruction
-    // Check if this is a field access that we can determine the type for
-    if let ProcTerm::MethodChain(method_chain) = &*dereference.term {
-        let object_name = method_chain.object.s();
-        let field_name = method_chain.field.s();
-
-        // Try to get type information from arrays
-        if let Some(array_type_name) = variable_arrays.get(object_name)
-            && let Some(array_info) = arrays.get(array_type_name)
-            && let Ok(field_type) = crate::arrays::get_field_type(
-                &array_info.field_types,
-                &array_info.field_names,
-                field_name,
-            )
-        {
-            match field_type.as_str() {
-                "f32" => {
-                    // For f32, load 4 bytes and zero-extend to 8 bytes in rax
-                    output.push_str("    mov eax, dword ptr [rax]\n");
-                    return Ok(());
-                }
-                "f64" => {
-                    output.push_str("    mov rax, qword ptr [rax]\n");
-                    return Ok(());
-                }
-                "u64" | "i64" => {
-                    output.push_str("    mov rax, qword ptr [rax]\n");
-                    return Ok(());
-                }
-                "u32" | "i32" => {
-                    output.push_str("    mov eax, dword ptr [rax]\n");
-                    return Ok(());
-                }
-                "u16" | "i16" => {
-                    output.push_str("    movzx rax, word ptr [rax]\n");
-                    return Ok(());
-                }
-                "u8" | "i8" => {
-                    output.push_str("    movzx rax, byte ptr [rax]\n");
-                    return Ok(());
-                }
-                _ => {
-                    // Default case - assume 8 bytes
-                    output.push_str("    mov rax, qword ptr [rax]\n");
-                    return Ok(());
-                }
-            }
-        }
-
-        // Try to infer element type from variable metadata when no structured array info exists
-        let combined = format!("{object_name}_{field_name}");
-        if let Some(field_type) =
-            resolve_array_element_type(&combined, field_name, variable_arrays, arrays).or_else(
-                || resolve_array_element_type(object_name, field_name, variable_arrays, arrays),
-            )
-        {
-            match field_type.as_str() {
-                "f32" => {
-                    output.push_str("    mov eax, dword ptr [rax]\n");
-                    return Ok(());
-                }
-                "f64" | "u64" | "i64" => {
-                    output.push_str("    mov rax, qword ptr [rax]\n");
-                    return Ok(());
-                }
-                "u32" | "i32" => {
-                    output.push_str("    mov eax, dword ptr [rax]\n");
-                    return Ok(());
-                }
-                "u16" | "i16" => {
-                    output.push_str("    movzx rax, word ptr [rax]\n");
-                    return Ok(());
-                }
-                "u8" | "i8" => {
-                    output.push_str("    movzx rax, byte ptr [rax]\n");
-                    return Ok(());
-                }
-                _ => {}
-            }
-        }
-    }
-
-    // Default case - load 4 bytes for unknown types (better for f32); integers <=32-bit still work
-    output.push_str("    mov eax, dword ptr [rax]\n");
-    Ok(())
 }
 
 pub fn resolve_array_element_type(

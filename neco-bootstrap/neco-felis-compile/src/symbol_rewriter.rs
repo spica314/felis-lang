@@ -226,9 +226,6 @@ fn update_proc_term(
                 )),
             }
         }
-        (ProcTerm::Dereference(orig), ProcTerm::Dereference(ren)) => {
-            update_proc_term(ctx, orig.term.as_mut(), ren.term.as_ref())
-        }
         (ProcTerm::Paren(orig), ProcTerm::Paren(ren)) => {
             update_proc_term(ctx, orig.proc_term.as_mut(), ren.proc_term.as_ref())
         }

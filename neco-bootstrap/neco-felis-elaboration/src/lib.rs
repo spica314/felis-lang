@@ -2,12 +2,12 @@ use neco_felis_syn::*;
 use neco_scope::ScopeStack;
 
 pub use crate::phase_elaborated::{
-    NameId, PhaseElaborated, ProcTermApplyIds, ProcTermConstructorCallIds, ProcTermDereferenceIds,
-    ProcTermFieldAccessIds, ProcTermIds, ProcTermIfIds, ProcTermNumberIds, ProcTermParenIds,
-    ProcTermStructValueIds, ProcTermUnitIds, ProcTermVariableIds, StatementCallPtxIds,
-    StatementLetMutIds, TermApplyIds, TermArrowDepIds, TermArrowNodepIds, TermConstructorCallIds,
-    TermFieldAccessIds, TermId, TermMatchIds, TermNumberIds, TermParenIds, TermStringIds,
-    TermStructIds, TermUnitIds, TermVariableIds,
+    NameId, PhaseElaborated, ProcTermApplyIds, ProcTermConstructorCallIds, ProcTermFieldAccessIds,
+    ProcTermIds, ProcTermIfIds, ProcTermNumberIds, ProcTermParenIds, ProcTermStructValueIds,
+    ProcTermUnitIds, ProcTermVariableIds, StatementCallPtxIds, StatementLetMutIds, TermApplyIds,
+    TermArrowDepIds, TermArrowNodepIds, TermConstructorCallIds, TermFieldAccessIds, TermId,
+    TermMatchIds, TermNumberIds, TermParenIds, TermStringIds, TermStructIds, TermUnitIds,
+    TermVariableIds,
 };
 
 pub mod phase_elaborated;
@@ -604,15 +604,6 @@ fn elaborate_proc_term(
                 brace_r: if_expr.brace_r.clone(),
                 else_clause,
                 ext: ProcTermIfIds { term_id },
-            }))
-        }
-        ProcTerm::Dereference(deref) => {
-            let term = elaborate_proc_term(context, &deref.term)?;
-            let term_id = context.generate_term_id();
-            Ok(ProcTerm::Dereference(ProcTermDereference {
-                term: Box::new(term),
-                dot_star: deref.dot_star.clone(),
-                ext: ProcTermDereferenceIds { term_id },
             }))
         }
         ProcTerm::Paren(paren) => {

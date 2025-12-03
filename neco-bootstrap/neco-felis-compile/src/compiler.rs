@@ -333,7 +333,6 @@ impl AssemblyCompiler {
                 }
             }
             ProcTerm::Paren(paren) => self.scan_proc_term_for_structs(&paren.proc_term),
-            ProcTerm::Dereference(deref) => self.scan_proc_term_for_structs(&deref.term),
             ProcTerm::StructValue(_)
             | ProcTerm::Struct(_)
             | ProcTerm::Variable(_)
@@ -390,21 +389,6 @@ impl AssemblyCompiler {
             &self.variables,
             &self.arrays,
             &self.variable_arrays,
-            &mut self.output,
-        )
-    }
-
-    pub fn compile_proc_dereference(
-        &mut self,
-        dereference: &ProcTermDereference<PhaseParse>,
-    ) -> Result<(), CompileError> {
-        crate::statement::memory::compile_proc_dereference(
-            dereference,
-            &self.variables,
-            &self.reference_variables,
-            &self.builtins,
-            &self.arrays,
-            &mut HashMap::new(), // We don't modify variable_arrays in dereferences
             &mut self.output,
         )
     }

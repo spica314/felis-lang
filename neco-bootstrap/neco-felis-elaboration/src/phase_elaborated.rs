@@ -129,11 +129,6 @@ pub struct ProcTermConstructorCallIds {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ProcTermDereferenceIds {
-    pub term_id: TermId,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ProcTermIfIds {
     pub term_id: TermId,
 }
@@ -185,7 +180,6 @@ impl Phase for PhaseElaborated {
     type ProcTermNumberExt = ProcTermNumberIds;
     type ProcTermFieldAccessExt = ProcTermFieldAccessIds;
     type ProcTermConstructorCallExt = ProcTermConstructorCallIds;
-    type ProcTermDereferenceExt = ProcTermDereferenceIds;
     type ProcTermIfExt = ProcTermIfIds;
     type ProcTermStructValueExt = ProcTermStructValueIds;
     type StatementReturnExt = ();

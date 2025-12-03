@@ -231,8 +231,6 @@ ProcTermFieldAccess <- Variable "." Variable ProcTermSimple?       // no whitesp
 ProcTermMethodChain <- Variable " ." VariableOrKeyword ProcTermSimple? // whitespace required before '.'
 ProcTermStructValue <- Variable "{" ProcTermStructField* "}"
 ProcTermStructField <- Variable ":" ProcTerm ","
-ProcTermDereference <- ProcTerm ".*"
-
 TypeArg           <- Variable
 VariableOrKeyword <- Variable / #keyword
 
@@ -245,7 +243,6 @@ ProcTermSimple    <- ProcTermNumber / ProcTermVariable
 - **Trailing commas in struct fields:** When trailing commas are allowed, define the field type with `Option<TokenComma>` and store the result of `TokenComma::parse` directly. When the comma is mandatory (for example `ItemInductiveBranch`), keep `TokenComma` as a required field.
 - **Field access vs. method chains:** Use `TokenOperator::parse_operator_after_non_whitespace` and `parse_operator_after_whitespace` to differentiate `a.b` from `a . b`. Reuse these helpers when you add new dotted syntax.
 - **Constructor calls with type arguments:** For `Type Arg1 Arg2 ::method ...`, greedily parse zero or more `TypeArg` (variables) before `::`, then allow the method token to come from either a variable or a keyword.
-- **Handling postfix operators:** After parsing the primary node (as in `ProcTerm::parse`), call `try_parse_postfix` to combine shared postfix operators such as `.*`. Provide similar helpers when you add new postfix operators.
 - **Extension points (`Ext` variants):** `Statement::Ext(P::StatementExt)` and `ProcTerm::Ext(P::ProcTermExt)` let you attach phase-specific information without changing the grammar. Prefer filling the `Ext` variants over adding new enum variants whenever possible.
 
 ## 6. Development Flow
