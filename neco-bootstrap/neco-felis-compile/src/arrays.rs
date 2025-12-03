@@ -4,54 +4,6 @@ use std::collections::HashMap;
 use crate::compiler::ArrayInfo;
 use crate::error::CompileError;
 
-/// Count array pointers in statements
-pub fn count_array_pointers_in_statements(statements: &Statements<PhaseParse>) -> i32 {
-    match statements {
-        Statements::Then(then) => {
-            let head_count = count_array_pointers_in_statement(&then.head);
-            let tail_count = count_array_pointers_in_statements(&then.tail);
-            head_count + tail_count
-        }
-        Statements::Statement(statement) => count_array_pointers_in_statement(statement),
-        Statements::Nil => 0,
-    }
-}
-
-/// Count array pointers in a single statement
-pub fn count_array_pointers_in_statement(statement: &Statement<PhaseParse>) -> i32 {
-    match statement {
-        Statement::Let(let_stmt) => count_array_pointers_in_proc_term(&let_stmt.value),
-        Statement::LetMut(let_mut_stmt) => count_array_pointers_in_proc_term(&let_mut_stmt.value),
-        Statement::Assign(_) => 0,
-        Statement::FieldAssign(_) => 0,
-        Statement::Loop(loop_stmt) => count_array_pointers_in_statements(&loop_stmt.body),
-        Statement::Break(_) => 0,
-        Statement::Return(return_stmt) => count_array_pointers_in_proc_term(&return_stmt.value),
-        Statement::Expr(proc_term) => count_array_pointers_in_proc_term(proc_term),
-        Statement::Ext(_) => unreachable!("Ext statements not supported in PhaseParse"),
-    }
-}
-
-/// Count array pointers in a proc term
-pub fn count_array_pointers_in_proc_term(_proc_term: &ProcTerm<PhaseParse>) -> i32 {
-    // For now, return 0 - this would need proper implementation
-    0
-}
-
-/// Count array pointers in a term
-pub fn count_array_pointers_in_term(term: &Term<PhaseParse>) -> i32 {
-    match term {
-        Term::Apply(apply) => {
-            let mut count = count_array_pointers_in_term(&apply.f);
-            for arg in &apply.args {
-                count += count_array_pointers_in_term(arg);
-            }
-            count
-        }
-        _ => 0,
-    }
-}
-
 /// Extract type information from a term
 pub fn extract_type_from_term(term: &Term<PhaseParse>) -> Result<String, CompileError> {
     match term {
