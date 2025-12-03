@@ -4,11 +4,12 @@
 #use_builtin "u64" #as __u64;
 #use_builtin "Array" #as __Array;
 #use_builtin "array_new_with_size" #as __array_new_with_size;
+#use_builtin "array_len" #as __array_len;
 
 #proc main : () -> () {
     #let #mut xs @ xs_ref = __array_new_with_size __u64 3;
 
     #let syscall_id = 231u64;
-    #let error_code = xs_ref .len ();
+    #let error_code = __array_len xs_ref;
     __syscall syscall_id error_code 0 0 0 0;
 }

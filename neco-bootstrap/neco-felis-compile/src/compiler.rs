@@ -376,7 +376,7 @@ impl AssemblyCompiler {
             &self.reference_variables,
             &self.builtins,
             &self.arrays,
-            &self.variable_arrays,
+            &mut self.variable_arrays,
             &mut self.output,
         )
     }

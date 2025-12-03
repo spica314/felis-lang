@@ -4,13 +4,16 @@
 #use_builtin "u64" #as __u64;
 #use_builtin "Array" #as __Array;
 #use_builtin "array_new_with_size" #as __array_new_with_size;
+#use_builtin "array_get" #as __array_get;
+#use_builtin "array_set" #as __array_set;
+#use_builtin "deref" #as __deref;
 
 #proc main : () -> () {
     #let #mut xs @ xs_ref = __array_new_with_size __u64 1;
 
-    xs_ref .set 0 42;
+    __array_set xs_ref 0 42;
 
     #let syscall_id = 231u64;
-    #let error_code = xs_ref .get 0 .*;
+    #let error_code = __deref (__array_get xs_ref 0);
     __syscall syscall_id error_code 0 0 0 0;
 }

@@ -254,6 +254,60 @@ File {
                 ext: (),
             },
         ),
+        UseBuiltin(
+            ItemUseBuiltin {
+                keyword_use_builtin: TokenKeyword {
+                    pos: Pos {
+                        file_id: FileId(
+                            0,
+                        ),
+                        line: 7,
+                        column: 1,
+                    },
+                    s: "use_builtin",
+                },
+                builtin_name: TokenString {
+                    pos: Pos {
+                        file_id: FileId(
+                            0,
+                        ),
+                        line: 7,
+                        column: 14,
+                    },
+                    s: "array_len",
+                },
+                keyword_as: TokenKeyword {
+                    pos: Pos {
+                        file_id: FileId(
+                            0,
+                        ),
+                        line: 7,
+                        column: 26,
+                    },
+                    s: "as",
+                },
+                name: TokenVariable {
+                    pos: Pos {
+                        file_id: FileId(
+                            0,
+                        ),
+                        line: 7,
+                        column: 30,
+                    },
+                    s: "__array_len",
+                },
+                semicolon: TokenSemicolon {
+                    pos: Pos {
+                        file_id: FileId(
+                            0,
+                        ),
+                        line: 7,
+                        column: 41,
+                    },
+                },
+                ext: (),
+            },
+        ),
         Proc(
             ItemProc {
                 keyword_proc: TokenKeyword {
@@ -261,7 +315,7 @@ File {
                         file_id: FileId(
                             0,
                         ),
-                        line: 8,
+                        line: 9,
                         column: 1,
                     },
                     s: "proc",
@@ -271,7 +325,7 @@ File {
                         file_id: FileId(
                             0,
                         ),
-                        line: 8,
+                        line: 9,
                         column: 7,
                     },
                     s: "main",
@@ -281,7 +335,7 @@ File {
                         file_id: FileId(
                             0,
                         ),
-                        line: 8,
+                        line: 9,
                         column: 12,
                     },
                 },
@@ -294,7 +348,7 @@ File {
                                         file_id: FileId(
                                             0,
                                         ),
-                                        line: 8,
+                                        line: 9,
                                         column: 14,
                                     },
                                 },
@@ -303,7 +357,7 @@ File {
                                         file_id: FileId(
                                             0,
                                         ),
-                                        line: 8,
+                                        line: 9,
                                         column: 15,
                                     },
                                 },
@@ -315,7 +369,7 @@ File {
                                 file_id: FileId(
                                     0,
                                 ),
-                                line: 8,
+                                line: 9,
                                 column: 17,
                             },
                             s: "->",
@@ -328,7 +382,7 @@ File {
                                         file_id: FileId(
                                             0,
                                         ),
-                                        line: 8,
+                                        line: 9,
                                         column: 20,
                                     },
                                 },
@@ -337,7 +391,7 @@ File {
                                         file_id: FileId(
                                             0,
                                         ),
-                                        line: 8,
+                                        line: 9,
                                         column: 21,
                                     },
                                 },
@@ -353,7 +407,7 @@ File {
                             file_id: FileId(
                                 0,
                             ),
-                            line: 8,
+                            line: 9,
                             column: 23,
                         },
                     },
@@ -366,7 +420,7 @@ File {
                                             file_id: FileId(
                                                 0,
                                             ),
-                                            line: 9,
+                                            line: 10,
                                             column: 5,
                                         },
                                         s: "let",
@@ -376,7 +430,7 @@ File {
                                             file_id: FileId(
                                                 0,
                                             ),
-                                            line: 9,
+                                            line: 10,
                                             column: 10,
                                         },
                                         s: "mut",
@@ -386,7 +440,7 @@ File {
                                             file_id: FileId(
                                                 0,
                                             ),
-                                            line: 9,
+                                            line: 10,
                                             column: 15,
                                         },
                                         s: "xs",
@@ -396,7 +450,7 @@ File {
                                             file_id: FileId(
                                                 0,
                                             ),
-                                            line: 9,
+                                            line: 10,
                                             column: 18,
                                         },
                                         s: "@",
@@ -407,7 +461,7 @@ File {
                                             file_id: FileId(
                                                 0,
                                             ),
-                                            line: 9,
+                                            line: 10,
                                             column: 20,
                                         },
                                         s: "xs_ref",
@@ -417,7 +471,7 @@ File {
                                             file_id: FileId(
                                                 0,
                                             ),
-                                            line: 9,
+                                            line: 10,
                                             column: 27,
                                         },
                                         s: "=",
@@ -432,7 +486,7 @@ File {
                                                             file_id: FileId(
                                                                 0,
                                                             ),
-                                                            line: 9,
+                                                            line: 10,
                                                             column: 29,
                                                         },
                                                         s: "__array_new_with_size",
@@ -448,7 +502,7 @@ File {
                                                                 file_id: FileId(
                                                                     0,
                                                                 ),
-                                                                line: 9,
+                                                                line: 10,
                                                                 column: 51,
                                                             },
                                                             s: "__u64",
@@ -463,7 +517,7 @@ File {
                                                                 file_id: FileId(
                                                                     0,
                                                                 ),
-                                                                line: 9,
+                                                                line: 10,
                                                                 column: 57,
                                                             },
                                                             s: "3",
@@ -483,7 +537,7 @@ File {
                                     file_id: FileId(
                                         0,
                                     ),
-                                    line: 9,
+                                    line: 10,
                                     column: 58,
                                 },
                             },
@@ -496,7 +550,7 @@ File {
                                                     file_id: FileId(
                                                         0,
                                                     ),
-                                                    line: 11,
+                                                    line: 12,
                                                     column: 5,
                                                 },
                                                 s: "let",
@@ -506,7 +560,7 @@ File {
                                                     file_id: FileId(
                                                         0,
                                                     ),
-                                                    line: 11,
+                                                    line: 12,
                                                     column: 10,
                                                 },
                                                 s: "syscall_id",
@@ -516,7 +570,7 @@ File {
                                                     file_id: FileId(
                                                         0,
                                                     ),
-                                                    line: 11,
+                                                    line: 12,
                                                     column: 21,
                                                 },
                                                 s: "=",
@@ -529,7 +583,7 @@ File {
                                                             file_id: FileId(
                                                                 0,
                                                             ),
-                                                            line: 11,
+                                                            line: 12,
                                                             column: 23,
                                                         },
                                                         s: "231u64",
@@ -545,7 +599,7 @@ File {
                                             file_id: FileId(
                                                 0,
                                             ),
-                                            line: 11,
+                                            line: 12,
                                             column: 29,
                                         },
                                     },
@@ -558,7 +612,7 @@ File {
                                                             file_id: FileId(
                                                                 0,
                                                             ),
-                                                            line: 12,
+                                                            line: 13,
                                                             column: 5,
                                                         },
                                                         s: "let",
@@ -568,7 +622,7 @@ File {
                                                             file_id: FileId(
                                                                 0,
                                                             ),
-                                                            line: 12,
+                                                            line: 13,
                                                             column: 10,
                                                         },
                                                         s: "error_code",
@@ -578,7 +632,7 @@ File {
                                                             file_id: FileId(
                                                                 0,
                                                             ),
-                                                            line: 12,
+                                                            line: 13,
                                                             column: 21,
                                                         },
                                                         s: "=",
@@ -586,63 +640,33 @@ File {
                                                     },
                                                     value: Apply(
                                                         ProcTermApply {
-                                                            f: MethodChain(
-                                                                ProcTermMethodChain {
-                                                                    object: TokenVariable {
+                                                            f: Variable(
+                                                                ProcTermVariable {
+                                                                    variable: TokenVariable {
                                                                         pos: Pos {
                                                                             file_id: FileId(
                                                                                 0,
                                                                             ),
-                                                                            line: 12,
+                                                                            line: 13,
                                                                             column: 23,
                                                                         },
-                                                                        s: "xs_ref",
+                                                                        s: "__array_len",
                                                                     },
-                                                                    dot: TokenOperator {
-                                                                        pos: Pos {
-                                                                            file_id: FileId(
-                                                                                0,
-                                                                            ),
-                                                                            line: 12,
-                                                                            column: 30,
-                                                                        },
-                                                                        s: ".",
-                                                                        after_whitespace: true,
-                                                                    },
-                                                                    field: TokenVariable {
-                                                                        pos: Pos {
-                                                                            file_id: FileId(
-                                                                                0,
-                                                                            ),
-                                                                            line: 12,
-                                                                            column: 31,
-                                                                        },
-                                                                        s: "len",
-                                                                    },
-                                                                    index: None,
                                                                     ext: (),
                                                                 },
                                                             ),
                                                             args: [
-                                                                Unit(
-                                                                    ProcTermUnit {
-                                                                        paren_l: TokenParenL {
+                                                                Variable(
+                                                                    ProcTermVariable {
+                                                                        variable: TokenVariable {
                                                                             pos: Pos {
                                                                                 file_id: FileId(
                                                                                     0,
                                                                                 ),
-                                                                                line: 12,
+                                                                                line: 13,
                                                                                 column: 35,
                                                                             },
-                                                                        },
-                                                                        paren_r: TokenParenR {
-                                                                            pos: Pos {
-                                                                                file_id: FileId(
-                                                                                    0,
-                                                                                ),
-                                                                                line: 12,
-                                                                                column: 36,
-                                                                            },
+                                                                            s: "xs_ref",
                                                                         },
                                                                         ext: (),
                                                                     },
@@ -659,8 +683,8 @@ File {
                                                     file_id: FileId(
                                                         0,
                                                     ),
-                                                    line: 12,
-                                                    column: 37,
+                                                    line: 13,
+                                                    column: 41,
                                                 },
                                             },
                                             tail: Then(
@@ -675,7 +699,7 @@ File {
                                                                                 file_id: FileId(
                                                                                     0,
                                                                                 ),
-                                                                                line: 13,
+                                                                                line: 14,
                                                                                 column: 5,
                                                                             },
                                                                             s: "__syscall",
@@ -691,7 +715,7 @@ File {
                                                                                     file_id: FileId(
                                                                                         0,
                                                                                     ),
-                                                                                    line: 13,
+                                                                                    line: 14,
                                                                                     column: 15,
                                                                                 },
                                                                                 s: "syscall_id",
@@ -706,7 +730,7 @@ File {
                                                                                     file_id: FileId(
                                                                                         0,
                                                                                     ),
-                                                                                    line: 13,
+                                                                                    line: 14,
                                                                                     column: 26,
                                                                                 },
                                                                                 s: "error_code",
@@ -721,7 +745,7 @@ File {
                                                                                     file_id: FileId(
                                                                                         0,
                                                                                     ),
-                                                                                    line: 13,
+                                                                                    line: 14,
                                                                                     column: 37,
                                                                                 },
                                                                                 s: "0",
@@ -736,7 +760,7 @@ File {
                                                                                     file_id: FileId(
                                                                                         0,
                                                                                     ),
-                                                                                    line: 13,
+                                                                                    line: 14,
                                                                                     column: 39,
                                                                                 },
                                                                                 s: "0",
@@ -751,7 +775,7 @@ File {
                                                                                     file_id: FileId(
                                                                                         0,
                                                                                     ),
-                                                                                    line: 13,
+                                                                                    line: 14,
                                                                                     column: 41,
                                                                                 },
                                                                                 s: "0",
@@ -766,7 +790,7 @@ File {
                                                                                     file_id: FileId(
                                                                                         0,
                                                                                     ),
-                                                                                    line: 13,
+                                                                                    line: 14,
                                                                                     column: 43,
                                                                                 },
                                                                                 s: "0",
@@ -784,7 +808,7 @@ File {
                                                             file_id: FileId(
                                                                 0,
                                                             ),
-                                                            line: 13,
+                                                            line: 14,
                                                             column: 44,
                                                         },
                                                     },
@@ -806,7 +830,7 @@ File {
                             file_id: FileId(
                                 0,
                             ),
-                            line: 14,
+                            line: 15,
                             column: 1,
                         },
                     },

@@ -13,7 +13,17 @@ pub fn builtin_types() -> BuiltinTypes {
     let array_param = Type::Hole(TypeHole(0));
     let array_elem = Type::Struct(Vec::new());
     let array = Type::arrow(array_param.clone(), array_elem);
-    let array_new_with_size = arrow_chain(vec![array_param, u64.clone()], Type::Hole(TypeHole(1)));
+    let array_new_with_size = arrow_chain(
+        vec![array_param.clone(), u64.clone()],
+        Type::Hole(TypeHole(1)),
+    );
+    let array_get = arrow_chain(vec![array.clone(), u64.clone()], array_param.clone());
+    let array_set = arrow_chain(
+        vec![array.clone(), u64.clone(), array_param.clone()],
+        array_param.clone(),
+    );
+    let array_len = arrow_chain(vec![array.clone()], u64.clone());
+    let deref = arrow_chain(vec![array_param.clone()], array_param.clone());
 
     BuiltinTypes::new([
         ("syscall", syscall),
@@ -37,6 +47,10 @@ pub fn builtin_types() -> BuiltinTypes {
         ("f32", f32.clone()),
         ("Array", array),
         ("array_new_with_size", array_new_with_size),
+        ("array_get", array_get),
+        ("array_set", array_set),
+        ("array_len", array_len),
+        ("deref", deref),
     ])
 }
 
