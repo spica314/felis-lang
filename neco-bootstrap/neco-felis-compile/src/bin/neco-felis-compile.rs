@@ -1,6 +1,6 @@
 use neco_felis_compile::compile_file_to_assembly;
+use neco_tempfile::TempDir;
 use std::process::Command;
-use tempfile::TempDir;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().collect();

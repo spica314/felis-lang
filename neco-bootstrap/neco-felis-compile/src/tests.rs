@@ -1,6 +1,6 @@
 use super::*;
+use neco_tempfile::TempDir;
 use std::process::Command;
-use tempfile::TempDir;
 
 #[test]
 fn test_compile_syscall_group_exit_42() {
