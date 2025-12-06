@@ -14,7 +14,7 @@ This document summarizes the implementation procedure for `neco-felis-syn`.
 2. **Add a variant to the `Token` enum.** Keep the existing order to make downstream pattern matching consistent.
 3. **Extend `Token::lex`.** Insert a branch that emits the new token and make sure it updates `line` and `column`. Pay attention to whitespace handling and the precedence for multi-character operators.
 4. **Prepare parser helpers.** When you only need to consume a single token, implement `Parse` for `TokenXxx`. For keywords or tokens that take arguments, provide static helpers such as `parse_keyword`.
-5. **Add lexer tests.** Call `Token::lex` under `#[cfg(test)]` and record the results with `insta::assert_debug_snapshot!`. Adding the minimal `.fe` input that exercises the new token lets subsequent syntax tests reuse it.
+5. **Add lexer tests.** Call `Token::lex` under `#[cfg(test)]` and assert the resulting tokens directly, so changes to the grammar immediately fail the test. Adding the minimal `.fe` input that exercises the new token lets subsequent syntax tests reuse it.
 
 ## 2. Design the AST Nodes
 
@@ -248,5 +248,5 @@ ProcTermSimple    <- ProcTermNumber / ProcTermVariable
 1. **Finalize the specification.** Merge your changes into the PEG above and list the tokens and nodes you need.
 2. **Implement in the order tokens → AST → parser.** Working from the lower layers to the upper ones keeps the diff minimal.
 3. **Update the Trees that Grow types.** When a new node needs an extension field, add `type NewNodeExt` to the `Phase` trait in `parsing/phase.rs` and assign `()` in `PhaseParse`.
-4. **Align the tests.** Add or update the affected `.fe` files, refresh the `insta` snapshots, and run `cargo test --workspace --offline`.
+4. **Align the tests.** Add or update the affected `.fe` files, refresh the accompanying Rust tests, and run `cargo test --workspace --offline`.
 5. **Perform the final check.** Review the re-exports in `lib.rs` and run `cargo clippy --all-targets --all-features -- -D warnings` to ensure there are no unused imports.
