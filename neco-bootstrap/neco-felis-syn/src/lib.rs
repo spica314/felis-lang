@@ -14,8 +14,8 @@ pub mod items {
     pub mod item_inductive_branch;
     pub mod item_proc;
     pub mod item_proc_block;
-    pub mod item_struct;
     pub mod item_theorem;
+    pub mod item_type;
     pub mod item_use_builtin;
 }
 
@@ -41,6 +41,7 @@ pub mod proc_terms {
     pub mod proc_term_constructor_call;
     pub mod proc_term_field_access;
     pub mod proc_term_if;
+    pub mod proc_term_match;
     pub mod proc_term_method_chain;
     pub mod proc_term_number;
     pub mod proc_term_paren;
@@ -82,8 +83,8 @@ pub use items::item_inductive::*;
 pub use items::item_inductive_branch::*;
 pub use items::item_proc::*;
 pub use items::item_proc_block::*;
-pub use items::item_struct::*;
 pub use items::item_theorem::*;
+pub use items::item_type::*;
 pub use items::item_use_builtin::*;
 
 pub use terms::term::*;
@@ -103,6 +104,7 @@ pub use proc_terms::proc_term_apply::*;
 pub use proc_terms::proc_term_constructor_call::*;
 pub use proc_terms::proc_term_field_access::*;
 pub use proc_terms::proc_term_if::*;
+pub use proc_terms::proc_term_match::*;
 pub use proc_terms::proc_term_method_chain::*;
 pub use proc_terms::proc_term_number::*;
 pub use proc_terms::proc_term_paren::*;

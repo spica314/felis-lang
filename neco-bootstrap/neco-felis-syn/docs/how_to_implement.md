@@ -125,8 +125,8 @@ impl Parse for Item<PhaseParse> {
         if let Some(proc_) = ItemProc::parse(tokens, i)? {
             return Ok(Some(Item::Proc(Box::new(proc_))));
         }
-        if let Some(struct_) = ItemStruct::parse(tokens, i)? {
-            return Ok(Some(Item::Struct(struct_)));
+        if let Some(type_) = ItemType::parse(tokens, i)? {
+            return Ok(Some(Item::Type(type_)));
         }
         Ok(None)
     }
@@ -148,7 +148,7 @@ Item              <- ItemEntrypoint
                    / ItemDefinition
                    / ItemTheorem
                    / ItemProc
-                   / ItemStruct
+                   / ItemType
 
 ItemEntrypoint    <- #entrypoint Variable ";"
 ItemUseBuiltin    <- #use_builtin String #as Variable ";"
@@ -158,8 +158,9 @@ ItemDefinition    <- #definition Variable ":" Term "{" Term "}"
 ItemTheorem       <- #theorem    Variable ":" Term "{" Term "}"
 ItemProc          <- ""#proc" Variable ":" Term ItemProcBlock
 ItemProcBlock     <- "{" Statements "}"
-ItemStruct        <- "#struct" Variable "{" ItemStructField* "}"
+ItemType          <- "#type" Variable "{" ItemTypeConstructor* "}"
 ItemStructField   <- Variable ":" Term ","
+ItemTypeConstructor <- Variable "{" ItemStructField* "}" ","?
 
 Statements        <- Statement ";" Statements
                    / Statement
@@ -212,12 +213,16 @@ TermNumber        <- Number
 TermVariable      <- Variable
 
 ProcTerm          <- ProcTermIf
+                   / ProcTermMatch
                    / ProcTermApply
                    / ProcTermFieldAccess
                    / ProcTermMethodChain
                    / ProcTermStructValue
-                   / ItemStruct                          // reuse struct definitions as expressions
                    / ProcTermVariable
+ProcTermMatch     <- "#match" Variable "{" ProcTermMatchBranch* "}"
+ProcTermMatchBranch <- ProcTermMatchPattern "=>" Statement ","
+ProcTermMatchPattern <- Variable "::" Variable "{" ProcTermMatchField* "}"
+ProcTermMatchField <- Variable ":" Variable ","?
                    / ProcTermNumber
                    / ProcTermUnit
                    / ProcTermParen

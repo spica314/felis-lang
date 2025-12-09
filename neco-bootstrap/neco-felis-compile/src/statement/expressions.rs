@@ -2,10 +2,12 @@ use crate::{ArrayInfo, error::CompileError, syscall::SyscallCompiler};
 use neco_felis_syn::*;
 use std::collections::HashMap;
 
+use super::StatementCompiler;
 use super::arithmetic;
 use super::control_flow;
 use super::memory;
 
+#[allow(clippy::too_many_arguments)]
 pub fn compile_proc_term(
     proc_term: &ProcTerm<PhaseParse>,
     variables: &HashMap<String, i32>,
@@ -13,6 +15,7 @@ pub fn compile_proc_term(
     builtins: &HashMap<String, String>,
     arrays: &HashMap<String, ArrayInfo>,
     variable_arrays: &mut HashMap<String, String>,
+    stack_offset: &mut i32,
     output: &mut String,
 ) -> Result<(), CompileError> {
     match proc_term {
@@ -23,6 +26,7 @@ pub fn compile_proc_term(
             builtins,
             arrays,
             variable_arrays,
+            stack_offset,
             output,
         ),
         ProcTerm::Variable(var) => compile_proc_variable(var, variables, output),
@@ -54,6 +58,16 @@ pub fn compile_proc_term(
             variable_arrays,
             output,
         ),
+        ProcTerm::Match(match_term) => compile_proc_match(
+            match_term,
+            variables,
+            reference_variables,
+            builtins,
+            arrays,
+            variable_arrays,
+            stack_offset,
+            output,
+        ),
         ProcTerm::Paren(paren) => compile_proc_term(
             &paren.proc_term,
             variables,
@@ -61,6 +75,7 @@ pub fn compile_proc_term(
             builtins,
             arrays,
             variable_arrays,
+            stack_offset,
             output,
         ),
         _ => Err(CompileError::UnsupportedConstruct(format!("{proc_term:?}"))),
@@ -384,6 +399,7 @@ fn compile_builtin_array_len(
     )))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn compile_builtin_deref(
     apply: &ProcTermApply<PhaseParse>,
     variables: &HashMap<String, i32>,
@@ -391,6 +407,7 @@ fn compile_builtin_deref(
     builtins: &HashMap<String, String>,
     arrays: &HashMap<String, ArrayInfo>,
     variable_arrays: &mut HashMap<String, String>,
+    stack_offset: &mut i32,
     output: &mut String,
 ) -> Result<(), CompileError> {
     if apply.args.len() != 1 {
@@ -408,12 +425,14 @@ fn compile_builtin_deref(
         builtins,
         arrays,
         variable_arrays,
+        stack_offset,
         output,
     )?;
     output.push_str("    mov rax, qword ptr [rax]\n");
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn compile_proc_apply(
     apply: &ProcTermApply<PhaseParse>,
     variables: &HashMap<String, i32>,
@@ -421,6 +440,7 @@ pub fn compile_proc_apply(
     builtins: &HashMap<String, String>,
     arrays: &HashMap<String, ArrayInfo>,
     variable_arrays: &mut HashMap<String, String>,
+    stack_offset: &mut i32,
     output: &mut String,
 ) -> Result<(), CompileError> {
     if let ProcTerm::MethodChain(method_chain) = &*apply.f {
@@ -470,6 +490,7 @@ pub fn compile_proc_apply(
                         builtins,
                         arrays,
                         variable_arrays,
+                        stack_offset,
                         output,
                     );
                 }
@@ -579,4 +600,46 @@ pub fn compile_proc_apply(
         }
     }
     Err(CompileError::UnsupportedConstruct(format!("{apply:?}")))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn compile_proc_match(
+    match_term: &ProcTermMatch<PhaseParse>,
+    variables: &HashMap<String, i32>,
+    reference_variables: &HashMap<String, String>,
+    builtins: &HashMap<String, String>,
+    arrays: &HashMap<String, ArrayInfo>,
+    variable_arrays: &mut HashMap<String, String>,
+    stack_offset: &mut i32,
+    output: &mut String,
+) -> Result<(), CompileError> {
+    if let Some(branch) = match_term.branches.first() {
+        let mut branch_variables = variables.clone();
+        let mut branch_reference_variables = reference_variables.clone();
+        let mut branch_variable_arrays = variable_arrays.clone();
+        let scrutinee_name = match_term.scrutinee.s();
+        for field in &branch.pattern.fields {
+            let field_var_name = format!("{scrutinee_name}_{}", field.field_name.s());
+            if let Some(&offset) = variables.get(&field_var_name) {
+                branch_variables.insert(field.binder.s().to_string(), offset);
+            }
+            if let Some(array_info) = variable_arrays.get(&field_var_name).cloned() {
+                branch_variable_arrays.insert(field.binder.s().to_string(), array_info);
+            }
+            if let Some(reference) = reference_variables.get(&field_var_name).cloned() {
+                branch_reference_variables.insert(field.binder.s().to_string(), reference);
+            }
+        }
+        StatementCompiler::compile_statements(
+            &branch.body,
+            &mut branch_variables,
+            &mut branch_reference_variables,
+            builtins,
+            arrays,
+            &mut branch_variable_arrays,
+            stack_offset,
+            output,
+        )?;
+    }
+    Ok(())
 }

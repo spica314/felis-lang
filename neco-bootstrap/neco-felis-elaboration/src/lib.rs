@@ -2,12 +2,12 @@ use neco_felis_syn::*;
 use neco_scope::ScopeStack;
 
 pub use crate::phase_elaborated::{
-    NameId, PhaseElaborated, ProcTermApplyIds, ProcTermConstructorCallIds, ProcTermFieldAccessIds,
-    ProcTermIds, ProcTermIfIds, ProcTermNumberIds, ProcTermParenIds, ProcTermStructValueIds,
-    ProcTermUnitIds, ProcTermVariableIds, StatementCallPtxIds, StatementLetMutIds, TermApplyIds,
-    TermArrowDepIds, TermArrowNodepIds, TermConstructorCallIds, TermFieldAccessIds, TermId,
-    TermMatchIds, TermNumberIds, TermParenIds, TermStringIds, TermStructIds, TermUnitIds,
-    TermVariableIds,
+    ItemTypeIds, NameId, PhaseElaborated, ProcTermApplyIds, ProcTermConstructorCallIds,
+    ProcTermFieldAccessIds, ProcTermIds, ProcTermIfIds, ProcTermMatchFieldIds, ProcTermMatchIds,
+    ProcTermNumberIds, ProcTermParenIds, ProcTermStructValueIds, ProcTermUnitIds,
+    ProcTermVariableIds, StatementCallPtxIds, StatementLetMutIds, TermApplyIds, TermArrowDepIds,
+    TermArrowNodepIds, TermConstructorCallIds, TermFieldAccessIds, TermId, TermMatchIds,
+    TermNumberIds, TermParenIds, TermStringIds, TermStructIds, TermUnitIds, TermVariableIds,
 };
 
 pub mod phase_elaborated;
@@ -137,7 +137,7 @@ fn elaborate_item(
             elaborate_use_builtin(context, use_builtin).map(Item::UseBuiltin)
         }
         Item::Proc(proc) => elaborate_proc(context, proc).map(|p| Item::Proc(Box::new(p))),
-        Item::Struct(struct_item) => elaborate_struct(context, struct_item).map(Item::Struct),
+        Item::Type(type_item) => elaborate_type(context, type_item).map(Item::Type),
     }
 }
 
@@ -326,34 +326,50 @@ fn elaborate_proc_block(
     })
 }
 
-fn elaborate_struct(
+fn elaborate_type(
     context: &mut ElaborationContext,
-    struct_item: &ItemStruct<PhaseParse>,
-) -> ElaborationResult<ItemStruct<PhaseElaborated>> {
-    let struct_id = context.bind_variable(struct_item.name.s());
+    type_item: &ItemType<PhaseParse>,
+) -> ElaborationResult<ItemType<PhaseElaborated>> {
+    let type_id = context.bind_variable(type_item.name.s());
 
-    let fields = struct_item
-        .fields()
+    let constructors = type_item
+        .constructors()
         .iter()
-        .map(|field| {
-            let ty = elaborate_term(context, field.ty.as_ref())?;
-            Ok(ItemStructField {
-                name: field.name.clone(),
-                colon: field.colon.clone(),
-                ty: Box::new(ty),
-                comma: field.comma.clone(),
-                ext: (),
-            })
-        })
+        .map(|constructor| elaborate_type_constructor(context, constructor))
         .collect::<ElaborationResult<Vec<_>>>()?;
 
-    Ok(ItemStruct {
-        keyword_struct: struct_item.keyword_struct.clone(),
-        name: struct_item.name.clone(),
-        brace_l: struct_item.brace_l.clone(),
+    Ok(ItemType {
+        keyword_type: type_item.keyword_type.clone(),
+        name: type_item.name.clone(),
+        brace_l: type_item.brace_l.clone(),
+        constructors,
+        brace_r: type_item.brace_r.clone(),
+        ext: ItemTypeIds { name_id: type_id },
+    })
+}
+
+fn elaborate_type_constructor(
+    context: &mut ElaborationContext,
+    constructor: &ItemTypeConstructor<PhaseParse>,
+) -> ElaborationResult<ItemTypeConstructor<PhaseElaborated>> {
+    let mut fields = Vec::with_capacity(constructor.fields.len());
+    for field in &constructor.fields {
+        let ty = elaborate_term(context, field.ty.as_ref())?;
+        fields.push(ItemStructField {
+            name: field.name.clone(),
+            colon: field.colon.clone(),
+            ty: Box::new(ty),
+            comma: field.comma.clone(),
+            ext: (),
+        });
+    }
+    Ok(ItemTypeConstructor {
+        name: constructor.name.clone(),
+        brace_l: constructor.brace_l.clone(),
         fields,
-        brace_r: struct_item.brace_r.clone(),
-        ext: struct_id,
+        brace_r: constructor.brace_r.clone(),
+        comma: constructor.comma.clone(),
+        ext: (),
     })
 }
 
@@ -530,9 +546,6 @@ fn elaborate_proc_term(
             let elaborated = elaborate_proc_method_chain(context, method_chain)?;
             Ok(ProcTerm::MethodChain(elaborated))
         }
-        ProcTerm::Struct(_item_struct) => {
-            unreachable!("Struct definitions are not supported inside proc terms")
-        }
         ProcTerm::StructValue(struct_value) => {
             let term_id = context.generate_term_id();
             let fields = struct_value
@@ -550,6 +563,8 @@ fn elaborate_proc_term(
                 .collect::<ElaborationResult<Vec<_>>>()?;
             Ok(ProcTerm::StructValue(ProcTermStructValue {
                 struct_name: struct_value.struct_name.clone(),
+                colon2: struct_value.colon2.clone(),
+                constructor_name: struct_value.constructor_name.clone(),
                 brace_l: struct_value.brace_l.clone(),
                 fields,
                 brace_r: struct_value.brace_r.clone(),
@@ -590,6 +605,26 @@ fn elaborate_proc_term(
                 ext: ProcTermIfIds { term_id },
             }))
         }
+        ProcTerm::Match(match_expr) => {
+            let term_id = context.generate_term_id();
+            let scrutinee_id = context.get_or_placeholder(match_expr.scrutinee.s());
+            let branches = match_expr
+                .branches
+                .iter()
+                .map(|branch| elaborate_proc_match_branch(context, branch))
+                .collect::<ElaborationResult<Vec<_>>>()?;
+            Ok(ProcTerm::Match(ProcTermMatch {
+                keyword_match: match_expr.keyword_match.clone(),
+                scrutinee: match_expr.scrutinee.clone(),
+                brace_l: match_expr.brace_l.clone(),
+                branches,
+                brace_r: match_expr.brace_r.clone(),
+                ext: ProcTermMatchIds {
+                    term_id,
+                    scrutinee_id,
+                },
+            }))
+        }
         ProcTerm::Paren(paren) => {
             let inner = elaborate_proc_term(context, &paren.proc_term)?;
             let term_id = context.generate_term_id();
@@ -620,6 +655,41 @@ fn elaborate_proc_method_chain(
         field: method_chain.field.clone(),
         index,
         ext: ProcTermFieldAccessIds { term_id, object_id },
+    })
+}
+
+fn elaborate_proc_match_branch(
+    context: &mut ElaborationContext,
+    branch: &ProcTermMatchBranch<PhaseParse>,
+) -> ElaborationResult<ProcTermMatchBranch<PhaseElaborated>> {
+    context.enter_scope();
+    let mut fields = Vec::with_capacity(branch.pattern.fields.len());
+    for field in &branch.pattern.fields {
+        let binder_id = context.bind_variable(field.binder.s());
+        fields.push(ProcTermMatchField {
+            field_name: field.field_name.clone(),
+            colon: field.colon.clone(),
+            binder: field.binder.clone(),
+            comma: field.comma.clone(),
+            ext: ProcTermMatchFieldIds { binder_id },
+        });
+    }
+    let body = elaborate_statements(context, &branch.body)?;
+    context.leave_scope();
+
+    Ok(ProcTermMatchBranch {
+        pattern: ProcTermMatchPattern {
+            type_name: branch.pattern.type_name.clone(),
+            colon2: branch.pattern.colon2.clone(),
+            constructor: branch.pattern.constructor.clone(),
+            brace_l: branch.pattern.brace_l.clone(),
+            fields,
+            brace_r: branch.pattern.brace_r.clone(),
+        },
+        arrow: branch.arrow.clone(),
+        body: Box::new(body),
+        comma: branch.comma.clone(),
+        ext: (),
     })
 }
 

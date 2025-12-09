@@ -4,19 +4,15 @@
 #use_builtin "u64_add" #as __u64_add;
 #use_builtin "u64" #as __u64;
 
-#struct Vec3 {
-    x: __u64,
-    y: __u64,
-    z: __u64,
+#type Vec3 {
+    Vec3 {
+        x: __u64,
+        y: __u64,
+        z: __u64,
+    },
 }
 
 #proc main : () -> () {
-    #let v = Vec3 {
-        x: 18,
-        y: 14,
-        z: 10,
-    };
-
     #let syscall_id = 231u64;
     #let error_code = 42;
     __syscall syscall_id error_code 0 0 0 0;

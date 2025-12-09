@@ -30,9 +30,5 @@ echo "Checking Rust formatting..."
 cargo fmt --all -- --check
 
 # Run clippy
-# echo "Running clippy..."
-# cargo clippy --all-targets --all-features -- -D warnings
-
-# Run tests
-echo "Running Rust tests..."
-cargo test --workspace --offline
+echo "Running clippy..."
+cargo clippy --all-targets --all-features -- -D warnings

@@ -84,9 +84,8 @@ impl AssemblyCompiler {
                 Ok(())
             }
             Item::Proc(proc) => self.compile_proc(proc),
-            Item::Struct(_struct_def) => {
-                // Struct type definitions are not needed for code generation yet
-                // Accept and ignore them to allow programs with user-defined structs
+            Item::Type(_type_item) => {
+                // Type definitions are handled at the typing level; no codegen required.
                 Ok(())
             }
             _ => Err(CompileError::UnsupportedConstruct(format!("{item:?}"))),
@@ -316,6 +315,11 @@ impl AssemblyCompiler {
                     self.scan_statements_for_structs(&else_clause.else_body);
                 }
             }
+            ProcTerm::Match(match_expr) => {
+                for branch in &match_expr.branches {
+                    self.scan_statements_for_structs(&branch.body);
+                }
+            }
             ProcTerm::Apply(apply) => {
                 self.scan_proc_term_for_structs(&apply.f);
                 for arg in &apply.args {
@@ -329,7 +333,6 @@ impl AssemblyCompiler {
             }
             ProcTerm::Paren(paren) => self.scan_proc_term_for_structs(&paren.proc_term),
             ProcTerm::StructValue(_)
-            | ProcTerm::Struct(_)
             | ProcTerm::Variable(_)
             | ProcTerm::Unit(_)
             | ProcTerm::Number(_)
@@ -349,6 +352,7 @@ impl AssemblyCompiler {
             &self.builtins,
             &self.arrays,
             &mut HashMap::new(), // We don't modify variable_arrays in proc terms
+            &mut self.stack_offset,
             &mut self.output,
         )
     }
@@ -371,6 +375,7 @@ impl AssemblyCompiler {
             &self.builtins,
             &self.arrays,
             &mut self.variable_arrays,
+            &mut self.stack_offset,
             &mut self.output,
         )
     }

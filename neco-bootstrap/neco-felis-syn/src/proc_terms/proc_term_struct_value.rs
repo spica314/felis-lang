@@ -1,11 +1,13 @@
 use crate::{
     Parse, ParseError, Phase, PhaseParse, ProcTerm,
-    token::{Token, TokenBraceL, TokenBraceR, TokenColon, TokenComma, TokenVariable},
+    token::{Token, TokenBraceL, TokenBraceR, TokenColon, TokenColon2, TokenComma, TokenVariable},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ProcTermStructValue<P: Phase> {
     pub struct_name: TokenVariable,
+    pub colon2: Option<TokenColon2>,
+    pub constructor_name: Option<TokenVariable>,
     pub brace_l: TokenBraceL,
     pub fields: Vec<ProcTermStructField<P>>,
     pub brace_r: TokenBraceR,
@@ -29,7 +31,19 @@ impl Parse for ProcTermStructValue<PhaseParse> {
             return Ok(None);
         };
 
-        // Check if the next token is a brace (to distinguish from other uses of variables)
+        // Optional "::Constructor" prefix (Vec3::Vec3)
+        let colon2 = TokenColon2::parse(tokens, &mut k)?;
+        let constructor_name = if colon2.is_some() {
+            let Some(constructor) = TokenVariable::parse(tokens, &mut k)? else {
+                return Err(ParseError::Unknown(
+                    "expected constructor after :: in struct literal",
+                ));
+            };
+            Some(constructor)
+        } else {
+            None
+        };
+
         let Some(brace_l) = TokenBraceL::parse(tokens, &mut k)? else {
             return Ok(None);
         };
@@ -78,6 +92,8 @@ impl Parse for ProcTermStructValue<PhaseParse> {
 
         let proc_term_struct_value = ProcTermStructValue {
             struct_name,
+            colon2,
+            constructor_name,
             brace_l,
             fields,
             brace_r,
@@ -175,5 +191,24 @@ mod tests {
             ProcTerm::Number(num) => assert_eq!(num.number.s(), "10"),
             _ => panic!("Expected number for z field"),
         }
+    }
+
+    #[test]
+    fn test_parse_struct_value_with_colon2_prefix() {
+        let mut file_id_generator = FileIdGenerator::new();
+        let file_id = file_id_generator.generate_file_id();
+        let s = r#"Vec3::Vec3 {
+            x: 1,
+        }"#;
+        let tokens = Token::lex(s, file_id);
+
+        let mut i = 0;
+        let result = ProcTermStructValue::parse(&tokens, &mut i).unwrap();
+        assert!(result.is_some());
+        let struct_value = result.unwrap();
+        assert_eq!(struct_value.struct_name.s(), "Vec3");
+        assert!(struct_value.colon2.is_some());
+        assert!(struct_value.constructor_name.is_some());
+        assert_eq!(struct_value.constructor_name.unwrap().s(), "Vec3");
     }
 }

@@ -1,0 +1,34 @@
+#entrypoint main;
+
+#use_builtin "syscall" #as __syscall;
+#use_builtin "u64_add" #as __u64_add;
+#use_builtin "u64" #as __u64;
+
+#type Vec3 {
+    Vec3 {
+        x: __u64,
+        y: __u64,
+        z: __u64,
+    },
+}
+
+#proc main : () -> () {
+    #let v = Vec3::Vec3 {
+        x: 18,
+        y: 14,
+        z: 10,
+    };
+
+    #match v {
+        Vec3::Vec3 { x: vx, y: vy, z: vz } => {
+            #let a = __u64_add vx vy;
+            #let b = __u64_add a vz;
+
+            #let syscall_id = 231u64;
+            #let error_code = b;
+            __syscall syscall_id error_code 0 0 0 0;
+        },
+    };
+
+    __syscall 231u64 1 0 0 0 0;
+}

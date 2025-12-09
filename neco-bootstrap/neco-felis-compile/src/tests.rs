@@ -699,11 +699,11 @@ fn test_print_num3_integration() {
 }
 
 #[test]
-fn test_compile_struct_3() {
-    let result = compile_file_to_assembly("../../testcases/felis/single/struct_3.fe");
+fn test_compile_type_3() {
+    let result = compile_file_to_assembly("../../testcases/felis/single/type_3.fe");
     match result {
         Ok(assembly) => {
-            println!("Generated assembly for struct_3.fe:\n{assembly}");
+            println!("Generated assembly for type_3.fe:\n{assembly}");
 
             // Basic assembly structure checks
             assert!(assembly.contains(".intel_syntax noprefix"));
@@ -718,20 +718,20 @@ fn test_compile_struct_3() {
 }
 
 #[test]
-fn test_struct_3_integration() {
-    let result = compile_and_execute("../../testcases/felis/single/struct_3.fe");
+fn test_type_3_integration() {
+    let result = compile_and_execute("../../testcases/felis/single/type_3.fe");
 
     match result {
         Ok(status) => {
             println!(
-                "struct_3.fe executed successfully with exit code: {:?}",
+                "type_3.fe executed successfully with exit code: {:?}",
                 status.code()
             );
-            // struct_3.fe should exit with code 42 (18 + 14 + 10 = 42)
+            // type_3.fe should exit with code 42 (18 + 14 + 10 = 42)
             assert_eq!(status.code(), Some(42), "Program should exit with code 42");
         }
         Err(e) => {
-            panic!("struct_3.fe integration test failed: {e}");
+            panic!("type_3.fe integration test failed: {e}");
         }
     }
 }

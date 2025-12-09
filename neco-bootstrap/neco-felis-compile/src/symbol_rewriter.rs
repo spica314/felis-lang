@@ -90,12 +90,6 @@ fn update_item(
             update_term(ctx, orig.ty.as_mut(), ren.ty.as_ref())?;
             update_proc_block(ctx, &mut orig.proc_block, &ren.proc_block)
         }
-        (Item::Struct(orig), Item::Struct(ren)) => {
-            for (orig_field, ren_field) in orig.fields.iter_mut().zip(&ren.fields) {
-                update_term(ctx, orig_field.ty.as_mut(), ren_field.ty.as_ref())?;
-            }
-            Ok(())
-        }
         _ => Ok(()),
     }
 }
@@ -203,7 +197,6 @@ fn update_proc_term(
             }
             Ok(())
         }
-        (ProcTerm::Struct(_), ProcTerm::Struct(_)) => Ok(()),
         (ProcTerm::Ext(_), ProcTerm::Ext(_)) => Ok(()),
         (ProcTerm::If(orig), ProcTerm::If(ren)) => {
             update_statements(ctx, orig.condition.as_mut(), ren.condition.as_ref())?;
@@ -219,6 +212,26 @@ fn update_proc_term(
                     "if-else clause mismatch during elaboration".to_string(),
                 )),
             }
+        }
+        (ProcTerm::Match(orig), ProcTerm::Match(ren)) => {
+            ctx.apply_elaborated_token(&mut orig.scrutinee, &ren.ext.scrutinee_id);
+            if orig.branches.len() != ren.branches.len() {
+                return Err(CompileError::UnsupportedConstruct(
+                    "match branch count mismatch during elaboration".to_string(),
+                ));
+            }
+            for (orig_branch, ren_branch) in orig.branches.iter_mut().zip(&ren.branches) {
+                for (orig_field, ren_field) in orig_branch
+                    .pattern
+                    .fields
+                    .iter_mut()
+                    .zip(&ren_branch.pattern.fields)
+                {
+                    ctx.apply_elaborated_token(&mut orig_field.binder, &ren_field.ext.binder_id);
+                }
+                update_statements(ctx, orig_branch.body.as_mut(), ren_branch.body.as_ref())?;
+            }
+            Ok(())
         }
         (ProcTerm::Paren(orig), ProcTerm::Paren(ren)) => {
             update_proc_term(ctx, orig.proc_term.as_mut(), ren.proc_term.as_ref())

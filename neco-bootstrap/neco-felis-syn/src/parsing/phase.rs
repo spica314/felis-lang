@@ -110,14 +110,15 @@ pub trait Phase {
         + PartialOrd
         + Ord
         + std::hash::Hash;
-    type ItemStructExt: std::fmt::Debug
+    type ItemStructFieldExt: std::fmt::Debug
         + Clone
         + PartialEq
         + Eq
         + PartialOrd
         + Ord
         + std::hash::Hash;
-    type ItemStructFieldExt: std::fmt::Debug
+    type ItemTypeExt: std::fmt::Debug + Clone + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash;
+    type ItemTypeConstructorExt: std::fmt::Debug
         + Clone
         + PartialEq
         + Eq
@@ -252,6 +253,27 @@ pub trait Phase {
         + PartialOrd
         + Ord
         + std::hash::Hash;
+    type ProcTermMatchExt: std::fmt::Debug
+        + Clone
+        + PartialEq
+        + Eq
+        + PartialOrd
+        + Ord
+        + std::hash::Hash;
+    type ProcTermMatchBranchExt: std::fmt::Debug
+        + Clone
+        + PartialEq
+        + Eq
+        + PartialOrd
+        + Ord
+        + std::hash::Hash;
+    type ProcTermMatchFieldExt: std::fmt::Debug
+        + Clone
+        + PartialEq
+        + Eq
+        + PartialOrd
+        + Ord
+        + std::hash::Hash;
     type StatementReturnExt: std::fmt::Debug
         + Clone
         + PartialEq
@@ -293,8 +315,9 @@ impl Phase for PhaseParse {
     type ItemProcExt = ();
     type TermUnitExt = ();
     type TermNumberExt = ();
-    type ItemStructExt = ();
     type ItemStructFieldExt = ();
+    type ItemTypeExt = ();
+    type ItemTypeConstructorExt = ();
     type TermStructExt = ();
     type TermFieldAccessExt = ();
     type TermConstructorCallExt = ();
@@ -315,6 +338,9 @@ impl Phase for PhaseParse {
     type ProcTermConstructorCallExt = ();
     type ProcTermIfExt = ();
     type ProcTermStructValueExt = ();
+    type ProcTermMatchExt = ();
+    type ProcTermMatchBranchExt = ();
+    type ProcTermMatchFieldExt = ();
     type StatementReturnExt = ();
     type StatementCallPtxExt = ();
 }

@@ -1,6 +1,6 @@
 use crate::{
-    ItemStruct, Parse, ParseError, Phase, PhaseParse, ProcTermApply, ProcTermFieldAccess,
-    ProcTermIf, ProcTermMethodChain, ProcTermNumber, ProcTermParen, ProcTermStructValue,
+    Parse, ParseError, Phase, PhaseParse, ProcTermApply, ProcTermFieldAccess, ProcTermIf,
+    ProcTermMatch, ProcTermMethodChain, ProcTermNumber, ProcTermParen, ProcTermStructValue,
     ProcTermUnit, ProcTermVariable, token::Token,
 };
 
@@ -13,9 +13,9 @@ pub enum ProcTerm<P: Phase> {
     Number(ProcTermNumber<P>),
     FieldAccess(ProcTermFieldAccess<P>),
     MethodChain(ProcTermMethodChain<P>),
-    Struct(ItemStruct<P>),
     StructValue(ProcTermStructValue<P>),
     If(ProcTermIf<P>),
+    Match(ProcTermMatch<P>),
     Ext(P::ProcTermExt),
 }
 
@@ -23,6 +23,10 @@ impl Parse for ProcTerm<PhaseParse> {
     fn parse(tokens: &[Token], i: &mut usize) -> Result<Option<Self>, ParseError> {
         if let Some(proc_term_if) = ProcTermIf::parse(tokens, i)? {
             return Ok(Some(ProcTerm::If(proc_term_if)));
+        }
+
+        if let Some(proc_term_match) = ProcTermMatch::parse(tokens, i)? {
+            return Ok(Some(ProcTerm::Match(proc_term_match)));
         }
 
         if let Some(proc_term_apply) = ProcTermApply::parse(tokens, i)? {
@@ -41,10 +45,6 @@ impl Parse for ProcTerm<PhaseParse> {
 
         if let Some(proc_term_struct_value) = ProcTermStructValue::parse(tokens, i)? {
             return Ok(Some(ProcTerm::StructValue(proc_term_struct_value)));
-        }
-
-        if let Some(item_struct) = ItemStruct::parse(tokens, i)? {
-            return Ok(Some(ProcTerm::Struct(item_struct)));
         }
 
         if let Some(proc_term_variable) = ProcTermVariable::parse(tokens, i)? {

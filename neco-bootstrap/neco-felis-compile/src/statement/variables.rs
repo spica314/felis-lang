@@ -37,6 +37,7 @@ pub fn compile_let_statement(
                     builtins,
                     arrays,
                     variable_arrays,
+                    stack_offset,
                     output,
                 )?;
 
@@ -157,6 +158,7 @@ pub fn compile_let_statement(
                 builtins,
                 arrays,
                 variable_arrays,
+                stack_offset,
                 output,
             )?;
 
@@ -189,6 +191,7 @@ pub fn compile_let_statement(
                 builtins,
                 arrays,
                 variable_arrays,
+                stack_offset,
                 output,
             )?;
 
@@ -292,6 +295,7 @@ pub fn compile_let_mut_statement(
         builtins,
         arrays,
         variable_arrays,
+        stack_offset,
         output,
     )?;
 
@@ -340,6 +344,7 @@ pub fn compile_let_mut_statement(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn compile_assign_statement(
     assign_stmt: &StatementAssign<PhaseParse>,
     variables: &mut HashMap<String, i32>,
@@ -347,6 +352,7 @@ pub fn compile_assign_statement(
     builtins: &HashMap<String, String>,
     arrays: &HashMap<String, ArrayInfo>,
     variable_arrays: &mut HashMap<String, String>,
+    stack_offset: &mut i32,
     output: &mut String,
 ) -> Result<(), CompileError> {
     let var_name = assign_stmt.variable.s();
@@ -361,6 +367,7 @@ pub fn compile_assign_statement(
             builtins,
             arrays,
             variable_arrays,
+            stack_offset,
             output,
         )?;
 
@@ -381,6 +388,7 @@ pub fn compile_assign_statement(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn compile_field_assign_statement(
     method_chain_assign_stmt: &StatementMethodChainAssign<PhaseParse>,
     variables: &mut HashMap<String, i32>,
@@ -388,6 +396,7 @@ pub fn compile_field_assign_statement(
     builtins: &HashMap<String, String>,
     arrays: &HashMap<String, ArrayInfo>,
     variable_arrays: &mut HashMap<String, String>,
+    stack_offset: &mut i32,
     output: &mut String,
 ) -> Result<(), CompileError> {
     // Compile the field access to get the address
@@ -422,6 +431,7 @@ pub fn compile_field_assign_statement(
         builtins,
         arrays,
         variable_arrays,
+        stack_offset,
         output,
     )?;
 
@@ -439,6 +449,7 @@ pub fn compile_return_statement(
     builtins: &HashMap<String, String>,
     arrays: &HashMap<String, ArrayInfo>,
     variable_arrays: &mut HashMap<String, String>,
+    stack_offset: &mut i32,
     output: &mut String,
 ) -> Result<(), CompileError> {
     // Compile the return value expression
@@ -449,6 +460,7 @@ pub fn compile_return_statement(
         builtins,
         arrays,
         variable_arrays,
+        stack_offset,
         output,
     )?;
 

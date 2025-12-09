@@ -60,7 +60,7 @@ mod tests {
     fn debug_parse_item_proc_in_struct_3() {
         let mut file_id_generator = FileIdGenerator::new();
         let file_id = file_id_generator.generate_file_id();
-        let s = std::fs::read_to_string("../../testcases/felis/single/struct_3.fe").unwrap();
+        let s = std::fs::read_to_string("../../testcases/felis/single/type_3.fe").unwrap();
         let tokens = Token::lex(&s, file_id);
 
         // find first 'proc'

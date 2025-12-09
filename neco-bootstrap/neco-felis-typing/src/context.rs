@@ -93,7 +93,7 @@ impl TypeChecker {
             Item::Inductive(ind) => self.check_inductive(ind),
             Item::Theorem(theorem) => self.check_theorem(theorem),
             Item::Proc(proc) => self.check_proc(proc),
-            Item::Struct(struct_item) => self.check_struct(struct_item),
+            Item::Type(type_item) => self.check_type(type_item),
             Item::Entrypoint(_) => Ok(()),
         }
     }
@@ -164,20 +164,19 @@ impl TypeChecker {
         Ok(())
     }
 
-    fn check_struct(
-        &mut self,
-        struct_item: &ItemStruct<PhaseElaborated>,
-    ) -> Result<(), TypingError> {
-        let mut fields = Vec::with_capacity(struct_item.fields.len());
-        for field in &struct_item.fields {
-            let field_ty = self.visit_term(&field.ty)?;
-            fields.push(StructFieldType {
-                name: field.name.s().to_string(),
-                ty: field_ty,
-            });
+    fn check_type(&mut self, type_item: &ItemType<PhaseElaborated>) -> Result<(), TypingError> {
+        let mut fields = Vec::new();
+        if let Some(constructor) = type_item.constructors.first() {
+            for field in &constructor.fields {
+                let field_ty = self.visit_term(&field.ty)?;
+                fields.push(StructFieldType {
+                    name: field.name.s().to_string(),
+                    ty: field_ty,
+                });
+            }
         }
         let struct_ty = Type::Struct(fields);
-        self.bind(struct_item.ext.clone(), struct_ty)?;
+        self.bind(type_item.ext.name_id.clone(), struct_ty)?;
         Ok(())
     }
 
@@ -382,15 +381,42 @@ impl TypeChecker {
                 let hole = Type::Hole(self.fresh_hole());
                 self.assign_type(&if_term.ext.term_id, hole)
             }
+            ProcTerm::Match(match_term) => {
+                let scrutinee_ty = self
+                    .env
+                    .get(&match_term.ext.scrutinee_id)
+                    .cloned()
+                    .ok_or_else(|| TypingError::UnboundName {
+                        name_id: match_term.ext.scrutinee_id.clone(),
+                    })?;
+                let resolved = self.solutions.resolve(&scrutinee_ty);
+                let fields = if let Type::Struct(fields) = resolved {
+                    fields
+                } else {
+                    Vec::new()
+                };
+                for branch in &match_term.branches {
+                    self.env.enter_scope();
+                    for field in &branch.pattern.fields {
+                        let field_ty = fields
+                            .iter()
+                            .find(|f| f.name == field.field_name.s())
+                            .map(|f| f.ty.clone())
+                            .unwrap_or_else(|| Type::Hole(self.fresh_hole()));
+                        self.bind(field.ext.binder_id.clone(), field_ty)?;
+                    }
+                    self.visit_statements(&branch.body)?;
+                    self.env.leave_scope();
+                }
+                let hole = Type::Hole(self.fresh_hole());
+                self.assign_type(&match_term.ext.term_id, hole)
+            }
             ProcTerm::Paren(paren) => {
                 let inner_ty = self.visit_proc_term(&paren.proc_term)?;
                 self.assign_type(&paren.ext.term_id, inner_ty)
             }
             ProcTerm::Ext(_) => Err(TypingError::Unsupported(
                 "ProcTerm::Ext is not supported in typing".to_string(),
-            )),
-            ProcTerm::Struct(_) => Err(TypingError::Unsupported(
-                "struct definitions are not allowed inside proc terms".to_string(),
             )),
         }
     }

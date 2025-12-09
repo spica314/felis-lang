@@ -24,6 +24,11 @@ pub struct StatementCallPtxIds {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ItemTypeIds {
+    pub name_id: NameId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TermVariableIds {
     pub term_id: TermId,
     pub name_id: NameId,
@@ -134,6 +139,17 @@ pub struct ProcTermIfIds {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ProcTermMatchIds {
+    pub term_id: TermId,
+    pub scrutinee_id: NameId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ProcTermMatchFieldIds {
+    pub binder_id: NameId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ProcTermStructValueIds {
     pub term_id: TermId,
 }
@@ -160,8 +176,9 @@ impl Phase for PhaseElaborated {
     type ItemProcExt = NameId;
     type TermUnitExt = TermUnitIds;
     type TermNumberExt = TermNumberIds;
-    type ItemStructExt = NameId;
     type ItemStructFieldExt = ();
+    type ItemTypeExt = ItemTypeIds;
+    type ItemTypeConstructorExt = ();
     type TermStructExt = TermStructIds;
     type TermFieldAccessExt = TermFieldAccessIds;
     type TermConstructorCallExt = TermConstructorCallIds;
@@ -182,6 +199,9 @@ impl Phase for PhaseElaborated {
     type ProcTermConstructorCallExt = ProcTermConstructorCallIds;
     type ProcTermIfExt = ProcTermIfIds;
     type ProcTermStructValueExt = ProcTermStructValueIds;
+    type ProcTermMatchExt = ProcTermMatchIds;
+    type ProcTermMatchBranchExt = ();
+    type ProcTermMatchFieldExt = ProcTermMatchFieldIds;
     type StatementReturnExt = ();
     type StatementCallPtxExt = StatementCallPtxIds;
 }

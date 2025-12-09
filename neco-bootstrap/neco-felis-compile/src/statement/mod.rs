@@ -52,6 +52,7 @@ impl StatementCompiler {
                 builtins,
                 arrays,
                 variable_arrays,
+                stack_offset,
                 output,
             ),
             Statement::FieldAssign(field_assign_stmt) => variables::compile_field_assign_statement(
@@ -61,6 +62,7 @@ impl StatementCompiler {
                 builtins,
                 arrays,
                 variable_arrays,
+                stack_offset,
                 output,
             ),
             Statement::Expr(proc_term) => expressions::compile_proc_term(
@@ -70,6 +72,7 @@ impl StatementCompiler {
                 builtins,
                 arrays,
                 variable_arrays,
+                stack_offset,
                 output,
             ),
             Statement::Return(return_stmt) => variables::compile_return_statement(
@@ -79,6 +82,7 @@ impl StatementCompiler {
                 builtins,
                 arrays,
                 variable_arrays,
+                stack_offset,
                 output,
             ),
             Statement::Loop(loop_stmt) => control_flow::compile_loop_statement(
