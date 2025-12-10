@@ -13,7 +13,7 @@ while IFS= read -r -d '' file; do
         echo "$file: $lines lines"
         large_files_found=true
     fi
-done < <(find . -path './neco-bootstrap/target' -prune -o -name '*.rs' -print0)
+done < <(find . -path './stage0/target' -prune -o -name '*.rs' -print0)
 
 if [ "$large_files_found" = true ]; then
     exit 1

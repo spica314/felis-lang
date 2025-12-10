@@ -4,7 +4,7 @@ set -euo pipefail
 
 # Resolve directories
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-WORKSPACE_DIR="$SCRIPT_DIR/../../neco-bootstrap"
+WORKSPACE_DIR="$SCRIPT_DIR/../../stage0"
 
 # Build and run for multiple images
 # images=(image1 image2)

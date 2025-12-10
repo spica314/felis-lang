@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `neco-bootstrap/` — Rust workspace with compiler crates (e.g., `neco-felis-compile`, `neco-felis-syn`, `neco-cic`).
+- `stage0/` — Rust workspace with compiler crates (e.g., `neco-felis-compile`, `neco-felis-syn`, `neco-cic`).
 - `examples/` — runnable Felis programs (e.g., ray-tracing). `.fe` sources.
 - `testcases/` — Felis language test inputs grouped by feature.
 - `docs/` — design and PTX notes.
@@ -10,12 +10,12 @@
 
 ## Build, Test, and Development Commands
 - Setup (local): `rustup toolchain install nightly && rustup component add rustfmt clippy`.
-- Workspace build: `cd neco-bootstrap && cargo build --workspace`.
-- Format check: `neco-bootstrap/ci-scripts/check.sh` or `cargo fmt --all -- --check`.
+- Workspace build: `cd stage0 && cargo build --workspace`.
+- Format check: `stage0/ci-scripts/check.sh` or `cargo fmt --all -- --check`.
 - Lint: `cargo clippy --all-targets --all-features -- -D warnings`.
 - Test (CPU): `cargo test --workspace --offline`.
 - Full repo checks: `ci-scripts/check.sh [--fix]`.
-- Coverage (HTML): `neco-bootstrap/ci-scripts/generate-coverage-report.sh`.
+- Coverage (HTML): `stage0/ci-scripts/generate-coverage-report.sh`.
 - Run compiler example: `cargo run -p neco-felis-compile -- ./examples/ray-tracing-in-one-weekend/main.fe -o a.out`.
 
 ## Coding Style & Naming Conventions

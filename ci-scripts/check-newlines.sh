@@ -34,7 +34,7 @@ done < <(find . -type f \
   -not -path './target/*' \
   -not -path './.git/*' \
   -not -path './node_modules/*' \
-  -not -path './neco-bootstrap/target/*' \
+  -not -path './stage0/target/*' \
   \( -name '*.rs' -o -name '*.toml' -o -name '*.md' -o -name '*.sh' -o -name '*.fe' -o -name '*.yml' -o -name '*.yaml' \) \
   -print0)
 

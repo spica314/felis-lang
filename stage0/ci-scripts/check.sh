@@ -11,7 +11,7 @@ if [[ "$1" == "--fix" ]]; then
     FIX_MODE=true
 fi
 
-cd "$PROJECT_ROOT/neco-bootstrap"
+cd "$PROJECT_ROOT/stage0"
 
 if $FIX_MODE; then
     echo "=== Starting Rust automatic fixes ==="
