@@ -1,9 +1,9 @@
-use crate::{Type, TypeHole, UnificationError};
+use crate::{Term, TypeHole, UnificationError};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TypeSolutions {
-    assignments: HashMap<TypeHole, Type>,
+    assignments: HashMap<TypeHole, Term>,
 }
 
 impl TypeSolutions {
@@ -13,30 +13,30 @@ impl TypeSolutions {
         }
     }
 
-    pub fn resolve(&self, ty: &Type) -> Type {
+    pub fn resolve(&self, ty: &Term) -> Term {
         match ty {
-            Type::Hole(h) => {
+            Term::Hole(h) => {
                 if let Some(replacement) = self.assignments.get(h) {
                     self.resolve(replacement)
                 } else {
                     ty.clone()
                 }
             }
-            Type::Variable(_) => ty.clone(),
-            Type::Arrow {
+            Term::Variable(_) => ty.clone(),
+            Term::Arrow {
                 param,
                 param_name,
                 result,
-            } => Type::Arrow {
+            } => Term::Arrow {
                 param: Box::new(self.resolve(param)),
                 param_name: param_name.clone(),
                 result: Box::new(self.resolve(result)),
             },
-            Type::Apply { function, argument } => Type::Apply {
+            Term::Apply { function, argument } => Term::Apply {
                 function: Box::new(self.resolve(function)),
                 argument: Box::new(self.resolve(argument)),
             },
-            Type::Struct(fields) => Type::Struct(
+            Term::Struct(fields) => Term::Struct(
                 fields
                     .iter()
                     .map(|field| crate::StructFieldType {
@@ -45,23 +45,23 @@ impl TypeSolutions {
                     })
                     .collect(),
             ),
-            Type::Unit => Type::Unit,
-            Type::Integer(int) => Type::Integer(*int),
-            Type::F32 => Type::F32,
+            Term::Unit => Term::Unit,
+            Term::Integer(int) => Term::Integer(*int),
+            Term::F32 => Term::F32,
         }
     }
 
-    pub fn apply_into(&self, ty: &mut Type) {
+    pub fn apply_into(&self, ty: &mut Term) {
         *ty = self.resolve(ty);
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&TypeHole, &Type)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&TypeHole, &Term)> {
         self.assignments.iter()
     }
 
-    fn occurs(&self, hole: &TypeHole, ty: &Type) -> bool {
+    fn occurs(&self, hole: &TypeHole, ty: &Term) -> bool {
         match ty {
-            Type::Hole(h) => {
+            Term::Hole(h) => {
                 if h == hole {
                     true
                 } else if let Some(replacement) = self.assignments.get(h) {
@@ -70,18 +70,18 @@ impl TypeSolutions {
                     false
                 }
             }
-            Type::Variable(_) | Type::Unit | Type::Integer(_) | Type::F32 => false,
-            Type::Arrow { param, result, .. } => {
+            Term::Variable(_) | Term::Unit | Term::Integer(_) | Term::F32 => false,
+            Term::Arrow { param, result, .. } => {
                 self.occurs(hole, param) || self.occurs(hole, result)
             }
-            Type::Apply { function, argument } => {
+            Term::Apply { function, argument } => {
                 self.occurs(hole, function) || self.occurs(hole, argument)
             }
-            Type::Struct(fields) => fields.iter().any(|f| self.occurs(hole, &f.ty)),
+            Term::Struct(fields) => fields.iter().any(|f| self.occurs(hole, &f.ty)),
         }
     }
 
-    fn assign(&mut self, hole: TypeHole, ty: Type) -> Result<(), UnificationError> {
+    fn assign(&mut self, hole: TypeHole, ty: Term) -> Result<(), UnificationError> {
         if self.occurs(&hole, &ty) {
             return Err(UnificationError::Occurs { hole, ty });
         }
@@ -99,20 +99,20 @@ impl<'a> UnificationCtx<'a> {
         Self { solutions }
     }
 
-    pub fn unify(&mut self, lhs: &Type, rhs: &Type) -> Result<(), UnificationError> {
+    pub fn unify(&mut self, lhs: &Term, rhs: &Term) -> Result<(), UnificationError> {
         let lhs = self.solutions.resolve(lhs);
         let rhs = self.solutions.resolve(rhs);
 
         match (lhs, rhs) {
-            (Type::Hole(hole), ty) | (ty, Type::Hole(hole)) => self.solutions.assign(hole, ty),
-            (Type::Variable(a), Type::Variable(b)) if a == b => Ok(()),
+            (Term::Hole(hole), ty) | (ty, Term::Hole(hole)) => self.solutions.assign(hole, ty),
+            (Term::Variable(a), Term::Variable(b)) if a == b => Ok(()),
             (
-                Type::Arrow {
+                Term::Arrow {
                     param: param_lhs,
                     param_name: param_name_lhs,
                     result: result_lhs,
                 },
-                Type::Arrow {
+                Term::Arrow {
                     param: param_rhs,
                     param_name: param_name_rhs,
                     result: result_rhs,
@@ -123,18 +123,18 @@ impl<'a> UnificationCtx<'a> {
                     && l != r
                 {
                     return Err(UnificationError::TypeMismatch {
-                        expected: Type::Variable(l),
-                        actual: Type::Variable(r),
+                        expected: Term::Variable(l),
+                        actual: Term::Variable(r),
                     });
                 }
                 self.unify(&result_lhs, &result_rhs)
             }
             (
-                Type::Apply {
+                Term::Apply {
                     function: f_lhs,
                     argument: a_lhs,
                 },
-                Type::Apply {
+                Term::Apply {
                     function: f_rhs,
                     argument: a_rhs,
                 },
@@ -142,27 +142,27 @@ impl<'a> UnificationCtx<'a> {
                 self.unify(&f_lhs, &f_rhs)?;
                 self.unify(&a_lhs, &a_rhs)
             }
-            (Type::Struct(fields_lhs), Type::Struct(fields_rhs)) => {
+            (Term::Struct(fields_lhs), Term::Struct(fields_rhs)) => {
                 if fields_lhs.len() != fields_rhs.len() {
                     return Err(UnificationError::TypeMismatch {
-                        expected: Type::Struct(fields_lhs),
-                        actual: Type::Struct(fields_rhs),
+                        expected: Term::Struct(fields_lhs),
+                        actual: Term::Struct(fields_rhs),
                     });
                 }
 
                 for (lhs_field, rhs_field) in fields_lhs.iter().zip(fields_rhs.iter()) {
                     if lhs_field.name != rhs_field.name {
                         return Err(UnificationError::TypeMismatch {
-                            expected: Type::Struct(fields_lhs),
-                            actual: Type::Struct(fields_rhs),
+                            expected: Term::Struct(fields_lhs),
+                            actual: Term::Struct(fields_rhs),
                         });
                     }
                     self.unify(&lhs_field.ty, &rhs_field.ty)?;
                 }
                 Ok(())
             }
-            (Type::Unit, Type::Unit) | (Type::F32, Type::F32) => Ok(()),
-            (Type::Integer(lhs), Type::Integer(rhs)) if lhs == rhs => Ok(()),
+            (Term::Unit, Term::Unit) | (Term::F32, Term::F32) => Ok(()),
+            (Term::Integer(lhs), Term::Integer(rhs)) if lhs == rhs => Ok(()),
             (expected, actual) => Err(UnificationError::TypeMismatch { expected, actual }),
         }
     }

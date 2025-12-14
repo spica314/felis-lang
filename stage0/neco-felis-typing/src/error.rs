@@ -1,11 +1,11 @@
-use crate::{Type, TypeHole};
+use crate::{Term, TypeHole};
 use neco_felis_elaboration::{NameId, TermId};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnificationError {
-    TypeMismatch { expected: Type, actual: Type },
-    Occurs { hole: TypeHole, ty: Type },
+    TypeMismatch { expected: Term, actual: Term },
+    Occurs { hole: TypeHole, ty: Term },
 }
 
 impl fmt::Display for UnificationError {

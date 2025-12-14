@@ -5,17 +5,17 @@ use std::fmt;
 pub struct TypeHole(pub usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Type {
+pub enum Term {
     Hole(TypeHole),
     Variable(NameId),
     Arrow {
-        param: Box<Type>,
+        param: Box<Term>,
         param_name: Option<NameId>,
-        result: Box<Type>,
+        result: Box<Term>,
     },
     Apply {
-        function: Box<Type>,
-        argument: Box<Type>,
+        function: Box<Term>,
+        argument: Box<Term>,
     },
     Struct(Vec<StructFieldType>),
     Unit,
@@ -38,16 +38,16 @@ pub enum IntegerType {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StructFieldType {
     pub name: String,
-    pub ty: Type,
+    pub ty: Term,
 }
 
-impl Type {
+impl Term {
     pub fn hole(id: TypeHole) -> Self {
-        Type::Hole(id)
+        Term::Hole(id)
     }
 
-    pub fn arrow(param: Type, result: Type) -> Self {
-        Type::Arrow {
+    pub fn arrow(param: Term, result: Term) -> Self {
+        Term::Arrow {
             param: Box::new(param),
             param_name: None,
             result: Box::new(result),
@@ -56,35 +56,35 @@ impl Type {
 
     pub fn from_number_literal(literal: &str) -> Self {
         if literal.ends_with("i8") {
-            Type::Integer(IntegerType::I8)
+            Term::Integer(IntegerType::I8)
         } else if literal.ends_with("i16") {
-            Type::Integer(IntegerType::I16)
+            Term::Integer(IntegerType::I16)
         } else if literal.ends_with("i32") {
-            Type::Integer(IntegerType::I32)
+            Term::Integer(IntegerType::I32)
         } else if literal.ends_with("i64") {
-            Type::Integer(IntegerType::I64)
+            Term::Integer(IntegerType::I64)
         } else if literal.ends_with("u8") {
-            Type::Integer(IntegerType::U8)
+            Term::Integer(IntegerType::U8)
         } else if literal.ends_with("u16") {
-            Type::Integer(IntegerType::U16)
+            Term::Integer(IntegerType::U16)
         } else if literal.ends_with("u32") {
-            Type::Integer(IntegerType::U32)
+            Term::Integer(IntegerType::U32)
         } else if literal.ends_with("u64") {
-            Type::Integer(IntegerType::U64)
+            Term::Integer(IntegerType::U64)
         } else if literal.ends_with("f32") || literal.contains('.') {
-            Type::F32
+            Term::F32
         } else {
-            Type::Integer(IntegerType::U64)
+            Term::Integer(IntegerType::U64)
         }
     }
 }
 
-impl fmt::Display for Type {
+impl fmt::Display for Term {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Type::Hole(TypeHole(id)) => write!(f, "_{id}"),
-            Type::Variable(name_id) => write!(f, "var#{name_id:?}"),
-            Type::Arrow {
+            Term::Hole(TypeHole(id)) => write!(f, "_{id}"),
+            Term::Variable(name_id) => write!(f, "var#{name_id:?}"),
+            Term::Arrow {
                 param,
                 param_name,
                 result,
@@ -95,8 +95,8 @@ impl fmt::Display for Type {
                     write!(f, "({param}) -> {result}")
                 }
             }
-            Type::Apply { function, argument } => write!(f, "{function} {argument}"),
-            Type::Struct(fields) => {
+            Term::Apply { function, argument } => write!(f, "{function} {argument}"),
+            Term::Struct(fields) => {
                 write!(f, "struct {{ ")?;
                 for (idx, field) in fields.iter().enumerate() {
                     if idx > 0 {
@@ -106,9 +106,9 @@ impl fmt::Display for Type {
                 }
                 write!(f, " }}")
             }
-            Type::Unit => write!(f, "()"),
-            Type::Integer(int) => write!(f, "{int}"),
-            Type::F32 => write!(f, "f32"),
+            Term::Unit => write!(f, "()"),
+            Term::Integer(int) => write!(f, "{int}"),
+            Term::F32 => write!(f, "f32"),
         }
     }
 }

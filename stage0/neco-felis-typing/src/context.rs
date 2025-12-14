@@ -1,28 +1,31 @@
 use crate::{
-    BuiltinTypes, IntegerType, StructFieldType, Type, TypeHole, TypeSolutions, TypingError,
+    BuiltinTypes, IntegerType, StructFieldType, Term, TypeHole, TypeSolutions, TypingError,
     UnificationCtx,
 };
 use neco_felis_elaboration::{NameId, PhaseElaborated, TermId};
-use neco_felis_syn::*;
+use neco_felis_syn::{
+    File, Item, ItemDefinition, ItemInductive, ItemProc, ItemProcBlock, ItemTheorem, ItemType,
+    ItemUseBuiltin, ProcTerm, ProcTermMethodChain, Statement, Statements, Term as SynTerm,
+};
 use neco_scope::ScopeStack;
 use std::collections::HashMap;
 
 pub struct TypeChecker {
     builtins: BuiltinTypes,
-    env: ScopeStack<NameId, Type>,
-    term_types: HashMap<TermId, Type>,
+    env: ScopeStack<NameId, Term>,
+    term_types: HashMap<TermId, Term>,
     solutions: TypeSolutions,
     next_hole: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct TypingResult {
-    pub term_types: HashMap<TermId, Type>,
+    pub term_types: HashMap<TermId, Term>,
     pub solutions: TypeSolutions,
 }
 
 impl TypingResult {
-    pub fn resolved_type(&self, term_id: &TermId) -> Option<Type> {
+    pub fn resolved_type(&self, term_id: &TermId) -> Option<Term> {
         self.term_types
             .get(term_id)
             .map(|ty| self.solutions.resolve(ty))
@@ -60,7 +63,7 @@ impl TypeChecker {
         TypeHole(id)
     }
 
-    fn bind(&mut self, name_id: NameId, ty: Type) -> Result<(), TypingError> {
+    fn bind(&mut self, name_id: NameId, ty: Term) -> Result<(), TypingError> {
         if self.env.get(&name_id).is_some() {
             return Err(TypingError::DuplicateBinding { name_id });
         }
@@ -68,15 +71,15 @@ impl TypeChecker {
         Ok(())
     }
 
-    fn type_for_term_id(&mut self, term_id: &TermId) -> Type {
-        let hole = Type::Hole(self.fresh_hole());
+    fn type_for_term_id(&mut self, term_id: &TermId) -> Term {
+        let hole = Term::Hole(self.fresh_hole());
         self.term_types
             .entry(term_id.clone())
             .or_insert_with(|| hole.clone())
             .clone()
     }
 
-    fn assign_type(&mut self, term_id: &TermId, ty: Type) -> Result<Type, TypingError> {
+    fn assign_type(&mut self, term_id: &TermId, ty: Term) -> Result<Term, TypingError> {
         let current = self.type_for_term_id(term_id);
         let mut ctx = UnificationCtx::new(&mut self.solutions);
         ctx.unify(&current, &ty)
@@ -125,7 +128,7 @@ impl TypeChecker {
                 .term_types
                 .get(&term_id)
                 .cloned()
-                .unwrap_or_else(|| Type::Hole(self.fresh_hole()));
+                .unwrap_or_else(|| Term::Hole(self.fresh_hole()));
             self.bind(param_id, ty)?;
         }
         self.visit_term(&def.body)?;
@@ -156,7 +159,7 @@ impl TypeChecker {
         let params = collect_proc_parameters(proc.ty.as_ref());
         self.env.enter_scope();
         for param in params {
-            let hole = Type::Hole(self.fresh_hole());
+            let hole = Term::Hole(self.fresh_hole());
             self.bind(param, hole)?;
         }
         self.visit_proc_block(&proc.proc_block)?;
@@ -175,7 +178,7 @@ impl TypeChecker {
                 });
             }
         }
-        let struct_ty = Type::Struct(fields);
+        let struct_ty = Term::Struct(fields);
         self.bind(type_item.ext.name_id.clone(), struct_ty)?;
         Ok(())
     }
@@ -214,7 +217,7 @@ impl TypeChecker {
             Statement::LetMut(stmt) => {
                 let value_ty = self.visit_proc_term(&stmt.value)?;
                 self.bind(stmt.ext.value_id.clone(), value_ty.clone())?;
-                let ref_ty = Type::Hole(self.fresh_hole());
+                let ref_ty = Term::Hole(self.fresh_hole());
                 self.bind(stmt.ext.reference_id.clone(), ref_ty)?;
                 Ok(())
             }
@@ -260,7 +263,7 @@ impl TypeChecker {
     fn visit_proc_method_chain(
         &mut self,
         chain: &ProcTermMethodChain<PhaseElaborated>,
-    ) -> Result<Type, TypingError> {
+    ) -> Result<Term, TypingError> {
         // Ensure the receiver is in scope even if we don't yet model its fields/methods precisely.
         self.env
             .get(&chain.ext.object_id)
@@ -272,25 +275,25 @@ impl TypeChecker {
         if let Some(index) = &chain.index {
             let idx_ty = self.visit_proc_term(index)?;
             let mut ctx = UnificationCtx::new(&mut self.solutions);
-            ctx.unify(&Type::Integer(IntegerType::U64), &idx_ty)
+            ctx.unify(&Term::Integer(IntegerType::U64), &idx_ty)
                 .map_err(TypingError::UnificationFailed)?;
         }
 
         // Basic shaping for common array helpers; otherwise fall back to a fresh hole.
         let result_ty = match chain.field.s() {
-            "#len" => Type::Integer(IntegerType::U64),
-            _ => Type::Hole(self.fresh_hole()),
+            "#len" => Term::Integer(IntegerType::U64),
+            _ => Term::Hole(self.fresh_hole()),
         };
 
         let assigned = self.assign_type(&chain.ext.term_id, result_ty)?;
         Ok(assigned)
     }
 
-    fn visit_proc_term(&mut self, term: &ProcTerm<PhaseElaborated>) -> Result<Type, TypingError> {
+    fn visit_proc_term(&mut self, term: &ProcTerm<PhaseElaborated>) -> Result<Term, TypingError> {
         match term {
-            ProcTerm::Unit(unit) => self.assign_type(&unit.ext.term_id, Type::Unit),
+            ProcTerm::Unit(unit) => self.assign_type(&unit.ext.term_id, Term::Unit),
             ProcTerm::Number(num) => {
-                self.assign_type(&num.ext.term_id, Type::from_number_literal(num.number.s()))
+                self.assign_type(&num.ext.term_id, Term::from_number_literal(num.number.s()))
             }
             ProcTerm::Variable(var) => {
                 let ty = self.env.get(&var.ext.name_id).cloned().ok_or_else(|| {
@@ -310,11 +313,11 @@ impl TypeChecker {
                 let mut result_ty = self.type_for_term_id(&apply.ext.term_id);
                 let mut callee_ty = f_ty;
                 for arg_ty in arg_types {
-                    let param_ty = Type::Hole(self.fresh_hole());
-                    let ret_ty = Type::Hole(self.fresh_hole());
+                    let param_ty = Term::Hole(self.fresh_hole());
+                    let ret_ty = Term::Hole(self.fresh_hole());
                     {
                         let mut ctx = UnificationCtx::new(&mut self.solutions);
-                        let arrow = Type::Arrow {
+                        let arrow = Term::Arrow {
                             param: Box::new(param_ty.clone()),
                             param_name: None,
                             result: Box::new(ret_ty.clone()),
@@ -341,12 +344,12 @@ impl TypeChecker {
                     self.visit_proc_term(index)?;
                 }
                 let result_ty = match self.solutions.resolve(&object_ty) {
-                    Type::Struct(fields) => fields
+                    Term::Struct(fields) => fields
                         .iter()
                         .find(|field| field.name == field_access.field.s())
                         .map(|field| field.ty.clone())
-                        .unwrap_or_else(|| Type::Hole(self.fresh_hole())),
-                    _ => Type::Hole(self.fresh_hole()),
+                        .unwrap_or_else(|| Term::Hole(self.fresh_hole())),
+                    _ => Term::Hole(self.fresh_hole()),
                 };
                 self.assign_type(&field_access.ext.term_id, result_ty)
             }
@@ -360,7 +363,7 @@ impl TypeChecker {
                         ty,
                     });
                 }
-                let ty = Type::Struct(fields);
+                let ty = Term::Struct(fields);
                 self.assign_type(&struct_value.ext.term_id, ty)
             }
             ProcTerm::If(if_term) => {
@@ -378,7 +381,7 @@ impl TypeChecker {
                     self.env.leave_scope();
                 }
 
-                let hole = Type::Hole(self.fresh_hole());
+                let hole = Term::Hole(self.fresh_hole());
                 self.assign_type(&if_term.ext.term_id, hole)
             }
             ProcTerm::Match(match_term) => {
@@ -390,7 +393,7 @@ impl TypeChecker {
                         name_id: match_term.ext.scrutinee_id.clone(),
                     })?;
                 let resolved = self.solutions.resolve(&scrutinee_ty);
-                let fields = if let Type::Struct(fields) = resolved {
+                let fields = if let Term::Struct(fields) = resolved {
                     fields
                 } else {
                     Vec::new()
@@ -402,13 +405,13 @@ impl TypeChecker {
                             .iter()
                             .find(|f| f.name == field.field_name.s())
                             .map(|f| f.ty.clone())
-                            .unwrap_or_else(|| Type::Hole(self.fresh_hole()));
+                            .unwrap_or_else(|| Term::Hole(self.fresh_hole()));
                         self.bind(field.ext.binder_id.clone(), field_ty)?;
                     }
                     self.visit_statements(&branch.body)?;
                     self.env.leave_scope();
                 }
-                let hole = Type::Hole(self.fresh_hole());
+                let hole = Term::Hole(self.fresh_hole());
                 self.assign_type(&match_term.ext.term_id, hole)
             }
             ProcTerm::Paren(paren) => {
@@ -421,13 +424,13 @@ impl TypeChecker {
         }
     }
 
-    fn visit_term(&mut self, term: &Term<PhaseElaborated>) -> Result<Type, TypingError> {
+    fn visit_term(&mut self, term: &SynTerm<PhaseElaborated>) -> Result<Term, TypingError> {
         match term {
-            Term::Unit(unit) => self.assign_type(&unit.ext.term_id, Type::Unit),
-            Term::Number(num) => {
-                self.assign_type(&num.ext.term_id, Type::from_number_literal(num.number.s()))
+            SynTerm::Unit(unit) => self.assign_type(&unit.ext.term_id, Term::Unit),
+            SynTerm::Number(num) => {
+                self.assign_type(&num.ext.term_id, Term::from_number_literal(num.number.s()))
             }
-            Term::Variable(var) => {
+            SynTerm::Variable(var) => {
                 let ty = self.env.get(&var.ext.name_id).cloned().ok_or_else(|| {
                     TypingError::UnboundName {
                         name_id: var.ext.name_id.clone(),
@@ -435,11 +438,11 @@ impl TypeChecker {
                 })?;
                 self.assign_type(&var.ext.term_id, ty)
             }
-            Term::Paren(paren) => {
+            SynTerm::Paren(paren) => {
                 let inner_ty = self.visit_term(&paren.term)?;
                 self.assign_type(&paren.ext.term_id, inner_ty)
             }
-            Term::ArrowDep(arrow) => {
+            SynTerm::ArrowDep(arrow) => {
                 let param_type = self.visit_term(&arrow.from_ty)?;
                 self.assign_type(&arrow.from.ext.term_id, param_type.clone())?;
 
@@ -448,7 +451,7 @@ impl TypeChecker {
                 let result_type = self.visit_term(&arrow.to)?;
                 self.env.leave_scope();
 
-                let ty = Type::Arrow {
+                let ty = Term::Arrow {
                     param: Box::new(param_type),
                     param_name: Some(arrow.ext.param_id.clone()),
                     result: Box::new(result_type),
@@ -456,14 +459,14 @@ impl TypeChecker {
                 self.assign_type(&arrow.ext.term_id, ty.clone())?;
                 Ok(ty)
             }
-            Term::ArrowNodep(arrow) => {
+            SynTerm::ArrowNodep(arrow) => {
                 let param_type = self.visit_term(&arrow.from)?;
                 let result_type = self.visit_term(&arrow.to)?;
-                let ty = Type::arrow(param_type, result_type);
+                let ty = Term::arrow(param_type, result_type);
                 self.assign_type(&arrow.ext.term_id, ty.clone())?;
                 Ok(ty)
             }
-            Term::Apply(apply) => {
+            SynTerm::Apply(apply) => {
                 let f_ty = self.visit_term(&apply.f)?;
                 let arg_types = apply
                     .args
@@ -473,11 +476,11 @@ impl TypeChecker {
                 let mut result_ty = self.type_for_term_id(&apply.ext.term_id);
                 let mut callee_ty = f_ty;
                 for arg_ty in arg_types {
-                    let param_ty = Type::Hole(self.fresh_hole());
-                    let ret_ty = Type::Hole(self.fresh_hole());
+                    let param_ty = Term::Hole(self.fresh_hole());
+                    let ret_ty = Term::Hole(self.fresh_hole());
                     {
                         let mut ctx = UnificationCtx::new(&mut self.solutions);
-                        let arrow = Type::Arrow {
+                        let arrow = Term::Arrow {
                             param: Box::new(param_ty.clone()),
                             param_name: None,
                             result: Box::new(ret_ty.clone()),
@@ -492,13 +495,13 @@ impl TypeChecker {
                 }
                 self.assign_type(&apply.ext.term_id, result_ty)
             }
-            Term::Match(match_term) => {
+            SynTerm::Match(match_term) => {
                 if self.env.get(&match_term.ext.scrutinee_id).is_none() {
                     return Err(TypingError::UnboundName {
                         name_id: match_term.ext.scrutinee_id.clone(),
                     });
                 }
-                let mut branch_ty: Option<Type> = None;
+                let mut branch_ty: Option<Term> = None;
                 for branch in &match_term.branches {
                     let body_ty = self.visit_term(&branch.body)?;
                     if let Some(existing) = &branch_ty {
@@ -511,11 +514,11 @@ impl TypeChecker {
                 }
                 let ty = match branch_ty {
                     Some(ty) => ty,
-                    None => Type::Hole(self.fresh_hole()),
+                    None => Term::Hole(self.fresh_hole()),
                 };
                 self.assign_type(&match_term.ext.term_id, ty)
             }
-            Term::Struct(term_struct) => {
+            SynTerm::Struct(term_struct) => {
                 let mut fields = Vec::with_capacity(term_struct.fields.len());
                 for field in &term_struct.fields {
                     let field_ty = self.visit_term(&field.ty)?;
@@ -524,21 +527,21 @@ impl TypeChecker {
                         ty: field_ty,
                     });
                 }
-                let ty = Type::Struct(fields);
+                let ty = Term::Struct(fields);
                 self.assign_type(&term_struct.ext.term_id, ty)
             }
         }
     }
 }
 
-fn collect_proc_parameters(term: &Term<PhaseElaborated>) -> Vec<NameId> {
-    fn collect(term: &Term<PhaseElaborated>, out: &mut Vec<NameId>) {
+fn collect_proc_parameters(term: &SynTerm<PhaseElaborated>) -> Vec<NameId> {
+    fn collect(term: &SynTerm<PhaseElaborated>, out: &mut Vec<NameId>) {
         match term {
-            Term::ArrowDep(arrow) => {
+            SynTerm::ArrowDep(arrow) => {
                 out.push(arrow.ext.param_id.clone());
                 collect(&arrow.to, out);
             }
-            Term::ArrowNodep(arrow) => collect(&arrow.to, out),
+            SynTerm::ArrowNodep(arrow) => collect(&arrow.to, out),
             _ => {}
         }
     }
@@ -548,14 +551,14 @@ fn collect_proc_parameters(term: &Term<PhaseElaborated>) -> Vec<NameId> {
     params
 }
 
-fn collect_term_parameter_types(term: &Term<PhaseElaborated>) -> Vec<(NameId, TermId)> {
-    fn collect(term: &Term<PhaseElaborated>, out: &mut Vec<(NameId, TermId)>) {
+fn collect_term_parameter_types(term: &SynTerm<PhaseElaborated>) -> Vec<(NameId, TermId)> {
+    fn collect(term: &SynTerm<PhaseElaborated>, out: &mut Vec<(NameId, TermId)>) {
         match term {
-            Term::ArrowDep(arrow) => {
+            SynTerm::ArrowDep(arrow) => {
                 out.push((arrow.ext.param_id.clone(), arrow.from.ext.term_id.clone()));
                 collect(&arrow.to, out);
             }
-            Term::ArrowNodep(arrow) => collect(&arrow.to, out),
+            SynTerm::ArrowNodep(arrow) => collect(&arrow.to, out),
             _ => {}
         }
     }

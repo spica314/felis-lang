@@ -1,21 +1,21 @@
 use neco_felis_elaboration::PhaseElaborated;
 use neco_felis_syn::File;
 use neco_felis_typing::{
-    BuiltinTypes, IntegerType, Type, TypeChecker, TypeHole, TypingError, TypingResult,
+    BuiltinTypes, IntegerType, Term, TypeChecker, TypeHole, TypingError, TypingResult,
 };
 
 pub fn builtin_types() -> BuiltinTypes {
-    let u64 = Type::Integer(IntegerType::U64);
-    let f32 = Type::F32;
+    let u64 = Term::Integer(IntegerType::U64);
+    let f32 = Term::F32;
     let binary_u64 = arrow_chain(vec![u64.clone(), u64.clone()], u64.clone());
     let binary_f32 = arrow_chain(vec![f32.clone(), f32.clone()], f32.clone());
     let syscall = arrow_chain(vec![u64.clone(); 6], u64.clone());
-    let array_param = Type::Hole(TypeHole(0));
-    let array_elem = Type::Struct(Vec::new());
-    let array = Type::arrow(array_param.clone(), array_elem);
+    let array_param = Term::Hole(TypeHole(0));
+    let array_elem = Term::Struct(Vec::new());
+    let array = Term::arrow(array_param.clone(), array_elem);
     let array_new_with_size = arrow_chain(
         vec![array_param.clone(), u64.clone()],
-        Type::Hole(TypeHole(1)),
+        Term::Hole(TypeHole(1)),
     );
     let array_get = arrow_chain(vec![array.clone(), u64.clone()], array_param.clone());
     let array_set = arrow_chain(
@@ -58,8 +58,8 @@ pub fn check_types(file: &File<PhaseElaborated>) -> Result<TypingResult, TypingE
     TypeChecker::new(builtin_types()).check_file(file)
 }
 
-fn arrow_chain(params: Vec<Type>, result: Type) -> Type {
+fn arrow_chain(params: Vec<Term>, result: Term) -> Term {
     params
         .into_iter()
-        .rfold(result, |acc, param| Type::arrow(param, acc))
+        .rfold(result, |acc, param| Term::arrow(param, acc))
 }
