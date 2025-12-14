@@ -6,7 +6,7 @@ members = [
     "neco-felis-syn",
     "neco-felis-typing",
     "neco-scope",
-    "neco-tempfile",
+    "neco-tempfile", "neco-typing",
 ]
 
 [workspace.dependencies]

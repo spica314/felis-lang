@@ -40,3 +40,7 @@ version = "0.1.0"
 [[package]]
 name = "neco-tempfile"
 version = "0.1.0"
+
+[[package]]
+name = "neco-typing"
+version = "0.1.0"
