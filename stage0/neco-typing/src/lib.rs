@@ -1,7 +1,9 @@
+mod check;
 mod replace;
 
 use std::collections::BTreeMap;
 
+pub use check::check;
 pub use replace::replace;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
