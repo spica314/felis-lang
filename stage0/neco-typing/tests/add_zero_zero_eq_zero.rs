@@ -142,5 +142,5 @@ fn add_zero_zero_eq_zero_returns_true() {
         ]),
     };
 
-    assert!(check(definitions));
+    assert!(check(&definitions));
 }
