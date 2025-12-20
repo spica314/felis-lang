@@ -8,8 +8,8 @@ pub fn check(defs: &Definitions) -> bool {
         }
     }
 
-    for (variable_id, term) in &defs.variables {
-        let r = check_variable(defs, *variable_id, term);
+    for (variable_id, (term_ty, term)) in &defs.variables {
+        let r = check_variable(defs, *variable_id, term_ty, term);
         if !r {
             return false;
         }
@@ -22,6 +22,6 @@ fn check_type_def(_defs: &Definitions, _variable_id: usize, _type_def: &TypeDef)
     true
 }
 
-fn check_variable(_defs: &Definitions, _variable_id: usize, _term: &Term) -> bool {
+fn check_variable(_defs: &Definitions, _variable_id: usize, _term_ty: &Term, _term: &Term) -> bool {
     true
 }

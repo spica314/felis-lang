@@ -5,7 +5,7 @@
 //    zero : Nat
 //    succ : Nat -> Nat
 //
-// add :=
+// add : Nat -> Nat -> Nat :=
 //     \forall n: Nat,
 //         \forall m: Nat,
 //             match n {
@@ -13,9 +13,7 @@
 //                 succ p => succ (add p m),
 //             }
 //
-// add_zero_zero_eq_zero := Eq Nat (add zero zero) zero
-//
-// proof :=
+// add_zero_zero_eq_zero : Eq Nat (add zero zero) zero :=
 //     refl Nat zero
 
 use std::collections::BTreeMap;
@@ -61,7 +59,6 @@ fn add_zero_zero_eq_zero_returns_true() {
     let succ_id = 5;
     let add_id = 6;
     let add_zero_zero_eq_zero_id = 7;
-    let proof_id = 8;
     let t_id = 10;
     let x_id = 11;
     let n_id = 12;
@@ -125,6 +122,7 @@ fn add_zero_zero_eq_zero_returns_true() {
         ],
     });
     let add_def = forall(n_id, var(nat_id), forall(m_id, var(nat_id), add_match));
+    let add_ty = arrow(var(nat_id), arrow(var(nat_id), var(nat_id)));
 
     let add_zero_zero = apply(apply(var(add_id), var(zero_id)), var(zero_id));
     let add_zero_zero_eq_zero = apply(
@@ -136,9 +134,11 @@ fn add_zero_zero_eq_zero_returns_true() {
     let definitions = Definitions {
         types: BTreeMap::from([(eq_id, eq_def), (nat_id, nat_def)]),
         variables: BTreeMap::from([
-            (add_id, Box::new(add_def)),
-            (add_zero_zero_eq_zero_id, Box::new(add_zero_zero_eq_zero)),
-            (proof_id, Box::new(proof)),
+            (add_id, (Box::new(add_ty), Box::new(add_def))),
+            (
+                add_zero_zero_eq_zero_id,
+                (Box::new(add_zero_zero_eq_zero), Box::new(proof)),
+            ),
         ]),
     };
 

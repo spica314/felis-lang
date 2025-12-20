@@ -74,5 +74,5 @@ pub struct TypeDef {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Definitions {
     pub types: BTreeMap<usize, TypeDef>,
-    pub variables: BTreeMap<usize, Box<Term>>,
+    pub variables: BTreeMap<usize, (Box<Term>, Box<Term>)>,
 }
