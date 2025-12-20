@@ -32,9 +32,15 @@ pub struct TermMatchArm {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TermSort {
+    pub u: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Term {
     Variable(TermVariable),
     Forall(TermForall),
     Apply(TermApply),
     Match(TermMatch),
+    Sort(TermSort),
 }

@@ -50,6 +50,7 @@ pub fn replace(t: &Term, from: usize, to: Term) -> Term {
             }
             Term::Match(TermMatch { arms: arms })
         }
+        Term::Sort(_) => t.clone(),
     }
 }
 
@@ -132,6 +133,13 @@ mod tests {
             }],
         });
         assert_eq!(replaced, expected);
+    }
+
+    #[test]
+    fn replace_sort_is_noop() {
+        let t = Term::Sort(TermSort { u: 1 });
+        let replaced = replace(&t, 1, var(99));
+        assert_eq!(replaced, t);
     }
 
     #[test]
