@@ -14,6 +14,12 @@ pub struct TermForall {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TermArrow {
+    pub from: Box<Term>,
+    pub to: Box<Term>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TermApply {
     pub f: Box<Term>,
     pub x: Box<Term>,
@@ -40,6 +46,7 @@ pub struct TermSort {
 pub enum Term {
     Variable(TermVariable),
     Forall(TermForall),
+    Arrow(TermArrow),
     Apply(TermApply),
     Match(TermMatch),
     Sort(TermSort),

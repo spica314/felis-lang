@@ -21,6 +21,14 @@ pub fn replace(t: &Term, from: usize, to: Term) -> Term {
                 body: Box::new(sub_term),
             })
         }
+        Term::Arrow(arrow) => {
+            let sub_from = replace(&arrow.from.clone(), from, to.clone());
+            let sub_to = replace(&arrow.to.clone(), from, to.clone());
+            Term::Arrow(TermArrow {
+                from: Box::new(sub_from),
+                to: Box::new(sub_to),
+            })
+        }
         Term::Apply(apply) => {
             let sub_f = replace(&apply.f.clone(), from, to.clone());
             let sub_x = replace(&apply.x.clone(), from, to.clone());
@@ -131,6 +139,26 @@ mod tests {
                     x: Box::new(var(2)),
                 })),
             }],
+        });
+        assert_eq!(replaced, expected);
+    }
+
+    #[test]
+    fn replace_under_arrow() {
+        let t = Term::Arrow(TermArrow {
+            from: Box::new(var(1)),
+            to: Box::new(Term::Apply(TermApply {
+                f: Box::new(var(2)),
+                x: Box::new(var(1)),
+            })),
+        });
+        let replaced = replace(&t, 2, var(42));
+        let expected = Term::Arrow(TermArrow {
+            from: Box::new(var(1)),
+            to: Box::new(Term::Apply(TermApply {
+                f: Box::new(var(42)),
+                x: Box::new(var(1)),
+            })),
         });
         assert_eq!(replaced, expected);
     }
