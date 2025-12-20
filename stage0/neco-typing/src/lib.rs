@@ -1,4 +1,7 @@
 mod replace;
+
+use std::collections::BTreeMap;
+
 pub use replace::replace;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -50,4 +53,23 @@ pub enum Term {
     Apply(TermApply),
     Match(TermMatch),
     Sort(TermSort),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TypeDefConstructor {
+    pub variable_id: usize,
+    pub ty: Box<Term>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TypeDef {
+    pub variable_id: usize,
+    pub ty: Box<Term>,
+    pub constructors: Vec<TypeDefConstructor>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Definitions {
+    pub types: BTreeMap<usize, TypeDef>,
+    pub variables: BTreeMap<usize, Box<Term>>,
 }
