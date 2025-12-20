@@ -6,6 +6,14 @@ version = 4
 name = "neco-felis-compile"
 version = "0.1.0"
 dependencies = [
+ "neco-felis-compile-x86_64",
+ "neco-tempfile",
+]
+
+[[package]]
+name = "neco-felis-compile-x86_64"
+version = "0.1.0"
+dependencies = [
  "neco-felis-resolve",
  "neco-felis-syn",
  "neco-felis-typing",

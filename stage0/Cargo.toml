@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "neco-felis-compile",
+    "neco-felis-compile-x86_64",
     "neco-felis-resolve",
     "neco-felis-syn",
     "neco-felis-typing",

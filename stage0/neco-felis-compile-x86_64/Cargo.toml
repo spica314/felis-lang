@@ -1,0 +1,12 @@
+[package]
+name = "neco-felis-compile-x86_64"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+neco-felis-resolve = { path = "../neco-felis-resolve" }
+neco-felis-syn = { path = "../neco-felis-syn" }
+neco-felis-typing = { path = "../neco-felis-typing" }
+
+[dev-dependencies]
+neco-tempfile = { workspace = true }
