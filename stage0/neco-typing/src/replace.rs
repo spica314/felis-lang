@@ -56,7 +56,11 @@ pub fn replace(t: &Term, from: usize, to: Term) -> Term {
                     term: Box::new(sub_term),
                 })
             }
-            Term::Match(TermMatch { arms: arms })
+            let sub_t = replace(&term_match.t.clone(), from, to.clone());
+            Term::Match(TermMatch {
+                t: Box::new(sub_t),
+                arms: arms,
+            })
         }
         Term::Sort(_) => t.clone(),
     }
@@ -120,6 +124,7 @@ mod tests {
     #[test]
     fn replace_under_match_non_shadowing() {
         let t = Term::Match(TermMatch {
+            t: Box::new(var(1)),
             arms: vec![TermMatchArm {
                 constructor: TermVariable { variable_id: 10 },
                 constructor_args: vec![TermVariable { variable_id: 20 }],
@@ -131,6 +136,7 @@ mod tests {
         });
         let replaced = replace(&t, 1, var(42));
         let expected = Term::Match(TermMatch {
+            t: Box::new(var(42)),
             arms: vec![TermMatchArm {
                 constructor: TermVariable { variable_id: 10 },
                 constructor_args: vec![TermVariable { variable_id: 20 }],
@@ -174,6 +180,7 @@ mod tests {
     #[should_panic]
     fn replace_panics_when_match_binds_from() {
         let t = Term::Match(TermMatch {
+            t: Box::new(var(2)),
             arms: vec![TermMatchArm {
                 constructor: TermVariable { variable_id: 1 },
                 constructor_args: vec![],
@@ -187,6 +194,7 @@ mod tests {
     #[should_panic]
     fn replace_panics_when_match_constructor_arg_binds_from() {
         let t = Term::Match(TermMatch {
+            t: Box::new(var(2)),
             arms: vec![TermMatchArm {
                 constructor: TermVariable { variable_id: 10 },
                 constructor_args: vec![TermVariable { variable_id: 1 }],

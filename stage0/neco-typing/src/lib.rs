@@ -32,6 +32,7 @@ pub struct TermApply {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TermMatch {
+    pub t: Box<Term>,
     pub arms: Vec<TermMatchArm>,
 }
 

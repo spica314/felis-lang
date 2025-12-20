@@ -5,11 +5,13 @@
 //    zero : Nat
 //    succ : Nat -> Nat
 //
-// add n m :=
-//     match n {
-//         zero => m,
-//         succ p => succ (add p m),
-//     }
+// add :=
+//     \forall n: Nat,
+//         \forall m: Nat,
+//             match n {
+//                 zero => m,
+//                 succ p => succ (add p m),
+//             }
 //
 // add_zero_zero_eq_zero := Eq Nat (add zero zero) zero
 //
@@ -100,7 +102,8 @@ fn add_zero_zero_eq_zero_returns_true() {
         ],
     };
 
-    let add_body = Term::Match(TermMatch {
+    let add_match = Term::Match(TermMatch {
+        t: Box::new(var(n_id)),
         arms: vec![
             TermMatchArm {
                 constructor: TermVariable {
@@ -121,7 +124,7 @@ fn add_zero_zero_eq_zero_returns_true() {
             },
         ],
     });
-    let add_def = forall(n_id, var(nat_id), forall(m_id, var(nat_id), add_body));
+    let add_def = forall(n_id, var(nat_id), forall(m_id, var(nat_id), add_match));
 
     let add_zero_zero = apply(apply(var(add_id), var(zero_id)), var(zero_id));
     let add_zero_zero_eq_zero = apply(
