@@ -1,24 +1,24 @@
 use crate::error::CompileError;
-use neco_felis_elaboration::{NameId, PhaseElaborated, StatementLetMutIds};
+use neco_felis_resolve::{NameId, PhaseResolved, StatementLetMutIds};
 use neco_felis_syn::*;
 use std::collections::HashSet;
 
 pub fn apply_symbol_ids(
     original: &mut File<PhaseParse>,
-    elaborated: &File<PhaseElaborated>,
+    resolved: &File<PhaseResolved>,
 ) -> Result<(), CompileError> {
-    if original.items.len() != elaborated.items.len() {
+    if original.items.len() != resolved.items.len() {
         return Err(CompileError::UnsupportedConstruct(
-            "mismatched item count during elaboration".to_string(),
+            "mismatched item count during resolve".to_string(),
         ));
     }
 
-    let preserve_ids = collect_preserve_ids(elaborated);
+    let preserve_ids = collect_preserve_ids(resolved);
     let ctx = RewriteContext {
         preserve: &preserve_ids,
     };
 
-    for (orig_item, elab_item) in original.items.iter_mut().zip(elaborated.items.iter()) {
+    for (orig_item, elab_item) in original.items.iter_mut().zip(resolved.items.iter()) {
         update_item(&ctx, orig_item, elab_item)?;
     }
 
@@ -30,7 +30,7 @@ struct RewriteContext<'a> {
 }
 
 impl<'a> RewriteContext<'a> {
-    fn apply_elaborated_token(&self, token: &mut TokenVariable, id: &NameId) {
+    fn apply_resolved_token(&self, token: &mut TokenVariable, id: &NameId) {
         if id.1 == usize::MAX || self.preserve.contains(id) {
             return;
         }
@@ -39,7 +39,7 @@ impl<'a> RewriteContext<'a> {
     }
 }
 
-fn collect_preserve_ids(file: &File<PhaseElaborated>) -> HashSet<NameId> {
+fn collect_preserve_ids(file: &File<PhaseResolved>) -> HashSet<NameId> {
     let mut set = HashSet::new();
     for item in &file.items {
         match item {
@@ -55,7 +55,7 @@ fn collect_preserve_ids(file: &File<PhaseElaborated>) -> HashSet<NameId> {
     set
 }
 
-fn collect_statements_preserve_ids(statements: &Statements<PhaseElaborated>) {
+fn collect_statements_preserve_ids(statements: &Statements<PhaseResolved>) {
     match statements {
         Statements::Then(then) => {
             collect_statements_preserve_ids(&then.tail);
@@ -68,9 +68,9 @@ fn collect_statements_preserve_ids(statements: &Statements<PhaseElaborated>) {
 fn update_item(
     ctx: &RewriteContext,
     original: &mut Item<PhaseParse>,
-    elaborated: &Item<PhaseElaborated>,
+    resolved: &Item<PhaseResolved>,
 ) -> Result<(), CompileError> {
-    match (original, elaborated) {
+    match (original, resolved) {
         (Item::Definition(orig), Item::Definition(ren)) => {
             update_term(ctx, orig.type_.as_mut(), ren.type_.as_ref())?;
             update_term(ctx, orig.body.as_mut(), ren.body.as_ref())
@@ -97,17 +97,17 @@ fn update_item(
 fn update_proc_block(
     ctx: &RewriteContext,
     original: &mut ItemProcBlock<PhaseParse>,
-    elaborated: &ItemProcBlock<PhaseElaborated>,
+    resolved: &ItemProcBlock<PhaseResolved>,
 ) -> Result<(), CompileError> {
-    update_statements(ctx, &mut original.statements, &elaborated.statements)
+    update_statements(ctx, &mut original.statements, &resolved.statements)
 }
 
 fn update_statements(
     ctx: &RewriteContext,
     original: &mut Statements<PhaseParse>,
-    elaborated: &Statements<PhaseElaborated>,
+    resolved: &Statements<PhaseResolved>,
 ) -> Result<(), CompileError> {
-    match (original, elaborated) {
+    match (original, resolved) {
         (Statements::Nil, Statements::Nil) => Ok(()),
         (Statements::Statement(orig_stmt), Statements::Statement(ren_stmt)) => {
             update_statement(ctx, orig_stmt, ren_stmt)
@@ -117,7 +117,7 @@ fn update_statements(
             update_statements(ctx, &mut orig_then.tail, &ren_then.tail)
         }
         _ => Err(CompileError::UnsupportedConstruct(
-            "statement shape mismatch during elaboration".to_string(),
+            "statement shape mismatch during resolve".to_string(),
         )),
     }
 }
@@ -125,11 +125,11 @@ fn update_statements(
 fn update_statement(
     ctx: &RewriteContext,
     original: &mut Statement<PhaseParse>,
-    elaborated: &Statement<PhaseElaborated>,
+    resolved: &Statement<PhaseResolved>,
 ) -> Result<(), CompileError> {
-    match (original, elaborated) {
+    match (original, resolved) {
         (Statement::Let(orig), Statement::Let(ren)) => {
-            ctx.apply_elaborated_token(&mut orig.variable, &ren.ext);
+            ctx.apply_resolved_token(&mut orig.variable, &ren.ext);
             update_proc_term(ctx, orig.value.as_mut(), ren.value.as_ref())
         }
         (Statement::LetMut(orig), Statement::LetMut(ren)) => {
@@ -137,12 +137,12 @@ fn update_statement(
                 value_id,
                 reference_id,
             } = &ren.ext;
-            ctx.apply_elaborated_token(&mut orig.variable, value_id);
-            ctx.apply_elaborated_token(&mut orig.reference_variable, reference_id);
+            ctx.apply_resolved_token(&mut orig.variable, value_id);
+            ctx.apply_resolved_token(&mut orig.reference_variable, reference_id);
             update_proc_term(ctx, orig.value.as_mut(), ren.value.as_ref())
         }
         (Statement::Assign(orig), Statement::Assign(ren)) => {
-            ctx.apply_elaborated_token(&mut orig.variable, &ren.ext);
+            ctx.apply_resolved_token(&mut orig.variable, &ren.ext);
             update_proc_term(ctx, orig.value.as_mut(), ren.value.as_ref())
         }
         (Statement::FieldAssign(orig), Statement::FieldAssign(ren)) => {
@@ -159,7 +159,7 @@ fn update_statement(
         (Statement::Break(_), Statement::Break(_)) => Ok(()),
         (Statement::Ext(_), Statement::Ext(_)) => Ok(()),
         _ => Err(CompileError::UnsupportedConstruct(
-            "statement variant mismatch during elaboration".to_string(),
+            "statement variant mismatch during resolve".to_string(),
         )),
     }
 }
@@ -167,11 +167,11 @@ fn update_statement(
 fn update_proc_term(
     ctx: &RewriteContext,
     original: &mut ProcTerm<PhaseParse>,
-    elaborated: &ProcTerm<PhaseElaborated>,
+    resolved: &ProcTerm<PhaseResolved>,
 ) -> Result<(), CompileError> {
-    match (original, elaborated) {
+    match (original, resolved) {
         (ProcTerm::Variable(orig), ProcTerm::Variable(ren)) => {
-            ctx.apply_elaborated_token(&mut orig.variable, &ren.ext.name_id);
+            ctx.apply_resolved_token(&mut orig.variable, &ren.ext.name_id);
             Ok(())
         }
         (ProcTerm::Apply(orig), ProcTerm::Apply(ren)) => {
@@ -182,7 +182,7 @@ fn update_proc_term(
             Ok(())
         }
         (ProcTerm::FieldAccess(orig), ProcTerm::FieldAccess(ren)) => {
-            ctx.apply_elaborated_token(&mut orig.object, &ren.ext.object_id);
+            ctx.apply_resolved_token(&mut orig.object, &ren.ext.object_id);
             if let (Some(orig_idx), Some(ren_idx)) = (orig.index.as_mut(), ren.index.as_ref()) {
                 update_proc_term(ctx, orig_idx, ren_idx)?;
             }
@@ -209,15 +209,15 @@ fn update_proc_term(
                 ),
                 (None, None) => Ok(()),
                 _ => Err(CompileError::UnsupportedConstruct(
-                    "if-else clause mismatch during elaboration".to_string(),
+                    "if-else clause mismatch during resolve".to_string(),
                 )),
             }
         }
         (ProcTerm::Match(orig), ProcTerm::Match(ren)) => {
-            ctx.apply_elaborated_token(&mut orig.scrutinee, &ren.ext.scrutinee_id);
+            ctx.apply_resolved_token(&mut orig.scrutinee, &ren.ext.scrutinee_id);
             if orig.branches.len() != ren.branches.len() {
                 return Err(CompileError::UnsupportedConstruct(
-                    "match branch count mismatch during elaboration".to_string(),
+                    "match branch count mismatch during resolve".to_string(),
                 ));
             }
             for (orig_branch, ren_branch) in orig.branches.iter_mut().zip(&ren.branches) {
@@ -227,7 +227,7 @@ fn update_proc_term(
                     .iter_mut()
                     .zip(&ren_branch.pattern.fields)
                 {
-                    ctx.apply_elaborated_token(&mut orig_field.binder, &ren_field.ext.binder_id);
+                    ctx.apply_resolved_token(&mut orig_field.binder, &ren_field.ext.binder_id);
                 }
                 update_statements(ctx, orig_branch.body.as_mut(), ren_branch.body.as_ref())?;
             }
@@ -239,7 +239,7 @@ fn update_proc_term(
         (ProcTerm::Number(_), ProcTerm::Number(_)) => Ok(()),
         (ProcTerm::Unit(_), ProcTerm::Unit(_)) => Ok(()),
         _ => Err(CompileError::UnsupportedConstruct(format!(
-            "unsupported proc term combination: {elaborated:?}"
+            "unsupported proc term combination: {resolved:?}"
         ))),
     }
 }
@@ -247,10 +247,10 @@ fn update_proc_term(
 fn update_method_chain(
     ctx: &RewriteContext,
     original: &mut ProcTermMethodChain<PhaseParse>,
-    elaborated: &ProcTermMethodChain<PhaseElaborated>,
+    resolved: &ProcTermMethodChain<PhaseResolved>,
 ) -> Result<(), CompileError> {
-    ctx.apply_elaborated_token(&mut original.object, &elaborated.ext.object_id);
-    if let (Some(orig_idx), Some(ren_idx)) = (original.index.as_mut(), elaborated.index.as_ref()) {
+    ctx.apply_resolved_token(&mut original.object, &resolved.ext.object_id);
+    if let (Some(orig_idx), Some(ren_idx)) = (original.index.as_mut(), resolved.index.as_ref()) {
         update_proc_term(ctx, orig_idx, ren_idx)?;
     }
     Ok(())
@@ -259,15 +259,15 @@ fn update_method_chain(
 fn update_term(
     ctx: &RewriteContext,
     original: &mut Term<PhaseParse>,
-    elaborated: &Term<PhaseElaborated>,
+    resolved: &Term<PhaseResolved>,
 ) -> Result<(), CompileError> {
-    match (original, elaborated) {
+    match (original, resolved) {
         (Term::Variable(orig), Term::Variable(ren)) => {
-            ctx.apply_elaborated_token(&mut orig.variable, &ren.ext.name_id);
+            ctx.apply_resolved_token(&mut orig.variable, &ren.ext.name_id);
             Ok(())
         }
         (Term::ArrowDep(orig), Term::ArrowDep(ren)) => {
-            ctx.apply_elaborated_token(&mut orig.from.variable, &ren.ext.param_id);
+            ctx.apply_resolved_token(&mut orig.from.variable, &ren.ext.param_id);
             update_term(ctx, orig.from_ty.as_mut(), ren.from_ty.as_ref())?;
             update_term(ctx, orig.to.as_mut(), ren.to.as_ref())
         }
@@ -283,7 +283,7 @@ fn update_term(
             Ok(())
         }
         (Term::Match(orig), Term::Match(ren)) => {
-            ctx.apply_elaborated_token(&mut orig.scrutinee, &ren.ext.scrutinee_id);
+            ctx.apply_resolved_token(&mut orig.scrutinee, &ren.ext.scrutinee_id);
             for (orig_branch, ren_branch) in orig.branches.iter_mut().zip(&ren.branches) {
                 update_term(ctx, orig_branch.body.as_mut(), ren_branch.body.as_ref())?;
             }

@@ -1,4 +1,4 @@
-use neco_felis_elaboration::NameId;
+use neco_felis_resolve::NameId;
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

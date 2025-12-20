@@ -1,10 +1,10 @@
-use neco_felis_elaboration::{PhaseElaborated, TermVariableIds, elaborate_file};
+use neco_felis_resolve::{PhaseResolved, TermVariableIds, resolve_file};
 use neco_felis_syn::{
     File, FileIdGenerator, Item, Parse, PhaseParse, Term as SynTerm, TermVariable, Token,
 };
 use neco_felis_typing::{BuiltinTypes, IntegerType, Term, TypeChecker};
 
-fn parse_and_elaborate(src: &str) -> File<PhaseElaborated> {
+fn parse_and_resolve(src: &str) -> File<PhaseResolved> {
     let mut file_id_gen = FileIdGenerator::new();
     let file_id = file_id_gen.generate_file_id();
     let tokens = Token::lex(src, file_id);
@@ -12,12 +12,12 @@ fn parse_and_elaborate(src: &str) -> File<PhaseElaborated> {
     let parsed = File::<PhaseParse>::parse(&tokens, &mut i)
         .expect("parse failed")
         .expect("no file parsed");
-    elaborate_file(&parsed).expect("elaboration failed")
+    resolve_file(&parsed).expect("resolve failed")
 }
 
 #[test]
 fn infers_simple_arrow_and_body() {
-    let file = parse_and_elaborate("#definition main: () -> () { () }");
+    let file = parse_and_resolve("#definition main: () -> () { () }");
     let Item::Definition(def) = &file.items[0] else {
         panic!("expected definition");
     };
@@ -46,7 +46,7 @@ fn infers_simple_arrow_and_body() {
 
 #[test]
 fn infers_dependent_arrow_parameter() {
-    let mut file = parse_and_elaborate("#definition id: (x: ()) -> () { x }");
+    let mut file = parse_and_resolve("#definition id: (x: ()) -> () { x }");
     let Item::Definition(def) = &mut file.items[0] else {
         panic!("expected definition");
     };
@@ -59,7 +59,7 @@ fn infers_dependent_arrow_parameter() {
         SynTerm::Variable(var) => var.ext.term_id.clone(),
         other => panic!("expected variable body, got {other:?}"),
     };
-    // Elaboration inserts a placeholder for the body variable; align it with the parameter id.
+    // Resolve inserts a placeholder for the body variable; align it with the parameter id.
     if let SynTerm::Variable(var) = def.body.as_mut() {
         let term_id = var.ext.term_id.clone();
         let updated = TermVariable {
@@ -87,7 +87,7 @@ fn infers_dependent_arrow_parameter() {
 
 #[test]
 fn binds_builtin_types_from_outside() {
-    let mut file = parse_and_elaborate(
+    let mut file = parse_and_resolve(
         r#"
 #use_builtin "u64" #as u64;
 #definition forty_two: u64 { 42 }
@@ -140,7 +140,7 @@ fn binds_builtin_types_from_outside() {
 }
 
 fn literal_body_type(src: &str) -> Term {
-    let file = parse_and_elaborate(src);
+    let file = parse_and_resolve(src);
     let Item::Definition(def) = &file.items[0] else {
         panic!("expected definition");
     };

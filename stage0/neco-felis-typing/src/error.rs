@@ -1,5 +1,5 @@
 use crate::{Term, TypeHole};
-use neco_felis_elaboration::{NameId, TermId};
+use neco_felis_resolve::{NameId, TermId};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

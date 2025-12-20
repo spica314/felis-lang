@@ -2,7 +2,7 @@ use crate::{
     BuiltinTypes, IntegerType, StructFieldType, Term, TypeHole, TypeSolutions, TypingError,
     UnificationCtx,
 };
-use neco_felis_elaboration::{NameId, PhaseElaborated, TermId};
+use neco_felis_resolve::{NameId, PhaseResolved, TermId};
 use neco_felis_syn::{
     File, Item, ItemDefinition, ItemInductive, ItemProc, ItemProcBlock, ItemTheorem, ItemType,
     ItemUseBuiltin, ProcTerm, ProcTermMethodChain, Statement, Statements, Term as SynTerm,
@@ -46,7 +46,7 @@ impl TypeChecker {
         }
     }
 
-    pub fn check_file(mut self, file: &File<PhaseElaborated>) -> Result<TypingResult, TypingError> {
+    pub fn check_file(mut self, file: &File<PhaseResolved>) -> Result<TypingResult, TypingError> {
         for item in &file.items {
             self.check_item(item)?;
         }
@@ -89,7 +89,7 @@ impl TypeChecker {
         Ok(resolved)
     }
 
-    fn check_item(&mut self, item: &Item<PhaseElaborated>) -> Result<(), TypingError> {
+    fn check_item(&mut self, item: &Item<PhaseResolved>) -> Result<(), TypingError> {
         match item {
             Item::UseBuiltin(use_builtin) => self.install_builtin(use_builtin),
             Item::Definition(def) => self.check_definition(def),
@@ -103,7 +103,7 @@ impl TypeChecker {
 
     fn install_builtin(
         &mut self,
-        use_builtin: &ItemUseBuiltin<PhaseElaborated>,
+        use_builtin: &ItemUseBuiltin<PhaseResolved>,
     ) -> Result<(), TypingError> {
         let builtin_name = use_builtin.builtin_name.s();
         let ty = self
@@ -116,10 +116,7 @@ impl TypeChecker {
         self.bind(use_builtin.ext.clone(), ty)
     }
 
-    fn check_definition(
-        &mut self,
-        def: &ItemDefinition<PhaseElaborated>,
-    ) -> Result<(), TypingError> {
+    fn check_definition(&mut self, def: &ItemDefinition<PhaseResolved>) -> Result<(), TypingError> {
         let annotated = self.visit_term(&def.type_)?;
         self.bind(def.ext.clone(), annotated)?;
         self.env.enter_scope();
@@ -136,7 +133,7 @@ impl TypeChecker {
         Ok(())
     }
 
-    fn check_inductive(&mut self, ind: &ItemInductive<PhaseElaborated>) -> Result<(), TypingError> {
+    fn check_inductive(&mut self, ind: &ItemInductive<PhaseResolved>) -> Result<(), TypingError> {
         let ty = self.visit_term(&ind.ty)?;
         self.bind(ind.ext.clone(), ty)?;
         for branch in &ind.branches {
@@ -145,14 +142,14 @@ impl TypeChecker {
         Ok(())
     }
 
-    fn check_theorem(&mut self, theorem: &ItemTheorem<PhaseElaborated>) -> Result<(), TypingError> {
+    fn check_theorem(&mut self, theorem: &ItemTheorem<PhaseResolved>) -> Result<(), TypingError> {
         let ty = self.visit_term(&theorem.type_)?;
         self.bind(theorem.ext.clone(), ty)?;
         self.visit_term(&theorem.body)?;
         Ok(())
     }
 
-    fn check_proc(&mut self, proc: &ItemProc<PhaseElaborated>) -> Result<(), TypingError> {
+    fn check_proc(&mut self, proc: &ItemProc<PhaseResolved>) -> Result<(), TypingError> {
         let proc_ty = self.visit_term(&proc.ty)?;
         self.bind(proc.ext.clone(), proc_ty)?;
 
@@ -167,7 +164,7 @@ impl TypeChecker {
         Ok(())
     }
 
-    fn check_type(&mut self, type_item: &ItemType<PhaseElaborated>) -> Result<(), TypingError> {
+    fn check_type(&mut self, type_item: &ItemType<PhaseResolved>) -> Result<(), TypingError> {
         let mut fields = Vec::new();
         if let Some(constructor) = type_item.constructors.first() {
             for field in &constructor.fields {
@@ -185,14 +182,14 @@ impl TypeChecker {
 
     fn visit_proc_block(
         &mut self,
-        block: &ItemProcBlock<PhaseElaborated>,
+        block: &ItemProcBlock<PhaseResolved>,
     ) -> Result<(), TypingError> {
         self.visit_statements(&block.statements)
     }
 
     fn visit_statements(
         &mut self,
-        statements: &Statements<PhaseElaborated>,
+        statements: &Statements<PhaseResolved>,
     ) -> Result<(), TypingError> {
         match statements {
             Statements::Nil => Ok(()),
@@ -204,10 +201,7 @@ impl TypeChecker {
         }
     }
 
-    fn visit_statement(
-        &mut self,
-        statement: &Statement<PhaseElaborated>,
-    ) -> Result<(), TypingError> {
+    fn visit_statement(&mut self, statement: &Statement<PhaseResolved>) -> Result<(), TypingError> {
         match statement {
             Statement::Let(stmt) => {
                 let value_ty = self.visit_proc_term(&stmt.value)?;
@@ -262,7 +256,7 @@ impl TypeChecker {
 
     fn visit_proc_method_chain(
         &mut self,
-        chain: &ProcTermMethodChain<PhaseElaborated>,
+        chain: &ProcTermMethodChain<PhaseResolved>,
     ) -> Result<Term, TypingError> {
         // Ensure the receiver is in scope even if we don't yet model its fields/methods precisely.
         self.env
@@ -289,7 +283,7 @@ impl TypeChecker {
         Ok(assigned)
     }
 
-    fn visit_proc_term(&mut self, term: &ProcTerm<PhaseElaborated>) -> Result<Term, TypingError> {
+    fn visit_proc_term(&mut self, term: &ProcTerm<PhaseResolved>) -> Result<Term, TypingError> {
         match term {
             ProcTerm::Unit(unit) => self.assign_type(&unit.ext.term_id, Term::Unit),
             ProcTerm::Number(num) => {
@@ -424,7 +418,7 @@ impl TypeChecker {
         }
     }
 
-    fn visit_term(&mut self, term: &SynTerm<PhaseElaborated>) -> Result<Term, TypingError> {
+    fn visit_term(&mut self, term: &SynTerm<PhaseResolved>) -> Result<Term, TypingError> {
         match term {
             SynTerm::Unit(unit) => self.assign_type(&unit.ext.term_id, Term::Unit),
             SynTerm::Number(num) => {
@@ -534,8 +528,8 @@ impl TypeChecker {
     }
 }
 
-fn collect_proc_parameters(term: &SynTerm<PhaseElaborated>) -> Vec<NameId> {
-    fn collect(term: &SynTerm<PhaseElaborated>, out: &mut Vec<NameId>) {
+fn collect_proc_parameters(term: &SynTerm<PhaseResolved>) -> Vec<NameId> {
+    fn collect(term: &SynTerm<PhaseResolved>, out: &mut Vec<NameId>) {
         match term {
             SynTerm::ArrowDep(arrow) => {
                 out.push(arrow.ext.param_id.clone());
@@ -551,8 +545,8 @@ fn collect_proc_parameters(term: &SynTerm<PhaseElaborated>) -> Vec<NameId> {
     params
 }
 
-fn collect_term_parameter_types(term: &SynTerm<PhaseElaborated>) -> Vec<(NameId, TermId)> {
-    fn collect(term: &SynTerm<PhaseElaborated>, out: &mut Vec<(NameId, TermId)>) {
+fn collect_term_parameter_types(term: &SynTerm<PhaseResolved>) -> Vec<(NameId, TermId)> {
+    fn collect(term: &SynTerm<PhaseResolved>, out: &mut Vec<(NameId, TermId)>) {
         match term {
             SynTerm::ArrowDep(arrow) => {
                 out.push((arrow.ext.param_id.clone(), arrow.from.ext.term_id.clone()));

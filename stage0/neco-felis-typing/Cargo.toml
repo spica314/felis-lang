@@ -5,5 +5,5 @@ edition = "2024"
 
 [dependencies]
 neco-felis-syn = { workspace = true }
-neco-felis-elaboration = { workspace = true }
+neco-felis-resolve = { workspace = true }
 neco-scope = { workspace = true }

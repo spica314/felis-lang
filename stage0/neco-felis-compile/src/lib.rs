@@ -16,15 +16,15 @@ pub use error::CompileError;
 
 /// Main public API function to compile a file to assembly
 pub fn compile_to_assembly(file: &File<PhaseParse>) -> Result<String, CompileError> {
-    let elaborated_file = neco_felis_elaboration::elaborate_file(file)
+    let resolved_file = neco_felis_resolve::resolve_file(file)
         .map_err(|err| CompileError::NameResolution(err.to_string()))?;
 
-    if let Err(err) = typing::check_types(&elaborated_file) {
+    if let Err(err) = typing::check_types(&resolved_file) {
         panic!("type error: {err}");
     }
 
     let mut lowered = file.clone();
-    symbol_rewriter::apply_symbol_ids(&mut lowered, &elaborated_file)?;
+    symbol_rewriter::apply_symbol_ids(&mut lowered, &resolved_file)?;
 
     let mut compiler = AssemblyCompiler::new();
     compiler.compile_file(&lowered)

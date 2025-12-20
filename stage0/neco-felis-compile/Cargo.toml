@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-neco-felis-elaboration = { path = "../neco-felis-elaboration" }
+neco-felis-resolve = { path = "../neco-felis-resolve" }
 neco-felis-syn = { path = "../neco-felis-syn" }
 neco-felis-typing = { path = "../neco-felis-typing" }
 neco-tempfile = { workspace = true }

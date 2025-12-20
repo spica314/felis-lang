@@ -1,4 +1,4 @@
-use neco_felis_elaboration::PhaseElaborated;
+use neco_felis_resolve::PhaseResolved;
 use neco_felis_syn::File;
 use neco_felis_typing::{
     BuiltinTypes, IntegerType, Term, TypeChecker, TypeHole, TypingError, TypingResult,
@@ -54,7 +54,7 @@ pub fn builtin_types() -> BuiltinTypes {
     ])
 }
 
-pub fn check_types(file: &File<PhaseElaborated>) -> Result<TypingResult, TypingError> {
+pub fn check_types(file: &File<PhaseResolved>) -> Result<TypingResult, TypingError> {
     TypeChecker::new(builtin_types()).check_file(file)
 }
 
