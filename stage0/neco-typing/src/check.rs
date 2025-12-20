@@ -35,6 +35,9 @@ fn check_type_def(
     }
 
     for constructor in &type_def.constructors {
+        if !check_constructor_returns_defined_type(type_def, constructor) {
+            return false;
+        }
         if !check_term_variable_ids(&constructor.ty, global_ids, &Vec::new()) {
             return false;
         }
@@ -71,6 +74,33 @@ fn check_term_final_sort(term: &Term) -> bool {
         Term::Arrow(arrow) => check_term_final_sort(&arrow.to),
         Term::Forall(forall) => check_term_final_sort(&forall.body),
         _ => false,
+    }
+}
+
+fn check_constructor_returns_defined_type(
+    type_def: &TypeDef,
+    constructor: &TypeDefConstructor,
+) -> bool {
+    let result_term = constructor_result_term(&constructor.ty);
+    match type_constructor_id(result_term) {
+        Some(variable_id) => variable_id == type_def.variable_id,
+        None => false,
+    }
+}
+
+fn constructor_result_term<'a>(term: &'a Term) -> &'a Term {
+    match term {
+        Term::Forall(forall) => constructor_result_term(&forall.body),
+        Term::Arrow(arrow) => constructor_result_term(&arrow.to),
+        _ => term,
+    }
+}
+
+fn type_constructor_id(term: &Term) -> Option<usize> {
+    match term {
+        Term::Variable(variable) => Some(variable.variable_id),
+        Term::Apply(apply) => type_constructor_id(&apply.f),
+        _ => None,
     }
 }
 
