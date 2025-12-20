@@ -1,4 +1,4 @@
-use neco_felis_compile::compile_file_to_assembly;
+use neco::compile_file_to_assembly;
 use neco_tempfile::TempDir;
 use std::process::Command;
 

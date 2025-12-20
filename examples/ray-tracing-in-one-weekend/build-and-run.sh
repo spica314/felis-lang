@@ -14,7 +14,7 @@ images=(image1 image2)
 pushd "$WORKSPACE_DIR" >/dev/null
 for img in "${images[@]}"; do
   # Compile
-  cargo run -p neco-felis-compile -- "$SCRIPT_DIR/${img}.fe" -o "$SCRIPT_DIR/${img}.out"
+  cargo run -p neco -- "$SCRIPT_DIR/${img}.fe" -o "$SCRIPT_DIR/${img}.out"
   # Run generated binary and convert output image
   "$SCRIPT_DIR/${img}.out" > "$SCRIPT_DIR/${img}.pnm"
   pnm2png "$SCRIPT_DIR/${img}.pnm" "$SCRIPT_DIR/${img}.png"

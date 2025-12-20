@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `stage0/` — Rust workspace with compiler crates (e.g., `neco-felis-compile`, `neco-felis-syn`, `neco-cic`).
+- `stage0/` — Rust workspace with compiler crates (e.g., `neco`, `neco-felis-syn`, `neco-cic`).
 - `examples/` — runnable Felis programs (e.g., ray-tracing). `.fe` sources.
 - `testcases/` — Felis language test inputs grouped by feature.
 - `docs/` — design and PTX notes.
@@ -16,7 +16,7 @@
 - Test (CPU): `cargo test --workspace --offline`.
 - Full repo checks: `ci-scripts/check.sh [--fix]`.
 - Coverage (HTML): `stage0/ci-scripts/generate-coverage-report.sh`.
-- Run compiler example: `cargo run -p neco-felis-compile -- ./examples/ray-tracing-in-one-weekend/main.fe -o a.out`.
+- Run compiler example: `cargo run -p neco -- ./examples/ray-tracing-in-one-weekend/main.fe -o a.out`.
 
 ## Coding Style & Naming Conventions
 - Rustfmt enforced; 4-space indentation; max line length per default rustfmt.
