@@ -1,0 +1,7 @@
+#entrypoint main;
+
+#use_builtin "u64" #as __u64;
+
+#proc ret_zero : () -> __u64 {
+    #return 0;
+}

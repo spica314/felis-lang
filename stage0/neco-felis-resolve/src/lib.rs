@@ -138,6 +138,8 @@ fn resolve_item(
         }
         Item::Proc(proc) => resolve_proc(context, proc).map(|p| Item::Proc(Box::new(p))),
         Item::Type(type_item) => resolve_type(context, type_item).map(Item::Type),
+        Item::Submodule(submodule) => resolve_submodule(submodule).map(Item::Submodule),
+        Item::Use(use_item) => resolve_use(use_item).map(Item::Use),
     }
 }
 
@@ -259,6 +261,37 @@ fn resolve_use_builtin(
         name: use_builtin.name.clone(),
         semicolon: use_builtin.semicolon.clone(),
         ext: alias_id,
+    })
+}
+
+fn resolve_submodule(
+    submodule: &ItemSubmodule<PhaseParse>,
+) -> ResolveResult<ItemSubmodule<PhaseResolved>> {
+    Ok(ItemSubmodule {
+        keyword_submodule: submodule.keyword_submodule.clone(),
+        name: submodule.name.clone(),
+        semicolon: submodule.semicolon.clone(),
+        ext: (),
+    })
+}
+
+fn resolve_use(use_item: &ItemUse<PhaseParse>) -> ResolveResult<ItemUse<PhaseResolved>> {
+    let scope_prefixes = use_item
+        .scope_prefixes
+        .iter()
+        .map(|prefix| ItemUseScopePrefix {
+            name: prefix.name.clone(),
+            colon2: prefix.colon2.clone(),
+            ext: (),
+        })
+        .collect();
+
+    Ok(ItemUse {
+        keyword_use: use_item.keyword_use.clone(),
+        scope_prefixes,
+        name: use_item.name.clone(),
+        semicolon: use_item.semicolon.clone(),
+        ext: (),
     })
 }
 

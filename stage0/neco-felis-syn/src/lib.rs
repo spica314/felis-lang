@@ -14,8 +14,10 @@ pub mod items {
     pub mod item_inductive_branch;
     pub mod item_proc;
     pub mod item_proc_block;
+    pub mod item_submodule;
     pub mod item_theorem;
     pub mod item_type;
+    pub mod item_use;
     pub mod item_use_builtin;
 }
 
@@ -83,8 +85,10 @@ pub use items::item_inductive::*;
 pub use items::item_inductive_branch::*;
 pub use items::item_proc::*;
 pub use items::item_proc_block::*;
+pub use items::item_submodule::*;
 pub use items::item_theorem::*;
 pub use items::item_type::*;
+pub use items::item_use::*;
 pub use items::item_use_builtin::*;
 
 pub use terms::term::*;

@@ -149,6 +149,8 @@ Item              <- ItemEntrypoint
                    / ItemTheorem
                    / ItemProc
                    / ItemType
+                   / ItemSubmodule
+                   / ItemUse
 
 ItemEntrypoint    <- #entrypoint Variable ";"
 ItemUseBuiltin    <- #use_builtin String #as Variable ";"
@@ -161,6 +163,9 @@ ItemProcBlock     <- "{" Statements "}"
 ItemType          <- "#type" Variable "{" ItemTypeConstructor* "}"
 ItemStructField   <- Variable ":" Term ","
 ItemTypeConstructor <- Variable "{" ItemStructField* "}" ","?
+ItemSubmodule     <- "#submodule" Variable ";"
+ItemUse           <- "#use" ItemUseScopePrefix* Variable ";"
+ItemUseScopePrefix <- Variable "::"
 
 Statements        <- Statement ";" Statements
                    / Statement

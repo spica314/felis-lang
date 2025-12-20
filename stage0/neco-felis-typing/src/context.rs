@@ -98,6 +98,8 @@ impl TypeChecker {
             Item::Proc(proc) => self.check_proc(proc),
             Item::Type(type_item) => self.check_type(type_item),
             Item::Entrypoint(_) => Ok(()),
+            Item::Submodule(_) => Ok(()),
+            Item::Use(_) => Ok(()),
         }
     }
 

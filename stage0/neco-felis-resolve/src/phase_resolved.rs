@@ -162,6 +162,9 @@ impl Phase for PhaseResolved {
     type ItemTheoremExt = NameId;
     type ItemEntrypointExt = NameId;
     type ItemBuiltinExt = NameId;
+    type ItemSubmoduleExt = ();
+    type ItemUseExt = ();
+    type ItemUseScopePrefixExt = ();
     type TermApplyExt = TermApplyIds;
     type TermArrowDepExt = TermArrowDepIds;
     type TermArrowNodepExt = TermArrowNodepIds;

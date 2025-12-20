@@ -1,0 +1,10 @@
+#submodule sub;
+
+#use sub::ret_zero;
+
+#use_builtin "u64" #as __u64;
+
+#proc ret_zero_2 : () -> __u64 {
+    #let r = ret_zero ();
+    #return 0;
+}

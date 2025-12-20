@@ -42,6 +42,21 @@ pub trait Phase {
         + PartialOrd
         + Ord
         + std::hash::Hash;
+    type ItemSubmoduleExt: std::fmt::Debug
+        + Clone
+        + PartialEq
+        + Eq
+        + PartialOrd
+        + Ord
+        + std::hash::Hash;
+    type ItemUseExt: std::fmt::Debug + Clone + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash;
+    type ItemUseScopePrefixExt: std::fmt::Debug
+        + Clone
+        + PartialEq
+        + Eq
+        + PartialOrd
+        + Ord
+        + std::hash::Hash;
     type TermApplyExt: std::fmt::Debug + Clone + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash;
     type TermArrowDepExt: std::fmt::Debug
         + Clone
@@ -301,6 +316,9 @@ impl Phase for PhaseParse {
     type ItemTheoremExt = ();
     type ItemEntrypointExt = ();
     type ItemBuiltinExt = ();
+    type ItemSubmoduleExt = ();
+    type ItemUseExt = ();
+    type ItemUseScopePrefixExt = ();
     type TermApplyExt = ();
     type TermArrowDepExt = ();
     type TermArrowNodepExt = ();
