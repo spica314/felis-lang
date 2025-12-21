@@ -68,6 +68,7 @@ pub mod statements {
 
 // Parsing infrastructure
 pub mod parsing {
+    pub mod module_tree;
     pub mod parse;
     pub mod phase;
     pub mod token;
@@ -127,6 +128,7 @@ pub use statements::statement_return::*;
 pub use statements::statements_list::*;
 pub use statements::statements_then::*;
 
+pub use parsing::module_tree::*;
 pub use parsing::parse::*;
 pub use parsing::phase::*;
 pub use parsing::token::*;
