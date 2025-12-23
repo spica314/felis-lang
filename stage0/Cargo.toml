@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "neco",
     "neco-felis-compile-x86_64",
+    "neco-felis-package",
     "neco-felis-resolve",
     "neco-felis-syn",
     "neco-felis-typing",
@@ -14,6 +15,7 @@ members = [
 neco-tempfile = { path = "./neco-tempfile" }
 
 neco-felis-syn = { path = "./neco-felis-syn" }
+neco-felis-package = { path = "./neco-felis-package" }
 neco-scope = { path = "./neco-scope" }
 neco-felis-resolve = { path = "./neco-felis-resolve" }
 neco-felis-typing = { path = "./neco-felis-typing" }

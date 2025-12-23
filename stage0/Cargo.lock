@@ -21,6 +21,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "neco-felis-package"
+version = "0.1.0"
+dependencies = [
+ "neco-felis-syn",
+]
+
+[[package]]
 name = "neco-felis-resolve"
 version = "0.1.0"
 dependencies = [

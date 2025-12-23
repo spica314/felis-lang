@@ -1,0 +1,7 @@
+[package]
+name = "neco-felis-package"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+neco-felis-syn = { workspace = true }
