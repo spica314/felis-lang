@@ -49,6 +49,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "neco-json"
+version = "0.1.0"
+
+[[package]]
 name = "neco-scope"
 version = "0.1.0"
 
