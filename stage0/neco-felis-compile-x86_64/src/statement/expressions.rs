@@ -207,7 +207,7 @@ fn apply_index_offset(
                     let shift = element_size.trailing_zeros();
                     output.push_str(&format!("    shl rbx, {shift}\n"));
                 } else {
-                    output.push_str(&format!("    imul rbx, {}\n", element_size));
+                    output.push_str(&format!("    imul rbx, {element_size}\n"));
                 }
                 output.push_str("    add rax, rbx\n");
                 Ok(())

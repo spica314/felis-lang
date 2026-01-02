@@ -59,7 +59,7 @@ pub fn replace(t: &Term, from: usize, to: Term) -> Term {
             let sub_t = replace(&term_match.t.clone(), from, to.clone());
             Term::Match(TermMatch {
                 t: Box::new(sub_t),
-                arms: arms,
+                arms,
             })
         }
         Term::Sort(_) => t.clone(),

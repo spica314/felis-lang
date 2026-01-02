@@ -88,7 +88,7 @@ fn check_constructor_returns_defined_type(
     }
 }
 
-fn constructor_result_term<'a>(term: &'a Term) -> &'a Term {
+fn constructor_result_term(term: &Term) -> &Term {
     match term {
         Term::Forall(forall) => constructor_result_term(&forall.body),
         Term::Arrow(arrow) => constructor_result_term(&arrow.to),

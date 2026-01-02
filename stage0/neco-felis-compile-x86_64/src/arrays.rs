@@ -65,8 +65,7 @@ pub fn generate_builtin_array_allocation_with_var(
         output.push_str(&format!("    mov rsi, {size}        # Load array size\n"));
     }
     output.push_str(&format!(
-        "    mov rax, {}               # element size\n",
-        element_size
+        "    mov rax, {element_size}               # element size\n",
     ));
     output.push_str("    mul rsi                  # rax = 8 * size\n");
     output.push_str("    mov rsi, rax             # rsi = total_size\n");

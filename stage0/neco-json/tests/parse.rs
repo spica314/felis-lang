@@ -1,4 +1,4 @@
-use neco_json::{parse_json, JsonValue};
+use neco_json::{JsonValue, parse_json};
 
 #[test]
 fn parse_scalars() {

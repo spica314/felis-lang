@@ -106,7 +106,7 @@ impl Lexer {
                 }
                 _ => {
                     return Err(ParseError::new(
-                        format!("unexpected character '{}'", ch),
+                        format!("unexpected character '{ch}'"),
                         line,
                         column,
                     ));
@@ -202,11 +202,7 @@ impl Lexer {
                             self.bump();
                             let low = self.read_hex4()?;
                             if !(0xDC00..=0xDFFF).contains(&low) {
-                                return Err(ParseError::new(
-                                    "invalid low surrogate",
-                                    line,
-                                    column,
-                                ));
+                                return Err(ParseError::new("invalid low surrogate", line, column));
                             }
                             let high = code_unit as u32 - 0xD800;
                             let low = low as u32 - 0xDC00;
@@ -248,9 +244,9 @@ impl Lexer {
             let Some(ch) = self.bump() else {
                 return Err(ParseError::new("unterminated unicode escape", line, column));
             };
-            let digit = ch.to_digit(16).ok_or_else(|| {
-                ParseError::new("invalid unicode escape", line, column)
-            })?;
+            let digit = ch
+                .to_digit(16)
+                .ok_or_else(|| ParseError::new("invalid unicode escape", line, column))?;
             value = (value << 4) | digit as u16;
         }
         Ok(value)
