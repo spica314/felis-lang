@@ -1,0 +1,38 @@
+#use #package::math::eq::eq::Eq;
+#use #package::math::nat::nat::Nat;
+
+#pub #fn nat_add : (x : Nat) -> (y : Nat) -> Nat {
+    #match x {
+        Nat::zero => y
+        Nat::succ p => {
+            Nat::succ (nat_add p y)
+        }
+    }
+}
+
+#pub #theorem nat_add_zero_x_eq_x : #forall x : Nat, Eq[0] Nat (nat_add Nat::zero x) x {
+    #fn proof : (x : Nat) -> Eq[0] Nat (nat_add Nat::zero x) x {
+        Eq[0]::eq_refl Nat x
+    }
+}
+
+#pub #theorem nat_add_x_zero_eq_x : #forall x : Nat, Eq[0] Nat (nat_add x Nat::zero) x {
+    #fn proof : (x : Nat) -> Eq[0] Nat (nat_add x Nat::zero) x {
+        #match x {
+            Nat::zero => {
+                Eq[0]::eq_refl Nat Nat::zero
+            }
+            Nat::succ p => {
+                // required: Eq[0] Nat (nat_add (Nat::succ p) Nat::zero) (Nat::succ p)
+                //        => Eq[0] Nat (Nat::succ (nat_add p Nat::zero)) (Nat::succ p)
+                // s: Eq[0] Nat (nat_add p Nat::zero) p
+                #let s = proof p;
+                #match s {
+                    Eq[0]::eq_refl _ p2 => {
+                        Eq[0]::eq_refl Nat (Nat::succ p2)
+                    }
+                }
+            }
+        }
+    }
+}

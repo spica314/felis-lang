@@ -122,6 +122,217 @@
           "docs": [
             "docs/module-visibility.md"
           ]
+        },
+        {
+          "id": "FR-004-003",
+          "title": "Package-Qualified Imports",
+          "description": "Source code can reference a public symbol through a package-qualified path rooted at `#package::`.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#use` declaration can name a public symbol by an absolute package path such as `#package::math::nat::nat::Nat`."
+            }
+          ],
+          "notes": "This captures the observable import form without constraining how package qualification is resolved internally.",
+          "docs": [
+            "docs/module-visibility.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FR-005",
+      "title": "Standard Library Mathematics Surface",
+      "description": "The standard library exposes public mathematics-oriented modules and symbols in addition to primitive builtin bindings.",
+      "notes": "This captures the observable standard-library API now present under `std::math` without constraining unrelated implementation details.",
+      "children": [
+        {
+          "id": "FR-005-001",
+          "title": "Natural Number Type",
+          "description": "The standard library provides a public natural-number type with zero and successor constructors.",
+          "acceptanceCriteria": [
+            {
+              "description": "The standard library provides a public type `Nat` under its `math::nat::nat` module."
+            },
+            {
+              "description": "The public `Nat` type provides public constructors `zero` and `succ`."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/standard-library.md"
+          ]
+        },
+        {
+          "id": "FR-005-002",
+          "title": "Equality Proposition",
+          "description": "The standard library provides a public equality proposition with a reflexivity constructor.",
+          "acceptanceCriteria": [
+            {
+              "description": "The standard library provides a public proposition `Eq[u]` under its `math::eq::eq` module."
+            },
+            {
+              "description": "The public `Eq[u]` proposition provides a public constructor `eq_refl`."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/standard-library.md"
+          ]
+        },
+        {
+          "id": "FR-005-003",
+          "title": "Natural Number Addition",
+          "description": "The standard library provides a public natural-number addition function.",
+          "acceptanceCriteria": [
+            {
+              "description": "The standard library provides a public function `nat_add` under its `math::nat::nat_add` module."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/standard-library.md"
+          ]
+        },
+        {
+          "id": "FR-005-004",
+          "title": "Natural Number Addition Theorems",
+          "description": "The standard library provides public theorems relating natural-number addition and zero.",
+          "acceptanceCriteria": [
+            {
+              "description": "The standard library provides a public theorem `nat_add_zero_x_eq_x` under its `math::nat::nat_add` module."
+            },
+            {
+              "description": "The standard library provides a public theorem `nat_add_x_zero_eq_x` under its `math::nat::nat_add` module."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/standard-library.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FR-006",
+      "title": "Core Expression And Theorem Forms",
+      "description": "Source code supports the expression and theorem forms used by the standard library's documented declarations.",
+      "notes": "This captures currently observable source forms without fixing a complete formal grammar for all expressions or proofs.",
+      "children": [
+        {
+          "id": "FR-006-001",
+          "title": "Public Function Declarations",
+          "description": "Source code can declare named functions, including public functions exposed from a module.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#fn` declaration can introduce a named function with an explicit type annotation and body."
+            },
+            {
+              "description": "A `#pub #fn` declaration makes the declared function part of the enclosing module's public surface."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/declaration-forms.md"
+          ]
+        },
+        {
+          "id": "FR-006-002",
+          "title": "Public Type Declarations",
+          "description": "Source code can declare named types, including reference-counted public types with constructor lists.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#type` declaration can introduce a named type with a type-level annotation and a body of constructors."
+            },
+            {
+              "description": "A `#type(rc)` declaration can mark the declared type as reference-counted."
+            },
+            {
+              "description": "A `#pub #type(rc)` declaration makes the declared type part of the enclosing module's public surface."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/declaration-forms.md"
+          ]
+        },
+        {
+          "id": "FR-006-003",
+          "title": "Public Theorem Declarations",
+          "description": "Source code can declare named theorems, including public theorems exposed from a module.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#theorem` declaration can introduce a named theorem with a statement and proof body."
+            },
+            {
+              "description": "A `#pub #theorem` declaration makes the declared theorem part of the enclosing module's public surface."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/declaration-forms.md"
+          ]
+        },
+        {
+          "id": "FR-006-004",
+          "title": "Public Proposition Declarations",
+          "description": "Source code can declare proposition-valued entities, including public propositions with constructor lists.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#prop` declaration can introduce a named proposition with a type annotation."
+            },
+            {
+              "description": "A proposition declaration body can list constructors."
+            },
+            {
+              "description": "A `#pub #prop` declaration makes the declared proposition part of the enclosing module's public surface."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/declaration-forms.md"
+          ]
+        },
+        {
+          "id": "FR-006-005",
+          "title": "Match Expressions",
+          "description": "Source code can branch by matching a value against cases.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#match` form can inspect a value and provide result expressions for multiple cases."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/declaration-forms.md"
+          ]
+        },
+        {
+          "id": "FR-006-006",
+          "title": "Local Let Bindings",
+          "description": "Source code can bind an intermediate value to a local name.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#let` form can bind the result of an expression to a local identifier for subsequent use."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/declaration-forms.md"
+          ]
+        },
+        {
+          "id": "FR-006-007",
+          "title": "Universal Quantification In Theorem Statements",
+          "description": "Source code can express universally quantified theorem statements.",
+          "acceptanceCriteria": [
+            {
+              "description": "A theorem statement can use `#forall` to bind a universally quantified variable together with its type."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/declaration-forms.md"
+          ]
         }
       ]
     }

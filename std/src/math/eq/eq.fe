@@ -1,0 +1,3 @@
+#pub #prop Eq[u] : (t : Type[u]) -> t -> t -> Prop[0] {
+    eq_refl : (t : Type[u]) -> (x : t) -> Eq[u] t x x,
+}

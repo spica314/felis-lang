@@ -1,0 +1,4 @@
+#pub #type(rc) Nat : Type[0] {
+    zero : Nat,
+    succ : Nat -> Nat,
+}

@@ -34,6 +34,11 @@ as follows:
 - [`std/`](../std/): reserved location for standard library source code, kept
   separate from requirements and design documentation.
 
+When standard-library structure or exported symbols become part of the intended
+public contract, that behavior should be captured in [`frd.json`](../frd.json)
+and explained in accompanying Markdown such as
+[`docs/standard-library.md`](./standard-library.md).
+
 Each requirement object uses the following members:
 
 - `id`: Functional requirement ID. Must start with `FR-`.
@@ -98,3 +103,5 @@ Example:
 - Put long-form rationale or design notes in [`docs/`](./).
 - When adding a requirement, update referenced Markdown files in the same
   change.
+- When adding externally observable standard-library APIs, update both
+  [`frd.json`](../frd.json) and the relevant documentation in `docs/`.

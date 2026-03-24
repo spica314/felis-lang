@@ -31,6 +31,20 @@ For example:
 #pub #use i32;
 ```
 
+## Package-Qualified Imports
+
+`#use` can also reference a symbol through a package-qualified path that starts
+from `#package::`.
+
+This gives source code an explicit way to name public modules and symbols from
+the current package root without depending on relative lookup rules.
+
+For example:
+
+```felis
+#use #package::math::nat::nat::Nat;
+```
+
 ## Design Direction
 
 Public module declarations and public re-exports provide explicit control over
@@ -38,3 +52,7 @@ which modules and symbols become part of a package's observable module surface.
 
 They should remain explicit in source code so the exported API can be read from
 module definitions without relying on implicit export rules.
+
+Package-qualified imports follow the same direction: source code should be able
+to spell out where a public symbol comes from when that improves readability or
+stability.

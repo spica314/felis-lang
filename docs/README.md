@@ -18,8 +18,12 @@ workflows.
 - Language design rationale: [`docs/language-design.md`](./language-design.md)
 - Builtin types and functions are documented as explicit source-level bindings
   in [`docs/language-design.md`](./language-design.md).
+- Declaration forms used by the standard library are documented in
+  [`docs/declaration-forms.md`](./declaration-forms.md).
 - Module visibility and public re-exports are documented in
   [`docs/module-visibility.md`](./module-visibility.md).
+- The documented standard-library surface is summarized in
+  [`docs/standard-library.md`](./standard-library.md).
 - Package manifest structure is documented in
   [`docs/package-manifest.md`](./package-manifest.md).
 
