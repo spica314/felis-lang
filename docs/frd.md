@@ -89,6 +89,8 @@ Example:
   `frd.json`.
 - Put detailed explanatory material in Markdown files and reference them from
   `docs`.
+- Write Markdown documents so they remain valid without citing specific `FR-*`
+  IDs in prose, because requirement numbering may change over time.
 
 ## Maintenance
 

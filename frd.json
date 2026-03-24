@@ -44,6 +44,84 @@
           "docs": [
             "docs/language-design.md"
           ]
+        },
+        {
+          "id": "FR-002-002",
+          "title": "Standard Library Primitive Exports",
+          "description": "The standard library exposes selected primitive builtin symbols through its public module surface.",
+          "acceptanceCriteria": [
+            {
+              "description": "The standard library provides a public binding for the builtin type `i32`."
+            },
+            {
+              "description": "The standard library provides public bindings for the builtin arithmetic functions `i32_add`, `i32_sub`, `i32_mul`, `i32_div`, and `i32_mod`."
+            }
+          ],
+          "notes": "This captures the externally visible standard-library surface without constraining the internal module layout used to organize those bindings.",
+          "docs": [
+            "docs/language-design.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FR-003",
+      "title": "Package Manifest",
+      "description": "A package is described by a manifest file that identifies the package and its Felis library entrypoint.",
+      "notes": "This captures the externally visible package contract without constraining unrelated manifest fields or package-specific values.",
+      "children": [
+        {
+          "id": "FR-003-001",
+          "title": "Manifest Name And Entrypoint Fields",
+          "description": "A package manifest declares the package name and the Felis library entrypoint.",
+          "acceptanceCriteria": [
+            {
+              "description": "A package can provide a `neco-package.json` manifest with a `name` field."
+            },
+            {
+              "description": "A package can provide a `neco-package.json` manifest with a `felis-lib-entrypoint` field."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/package-manifest.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FR-004",
+      "title": "Module Visibility",
+      "description": "Source code can explicitly expose modules and symbols through a module's public surface.",
+      "notes": "This captures externally observable module visibility behavior without constraining unrelated name resolution details.",
+      "children": [
+        {
+          "id": "FR-004-001",
+          "title": "Public Module Declarations",
+          "description": "Source code can declare a child module as public.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#pub #mod` declaration makes the declared child module part of the enclosing module's public surface."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/module-visibility.md"
+          ]
+        },
+        {
+          "id": "FR-004-002",
+          "title": "Public Re-Exports",
+          "description": "Source code can expose an existing symbol as public from the current module.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#pub #use` declaration makes the referenced symbol part of the current module's public surface."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/module-visibility.md"
+          ]
         }
       ]
     }

@@ -1,0 +1,13 @@
+#bind_builtin "i32" #as i32;
+#bind_builtin "i32_add" #as i32_add;
+#bind_builtin "i32_sub" #as i32_sub;
+#bind_builtin "i32_mul" #as i32_mul;
+#bind_builtin "i32_div" #as i32_div;
+#bind_builtin "i32_mod" #as i32_mod;
+
+#pub #use i32;
+#pub #use i32_add;
+#pub #use i32_sub;
+#pub #use i32_mul;
+#pub #use i32_div;
+#pub #use i32_mod;

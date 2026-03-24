@@ -18,6 +18,10 @@ workflows.
 - Language design rationale: [`docs/language-design.md`](./language-design.md)
 - Builtin types and functions are documented as explicit source-level bindings
   in [`docs/language-design.md`](./language-design.md).
+- Module visibility and public re-exports are documented in
+  [`docs/module-visibility.md`](./module-visibility.md).
+- Package manifest structure is documented in
+  [`docs/package-manifest.md`](./package-manifest.md).
 
 ## Repository Conventions
 
