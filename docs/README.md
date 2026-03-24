@@ -18,3 +18,10 @@ workflows.
 - Language design rationale: [`docs/language-design.md`](./language-design.md)
 - Builtin types and functions are documented as explicit source-level bindings
   in [`docs/language-design.md`](./language-design.md).
+
+## Repository Conventions
+
+- [`std/`](../std/) is reserved for the Felis standard library.
+- Documentation about how `std/` is organized should live in
+  [`std/README.md`](../std/README.md) and in this `docs/` directory when broader
+  repository context is needed.

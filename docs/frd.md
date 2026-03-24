@@ -25,6 +25,15 @@ The top-level structure is:
 }
 ```
 
+Repository-level materials related to the functional requirements are organized
+as follows:
+
+- [`frd.json`](../frd.json): machine-processable source of truth for
+  requirements.
+- [`docs/`](./): explanatory documents and design notes.
+- [`std/`](../std/): reserved location for standard library source code, kept
+  separate from requirements and design documentation.
+
 Each requirement object uses the following members:
 
 - `id`: Functional requirement ID. Must start with `FR-`.

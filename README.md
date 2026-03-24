@@ -2,6 +2,11 @@
 
 Hobbyist-created programming language (Felis) and compiler (neco)
 
+## Repository Layout
+
+- [`docs/`](./docs/) contains project documentation and design notes.
+- [`std/`](./std/) is the top-level location for the Felis standard library.
+
 ## License
 
 Licensed under either of
