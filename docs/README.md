@@ -6,8 +6,13 @@ This directory contains project documentation.
 
 Primary functional requirements are managed in [`frd.json`](../frd.json).
 
+[`frd.json`](../frd.json) is intended to be machine-processable with `jq` and
+stable enough to serve as a reliable reference for both humans and AI-assisted
+workflows.
+
 - Specification: [`docs/frd.md`](./frd.md)
 - Source of truth: [`frd.json`](../frd.json)
 
-The file is intended to be machine-processable with `jq` and stable enough to
-serve as a reliable reference for both humans and AI-assisted workflows.
+## Design Notes
+
+- Language design rationale: [`docs/language-design.md`](./language-design.md)

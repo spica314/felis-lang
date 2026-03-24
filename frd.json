@@ -1,3 +1,26 @@
 {
-  "requirements": []
+  "requirements": [
+    {
+      "id": "FR-001",
+      "title": "Keyword Namespace Separation",
+      "description": "The language separates keywords from ordinary identifiers.",
+      "notes": "This avoids collisions between compiler-recognized syntax words and user-defined names.",
+      "children": [
+        {
+          "id": "FR-001-001",
+          "title": "Hash-Prefixed Keywords",
+          "description": "Keywords in source code begin with `#` so that words without the prefix remain available as identifiers.",
+          "acceptanceCriteria": [
+            {
+              "description": "Source code can use a plain word as an identifier even when the corresponding `#`-prefixed form is treated as a keyword."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/language-design.md"
+          ]
+        }
+      ]
+    }
+  ]
 }
