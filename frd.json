@@ -21,6 +21,31 @@
           ]
         }
       ]
+    },
+    {
+      "id": "FR-002",
+      "title": "Builtin Symbol Exposure",
+      "description": "The language exposes compiler-provided builtin types and functions through explicit source-level bindings.",
+      "notes": "Builtin symbols should follow the same namespace-preserving design direction as `#`-prefixed keywords, so compiler-provided names do not silently occupy ordinary identifiers.",
+      "children": [
+        {
+          "id": "FR-002-001",
+          "title": "Explicit Builtin Binding",
+          "description": "Builtin types and functions are made available to user programs only when source code explicitly binds them.",
+          "acceptanceCriteria": [
+            {
+              "description": "A builtin symbol is not available under an ordinary identifier unless the source code binds it explicitly."
+            },
+            {
+              "description": "Source code can bind a builtin symbol to an ordinary identifier through a `#`-prefixed builtin-binding construct."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/language-design.md"
+          ]
+        }
+      ]
     }
   ]
 }
