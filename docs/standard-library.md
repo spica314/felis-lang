@@ -8,12 +8,17 @@ summarizes the observable API shape exposed from [`std/`](../std/).
 
 ## Root Modules
 
-The standard library root currently exposes two public child modules:
+The standard library root surface is declared in
+[`std/src/lib.fe`](../std/src/lib.fe).
 
-- `primitive`
-- `math`
+It currently exposes:
 
-The root module surface is declared in [`std/src/lib.fe`](../std/src/lib.fe).
+- `primitive` unconditionally.
+- `math` only when the `bootstrap` feature is not enabled.
+
+This conditional export is expressed with `#[cfg(not(feature="bootstrap"))]`
+on the public `math` module declaration. The `cfg` attribute form is
+documented in [`docs/cfg-attributes.md`](./cfg-attributes.md).
 
 ## Primitive Module
 

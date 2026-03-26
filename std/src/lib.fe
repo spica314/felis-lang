@@ -1,2 +1,4 @@
 #pub #mod primitive;
+
+#[cfg(not(feature="bootstrap"))]
 #pub #mod math;

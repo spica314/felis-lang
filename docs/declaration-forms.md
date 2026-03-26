@@ -7,6 +7,13 @@ It is intentionally narrow: it describes the currently documented source forms
 that are observable in [`std/`](../std/) rather than trying to define the whole
 language grammar at once.
 
+## Declaration Attributes
+
+Declarations can be preceded by attribute lines such as `#[cfg(...)]`.
+
+The currently documented conditional-compilation attribute is described in
+[`docs/cfg-attributes.md`](./cfg-attributes.md).
+
 ## Public Function Declarations
 
 `#fn` declares a function. `#pub #fn` declares a public function that becomes
