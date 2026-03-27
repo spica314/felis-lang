@@ -1,0 +1,7 @@
+#use workspace-app::f;
+
+#entrypoint main;
+
+#fn main : () {
+    f
+}

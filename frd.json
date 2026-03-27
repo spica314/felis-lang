@@ -67,8 +67,8 @@
     {
       "id": "FR-003",
       "title": "Package Manifest",
-      "description": "A package is described by a manifest file that identifies the package and its Felis library entrypoint.",
-      "notes": "This captures the externally visible package contract without constraining unrelated manifest fields or package-specific values.",
+      "description": "Packages and workspaces are described by a manifest file that identifies package metadata, workspace membership, and Felis entrypoints.",
+      "notes": "This captures the externally visible manifest contract without constraining unrelated manifest fields or package-specific values.",
       "children": [
         {
           "id": "FR-003-001",
@@ -89,6 +89,23 @@
         },
         {
           "id": "FR-003-002",
+          "title": "Manifest Dependency Fields",
+          "description": "A package manifest can declare dependencies on other packages, including workspace members.",
+          "acceptanceCriteria": [
+            {
+              "description": "A package can provide a `neco-package.json` manifest with a `dependencies` field."
+            },
+            {
+              "description": "A package can declare a dependency on another workspace member through a dependency entry with `\"workspace\": true`."
+            }
+          ],
+          "notes": "This captures the externally visible dependency declaration shape without constraining future external dependency formats.",
+          "docs": [
+            "docs/package-manifest.md"
+          ]
+        },
+        {
+          "id": "FR-003-003",
           "title": "Manifest Binary Entrypoint Fields",
           "description": "A package manifest can declare one or more Felis binary entrypoint files.",
           "acceptanceCriteria": [
@@ -97,6 +114,43 @@
             }
           ],
           "notes": "",
+          "docs": [
+            "docs/package-manifest.md"
+          ]
+        },
+        {
+          "id": "FR-003-004",
+          "title": "Workspace Member Fields",
+          "description": "A workspace manifest can declare one or more member package directories.",
+          "acceptanceCriteria": [
+            {
+              "description": "A workspace can provide a `neco-package.json` manifest with a `workspace.members` field."
+            },
+            {
+              "description": "Each `workspace.members` entry identifies a package directory relative to the workspace root."
+            },
+            {
+              "description": "Each workspace member directory contains its own `neco-package.json` package manifest."
+            }
+          ],
+          "notes": "This captures the externally visible workspace-root shape without constraining manifest discovery or command behavior.",
+          "docs": [
+            "docs/package-manifest.md"
+          ]
+        },
+        {
+          "id": "FR-003-005",
+          "title": "Workspace And Package Separation",
+          "description": "A manifest is either a package manifest or a workspace manifest.",
+          "acceptanceCriteria": [
+            {
+              "description": "A workspace root manifest can omit package fields such as `name` and Felis entrypoints."
+            },
+            {
+              "description": "A manifest that declares `workspace` is not required to act as a package."
+            }
+          ],
+          "notes": "This keeps the workspace model narrow by avoiding a root manifest that is both a workspace and a package.",
           "docs": [
             "docs/package-manifest.md"
           ]

@@ -9,6 +9,9 @@ compiler test fixtures.
   behavior.
 - Place small package directories here when a test case needs manifest-driven
   loading or multiple source files.
+- Place small workspace-shaped directories here when a test case needs a root
+  manifest that enumerates member packages and package-to-package
+  dependencies.
 - Organize cases by concern as the suite grows, such as parsing, type checking,
   or diagnostics.
 
