@@ -20,7 +20,8 @@ The current functional requirements cover these manifest fields:
   for the package.
 
 Binary entrypoint source files can then mark the selected function with an
-`#entrypoint` declaration.
+`#entrypoint` declaration ending with `;`, for example
+`#entrypoint main;`.
 
 For example:
 

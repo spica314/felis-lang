@@ -1,6 +1,6 @@
 #use std::io::IO;
 
-#entrypoint main
+#entrypoint main;
 
 #fn main : () #with IO {
     #let stdout <- IO::stdout;

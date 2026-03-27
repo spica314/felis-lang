@@ -10,18 +10,19 @@ trying to define the whole language grammar at once.
 
 ## Entrypoint Declarations
 
-`#entrypoint` marks a named function as a binary entrypoint.
+`#entrypoint` marks a named function as a binary entrypoint. The declaration
+must end with `;`.
 
 Example:
 
 ```felis
-#entrypoint main
+#entrypoint main;
 ```
 
 The documented shape is:
 
 ```felis
-#entrypoint <name>
+#entrypoint <name>;
 ```
 
 ## Declaration Attributes

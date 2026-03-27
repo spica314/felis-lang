@@ -389,7 +389,7 @@
           "description": "Source code can mark a named function as a binary entrypoint.",
           "acceptanceCriteria": [
             {
-              "description": "A source file can use `#entrypoint <name>` to identify a function declaration as the program entrypoint."
+              "description": "A source file can use `#entrypoint <name>;` to identify a function declaration as the program entrypoint."
             }
           ],
           "notes": "",
