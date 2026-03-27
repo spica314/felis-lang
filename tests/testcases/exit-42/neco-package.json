@@ -1,0 +1,4 @@
+{
+    "name": "exit-42",
+    "felis-bin-entrypoints": ["src/exit-42.fe"]
+}
