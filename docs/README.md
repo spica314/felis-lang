@@ -32,6 +32,10 @@ workflows.
 ## Repository Conventions
 
 - [`std/`](../std/) is reserved for the Felis standard library.
+- [`tests/`](../tests/) is reserved for compiler test cases.
 - Documentation about how `std/` is organized should live in
   [`std/README.md`](../std/README.md) and in this `docs/` directory when broader
   repository context is needed.
+- Documentation about how tests are organized should live in
+  [`tests/README.md`](../tests/README.md) when repository-level guidance is
+  needed.

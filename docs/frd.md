@@ -33,6 +33,8 @@ as follows:
 - [`docs/`](./): explanatory documents and design notes.
 - [`std/`](../std/): reserved location for standard library source code, kept
   separate from requirements and design documentation.
+- [`tests/`](../tests/): reserved location for compiler test cases used to
+  validate implementation behavior.
 
 When standard-library structure or exported symbols become part of the intended
 public contract, that behavior should be captured in [`frd.json`](../frd.json)
