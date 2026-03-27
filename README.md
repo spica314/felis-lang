@@ -5,6 +5,8 @@ Hobbyist-created programming language (Felis) and compiler (neco)
 ## Repository Layout
 
 - [`docs/`](./docs/) contains project documentation and design notes.
+- [`neco-felis/`](./neco-felis/) contains the Felis implementation of neco.
+- [`neco-rs/`](./neco-rs/) contains the Rust bootstrap implementation of neco.
 - [`std/`](./std/) is the top-level location for the Felis standard library.
 - [`tests/`](./tests/) contains compiler-facing test cases.
 

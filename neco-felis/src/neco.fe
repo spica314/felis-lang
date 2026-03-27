@@ -1,0 +1,7 @@
+#use std::io::IO;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    ()
+}
