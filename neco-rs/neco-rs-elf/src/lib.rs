@@ -31,6 +31,12 @@ pub struct SegmentFlags {
 }
 
 impl SegmentFlags {
+    pub const READ_ONLY: Self = Self {
+        readable: true,
+        writable: false,
+        executable: false,
+    };
+
     pub const READ_EXECUTE: Self = Self {
         readable: true,
         writable: false,
