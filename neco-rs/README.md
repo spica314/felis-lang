@@ -1,9 +1,9 @@
 # neco-rs
 
-This directory contains the Rust bootstrap implementation of the neco
-compiler.
+This directory contains the Cargo workspace for the Rust bootstrap
+implementation of the neco compiler.
 
 ## Current Status
 
-The Rust crate skeleton exists, but the compiler implementation is not in place
-yet.
+The `neco-rs` workspace currently contains a single `neco-rs` crate skeleton,
+but the compiler implementation is not in place yet.
