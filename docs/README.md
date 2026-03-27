@@ -31,6 +31,15 @@ workflows.
 
 ## Repository Conventions
 
+- Compiler implementation and bootstrap in this repository follow a strict
+  dependency policy:
+  building neco should not require anything beyond a Rust compiler, and the
+  repository should not depend on external Rust crates or other non-Rust build
+  tooling.
+  This policy exists to keep behavior under project control as much as
+  possible, to reduce supply-chain and security risk, and to preserve a
+  realistic discipline for the self-hosted Felis compiler, where external
+  dependencies cannot be assumed.
 - [`std/`](../std/) is reserved for the Felis standard library.
 - [`tests/`](../tests/) is reserved for compiler test cases.
 - Documentation about how `std/` is organized should live in
