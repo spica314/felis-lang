@@ -86,6 +86,20 @@
           "docs": [
             "docs/package-manifest.md"
           ]
+        },
+        {
+          "id": "FR-003-002",
+          "title": "Manifest Binary Entrypoint Fields",
+          "description": "A package manifest can declare one or more Felis binary entrypoint files.",
+          "acceptanceCriteria": [
+            {
+              "description": "A package can provide a `neco-package.json` manifest with a `felis-bin-entrypoints` field."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/package-manifest.md"
+          ]
         }
       ]
     },
@@ -141,9 +155,9 @@
     },
     {
       "id": "FR-005",
-      "title": "Standard Library Mathematics Surface",
-      "description": "The standard library exposes public mathematics-oriented modules and symbols in addition to primitive builtin bindings.",
-      "notes": "This captures the observable standard-library API now present under `std::math` without constraining unrelated implementation details.",
+      "title": "Standard Library Public Surface",
+      "description": "The standard library exposes public modules and symbols in addition to primitive builtin bindings.",
+      "notes": "This captures the observable standard-library API now present under branches such as `std::io` and `std::math` without constraining unrelated implementation details.",
       "children": [
         {
           "id": "FR-005-001",
@@ -206,6 +220,20 @@
             }
           ],
           "notes": "",
+          "docs": [
+            "docs/standard-library.md"
+          ]
+        },
+        {
+          "id": "FR-005-005",
+          "title": "IO Effect Binding",
+          "description": "The standard library provides a public binding for the builtin `IO` effect.",
+          "acceptanceCriteria": [
+            {
+              "description": "The standard library provides a public binding `IO` under its `io` module."
+            }
+          ],
+          "notes": "This captures the observable public binding exposed from `std::io` without constraining the full set of builtin operations available through that effect.",
           "docs": [
             "docs/standard-library.md"
           ]
@@ -353,6 +381,80 @@
           "docs": [
             "docs/cfg-attributes.md",
             "docs/standard-library.md"
+          ]
+        },
+        {
+          "id": "FR-006-009",
+          "title": "Entrypoint Declarations",
+          "description": "Source code can mark a named function as a binary entrypoint.",
+          "acceptanceCriteria": [
+            {
+              "description": "A source file can use `#entrypoint <name>` to identify a function declaration as the program entrypoint."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/declaration-forms.md",
+            "docs/package-manifest.md"
+          ]
+        },
+        {
+          "id": "FR-006-010",
+          "title": "Effect-Annotated Function Declarations",
+          "description": "Function declarations can annotate the algebraic effects they perform.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#fn` declaration can place `#with <effect>` between its result type and body."
+            }
+          ],
+          "notes": "`#with` attaches an Algebraic Effects `Effect` to the function declaration.",
+          "docs": [
+            "docs/declaration-forms.md"
+          ]
+        },
+        {
+          "id": "FR-006-011",
+          "title": "Effectful Let Bindings",
+          "description": "Local let bindings can bind the result of an effectful expression using a left-arrow form.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#let` form can use `<-` to bind the result produced by an effectful expression."
+            }
+          ],
+          "notes": "",
+          "docs": [
+            "docs/declaration-forms.md"
+          ]
+        },
+        {
+          "id": "FR-006-012",
+          "title": "Let Reference-Binding Targets",
+          "description": "Local let bindings can introduce a value and a reference to that value at the same time.",
+          "acceptanceCriteria": [
+            {
+              "description": "A `#let` form can use `<value-binder> @ <reference-binder>` as its binding target."
+            }
+          ],
+          "notes": "In this form, the left side binds the value itself and the right side binds a reference introduced together with that value.",
+          "docs": [
+            "docs/declaration-forms.md"
+          ]
+        },
+        {
+          "id": "FR-006-013",
+          "title": "String Literal And Method Call Expressions",
+          "description": "Source code supports string literals and the `.>` method-call form used to invoke a method associated with the left-hand side type.",
+          "acceptanceCriteria": [
+            {
+              "description": "An expression can contain a string literal such as `\"Hello, world!\"`."
+            },
+            {
+              "description": "An expression can call a method in the form `<value> .> <method>`."
+            }
+          ],
+          "notes": "This requirement records only the currently observed surface forms and does not define a full expression grammar. The `.>` form is a method call rather than member access.",
+          "docs": [
+            "docs/declaration-forms.md"
           ]
         }
       ]

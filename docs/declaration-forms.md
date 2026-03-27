@@ -1,11 +1,28 @@
 # Declaration Forms
 
-This document records declaration forms that are already used by the Felis
-standard library.
+This document records declaration and expression forms that are already used by
+the Felis standard library and repository test cases.
 
 It is intentionally narrow: it describes the currently documented source forms
-that are observable in [`std/`](../std/) rather than trying to define the whole
-language grammar at once.
+that are observable in [`std/`](../std/) and
+[`tests/testcases/hello-world/`](../tests/testcases/hello-world/) rather than
+trying to define the whole language grammar at once.
+
+## Entrypoint Declarations
+
+`#entrypoint` marks a named function as a binary entrypoint.
+
+Example:
+
+```felis
+#entrypoint main
+```
+
+The documented shape is:
+
+```felis
+#entrypoint <name>
+```
 
 ## Declaration Attributes
 
@@ -19,6 +36,10 @@ The currently documented conditional-compilation attribute is described in
 `#fn` declares a function. `#pub #fn` declares a public function that becomes
 part of the enclosing module surface.
 
+Function declarations can also carry a `#with` clause between the type
+annotation and body. In current sources, `#with` attaches an Algebraic Effects
+`Effect` to the declaration.
+
 Example:
 
 ```felis
@@ -29,6 +50,12 @@ Example:
             Nat::succ (nat_add p y)
         }
     }
+}
+```
+
+```felis
+#fn main : () #with IO {
+    ()
 }
 ```
 
@@ -44,6 +71,14 @@ or, when exported:
 
 ```felis
 #pub #fn <name> : <type> {
+    <body>
+}
+```
+
+or, with an effect annotation:
+
+```felis
+#fn <name> : <type> #with <effect> {
     <body>
 }
 ```
@@ -195,6 +230,8 @@ Example:
 
 ```felis
 #let s = proof p;
+#let stdout <- IO::stdout;
+#let _ @ hello_world_ref = "Hello, world!";
 ```
 
 The documented shape is:
@@ -202,6 +239,33 @@ The documented shape is:
 ```felis
 #let <name> = <value>;
 ```
+
+The currently observed variations are:
+
+- `#let <name> <- <value>;` for binding the result of an effectful expression.
+- `#let <value-binder> @ <reference-binder> = <value>;` for introducing the
+  value itself on the left and a reference to that value on the right as part
+  of the same `#let`.
+
+In this form, `@` is not documented as a general-purpose expression operator.
+It is the `#let`-binding form used when source code needs both the value and a
+reference bound from the same definition site.
+
+## String Literals And Method Calls
+
+Current sources also use these expression forms:
+
+- String literals such as `"Hello, world!"`.
+- Method calls in the form `<value> .> <method>`.
+
+Example:
+
+```felis
+#let hello_world_bytes_ref = hello_world_ref .> as_bytes;
+```
+
+The `.>` form calls a method associated with the left-hand side type. This is
+analogous to Rust's method-call `.` syntax, not to field or member access.
 
 ## Universal Quantification
 

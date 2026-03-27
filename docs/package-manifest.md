@@ -19,6 +19,9 @@ The current functional requirements cover these manifest fields:
 - `felis-bin-entrypoints`: identifies one or more Felis binary entrypoint files
   for the package.
 
+Binary entrypoint source files can then mark the selected function with an
+`#entrypoint` declaration.
+
 For example:
 
 ```json

@@ -14,6 +14,7 @@ The standard library root surface is declared in
 It currently exposes:
 
 - `primitive` unconditionally.
+- `io` unconditionally.
 - `math` only when the `bootstrap` feature is not enabled.
 
 This conditional export is expressed with `#[cfg(not(feature="bootstrap"))]`
@@ -33,6 +34,18 @@ source-level symbols.
 - `i32_mul`
 - `i32_div`
 - `i32_mod`
+
+## IO Module
+
+The `io` branch exposes the builtin `IO` effect as an ordinary public symbol.
+
+[`std/src/io.fe`](../std/src/io.fe) currently re-exports:
+
+- `IO`
+
+The `hello-world` testcase shows this binding being imported as `std::io::IO`
+and used in a function declaration with `#with IO`. In this context, `#with`
+attaches an Algebraic Effects `Effect` to the function declaration.
 
 ## Mathematics Modules
 

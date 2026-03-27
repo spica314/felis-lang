@@ -1,0 +1,3 @@
+#bind_builtin "IO" #as IO;
+
+#pub #use IO;
