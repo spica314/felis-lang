@@ -1,29 +1,4 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ElfClass {
-    Elf64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ElfDataEncoding {
-    LittleEndian,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ElfOsAbi {
-    SystemV,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ElfType {
-    Executable,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ElfMachine {
-    X86_64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SegmentFlags {
     readable: bool,
     writable: bool,
@@ -68,9 +43,6 @@ pub struct LoadSegment {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Elf64Executable {
-    data_encoding: ElfDataEncoding,
-    os_abi: ElfOsAbi,
-    machine: ElfMachine,
     entry_virtual_address: u64,
     load_segments: Vec<LoadSegment>,
 }
@@ -87,11 +59,8 @@ impl LoadSegment {
 }
 
 impl Elf64Executable {
-    pub fn new(machine: ElfMachine, entry_virtual_address: u64) -> Self {
+    pub fn new(entry_virtual_address: u64) -> Self {
         Self {
-            data_encoding: ElfDataEncoding::LittleEndian,
-            os_abi: ElfOsAbi::SystemV,
-            machine,
             entry_virtual_address,
             load_segments: Vec::new(),
         }
@@ -102,6 +71,7 @@ impl Elf64Executable {
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
+        // This crate currently emits only ELF64 little-endian / System V ABI / x86_64 / ET_EXEC images.
         const ELF_HEADER_SIZE: usize = 64;
         const PROGRAM_HEADER_SIZE: usize = 56;
 
@@ -119,40 +89,80 @@ impl Elf64Executable {
 
         let mut elf = vec![0_u8; file_size];
 
+        /* ELF Header (Elf64_Ehdr) (64 bytes) */
+        // e_ident (16 bytes)
+        // 0..4: Magic Number
         elf[0..4].copy_from_slice(b"\x7FELF");
-        elf[4] = elf_class_to_byte(ElfClass::Elf64);
-        elf[5] = data_encoding_to_byte(self.data_encoding);
+        // class
+        // ELFCLASS64: 2
+        elf[4] = 2;
+        // encoding
+        // ELFDATA2LSB: 1
+        elf[5] = 1;
+        // version
         elf[6] = 1;
-        elf[7] = os_abi_to_byte(self.os_abi);
-        elf[8..16].fill(0);
+        // osabi
+        // ELFOSABI_SYSV: 0
+        elf[7] = 0;
+        // abiversion
+        elf[8] = 0;
+        // pad
+        elf[9..16].fill(0);
 
-        write_u16(&mut elf, 16, elf_type_to_u16(ElfType::Executable));
-        write_u16(&mut elf, 18, machine_to_u16(self.machine));
+        // e_type (2 bytes)
+        // ET_EXEC: 2
+        write_u16(&mut elf, 16, 2);
+        // e_machine (2 bytes)
+        // EM_X86_64: 62
+        write_u16(&mut elf, 18, 62);
+        // e_version (4 bytes)
         write_u32(&mut elf, 20, 1);
+        // e_entry (8 bytes)
         write_u64(&mut elf, 24, self.entry_virtual_address);
+        // e_phoff (8 bytes)
         write_u64(&mut elf, 32, phoff as u64);
+        // e_shoff (8 bytes)
         write_u64(&mut elf, 40, 0);
+        // e_flags (4 bytes)
         write_u32(&mut elf, 48, 0);
+        // e_ehsize (2 bytes)
         write_u16(&mut elf, 52, ELF_HEADER_SIZE as u16);
+        // e_phentsize (2 bytes)
         write_u16(&mut elf, 54, PROGRAM_HEADER_SIZE as u16);
+        // e_phnum (2 bytes)
         write_u16(&mut elf, 56, self.load_segments.len() as u16);
+        // e_shentsize (2 bytes)
         write_u16(&mut elf, 58, 0);
+        // e_shnum (2 bytes)
         write_u16(&mut elf, 60, 0);
+        // e_shstrndx (2 bytes)
         write_u16(&mut elf, 62, 0);
 
+        /* Program Headers and Segment Data */
         for (index, segment) in self.load_segments.iter().enumerate() {
             let offset = segment_offsets[index];
             let phdr = phoff + index * PROGRAM_HEADER_SIZE;
 
+            /* Program Header (Elf64_Phdr) (56 bytes) */
+            // p_type (4 bytes)
+            // PT_LOAD: 1
             write_u32(&mut elf, phdr, 1);
+            // p_flags (4 bytes)
             write_u32(&mut elf, phdr + 4, segment.flags.to_elf_bits());
+            // p_offset (8 bytes)
             write_u64(&mut elf, phdr + 8, offset as u64);
+            // p_vaddr (8 bytes)
             write_u64(&mut elf, phdr + 16, segment.virtual_address);
+            // p_paddr (8 bytes)
             write_u64(&mut elf, phdr + 24, segment.virtual_address);
+            // p_filesz (8 bytes)
             write_u64(&mut elf, phdr + 32, segment.data.len() as u64);
+            // p_memsz (8 bytes)
             write_u64(&mut elf, phdr + 40, segment.data.len() as u64);
+            // p_align (8 bytes)
             write_u64(&mut elf, phdr + 48, segment.alignment);
 
+            /* Segment Data */
             elf[offset..offset + segment.data.len()].copy_from_slice(&segment.data);
         }
 
@@ -172,36 +182,6 @@ fn align_usize(value: usize, alignment: usize) -> usize {
     }
 }
 
-fn elf_class_to_byte(class: ElfClass) -> u8 {
-    match class {
-        ElfClass::Elf64 => 2,
-    }
-}
-
-fn data_encoding_to_byte(encoding: ElfDataEncoding) -> u8 {
-    match encoding {
-        ElfDataEncoding::LittleEndian => 1,
-    }
-}
-
-fn os_abi_to_byte(os_abi: ElfOsAbi) -> u8 {
-    match os_abi {
-        ElfOsAbi::SystemV => 0,
-    }
-}
-
-fn elf_type_to_u16(elf_type: ElfType) -> u16 {
-    match elf_type {
-        ElfType::Executable => 2,
-    }
-}
-
-fn machine_to_u16(machine: ElfMachine) -> u16 {
-    match machine {
-        ElfMachine::X86_64 => 62,
-    }
-}
-
 fn write_u16(buffer: &mut [u8], offset: usize, value: u16) {
     buffer[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
 }
@@ -216,11 +196,11 @@ fn write_u64(buffer: &mut [u8], offset: usize, value: u64) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Elf64Executable, ElfMachine, LoadSegment, SegmentFlags};
+    use super::{Elf64Executable, LoadSegment, SegmentFlags};
 
     #[test]
     fn serializes_single_load_segment_executable() {
-        let mut elf = Elf64Executable::new(ElfMachine::X86_64, 0x401000);
+        let mut elf = Elf64Executable::new(0x401000);
         elf.add_load_segment(LoadSegment::new(
             0x401000,
             0x1000,

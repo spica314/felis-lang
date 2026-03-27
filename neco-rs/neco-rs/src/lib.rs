@@ -3,7 +3,7 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use neco_rs_elf::{Elf64Executable, ElfMachine, LoadSegment, SegmentFlags};
+use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
 use neco_rs_parser::{
     BindingPattern, Item, ParsedPackage, ParsedRoot, PathExpression, Statement, Term, parse_root,
 };
@@ -461,7 +461,7 @@ fn intern_data(program: &mut LoweredProgram, bytes: Vec<u8>) -> usize {
 fn build_linux_x86_64_program_executable(program: &LoweredProgram) -> Elf64Executable {
     let code_virtual_address = 0x401000;
     let data_virtual_address = 0x402000;
-    let mut elf = Elf64Executable::new(ElfMachine::X86_64, code_virtual_address);
+    let mut elf = Elf64Executable::new(code_virtual_address);
     elf.add_load_segment(LoadSegment::new(
         code_virtual_address,
         0x1000,
