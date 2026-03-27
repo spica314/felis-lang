@@ -1,0 +1,4 @@
+{
+    "name": "hello-world",
+    "felis-bin-entrypoints": ["src/hello-world.fe"]
+}

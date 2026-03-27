@@ -11,8 +11,10 @@ This directory is reserved for compiler-facing test cases.
 ## Directory Policy
 
 - `tests/` is the canonical top-level location for compiler tests.
-- Source-level test programs should live under [`tests/testcases/`](./testcases/).
+- Source-level test programs and small package-shaped test fixtures should live
+  under [`tests/testcases/`](./testcases/).
 
 ## Current Layout
 
-- `testcases/` contains Felis source files used as compiler test inputs.
+- `testcases/` contains compiler test inputs, including Felis source files and
+  package-shaped fixtures.
