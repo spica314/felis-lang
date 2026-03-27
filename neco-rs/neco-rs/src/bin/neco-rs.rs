@@ -1,3 +1,6 @@
 fn main() {
-    println!("neco-rs bootstrap placeholder");
+    if let Err(error) = neco_rs::run_cli(std::env::args()) {
+        eprintln!("{error}");
+        std::process::exit(1);
+    }
 }

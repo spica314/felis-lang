@@ -1,9 +1,7 @@
 [package]
-name = "neco-rs"
+name = "neco-rs-elf"
 version = "0.1.0"
 edition = "2024"
 rust-version.workspace = true
 
 [dependencies]
-neco-rs-elf.workspace = true
-neco-rs-parser.workspace = true

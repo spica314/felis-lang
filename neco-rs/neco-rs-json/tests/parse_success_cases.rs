@@ -12,7 +12,10 @@ fn parses_nested_document() {
     )
     .expect("json parses");
 
-    assert!(matches!(tokens.first().map(|token| &token.kind), Some(TokenKind::LeftBrace)));
+    assert!(matches!(
+        tokens.first().map(|token| &token.kind),
+        Some(TokenKind::LeftBrace)
+    ));
     assert!(matches!(
         tokens.last().map(|token| &token.kind),
         Some(TokenKind::EndOfFile)
@@ -24,7 +27,10 @@ fn parses_nested_document() {
 
     assert_eq!(entries.len(), 4);
     assert_eq!(entries[0].key, "name");
-    assert_eq!(entries[0].value, JsonValue::String("hello\nworld".to_string()));
+    assert_eq!(
+        entries[0].value,
+        JsonValue::String("hello\nworld".to_string())
+    );
     assert_eq!(entries[1].key, "version");
     assert_eq!(entries[1].value, JsonValue::Number("1.25e+2".to_string()));
     assert_eq!(entries[2].key, "enabled");
@@ -43,7 +49,10 @@ fn parses_nested_document() {
     };
     assert_eq!(nested_entries.len(), 1);
     assert_eq!(nested_entries[0].key, "path");
-    assert_eq!(nested_entries[0].value, JsonValue::String("a/b".to_string()));
+    assert_eq!(
+        nested_entries[0].value,
+        JsonValue::String("a/b".to_string())
+    );
 }
 
 #[test]

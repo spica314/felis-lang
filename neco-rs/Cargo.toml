@@ -1,5 +1,5 @@
 [workspace]
-members = ["neco-rs", "neco-rs-json", "neco-rs-parser"]
+members = ["neco-rs", "neco-rs-elf", "neco-rs-json", "neco-rs-parser"]
 resolver = "3"
 
 [workspace.package]
@@ -7,5 +7,6 @@ rust-version = "1.94.0"
 
 [workspace.dependencies]
 neco-rs = { path = "./neco-rs" }
+neco-rs-elf = { path = "./neco-rs-elf" }
 neco-rs-json = { path = "./neco-rs-json" }
 neco-rs-parser = { path = "./neco-rs-parser" }

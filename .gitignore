@@ -1,2 +1,5 @@
 .local
 target
+*.elf
+.tmp
+.neco
