@@ -5,3 +5,14 @@ version = 4
 [[package]]
 name = "neco-rs"
 version = "0.1.0"
+
+[[package]]
+name = "neco-rs-json"
+version = "0.1.0"
+
+[[package]]
+name = "neco-rs-parser"
+version = "0.1.0"
+dependencies = [
+ "neco-rs-json",
+]

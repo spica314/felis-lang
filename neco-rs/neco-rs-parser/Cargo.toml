@@ -1,0 +1,8 @@
+[package]
+name = "neco-rs-parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+neco-rs-json.workspace = true
+

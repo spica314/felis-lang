@@ -1,0 +1,114 @@
+use std::path::PathBuf;
+
+use neco_rs_parser::{
+    Item, ParsedRoot, Pattern, SourceFileRole, Statement, Term, Visibility, parse_root,
+};
+
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("repo root")
+}
+
+#[test]
+fn parses_single_package_root() {
+    let root = repo_root().join("tests/testcases/hello-world");
+    let parsed = parse_root(&root).expect("hello-world package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "hello-world");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 3);
+    let Item::Function(main_fn) = &syntax.items[2] else {
+        panic!("expected function");
+    };
+    assert_eq!(main_fn.visibility, Visibility::Private);
+    assert!(main_fn.effect.is_some());
+    assert_eq!(main_fn.body.statements.len(), 4);
+}
+
+#[test]
+fn parses_workspace_root_and_member_packages() {
+    let root = repo_root().join("tests/testcases/workspace-basic");
+    let parsed = parse_root(&root).expect("workspace parses");
+    let ParsedRoot::Workspace(workspace) = parsed else {
+        panic!("expected workspace root");
+    };
+
+    assert_eq!(workspace.manifest.members.len(), 2);
+    assert_eq!(workspace.packages.len(), 2);
+
+    let member_names: Vec<_> = workspace
+        .packages
+        .iter()
+        .map(|package| package.manifest.name.as_str())
+        .collect();
+    assert!(member_names.contains(&"workspace-app"));
+    assert!(member_names.contains(&"workspace-lib"));
+}
+
+#[test]
+fn parses_std_package_with_nested_modules_and_theorems() {
+    let root = repo_root().join("std");
+    let parsed = parse_root(&root).expect("std parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert!(package.source_files.len() >= 6);
+    let nat_add_file = package
+        .source_files
+        .iter()
+        .find(|file| file.path.ends_with("std/src/math/nat/nat_add.fe"))
+        .expect("nat_add file");
+
+    let theorem = nat_add_file
+        .syntax
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::Theorem(theorem) if theorem.name.name == "nat_add_x_zero_eq_x" => Some(theorem),
+            _ => None,
+        })
+        .expect("theorem");
+
+    assert_eq!(theorem.visibility, Visibility::Public);
+    assert_eq!(theorem.body.statements.len(), 1);
+
+    let Statement::Item(proof_item) = &theorem.body.statements[0] else {
+        panic!("expected nested proof item");
+    };
+    let Item::Function(proof_fn) = proof_item.as_ref() else {
+        panic!("expected nested function");
+    };
+    let Some(match_stmt) = proof_fn.body.tail.as_deref() else {
+        panic!("expected match expression");
+    };
+    let Term::Match(match_expr) = match_stmt else {
+        panic!("expected match expression");
+    };
+    let Pattern::Constructor { subpatterns, .. } = &match_expr.arms[1].pattern else {
+        panic!("expected constructor pattern");
+    };
+    assert_eq!(subpatterns.len(), 1);
+
+    let Term::Block(second_arm_block) = match_expr.arms[1].result.as_ref() else {
+        panic!("expected block in second arm");
+    };
+    let Statement::Let(let_stmt) = &second_arm_block.statements[0] else {
+        panic!("expected let statement in second arm block");
+    };
+    match let_stmt.value.as_ref() {
+        Term::Application { .. } => {}
+        other => panic!("expected application term, got {other:?}"),
+    }
+}
