@@ -372,14 +372,22 @@ fn parse_dependencies(path: &Path, value: Option<&JsonValue>) -> Result<Vec<Depe
         .iter()
         .map(|entry| {
             let dependency = expect_object(path, &entry.value, "dependency entry")?;
-            let workspace = optional_bool_field(dependency, "workspace")?.unwrap_or(false);
+            match optional_bool_field(dependency, "workspace")? {
+                Some(true) => {}
+                Some(false) => {
+                    return Err(
+                        Error::new("dependency entry only supports `workspace: true`")
+                            .with_path(path.to_path_buf()),
+                    );
+                }
+                None => {
+                    return Err(Error::new("dependency entry must define `workspace: true`")
+                        .with_path(path.to_path_buf()));
+                }
+            }
             Ok(Dependency {
                 name: entry.key.clone(),
-                source: if workspace {
-                    DependencySource::Workspace
-                } else {
-                    DependencySource::Workspace
-                },
+                source: DependencySource::Workspace,
             })
         })
         .collect()
@@ -478,7 +486,7 @@ fn convert_json_error(path: &Path, error: neco_rs_json::Error) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{Manifest, parse_manifest};
+    use super::{DependencySource, Manifest, parse_manifest};
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -505,6 +513,30 @@ mod tests {
             vec![PathBuf::from("src/main.fe")]
         );
         assert_eq!(package.dependencies.len(), 1);
+        assert_eq!(package.dependencies[0].source, DependencySource::Workspace);
+    }
+
+    #[test]
+    fn rejects_non_workspace_dependency_entries() {
+        let error = match parse_manifest(
+            Path::new("neco-package.json"),
+            r#"{
+                "name": "hello-world",
+                "dependencies": {
+                    "std": { "workspace": false }
+                }
+            }"#,
+        ) {
+            Ok(_) => panic!("manifest should reject non-workspace dependency entries"),
+            Err(error) => error,
+        };
+
+        assert!(
+            error
+                .message
+                .contains("dependency entry only supports `workspace: true`"),
+            "unexpected error: {error:?}"
+        );
     }
 
     #[test]
