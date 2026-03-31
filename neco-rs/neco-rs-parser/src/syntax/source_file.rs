@@ -8,11 +8,11 @@ pub struct SourceFile {
 }
 
 impl Parse for SourceFile {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         let mut items = Vec::new();
         while !parser.at_end() {
-            items.push(Item::parse(parser)?);
+            items.push(Item::parse(parser)?.unwrap());
         }
-        Ok(Self { items })
+        Ok(Some(Self { items }))
     }
 }

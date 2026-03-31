@@ -12,41 +12,41 @@ pub enum CfgPredicate {
 }
 
 impl Parse for Attribute {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         let name = parser.expect_identifier()?;
         if name != "cfg" {
             return Err(parser.error_here(format!("unsupported attribute `{name}`")));
         }
         parser.expect_punctuation(TokenKind::LeftParen)?;
-        let predicate = CfgPredicate::parse(parser)?;
+        let predicate = CfgPredicate::parse(parser)?.unwrap();
         parser.expect_punctuation(TokenKind::RightParen)?;
         parser.expect_punctuation(TokenKind::RightBracket)?;
-        Ok(Self::Cfg(predicate))
+        Ok(Some(Self::Cfg(predicate)))
     }
 }
 
 impl Parse for CfgPredicate {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         let identifier = parser.expect_identifier()?;
         if identifier == "feature" {
             parser.expect_punctuation(TokenKind::Equals)?;
             let value = parser.expect_string_literal()?;
-            return Ok(Self::Feature(value));
+            return Ok(Some(Self::Feature(value)));
         }
         if identifier != "not" {
             return Err(parser.error_here(format!("unsupported cfg predicate `{identifier}`")));
         }
         parser.expect_punctuation(TokenKind::LeftParen)?;
-        let predicate = Self::parse(parser)?;
+        let predicate = Self::parse(parser)?.unwrap();
         parser.expect_punctuation(TokenKind::RightParen)?;
-        Ok(Self::Not(Box::new(predicate)))
+        Ok(Some(Self::Not(Box::new(predicate))))
     }
 }
 
 pub(crate) fn parse_attributes(parser: &mut Parser) -> Result<Vec<Attribute>> {
     let mut attributes = Vec::new();
     while parser.consume_punctuation(TokenKind::AttributeStart) {
-        attributes.push(Attribute::parse(parser)?);
+        attributes.push(Attribute::parse(parser)?.unwrap());
     }
     Ok(attributes)
 }

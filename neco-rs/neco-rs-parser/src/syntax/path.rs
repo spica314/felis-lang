@@ -15,7 +15,7 @@ pub struct PathSegment {
 }
 
 impl Parse for PathExpression {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         let mut starts_with_package = false;
         let mut segments = Vec::new();
 
@@ -24,30 +24,30 @@ impl Parse for PathExpression {
             parser.expect_punctuation(TokenKind::DoubleColon)?;
         }
 
-        segments.push(PathSegment::parse(parser)?);
+        segments.push(PathSegment::parse(parser)?.unwrap());
         while parser.consume_punctuation(TokenKind::DoubleColon) {
-            segments.push(PathSegment::parse(parser)?);
+            segments.push(PathSegment::parse(parser)?.unwrap());
         }
 
-        Ok(Self {
+        Ok(Some(Self {
             starts_with_package,
             segments,
-        })
+        }))
     }
 }
 
 impl Parse for PathSegment {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         let name = parser.expect_identifier()?;
         let suffixes = parse_suffixes(parser)?;
-        Ok(Self { name, suffixes })
+        Ok(Some(Self { name, suffixes }))
     }
 }
 
 pub(crate) fn parse_suffixes(parser: &mut Parser) -> Result<Vec<Term>> {
     let mut suffixes = Vec::new();
     while parser.consume_punctuation(TokenKind::LeftBracket) {
-        suffixes.push(Term::parse(parser)?);
+        suffixes.push(Term::parse(parser)?.unwrap());
         parser.expect_punctuation(TokenKind::RightBracket)?;
     }
     Ok(suffixes)

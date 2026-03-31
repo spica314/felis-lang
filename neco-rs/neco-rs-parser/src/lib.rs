@@ -174,7 +174,7 @@ pub fn parse_root(path: impl AsRef<Path>) -> Result<ParsedRoot> {
     }
 }
 
-pub fn parse_source(source: &str) -> Result<(Vec<Token>, SourceFile)> {
+pub fn parse_source(source: &str) -> Result<(Vec<Token>, Option<SourceFile>)> {
     let mut lexer = lexer::Lexer::new(source);
     let tokens = lexer.lex()?;
     let mut parser = Parser::new(tokens.clone());
@@ -239,6 +239,7 @@ fn collect_source_file(
         span: error.span,
         message: error.message,
     })?;
+    let syntax = syntax.unwrap();
 
     let module_names: Vec<String> = syntax
         .items

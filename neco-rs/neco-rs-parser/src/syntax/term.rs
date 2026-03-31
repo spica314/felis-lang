@@ -97,40 +97,40 @@ pub struct MatchArm {
 }
 
 impl Parse for Term {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         parse_arrow_term(parser)
     }
 }
 
 impl Parse for TypedBinder {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         let name = parser.expect_identifier()?;
         parser.expect_punctuation(TokenKind::Colon)?;
-        let ty = Term::parse(parser)?;
-        Ok(Self {
+        let ty = Term::parse(parser)?.unwrap();
+        Ok(Some(Self {
             name,
             ty: Box::new(ty),
-        })
+        }))
     }
 }
 
 impl Parse for Block {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         parser.expect_punctuation(TokenKind::LeftBrace)?;
         let mut statements = Vec::new();
         let mut tail = None;
 
         while !parser.check_punctuation(TokenKind::RightBrace) {
             if parser.is_item_start() {
-                statements.push(Statement::Item(Box::new(Item::parse(parser)?)));
+                statements.push(Statement::Item(Box::new(Item::parse(parser)?.unwrap())));
                 continue;
             }
             if parser.consume_keyword(Keyword::Let) {
-                statements.push(Statement::Let(LetStatement::parse(parser)?));
+                statements.push(Statement::Let(LetStatement::parse(parser)?.unwrap()));
                 continue;
             }
 
-            let expression = Term::parse(parser)?;
+            let expression = Term::parse(parser)?.unwrap();
             if parser.consume_punctuation(TokenKind::Semicolon) {
                 statements.push(Statement::Expression(Box::new(expression)));
             } else {
@@ -140,31 +140,31 @@ impl Parse for Block {
         }
 
         parser.expect_punctuation(TokenKind::RightBrace)?;
-        Ok(Self { statements, tail })
+        Ok(Some(Self { statements, tail }))
     }
 }
 
 impl Parse for LetStatement {
-    fn parse(parser: &mut Parser) -> Result<Self> {
-        let binder = BindingPattern::parse(parser)?;
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
+        let binder = BindingPattern::parse(parser)?.unwrap();
         let operator = if parser.consume_punctuation(TokenKind::Equals) {
             LetOperator::Equals
         } else {
             parser.expect_punctuation(TokenKind::LeftArrow)?;
             LetOperator::LeftArrow
         };
-        let value = Term::parse(parser)?;
+        let value = Term::parse(parser)?.unwrap();
         parser.expect_punctuation(TokenKind::Semicolon)?;
-        Ok(Self {
+        Ok(Some(Self {
             binder,
             operator,
             value: Box::new(value),
-        })
+        }))
     }
 }
 
 impl Parse for BindingPattern {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         let left = if parser.consume_punctuation(TokenKind::Underscore) {
             Self::Wildcard
         } else {
@@ -172,64 +172,64 @@ impl Parse for BindingPattern {
         };
         if parser.consume_punctuation(TokenKind::At) {
             let reference = parser.expect_identifier()?;
-            Ok(Self::ValueAndReference {
+            Ok(Some(Self::ValueAndReference {
                 value: Box::new(left),
                 reference,
-            })
+            }))
         } else {
-            Ok(left)
+            Ok(Some(left))
         }
     }
 }
 
 impl Parse for MatchExpression {
-    fn parse(parser: &mut Parser) -> Result<Self> {
-        let scrutinee = Term::parse(parser)?;
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
+        let scrutinee = Term::parse(parser)?.unwrap();
         parser.expect_punctuation(TokenKind::LeftBrace)?;
         let mut arms = Vec::new();
         while !parser.consume_punctuation(TokenKind::RightBrace) {
-            arms.push(MatchArm::parse(parser)?);
+            arms.push(MatchArm::parse(parser)?.unwrap());
         }
-        Ok(Self {
+        Ok(Some(Self {
             scrutinee: Box::new(scrutinee),
             arms,
-        })
+        }))
     }
 }
 
 impl Parse for MatchArm {
-    fn parse(parser: &mut Parser) -> Result<Self> {
-        let pattern = Pattern::parse(parser)?;
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
+        let pattern = Pattern::parse(parser)?.unwrap();
         parser.expect_punctuation(TokenKind::FatArrow)?;
-        let result = parser.with_match_arm_boundary(true, Term::parse)?;
-        Ok(Self {
+        let result = parser.with_match_arm_boundary(true, Term::parse)?.unwrap();
+        Ok(Some(Self {
             pattern,
             result: Box::new(result),
-        })
+        }))
     }
 }
 
-fn parse_arrow_term(parser: &mut Parser) -> Result<Term> {
+fn parse_arrow_term(parser: &mut Parser) -> Result<Option<Term>> {
     let left = parse_forall_term(parser)?;
     if parser.consume_punctuation(TokenKind::Arrow) {
-        let result = parse_arrow_term(parser)?;
+        let result = parse_arrow_term(parser)?.unwrap();
         let parameter = match left {
             Term::TypedBinder(binder) => ArrowParameter::Binder(binder),
             other => ArrowParameter::Domain(Box::new(other)),
         };
-        return Ok(Term::Arrow(ArrowTerm {
+        return Ok(Some(Term::Arrow(ArrowTerm {
             parameter,
             result: Box::new(result),
-        }));
+        })));
     }
-    Ok(left)
+    Ok(Some(left))
 }
 
 fn parse_forall_term(parser: &mut Parser) -> Result<Term> {
     if parser.consume_keyword(Keyword::Forall) {
-        let binder = TypedBinder::parse(parser)?;
+        let binder = TypedBinder::parse(parser)?.unwrap();
         parser.expect_punctuation(TokenKind::Comma)?;
-        let body = Term::parse(parser)?;
+        let body = Term::parse(parser)?.unwrap();
         return Ok(Term::Forall(ForallTerm {
             binder,
             body: Box::new(body),
@@ -276,11 +276,11 @@ fn parse_application_term(parser: &mut Parser) -> Result<Term> {
 
 fn parse_primary_term(parser: &mut Parser) -> Result<Term> {
     if parser.consume_keyword(Keyword::Match) {
-        return Ok(Term::Match(MatchExpression::parse(parser)?));
+        return Ok(Term::Match(MatchExpression::parse(parser)?.unwrap()));
     }
 
     if parser.check_punctuation(TokenKind::LeftBrace) {
-        return Ok(Term::Block(Block::parse(parser)?));
+        return Ok(Term::Block(Block::parse(parser)?.unwrap()));
     }
 
     if parser.consume_punctuation(TokenKind::LeftParen) {
@@ -291,12 +291,12 @@ fn parse_primary_term(parser: &mut Parser) -> Result<Term> {
         if parser.looks_like_typed_binder() {
             let binder = TypedBinder::parse(parser)?;
             parser.expect_punctuation(TokenKind::RightParen)?;
-            return Ok(Term::TypedBinder(binder));
+            return Ok(Term::TypedBinder(binder.unwrap()));
         }
 
         let inner = Term::parse(parser)?;
         parser.expect_punctuation(TokenKind::RightParen)?;
-        return Ok(Term::Group(Box::new(inner)));
+        return Ok(Term::Group(Box::new(inner.unwrap())));
     }
 
     if let Some(text) = parser.consume_string_literal() {
@@ -308,7 +308,7 @@ fn parse_primary_term(parser: &mut Parser) -> Result<Term> {
     }
 
     if parser.is_path_start() {
-        return Ok(Term::Path(PathExpression::parse(parser)?));
+        return Ok(Term::Path(PathExpression::parse(parser)?.unwrap()));
     }
 
     Err(parser.error_here("expected term"))

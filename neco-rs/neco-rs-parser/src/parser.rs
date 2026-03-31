@@ -1,7 +1,7 @@
 use crate::{Error, Keyword, Result, Span, Token, TokenKind};
 
 pub trait Parse: Sized {
-    fn parse(parser: &mut Parser) -> Result<Self>;
+    fn parse(parser: &mut Parser) -> Result<Option<Self>>;
 }
 
 pub struct Parser {

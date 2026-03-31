@@ -12,15 +12,15 @@ pub enum Pattern {
 }
 
 impl Parse for Pattern {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         if parser.consume_punctuation(TokenKind::Underscore) {
-            return Ok(Self::Wildcard);
+            return Ok(Some(Self::Wildcard));
         }
-        let path = PathExpression::parse(parser)?;
+        let path = PathExpression::parse(parser)?.unwrap();
         let mut subpatterns = Vec::new();
         while parser.is_pattern_start() {
-            subpatterns.push(Self::parse(parser)?);
+            subpatterns.push(Self::parse(parser)?.unwrap());
         }
-        Ok(Self::Constructor { path, subpatterns })
+        Ok(Some(Self::Constructor { path, subpatterns }))
     }
 }
