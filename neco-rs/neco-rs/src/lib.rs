@@ -323,6 +323,7 @@ fn bind_pattern(pattern: &BindingPattern, value: Value, environment: &mut HashMa
         BindingPattern::ValueAndReference {
             value: inner,
             reference,
+            exclusive: _,
         } => {
             bind_pattern(inner, value.clone(), environment);
             environment.insert(reference.clone(), value);

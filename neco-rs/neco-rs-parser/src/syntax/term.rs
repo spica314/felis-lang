@@ -75,6 +75,7 @@ pub enum BindingPattern {
     ValueAndReference {
         value: Box<BindingPattern>,
         reference: String,
+        exclusive: bool,
     },
 }
 
@@ -170,14 +171,20 @@ impl Parse for BindingPattern {
         } else {
             Self::Name(parser.expect_identifier()?)
         };
-        if parser.consume_punctuation(TokenKind::At) {
+        let exclusive = if parser.consume_punctuation(TokenKind::At) {
+            false
+        } else if parser.consume_punctuation(TokenKind::AtCaret) {
+            true
+        } else {
+            return Ok(Some(left));
+        };
+        {
             let reference = parser.expect_identifier()?;
             Ok(Some(Self::ValueAndReference {
                 value: Box::new(left),
                 reference,
+                exclusive,
             }))
-        } else {
-            Ok(Some(left))
         }
     }
 }

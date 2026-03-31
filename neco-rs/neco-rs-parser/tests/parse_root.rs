@@ -57,6 +57,31 @@ fn parses_workspace_root_and_member_packages() {
 }
 
 #[test]
+fn parses_array_basic_package_root() {
+    let root = repo_root().join("tests/testcases/array-basic");
+    let parsed = parse_root(&root).expect("array-basic package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "array-basic");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 5);
+    let Item::Function(main_fn) = &syntax.items[4] else {
+        panic!("expected function");
+    };
+    assert_eq!(main_fn.visibility, Visibility::Private);
+    assert!(main_fn.effect.is_some());
+    assert_eq!(main_fn.body.statements.len(), 10);
+}
+
+#[test]
 fn parses_std_package_with_nested_modules_and_theorems() {
     let root = repo_root().join("std");
     let parsed = parse_root(&root).expect("std parses");

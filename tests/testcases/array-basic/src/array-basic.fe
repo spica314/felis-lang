@@ -1,0 +1,19 @@
+#use std::io::IO;
+#use std::primitive::i32::i32;
+#use std::primitive::i32::i32_add;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let _ @^ array_ref <- IO::array_new i32 4i32;
+    array_ref .> set 0i32 7;
+    array_ref .> set 1i32 14;
+    array_ref .> set 2i32 21;
+    #let a0 = array_ref .> get 0i32;
+    #let a1 = array_ref .> get 1i32;
+    #let a2 = array_ref .> get 2i32;
+    #let a0_plus_a1 = i32_add a0 a1;
+    #let r = i32_add a0_plus_a1 p2;
+    #let _ <- IO::exit r;
+    ()
+}

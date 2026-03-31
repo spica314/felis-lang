@@ -272,6 +272,7 @@ fn punctuation_name(kind: &TokenKind) -> &'static str {
         TokenKind::Comma => ",",
         TokenKind::Equals => "=",
         TokenKind::At => "@",
+        TokenKind::AtCaret => "@^",
         TokenKind::Underscore => "_",
         TokenKind::DoubleColon => "::",
         TokenKind::Arrow => "->",

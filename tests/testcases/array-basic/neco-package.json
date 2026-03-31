@@ -1,0 +1,4 @@
+{
+    "name": "array-basic",
+    "felis-bin-entrypoints": ["src/array-basic.fe"]
+}

@@ -31,6 +31,7 @@ pub enum TokenKind {
     Comma,
     Equals,
     At,
+    AtCaret,
     Underscore,
     DoubleColon,
     Arrow,
@@ -149,6 +150,10 @@ impl Lexer {
         if self.starts_with(".>") {
             self.offset += 2;
             return Ok(simple_token(TokenKind::DotArrow, start, self.offset, ".>"));
+        }
+        if self.starts_with("@^") {
+            self.offset += 2;
+            return Ok(simple_token(TokenKind::AtCaret, start, self.offset, "@^"));
         }
 
         let ch = self
