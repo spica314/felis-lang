@@ -3,10 +3,11 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+mod effect;
+
+use effect::{Value, bind_pattern, lower_effect, resolve_value};
 use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
-use neco_rs_parser::{
-    BindingPattern, Item, ParsedPackage, ParsedRoot, PathExpression, Statement, Term, parse_root,
-};
+use neco_rs_parser::{Item, ParsedPackage, ParsedRoot, Statement, Term, parse_root};
 
 #[derive(Debug)]
 pub enum Error {
@@ -158,13 +159,6 @@ enum Operation {
     Exit(i32),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Value {
-    Unit,
-    FileDescriptor(u32),
-    ByteString(usize),
-}
-
 fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
     let entrypoint_name = package
         .source_files
@@ -269,189 +263,6 @@ fn lower_pure_value(
             "unsupported pure expression in entrypoint body: {term:?}"
         ))),
     }
-}
-
-fn lower_effect(
-    binder: &BindingPattern,
-    term: &Term,
-    environment: &mut HashMap<String, Value>,
-    program: &mut LoweredProgram,
-) -> Result<bool> {
-    match term {
-        Term::Path(path) if path_segments(path)? == ["IO", "stdout"] => {
-            bind_pattern(binder, Value::FileDescriptor(1), environment);
-            Ok(false)
-        }
-        Term::Application { callee, arguments } => {
-            let Term::Path(path) = callee.as_ref() else {
-                return Err(Error::Unsupported(
-                    "effectful entrypoint calls must use a path callee".to_string(),
-                ));
-            };
-
-            match path_segments(path)?.as_slice() {
-                ["IO", "write"] => {
-                    let (fd, data_index) = parse_write_arguments(arguments, environment)?;
-                    program.operations.push(Operation::Write { fd, data_index });
-                    bind_pattern(binder, Value::Unit, environment);
-                    Ok(false)
-                }
-                ["IO", "exit"] => {
-                    let exit_code = parse_exit_code_arguments(arguments)?;
-                    program.operations.push(Operation::Exit(exit_code));
-                    bind_pattern(binder, Value::Unit, environment);
-                    Ok(true)
-                }
-                segments => Err(Error::Unsupported(format!(
-                    "unsupported effectful call `{}`",
-                    segments.join("::")
-                ))),
-            }
-        }
-        _ => Err(Error::Unsupported(format!(
-            "unsupported effectful expression in entrypoint body: {term:?}"
-        ))),
-    }
-}
-
-fn bind_pattern(pattern: &BindingPattern, value: Value, environment: &mut HashMap<String, Value>) {
-    match pattern {
-        BindingPattern::Name(name) => {
-            environment.insert(name.clone(), value);
-        }
-        BindingPattern::Wildcard => {}
-        BindingPattern::ValueAndReference {
-            value: inner,
-            reference,
-            exclusive: _,
-        } => {
-            bind_pattern(inner, value.clone(), environment);
-            environment.insert(reference.clone(), value);
-        }
-    }
-}
-
-fn resolve_value(term: &Term, environment: &HashMap<String, Value>) -> Result<Value> {
-    let Term::Path(path) = term else {
-        return Err(Error::Unsupported(format!(
-            "expected a variable reference, got {term:?}"
-        )));
-    };
-
-    let segments = path_segments(path)?;
-    let [name] = segments.as_slice() else {
-        return Err(Error::Unsupported(
-            "only simple local variable references are supported here".to_string(),
-        ));
-    };
-
-    environment
-        .get(*name)
-        .cloned()
-        .ok_or_else(|| Error::Unsupported(format!("unknown entrypoint local `{name}`")))
-}
-
-fn parse_write_arguments(
-    arguments: &[Term],
-    environment: &HashMap<String, Value>,
-) -> Result<(u32, usize)> {
-    let [fd_term, bytes_term] = arguments else {
-        return Err(Error::Unsupported(
-            "`IO::write` must receive a file descriptor and a byte string reference".to_string(),
-        ));
-    };
-
-    let fd = match resolve_value(fd_term, environment)? {
-        Value::FileDescriptor(fd) => fd,
-        other => {
-            return Err(Error::Unsupported(format!(
-                "`IO::write` expects a file descriptor as its first argument, got {other:?}"
-            )));
-        }
-    };
-
-    let data_index = match resolve_value(bytes_term, environment)? {
-        Value::ByteString(data_index) => data_index,
-        other => {
-            return Err(Error::Unsupported(format!(
-                "`IO::write` expects a byte string reference as its second argument, got {other:?}"
-            )));
-        }
-    };
-
-    Ok((fd, data_index))
-}
-
-fn parse_exit_code_arguments(arguments: &[Term]) -> Result<i32> {
-    match arguments {
-        [value] => parse_i32_literal(value),
-        [value, suffix] if is_i32_suffix(suffix) => parse_bare_integer_literal(value),
-        _ => Err(Error::Unsupported(
-            "`IO::exit` must receive a single `i32` literal argument".to_string(),
-        )),
-    }
-}
-
-fn parse_i32_literal(term: &Term) -> Result<i32> {
-    let Term::IntegerLiteral(literal) = term else {
-        return Err(Error::Unsupported(
-            "exit code must be an integer literal".to_string(),
-        ));
-    };
-
-    let digits = literal
-        .strip_suffix("i32")
-        .ok_or_else(|| Error::Unsupported("exit code must use the `i32` suffix".to_string()))?;
-    digits.parse::<i32>().map_err(|_| {
-        Error::Unsupported(format!(
-            "exit code literal `{literal}` could not be parsed as i32"
-        ))
-    })
-}
-
-fn parse_bare_integer_literal(term: &Term) -> Result<i32> {
-    let Term::IntegerLiteral(literal) = term else {
-        return Err(Error::Unsupported(
-            "exit code must be an integer literal".to_string(),
-        ));
-    };
-
-    literal.parse::<i32>().map_err(|_| {
-        Error::Unsupported(format!(
-            "exit code literal `{literal}` could not be parsed as i32"
-        ))
-    })
-}
-
-fn is_i32_suffix(term: &Term) -> bool {
-    match term {
-        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i32",
-        _ => false,
-    }
-}
-
-fn path_segments(path: &PathExpression) -> Result<Vec<&str>> {
-    if path.starts_with_package {
-        return Err(Error::Unsupported(
-            "package-qualified paths are not supported in entrypoint lowering".to_string(),
-        ));
-    }
-
-    if path
-        .segments
-        .iter()
-        .any(|segment| !segment.suffixes.is_empty())
-    {
-        return Err(Error::Unsupported(
-            "path suffixes are not supported in entrypoint lowering".to_string(),
-        ));
-    }
-
-    Ok(path
-        .segments
-        .iter()
-        .map(|segment| segment.name.as_str())
-        .collect())
 }
 
 fn intern_data(program: &mut LoweredProgram, bytes: Vec<u8>) -> usize {
