@@ -390,7 +390,7 @@ mod tests {
                 Operation::Exit(0)
             ]
         );
-        assert_eq!(program.data, vec![b"Hello, world!".to_vec()]);
+        assert_eq!(program.data, vec![b"Hello, world!\n".to_vec()]);
     }
 
     #[test]
@@ -416,7 +416,7 @@ mod tests {
                 },
                 Operation::Exit(0),
             ],
-            data: vec![b"Hello, world!".to_vec()],
+            data: vec![b"Hello, world!\n".to_vec()],
         };
         let elf = build_linux_x86_64_program_executable(&program).to_bytes();
 
@@ -425,12 +425,12 @@ mod tests {
         assert_eq!(&elf[0x1005..0x100a], &[0xbf, 0x01, 0x00, 0x00, 0x00]);
         assert_eq!(&elf[0x100a..0x100c], &[0x48, 0xbe]);
         assert_eq!(&elf[0x100c..0x1014], &0x402000_u64.to_le_bytes());
-        assert_eq!(&elf[0x1014..0x1019], &[0xba, 13, 0x00, 0x00, 0x00]);
+        assert_eq!(&elf[0x1014..0x1019], &[0xba, 14, 0x00, 0x00, 0x00]);
         assert_eq!(&elf[0x1019..0x101b], &[0x0f, 0x05]);
         assert_eq!(&elf[0x101b..0x1020], &[0xb8, 0x3c, 0x00, 0x00, 0x00]);
         assert_eq!(&elf[0x1020..0x1025], &[0xbf, 0x00, 0x00, 0x00, 0x00]);
         assert_eq!(&elf[0x1025..0x1027], &[0x0f, 0x05]);
-        assert_eq!(&elf[0x2000..0x200d], b"Hello, world!");
+        assert_eq!(&elf[0x2000..0x200e], b"Hello, world!\n");
     }
 
     #[test]

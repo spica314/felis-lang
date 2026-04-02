@@ -4,7 +4,7 @@
 
 #fn main : () #with IO {
     #let stdout <- IO::stdout;
-    #let _ @ hello_world_ref = "Hello, world!";
+    #let _ @ hello_world_ref = "Hello, world!\n";
     #let hello_world_bytes_ref = hello_world_ref .> as_bytes;
     #let _ <- IO::write stdout hello_world_bytes_ref;
     ()
