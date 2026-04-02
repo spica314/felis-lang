@@ -1,0 +1,13 @@
+#bind_builtin "u8" #as u8;
+#bind_builtin "u8_add" #as u8_add;
+#bind_builtin "u8_sub" #as u8_sub;
+#bind_builtin "u8_mul" #as u8_mul;
+#bind_builtin "u8_div" #as u8_div;
+#bind_builtin "u8_mod" #as u8_mod;
+
+#pub #use u8;
+#pub #use u8_add;
+#pub #use u8_sub;
+#pub #use u8_mul;
+#pub #use u8_div;
+#pub #use u8_mod;

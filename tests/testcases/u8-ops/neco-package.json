@@ -1,0 +1,4 @@
+{
+    "name": "u8-ops",
+    "felis-bin-entrypoints": ["src/u8-ops.fe"]
+}

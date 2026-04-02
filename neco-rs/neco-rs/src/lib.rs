@@ -169,6 +169,22 @@ pub(crate) enum I32Expr {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum U8Expr {
+    Literal(u8),
+    Add(Box<U8Expr>, Box<U8Expr>),
+    Sub(Box<U8Expr>, Box<U8Expr>),
+    Mul(Box<U8Expr>, Box<U8Expr>),
+    Div(Box<U8Expr>, Box<U8Expr>),
+    Mod(Box<U8Expr>, Box<U8Expr>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ExitCodeExpr {
+    I32(I32Expr),
+    U8(U8Expr),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ArrayAllocation {
     slot: usize,
     len: usize,
@@ -185,7 +201,7 @@ enum Operation {
         index: I32Expr,
         value: I32Expr,
     },
-    Exit(I32Expr),
+    Exit(ExitCodeExpr),
 }
 
 pub(crate) struct LoweringState {
@@ -261,7 +277,7 @@ fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
     if !terminated {
         program
             .operations
-            .push(Operation::Exit(I32Expr::Literal(0)));
+            .push(Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))));
     }
 
     Ok(program)
@@ -308,6 +324,9 @@ fn lower_pure_value(
             if let Ok(expr) = lower_i32_expr(term, state) {
                 return Ok(Value::I32(expr));
             }
+            if let Ok(expr) = lower_u8_expr(term, state) {
+                return Ok(Value::U8(expr));
+            }
             Err(Error::Unsupported(format!(
                 "unsupported pure expression in entrypoint body: {term:?}"
             )))
@@ -348,6 +367,28 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
         }
         _ => Err(Error::Unsupported(format!(
             "unsupported `i32` expression in entrypoint body: {term:?}"
+        ))),
+    }
+}
+
+pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr> {
+    match term {
+        Term::Group(inner) => lower_u8_expr(inner, state),
+        Term::IntegerLiteral(literal) => parse_suffixed_u8_literal(literal),
+        Term::Path(_) => match resolve_value(term, &state.environment)? {
+            Value::U8(expr) => Ok(expr),
+            other => Err(Error::Unsupported(format!(
+                "expected a `u8` value, got {other:?}"
+            ))),
+        },
+        Term::Application { callee, arguments } => {
+            if let Some(expr) = lower_u8_literal_application(callee, arguments)? {
+                return Ok(expr);
+            }
+            lower_u8_primitive_call(callee, arguments, state)
+        }
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `u8` expression in entrypoint body: {term:?}"
         ))),
     }
 }
@@ -400,6 +441,59 @@ fn lower_i32_primitive_call(
         "i32_mod" => Ok(I32Expr::Mod(lhs, rhs)),
         _ => Err(Error::Unsupported(format!(
             "unsupported `i32` primitive call `{}`",
+            segments.join("::")
+        ))),
+    }
+}
+
+fn lower_u8_literal_application(callee: &Term, arguments: &[Term]) -> Result<Option<U8Expr>> {
+    let [suffix] = arguments else {
+        return Ok(None);
+    };
+    let Term::IntegerLiteral(literal) = callee else {
+        return Ok(None);
+    };
+    if !is_u8_suffix_term(suffix) {
+        return Ok(None);
+    }
+    Ok(Some(parse_bare_u8_literal(literal)?))
+}
+
+fn lower_u8_primitive_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<U8Expr> {
+    let Term::Path(path) = callee else {
+        return Err(Error::Unsupported(
+            "unsupported `u8` callee in entrypoint body".to_string(),
+        ));
+    };
+
+    let segments: Vec<_> = path
+        .segments
+        .iter()
+        .map(|segment| segment.name.as_str())
+        .collect();
+    let [lhs, rhs] = arguments else {
+        return Err(Error::Unsupported(format!(
+            "`{}` must receive exactly two arguments",
+            segments.join("::")
+        )));
+    };
+    let lhs = Box::new(lower_u8_expr(lhs, state)?);
+    let rhs = Box::new(lower_u8_expr(rhs, state)?);
+
+    let primitive = segments.last().copied().unwrap_or_default();
+
+    match primitive {
+        "u8_add" => Ok(U8Expr::Add(lhs, rhs)),
+        "u8_sub" => Ok(U8Expr::Sub(lhs, rhs)),
+        "u8_mul" => Ok(U8Expr::Mul(lhs, rhs)),
+        "u8_div" => Ok(U8Expr::Div(lhs, rhs)),
+        "u8_mod" => Ok(U8Expr::Mod(lhs, rhs)),
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `u8` primitive call `{}`",
             segments.join("::")
         ))),
     }
@@ -495,6 +589,17 @@ fn parse_bare_i32_literal(literal: &str) -> Result<I32Expr> {
     Ok(I32Expr::Literal(parse_i32_digits(literal, literal)?))
 }
 
+fn parse_suffixed_u8_literal(literal: &str) -> Result<U8Expr> {
+    let digits = literal.strip_suffix("u8").ok_or_else(|| {
+        Error::Unsupported("integer literal must use the `u8` suffix".to_string())
+    })?;
+    Ok(U8Expr::Literal(parse_u8_digits(digits, literal)?))
+}
+
+fn parse_bare_u8_literal(literal: &str) -> Result<U8Expr> {
+    Ok(U8Expr::Literal(parse_u8_digits(literal, literal)?))
+}
+
 fn parse_i32_digits(digits: &str, original: &str) -> Result<i32> {
     digits.parse::<i32>().map_err(|_| {
         Error::Unsupported(format!(
@@ -503,9 +608,24 @@ fn parse_i32_digits(digits: &str, original: &str) -> Result<i32> {
     })
 }
 
+fn parse_u8_digits(digits: &str, original: &str) -> Result<u8> {
+    digits.parse::<u8>().map_err(|_| {
+        Error::Unsupported(format!(
+            "integer literal `{original}` could not be parsed as u8"
+        ))
+    })
+}
+
 fn is_i32_suffix_term(term: &Term) -> bool {
     match term {
         Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i32",
+        _ => false,
+    }
+}
+
+fn is_u8_suffix_term(term: &Term) -> bool {
+    match term {
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "u8",
         _ => false,
     }
 }
@@ -614,7 +734,7 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
                 value,
             } => emit_array_set(*array_slot, index, value, &mut code, program),
             Operation::Exit(exit_code) => {
-                emit_i32_expr_to_eax(exit_code, &mut code, program);
+                emit_exit_code_expr_to_eax(exit_code, &mut code, program);
                 // mov edi, eax
                 code.extend_from_slice(&[0x89, 0xc7]);
                 // mov eax, (imm32): 0xb8, (imm32)
@@ -627,6 +747,13 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
     }
 
     code
+}
+
+fn emit_exit_code_expr_to_eax(expr: &ExitCodeExpr, code: &mut Vec<u8>, program: &LoweredProgram) {
+    match expr {
+        ExitCodeExpr::I32(expr) => emit_i32_expr_to_eax(expr, code, program),
+        ExitCodeExpr::U8(expr) => emit_u8_expr_to_eax(expr, code, program),
+    }
 }
 
 fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>, program: &LoweredProgram) {
@@ -702,6 +829,83 @@ fn emit_i32_div_mod_expr(
         // mov eax, edx
         code.extend_from_slice(&[0x89, 0xd0]);
     }
+}
+
+fn emit_u8_expr_to_eax(expr: &U8Expr, code: &mut Vec<u8>, program: &LoweredProgram) {
+    match expr {
+        U8Expr::Literal(value) => {
+            // mov eax, imm32
+            code.push(0xb8);
+            code.extend_from_slice(&u32::from(*value).to_le_bytes());
+        }
+        U8Expr::Add(lhs, rhs) => emit_u8_binary_expr(lhs, rhs, code, program, &[0x00, 0xc8]),
+        U8Expr::Sub(lhs, rhs) => emit_u8_binary_expr(lhs, rhs, code, program, &[0x28, 0xc8]),
+        U8Expr::Mul(lhs, rhs) => emit_u8_mul_expr(lhs, rhs, code, program),
+        U8Expr::Div(lhs, rhs) => emit_u8_div_mod_expr(lhs, rhs, code, program, false),
+        U8Expr::Mod(lhs, rhs) => emit_u8_div_mod_expr(lhs, rhs, code, program, true),
+    }
+}
+
+fn emit_u8_binary_expr(
+    lhs: &U8Expr,
+    rhs: &U8Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+    opcode: &[u8],
+) {
+    emit_u8_expr_to_eax(lhs, code, program);
+    // push rax
+    code.push(0x50);
+    emit_u8_expr_to_eax(rhs, code, program);
+    // mov ecx, eax
+    code.extend_from_slice(&[0x89, 0xc1]);
+    // pop rax
+    code.push(0x58);
+    code.extend_from_slice(opcode);
+    // movzx eax, al
+    code.extend_from_slice(&[0x0f, 0xb6, 0xc0]);
+}
+
+fn emit_u8_mul_expr(lhs: &U8Expr, rhs: &U8Expr, code: &mut Vec<u8>, program: &LoweredProgram) {
+    emit_u8_expr_to_eax(lhs, code, program);
+    // push rax
+    code.push(0x50);
+    emit_u8_expr_to_eax(rhs, code, program);
+    // mov ecx, eax
+    code.extend_from_slice(&[0x89, 0xc1]);
+    // pop rax
+    code.push(0x58);
+    // imul eax, ecx
+    code.extend_from_slice(&[0x0f, 0xaf, 0xc1]);
+    // movzx eax, al
+    code.extend_from_slice(&[0x0f, 0xb6, 0xc0]);
+}
+
+fn emit_u8_div_mod_expr(
+    lhs: &U8Expr,
+    rhs: &U8Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+    modulo: bool,
+) {
+    emit_u8_expr_to_eax(lhs, code, program);
+    // push rax
+    code.push(0x50);
+    emit_u8_expr_to_eax(rhs, code, program);
+    // mov ecx, eax
+    code.extend_from_slice(&[0x89, 0xc1]);
+    // pop rax
+    code.push(0x58);
+    // xor edx, edx
+    code.extend_from_slice(&[0x31, 0xd2]);
+    // div ecx
+    code.extend_from_slice(&[0xf7, 0xf1]);
+    if modulo {
+        // mov eax, edx
+        code.extend_from_slice(&[0x89, 0xd0]);
+    }
+    // movzx eax, al
+    code.extend_from_slice(&[0x0f, 0xb6, 0xc0]);
 }
 
 fn stack_frame_size(program: &LoweredProgram) -> usize {
@@ -809,7 +1013,7 @@ mod tests {
         let program = lower_package_to_program(&package).expect("lower fixture");
         assert_eq!(
             program.operations,
-            vec![Operation::Exit(I32Expr::Literal(42))]
+            vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))]
         );
         assert!(program.data.is_empty());
         assert!(program.arrays.is_empty());
@@ -830,7 +1034,7 @@ mod tests {
                     fd: 1,
                     data_index: 0
                 },
-                Operation::Exit(I32Expr::Literal(0))
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0)))
             ]
         );
         assert_eq!(program.data, vec![b"Hello, world!\n".to_vec()]);
@@ -847,7 +1051,7 @@ mod tests {
         let program = lower_package_to_program(&package).expect("lower fixture");
         assert_eq!(
             program.operations,
-            vec![Operation::Exit(I32Expr::Mod(
+            vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Mod(
                 Box::new(I32Expr::Div(
                     Box::new(I32Expr::Mul(
                         Box::new(I32Expr::Sub(
@@ -862,7 +1066,38 @@ mod tests {
                     Box::new(I32Expr::Literal(3)),
                 )),
                 Box::new(I32Expr::Literal(80)),
-            ))]
+            )))]
+        );
+        assert!(program.data.is_empty());
+        assert!(program.arrays.is_empty());
+    }
+
+    #[test]
+    fn lowers_u8_ops_fixture_to_runtime_expression_tree() {
+        let root = repo_root().join("tests/testcases/u8-ops");
+        let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.operations,
+            vec![Operation::Exit(ExitCodeExpr::U8(U8Expr::Mod(
+                Box::new(U8Expr::Div(
+                    Box::new(U8Expr::Mul(
+                        Box::new(U8Expr::Sub(
+                            Box::new(U8Expr::Add(
+                                Box::new(U8Expr::Literal(3)),
+                                Box::new(U8Expr::Literal(7)),
+                            )),
+                            Box::new(U8Expr::Literal(4)),
+                        )),
+                        Box::new(U8Expr::Literal(21)),
+                    )),
+                    Box::new(U8Expr::Literal(3)),
+                )),
+                Box::new(U8Expr::Literal(80)),
+            )))]
         );
         assert!(program.data.is_empty());
         assert!(program.arrays.is_empty());
@@ -895,7 +1130,7 @@ mod tests {
                     index: I32Expr::Literal(2),
                     value: I32Expr::Literal(21),
                 },
-                Operation::Exit(I32Expr::Add(
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
                     Box::new(I32Expr::Add(
                         Box::new(I32Expr::ArrayGet {
                             array_slot: 0,
@@ -910,7 +1145,7 @@ mod tests {
                         array_slot: 0,
                         index: Box::new(I32Expr::Literal(2)),
                     }),
-                )),
+                ))),
             ]
         );
     }
@@ -918,7 +1153,7 @@ mod tests {
     #[test]
     fn builds_elf_image_with_exit_syscall() {
         let program = LoweredProgram {
-            operations: vec![Operation::Exit(I32Expr::Literal(42))],
+            operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))],
             data: Vec::new(),
             arrays: Vec::new(),
         };
@@ -938,7 +1173,7 @@ mod tests {
                     fd: 1,
                     data_index: 0,
                 },
-                Operation::Exit(I32Expr::Literal(0)),
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
             ],
             data: vec![b"Hello, world!\n".to_vec()],
             arrays: Vec::new(),
@@ -962,7 +1197,7 @@ mod tests {
     #[test]
     fn builds_elf_image_with_runtime_i32_ops() {
         let program = LoweredProgram {
-            operations: vec![Operation::Exit(I32Expr::Mod(
+            operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Mod(
                 Box::new(I32Expr::Div(
                     Box::new(I32Expr::Mul(
                         Box::new(I32Expr::Sub(
@@ -977,7 +1212,7 @@ mod tests {
                     Box::new(I32Expr::Literal(3)),
                 )),
                 Box::new(I32Expr::Literal(80)),
-            ))],
+            )))],
             data: Vec::new(),
             arrays: Vec::new(),
         };
@@ -1005,6 +1240,29 @@ mod tests {
             .expect("system time")
             .as_nanos();
         let output = std::env::temp_dir().join(format!("neco-rs-i32-ops-{unique}"));
+
+        compile_path_to_elf(&root, &output).expect("compile fixture");
+
+        let mut permissions = fs::metadata(&output)
+            .expect("binary metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&output, permissions).expect("binary permissions");
+
+        let status = Command::new(&output).status().expect("run binary");
+        assert_eq!(status.code(), Some(42));
+
+        fs::remove_file(&output).expect("cleanup binary");
+    }
+
+    #[test]
+    fn compiles_and_runs_u8_ops_fixture() {
+        let root = repo_root().join("tests/testcases/u8-ops");
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let output = std::env::temp_dir().join(format!("neco-rs-u8-ops-{unique}"));
 
         compile_path_to_elf(&root, &output).expect("compile fixture");
 

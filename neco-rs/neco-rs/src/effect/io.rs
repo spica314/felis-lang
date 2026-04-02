@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use neco_rs_parser::{BindingPattern, Term};
 
 use crate::effect::{Value, bind_pattern, resolve_value};
-use crate::{Error, LoweredProgram, LoweringState, Operation, Result, lower_i32_expr};
+use crate::{
+    Error, ExitCodeExpr, LoweredProgram, LoweringState, Operation, Result, lower_i32_expr,
+    lower_u8_expr,
+};
 
 pub(crate) fn lower_io_reference(
     binder: &BindingPattern,
@@ -88,18 +91,22 @@ fn parse_write_arguments(
     Ok((fd, data_index))
 }
 
-fn parse_exit_code_arguments(arguments: &[Term], state: &LoweringState) -> Result<crate::I32Expr> {
+fn parse_exit_code_arguments(arguments: &[Term], state: &LoweringState) -> Result<ExitCodeExpr> {
     match arguments {
-        [value] => lower_i32_expr(value, state),
-        [value, suffix] if is_i32_suffix(suffix) => lower_i32_expr(
-            &Term::Application {
+        [value] => lower_i32_expr(value, state)
+            .map(ExitCodeExpr::I32)
+            .or_else(|_| lower_u8_expr(value, state).map(ExitCodeExpr::U8)),
+        [value, suffix] if is_i32_suffix(suffix) || is_u8_suffix(suffix) => {
+            let term = Term::Application {
                 callee: Box::new(value.clone()),
                 arguments: vec![suffix.clone()],
-            },
-            state,
-        ),
+            };
+            lower_i32_expr(&term, state)
+                .map(ExitCodeExpr::I32)
+                .or_else(|_| lower_u8_expr(&term, state).map(ExitCodeExpr::U8))
+        }
         _ => Err(Error::Unsupported(
-            "`IO::exit` must receive a single `i32` expression".to_string(),
+            "`IO::exit` must receive a single `i32` or `u8` expression".to_string(),
         )),
     }
 }
@@ -136,6 +143,13 @@ fn parse_array_new_arguments(arguments: &[Term]) -> Result<usize> {
 fn is_i32_suffix(term: &Term) -> bool {
     match term {
         Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i32",
+        _ => false,
+    }
+}
+
+fn is_u8_suffix(term: &Term) -> bool {
+    match term {
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "u8",
         _ => false,
     }
 }

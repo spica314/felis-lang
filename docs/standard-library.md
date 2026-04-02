@@ -35,6 +35,15 @@ source-level symbols.
 - `i32_div`
 - `i32_mod`
 
+[`std/src/primitive/u8.fe`](../std/src/primitive/u8.fe) currently re-exports:
+
+- `u8`
+- `u8_add`
+- `u8_sub`
+- `u8_mul`
+- `u8_div`
+- `u8_mod`
+
 ## IO Module
 
 The `io` branch exposes the builtin `IO` effect as an ordinary public symbol.

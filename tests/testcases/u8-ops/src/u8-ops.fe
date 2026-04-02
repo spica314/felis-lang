@@ -1,0 +1,25 @@
+#use std::io::IO;
+#use std::primitive::u8::u8;
+#use std::primitive::u8::u8_add;
+#use std::primitive::u8::u8_sub;
+#use std::primitive::u8::u8_mul;
+#use std::primitive::u8::u8_div;
+#use std::primitive::u8::u8_mod;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let a = 3u8;
+    #let b = 7u8;
+    #let c = 4u8;
+    #let d = 21u8;
+    #let e = 3u8;
+    #let f = 80u8;
+    #let x1 = u8_add a b;
+    #let x2 = u8_sub x1 c;
+    #let x3 = u8_mul x2 d;
+    #let x4 = u8_div x3 e;
+    #let x5 = u8_mod x4 f;
+    #let _ <- IO::exit x5;
+    ()
+}
