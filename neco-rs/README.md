@@ -1,7 +1,7 @@
 # neco-rs
 
-This directory contains the Cargo workspace for the Rust bootstrap
-implementation of the neco compiler.
+This directory contains the Rust crates for the bootstrap implementation of the
+neco compiler. The Cargo workspace lives at the repository root.
 
 ## Current Status
 
