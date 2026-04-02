@@ -318,19 +318,29 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
         match *operation {
             Operation::Write { fd, data_index } => {
                 let bytes = &program.data[data_index];
+                // mov eax, (imm32): 0xb8, (imm32)
+                // write syscall: 1
                 code.extend_from_slice(&[0xb8, 0x01, 0x00, 0x00, 0x00]);
+                // mov edi, (imm32): 0xbf, (imm32)
                 code.push(0xbf);
                 code.extend_from_slice(&fd.to_le_bytes());
+                // mov rsi, (imm64): 0x48, 0xbe, (imm64)
                 code.extend_from_slice(&[0x48, 0xbe]);
                 code.extend_from_slice(&addresses[data_index].to_le_bytes());
+                // mov edx, (imm32): 0xba
                 code.push(0xba);
                 code.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+                // syscall
                 code.extend_from_slice(&[0x0f, 0x05]);
             }
             Operation::Exit(exit_code) => {
+                // mov eax, (imm32): 0xb8, (imm32)
+                // exit syscall: 60
                 code.extend_from_slice(&[0xb8, 0x3c, 0x00, 0x00, 0x00]);
+                // mov edi, (imm32): 0xbf, (imm32)
                 code.push(0xbf);
                 code.extend_from_slice(&exit_code.to_le_bytes());
+                // syscall
                 code.extend_from_slice(&[0x0f, 0x05]);
             }
         }
