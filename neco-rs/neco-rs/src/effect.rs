@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use neco_rs_parser::{BindingPattern, PathExpression, Term};
 
-use crate::{Error, I32Expr, LoweredProgram, Result};
+use crate::{Error, I32Expr, LoweredProgram, LoweringState, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Value {
@@ -12,18 +12,20 @@ pub(crate) enum Value {
     FileDescriptor(u32),
     ByteString(usize),
     I32(I32Expr),
+    Array(usize),
 }
 
 pub(crate) fn lower_effect(
     binder: &BindingPattern,
     term: &Term,
-    environment: &mut HashMap<String, Value>,
+    state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<bool> {
     match term {
         Term::Path(path) => {
             let segments = path_segments(path)?;
-            if let Some(result) = io::lower_io_reference(binder, &segments, environment) {
+            if let Some(result) = io::lower_io_reference(binder, &segments, &mut state.environment)
+            {
                 return result;
             }
 
@@ -40,9 +42,7 @@ pub(crate) fn lower_effect(
             };
 
             let segments = path_segments(path)?;
-            if let Some(result) =
-                io::lower_io_call(binder, &segments, arguments, environment, program)
-            {
+            if let Some(result) = io::lower_io_call(binder, &segments, arguments, state, program) {
                 return result;
             }
 

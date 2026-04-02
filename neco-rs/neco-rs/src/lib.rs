@@ -151,6 +151,7 @@ fn default_output_path(input: &Path) -> PathBuf {
 pub(crate) struct LoweredProgram {
     operations: Vec<Operation>,
     data: Vec<Vec<u8>>,
+    arrays: Vec<ArrayAllocation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,12 +162,51 @@ pub(crate) enum I32Expr {
     Mul(Box<I32Expr>, Box<I32Expr>),
     Div(Box<I32Expr>, Box<I32Expr>),
     Mod(Box<I32Expr>, Box<I32Expr>),
+    ArrayGet {
+        array_slot: usize,
+        index: Box<I32Expr>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ArrayAllocation {
+    slot: usize,
+    len: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Operation {
-    Write { fd: u32, data_index: usize },
+    Write {
+        fd: u32,
+        data_index: usize,
+    },
+    ArraySet {
+        array_slot: usize,
+        index: I32Expr,
+        value: I32Expr,
+    },
     Exit(I32Expr),
+}
+
+pub(crate) struct LoweringState {
+    environment: HashMap<String, Value>,
+    next_array_slot: usize,
+}
+
+impl LoweringState {
+    fn new() -> Self {
+        Self {
+            environment: HashMap::new(),
+            next_array_slot: 0,
+        }
+    }
+
+    fn allocate_array(&mut self, len: usize, program: &mut LoweredProgram) -> usize {
+        let slot = self.next_array_slot;
+        self.next_array_slot += 1;
+        program.arrays.push(ArrayAllocation { slot, len });
+        slot
+    }
 }
 
 fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
@@ -203,8 +243,9 @@ fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
     let mut program = LoweredProgram {
         operations: Vec::new(),
         data: Vec::new(),
+        arrays: Vec::new(),
     };
-    let mut environment = HashMap::new();
+    let mut state = LoweringState::new();
     let mut terminated = false;
 
     for statement in &main_fn.body.statements {
@@ -214,7 +255,7 @@ fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
             ));
         }
 
-        terminated = lower_statement(statement, &mut environment, &mut program)?;
+        terminated = lower_statement(statement, &mut state, &mut program)?;
     }
 
     if !terminated {
@@ -228,43 +269,43 @@ fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
 
 fn lower_statement(
     statement: &Statement,
-    environment: &mut HashMap<String, Value>,
+    state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<bool> {
-    let Statement::Let(let_stmt) = statement else {
-        return Err(Error::Unsupported(
-            "only let statements are supported in entrypoint bodies".to_string(),
-        ));
-    };
-
-    match let_stmt.operator {
-        neco_rs_parser::LetOperator::Equals => {
-            let value = lower_pure_value(let_stmt.value.as_ref(), environment, program)?;
-            bind_pattern(&let_stmt.binder, value, environment);
+    match statement {
+        Statement::Let(let_stmt) => match let_stmt.operator {
+            neco_rs_parser::LetOperator::Equals => {
+                let value = lower_pure_value(let_stmt.value.as_ref(), state, program)?;
+                bind_pattern(&let_stmt.binder, value, &mut state.environment);
+                Ok(false)
+            }
+            neco_rs_parser::LetOperator::LeftArrow => {
+                lower_effect(&let_stmt.binder, let_stmt.value.as_ref(), state, program)
+            }
+        },
+        Statement::Expression(term) => {
+            lower_expression_statement(term.as_ref(), state, program)?;
             Ok(false)
         }
-        neco_rs_parser::LetOperator::LeftArrow => lower_effect(
-            &let_stmt.binder,
-            let_stmt.value.as_ref(),
-            environment,
-            program,
-        ),
+        Statement::Item(_) => Err(Error::Unsupported(
+            "items inside entrypoint bodies are not supported".to_string(),
+        )),
     }
 }
 
 fn lower_pure_value(
     term: &Term,
-    environment: &HashMap<String, Value>,
+    state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<Value> {
     match term {
-        Term::Group(inner) => lower_pure_value(inner, environment, program),
+        Term::Group(inner) => lower_pure_value(inner, state, program),
         Term::StringLiteral(literal) => {
             let data_index = intern_data(program, literal.as_bytes().to_vec());
             Ok(Value::ByteString(data_index))
         }
         Term::IntegerLiteral(_) | Term::Application { .. } => {
-            if let Ok(expr) = lower_i32_expr(term, environment) {
+            if let Ok(expr) = lower_i32_expr(term, state) {
                 return Ok(Value::I32(expr));
             }
             Err(Error::Unsupported(format!(
@@ -272,25 +313,25 @@ fn lower_pure_value(
             )))
         }
         Term::MethodCall { receiver, method } if method == "as_bytes" => {
-            match resolve_value(receiver.as_ref(), environment)? {
+            match resolve_value(receiver.as_ref(), &state.environment)? {
                 Value::ByteString(data_index) => Ok(Value::ByteString(data_index)),
                 other => Err(Error::Unsupported(format!(
                     "`as_bytes` expects a string reference, got {other:?}"
                 ))),
             }
         }
-        Term::Path(_) => resolve_value(term, environment),
+        Term::Path(_) => resolve_value(term, &state.environment),
         _ => Err(Error::Unsupported(format!(
             "unsupported pure expression in entrypoint body: {term:?}"
         ))),
     }
 }
 
-pub(crate) fn lower_i32_expr(term: &Term, environment: &HashMap<String, Value>) -> Result<I32Expr> {
+pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Expr> {
     match term {
-        Term::Group(inner) => lower_i32_expr(inner, environment),
+        Term::Group(inner) => lower_i32_expr(inner, state),
         Term::IntegerLiteral(literal) => parse_suffixed_i32_literal(literal),
-        Term::Path(_) => match resolve_value(term, environment)? {
+        Term::Path(_) => match resolve_value(term, &state.environment)? {
             Value::I32(expr) => Ok(expr),
             other => Err(Error::Unsupported(format!(
                 "expected an `i32` value, got {other:?}"
@@ -300,7 +341,10 @@ pub(crate) fn lower_i32_expr(term: &Term, environment: &HashMap<String, Value>) 
             if let Some(expr) = lower_i32_literal_application(callee, arguments)? {
                 return Ok(expr);
             }
-            lower_i32_primitive_call(callee, arguments, environment)
+            if let Some(expr) = lower_array_get_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
+            lower_i32_primitive_call(callee, arguments, state)
         }
         _ => Err(Error::Unsupported(format!(
             "unsupported `i32` expression in entrypoint body: {term:?}"
@@ -324,7 +368,7 @@ fn lower_i32_literal_application(callee: &Term, arguments: &[Term]) -> Result<Op
 fn lower_i32_primitive_call(
     callee: &Term,
     arguments: &[Term],
-    environment: &HashMap<String, Value>,
+    state: &LoweringState,
 ) -> Result<I32Expr> {
     let Term::Path(path) = callee else {
         return Err(Error::Unsupported(
@@ -343,8 +387,8 @@ fn lower_i32_primitive_call(
             segments.join("::")
         )));
     };
-    let lhs = Box::new(lower_i32_expr(lhs, environment)?);
-    let rhs = Box::new(lower_i32_expr(rhs, environment)?);
+    let lhs = Box::new(lower_i32_expr(lhs, state)?);
+    let rhs = Box::new(lower_i32_expr(rhs, state)?);
 
     let primitive = segments.last().copied().unwrap_or_default();
 
@@ -359,6 +403,85 @@ fn lower_i32_primitive_call(
             segments.join("::")
         ))),
     }
+}
+
+fn lower_array_get_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<I32Expr>> {
+    let Term::MethodCall { receiver, method } = callee else {
+        return Ok(None);
+    };
+    if method != "get" {
+        return Ok(None);
+    }
+
+    let normalized = normalize_i32_literal_arguments(arguments);
+    let [index] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`get` must receive exactly one index argument".to_string(),
+        ));
+    };
+
+    let array_slot = match resolve_value(receiver.as_ref(), &state.environment)? {
+        Value::Array(slot) => slot,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`get` expects an array reference, got {other:?}"
+            )));
+        }
+    };
+
+    Ok(Some(I32Expr::ArrayGet {
+        array_slot,
+        index: Box::new(lower_i32_expr(index, state)?),
+    }))
+}
+
+fn lower_expression_statement(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<()> {
+    let Term::Application { callee, arguments } = term else {
+        return Err(Error::Unsupported(format!(
+            "unsupported expression statement in entrypoint body: {term:?}"
+        )));
+    };
+    let Term::MethodCall { receiver, method } = callee.as_ref() else {
+        return Err(Error::Unsupported(format!(
+            "unsupported expression statement in entrypoint body: {term:?}"
+        )));
+    };
+    if method != "set" {
+        return Err(Error::Unsupported(format!(
+            "unsupported expression statement in entrypoint body: {term:?}"
+        )));
+    }
+
+    let normalized = normalize_i32_literal_arguments(arguments);
+    let [index, value] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`set` must receive exactly two arguments".to_string(),
+        ));
+    };
+
+    let array_slot = match resolve_value(receiver.as_ref(), &state.environment)? {
+        Value::Array(slot) => slot,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`set` expects an array reference, got {other:?}"
+            )));
+        }
+    };
+
+    program.operations.push(Operation::ArraySet {
+        array_slot,
+        index: lower_i32_expr(index, state)?,
+        value: lower_i32_expr(value, state)?,
+    });
+    Ok(())
 }
 
 fn parse_suffixed_i32_literal(literal: &str) -> Result<I32Expr> {
@@ -385,6 +508,27 @@ fn is_i32_suffix_term(term: &Term) -> bool {
         Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i32",
         _ => false,
     }
+}
+
+fn normalize_i32_literal_arguments(arguments: &[Term]) -> Vec<Term> {
+    let mut normalized = Vec::with_capacity(arguments.len());
+    let mut index = 0;
+    while index < arguments.len() {
+        if index + 1 < arguments.len()
+            && matches!(arguments[index], Term::IntegerLiteral(_))
+            && is_i32_suffix_term(&arguments[index + 1])
+        {
+            normalized.push(Term::Application {
+                callee: Box::new(arguments[index].clone()),
+                arguments: vec![arguments[index + 1].clone()],
+            });
+            index += 2;
+            continue;
+        }
+        normalized.push(arguments[index].clone());
+        index += 1;
+    }
+    normalized
 }
 
 fn intern_data(program: &mut LoweredProgram, bytes: Vec<u8>) -> usize {
@@ -435,6 +579,15 @@ fn data_addresses(program: &LoweredProgram, data_virtual_address: u64) -> Vec<u6
 fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> Vec<u8> {
     let addresses = data_addresses(program, data_virtual_address);
     let mut code = Vec::new();
+    let stack_frame_size = stack_frame_size(program);
+
+    if stack_frame_size > 0 {
+        code.push(0x55);
+        code.extend_from_slice(&[0x48, 0x89, 0xe5]);
+        code.extend_from_slice(&[0x48, 0x81, 0xec]);
+        code.extend_from_slice(&(stack_frame_size as u32).to_le_bytes());
+        emit_array_initializers(program, &mut code);
+    }
 
     for operation in &program.operations {
         match operation {
@@ -455,8 +608,13 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
                 // syscall
                 code.extend_from_slice(&[0x0f, 0x05]);
             }
+            Operation::ArraySet {
+                array_slot,
+                index,
+                value,
+            } => emit_array_set(*array_slot, index, value, &mut code, program),
             Operation::Exit(exit_code) => {
-                emit_i32_expr_to_eax(exit_code, &mut code);
+                emit_i32_expr_to_eax(exit_code, &mut code, program);
                 // mov edi, eax
                 code.extend_from_slice(&[0x89, 0xc7]);
                 // mov eax, (imm32): 0xb8, (imm32)
@@ -471,7 +629,7 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
     code
 }
 
-fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>) {
+fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>, program: &LoweredProgram) {
     match expr {
         I32Expr::Literal(value) => {
             // mov eax, imm32
@@ -479,22 +637,33 @@ fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>) {
             code.extend_from_slice(&value.to_le_bytes());
         }
         // add eax, ecx
-        I32Expr::Add(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, &[0x01, 0xc8]),
+        I32Expr::Add(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0x01, 0xc8]),
         // sub eax, ecx
-        I32Expr::Sub(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, &[0x29, 0xc8]),
+        I32Expr::Sub(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0x29, 0xc8]),
         // imul eax, ecx
-        I32Expr::Mul(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, &[0x0f, 0xaf, 0xc1]),
-        I32Expr::Div(lhs, rhs) => emit_i32_div_mod_expr(lhs, rhs, code, false),
-        I32Expr::Mod(lhs, rhs) => emit_i32_div_mod_expr(lhs, rhs, code, true),
+        I32Expr::Mul(lhs, rhs) => {
+            emit_i32_binary_expr(lhs, rhs, code, program, &[0x0f, 0xaf, 0xc1])
+        }
+        I32Expr::Div(lhs, rhs) => emit_i32_div_mod_expr(lhs, rhs, code, program, false),
+        I32Expr::Mod(lhs, rhs) => emit_i32_div_mod_expr(lhs, rhs, code, program, true),
+        I32Expr::ArrayGet { array_slot, index } => {
+            emit_array_get(*array_slot, index, code, program)
+        }
     }
 }
 
-fn emit_i32_binary_expr(lhs: &I32Expr, rhs: &I32Expr, code: &mut Vec<u8>, opcode: &[u8]) {
-    emit_i32_expr_to_eax(lhs, code);
+fn emit_i32_binary_expr(
+    lhs: &I32Expr,
+    rhs: &I32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+    opcode: &[u8],
+) {
+    emit_i32_expr_to_eax(lhs, code, program);
     // Save the left operand while evaluating the right operand into eax.
     // push rax
     code.push(0x50);
-    emit_i32_expr_to_eax(rhs, code);
+    emit_i32_expr_to_eax(rhs, code, program);
     // Move the right operand into ecx.
     // mov ecx, eax
     code.extend_from_slice(&[0x89, 0xc1]);
@@ -504,12 +673,18 @@ fn emit_i32_binary_expr(lhs: &I32Expr, rhs: &I32Expr, code: &mut Vec<u8>, opcode
     code.extend_from_slice(opcode);
 }
 
-fn emit_i32_div_mod_expr(lhs: &I32Expr, rhs: &I32Expr, code: &mut Vec<u8>, modulo: bool) {
-    emit_i32_expr_to_eax(lhs, code);
+fn emit_i32_div_mod_expr(
+    lhs: &I32Expr,
+    rhs: &I32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+    modulo: bool,
+) {
+    emit_i32_expr_to_eax(lhs, code, program);
     // Save the dividend while evaluating the divisor.
     // push rax
     code.push(0x50);
-    emit_i32_expr_to_eax(rhs, code);
+    emit_i32_expr_to_eax(rhs, code, program);
     // Move the divisor into ecx.
     // mov ecx, eax
     code.extend_from_slice(&[0x89, 0xc1]);
@@ -527,6 +702,87 @@ fn emit_i32_div_mod_expr(lhs: &I32Expr, rhs: &I32Expr, code: &mut Vec<u8>, modul
         // mov eax, edx
         code.extend_from_slice(&[0x89, 0xd0]);
     }
+}
+
+fn stack_frame_size(program: &LoweredProgram) -> usize {
+    let pointer_bytes = program.arrays.len() * 8;
+    let array_bytes: usize = program.arrays.iter().map(|array| array.len * 4).sum();
+    pointer_bytes + array_bytes
+}
+
+fn array_slot_offset(slot: usize) -> i32 {
+    -8 * (slot as i32 + 1)
+}
+
+fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
+    let pointer_bytes = (program.arrays.len() * 8) as i32;
+    let mut offset = pointer_bytes;
+    for array in &program.arrays {
+        offset += (array.len * 4) as i32;
+        if array.slot == slot {
+            return -offset;
+        }
+    }
+    panic!("unknown array slot {slot}");
+}
+
+fn emit_array_initializers(program: &LoweredProgram, code: &mut Vec<u8>) {
+    for array in &program.arrays {
+        let slot_offset = array_slot_offset(array.slot);
+        let data_offset = array_data_offset(program, array.slot);
+        // lea rax, [rbp + disp32]
+        code.extend_from_slice(&[0x48, 0x8d, 0x85]);
+        code.extend_from_slice(&data_offset.to_le_bytes());
+        // mov [rbp + disp32], rax
+        code.extend_from_slice(&[0x48, 0x89, 0x85]);
+        code.extend_from_slice(&slot_offset.to_le_bytes());
+    }
+}
+
+fn emit_array_set(
+    array_slot: usize,
+    index: &I32Expr,
+    value: &I32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    emit_i32_expr_to_eax(index, code, program);
+    // movsxd rcx, eax
+    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    // shl rcx, 2
+    code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x02]);
+    // push rcx
+    code.push(0x51);
+    emit_i32_expr_to_eax(value, code, program);
+    // mov edx, eax
+    code.extend_from_slice(&[0x89, 0xc2]);
+    // pop rcx
+    code.push(0x59);
+    let slot_offset = array_slot_offset(array_slot);
+    // mov rbx, [rbp + disp32]
+    code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
+    code.extend_from_slice(&slot_offset.to_le_bytes());
+    // mov [rbx + rcx], edx
+    code.extend_from_slice(&[0x89, 0x14, 0x0b]);
+}
+
+fn emit_array_get(
+    array_slot: usize,
+    index: &I32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    emit_i32_expr_to_eax(index, code, program);
+    // movsxd rcx, eax
+    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    // shl rcx, 2
+    code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x02]);
+    let slot_offset = array_slot_offset(array_slot);
+    // mov rbx, [rbp + disp32]
+    code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
+    code.extend_from_slice(&slot_offset.to_le_bytes());
+    // mov eax, [rbx + rcx]
+    code.extend_from_slice(&[0x8b, 0x04, 0x0b]);
 }
 
 #[cfg(test)]
@@ -556,6 +812,7 @@ mod tests {
             vec![Operation::Exit(I32Expr::Literal(42))]
         );
         assert!(program.data.is_empty());
+        assert!(program.arrays.is_empty());
     }
 
     #[test]
@@ -577,6 +834,7 @@ mod tests {
             ]
         );
         assert_eq!(program.data, vec![b"Hello, world!\n".to_vec()]);
+        assert!(program.arrays.is_empty());
     }
 
     #[test]
@@ -607,6 +865,54 @@ mod tests {
             ))]
         );
         assert!(program.data.is_empty());
+        assert!(program.arrays.is_empty());
+    }
+
+    #[test]
+    fn lowers_array_basic_fixture_to_runtime_array_operations() {
+        let root = repo_root().join("tests/testcases/array-basic");
+        let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(program.arrays, vec![ArrayAllocation { slot: 0, len: 4 }]);
+        assert_eq!(
+            program.operations,
+            vec![
+                Operation::ArraySet {
+                    array_slot: 0,
+                    index: I32Expr::Literal(0),
+                    value: I32Expr::Literal(7),
+                },
+                Operation::ArraySet {
+                    array_slot: 0,
+                    index: I32Expr::Literal(1),
+                    value: I32Expr::Literal(14),
+                },
+                Operation::ArraySet {
+                    array_slot: 0,
+                    index: I32Expr::Literal(2),
+                    value: I32Expr::Literal(21),
+                },
+                Operation::Exit(I32Expr::Add(
+                    Box::new(I32Expr::Add(
+                        Box::new(I32Expr::ArrayGet {
+                            array_slot: 0,
+                            index: Box::new(I32Expr::Literal(0)),
+                        }),
+                        Box::new(I32Expr::ArrayGet {
+                            array_slot: 0,
+                            index: Box::new(I32Expr::Literal(1)),
+                        }),
+                    )),
+                    Box::new(I32Expr::ArrayGet {
+                        array_slot: 0,
+                        index: Box::new(I32Expr::Literal(2)),
+                    }),
+                )),
+            ]
+        );
     }
 
     #[test]
@@ -614,6 +920,7 @@ mod tests {
         let program = LoweredProgram {
             operations: vec![Operation::Exit(I32Expr::Literal(42))],
             data: Vec::new(),
+            arrays: Vec::new(),
         };
         let elf = build_linux_x86_64_program_executable(&program).to_bytes();
         assert_eq!(&elf[0..4], b"\x7FELF");
@@ -634,6 +941,7 @@ mod tests {
                 Operation::Exit(I32Expr::Literal(0)),
             ],
             data: vec![b"Hello, world!\n".to_vec()],
+            arrays: Vec::new(),
         };
         let elf = build_linux_x86_64_program_executable(&program).to_bytes();
 
@@ -671,6 +979,7 @@ mod tests {
                 Box::new(I32Expr::Literal(80)),
             ))],
             data: Vec::new(),
+            arrays: Vec::new(),
         };
         let elf = build_linux_x86_64_program_executable(&program).to_bytes();
         let code = &elf[0x1000..];
@@ -696,6 +1005,29 @@ mod tests {
             .expect("system time")
             .as_nanos();
         let output = std::env::temp_dir().join(format!("neco-rs-i32-ops-{unique}"));
+
+        compile_path_to_elf(&root, &output).expect("compile fixture");
+
+        let mut permissions = fs::metadata(&output)
+            .expect("binary metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&output, permissions).expect("binary permissions");
+
+        let status = Command::new(&output).status().expect("run binary");
+        assert_eq!(status.code(), Some(42));
+
+        fs::remove_file(&output).expect("cleanup binary");
+    }
+
+    #[test]
+    fn compiles_and_runs_array_basic_fixture() {
+        let root = repo_root().join("tests/testcases/array-basic");
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let output = std::env::temp_dir().join(format!("neco-rs-array-basic-{unique}"));
 
         compile_path_to_elf(&root, &output).expect("compile fixture");
 
