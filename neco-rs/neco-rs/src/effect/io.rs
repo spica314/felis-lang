@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use neco_rs_parser::{BindingPattern, Term};
 
 use crate::effect::{Value, bind_pattern, resolve_value};
-use crate::{Error, LoweredProgram, Operation, Result};
+use crate::{Error, LoweredProgram, Operation, Result, lower_i32_expr};
 
 pub(crate) fn lower_io_reference(
     binder: &BindingPattern,
@@ -37,7 +37,7 @@ pub(crate) fn lower_io_call(
             Some(Ok(false))
         }
         ["IO", "exit"] => {
-            let exit_code = match parse_exit_code_arguments(arguments) {
+            let exit_code = match parse_exit_code_arguments(arguments, environment) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
@@ -80,45 +80,23 @@ fn parse_write_arguments(
     Ok((fd, data_index))
 }
 
-fn parse_exit_code_arguments(arguments: &[Term]) -> Result<i32> {
+fn parse_exit_code_arguments(
+    arguments: &[Term],
+    environment: &HashMap<String, Value>,
+) -> Result<crate::I32Expr> {
     match arguments {
-        [value] => parse_i32_literal(value),
-        [value, suffix] if is_i32_suffix(suffix) => parse_bare_integer_literal(value),
+        [value] => lower_i32_expr(value, environment),
+        [value, suffix] if is_i32_suffix(suffix) => lower_i32_expr(
+            &Term::Application {
+                callee: Box::new(value.clone()),
+                arguments: vec![suffix.clone()],
+            },
+            environment,
+        ),
         _ => Err(Error::Unsupported(
-            "`IO::exit` must receive a single `i32` literal argument".to_string(),
+            "`IO::exit` must receive a single `i32` expression".to_string(),
         )),
     }
-}
-
-fn parse_i32_literal(term: &Term) -> Result<i32> {
-    let Term::IntegerLiteral(literal) = term else {
-        return Err(Error::Unsupported(
-            "exit code must be an integer literal".to_string(),
-        ));
-    };
-
-    let digits = literal
-        .strip_suffix("i32")
-        .ok_or_else(|| Error::Unsupported("exit code must use the `i32` suffix".to_string()))?;
-    digits.parse::<i32>().map_err(|_| {
-        Error::Unsupported(format!(
-            "exit code literal `{literal}` could not be parsed as i32"
-        ))
-    })
-}
-
-fn parse_bare_integer_literal(term: &Term) -> Result<i32> {
-    let Term::IntegerLiteral(literal) = term else {
-        return Err(Error::Unsupported(
-            "exit code must be an integer literal".to_string(),
-        ));
-    };
-
-    literal.parse::<i32>().map_err(|_| {
-        Error::Unsupported(format!(
-            "exit code literal `{literal}` could not be parsed as i32"
-        ))
-    })
 }
 
 fn is_i32_suffix(term: &Term) -> bool {

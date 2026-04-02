@@ -4,13 +4,14 @@ use std::collections::HashMap;
 
 use neco_rs_parser::{BindingPattern, PathExpression, Term};
 
-use crate::{Error, LoweredProgram, Result};
+use crate::{Error, I32Expr, LoweredProgram, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Value {
     Unit,
     FileDescriptor(u32),
     ByteString(usize),
+    I32(I32Expr),
 }
 
 pub(crate) fn lower_effect(

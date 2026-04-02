@@ -148,15 +148,25 @@ fn default_output_path(input: &Path) -> PathBuf {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct LoweredProgram {
+pub(crate) struct LoweredProgram {
     operations: Vec<Operation>,
     data: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum I32Expr {
+    Literal(i32),
+    Add(Box<I32Expr>, Box<I32Expr>),
+    Sub(Box<I32Expr>, Box<I32Expr>),
+    Mul(Box<I32Expr>, Box<I32Expr>),
+    Div(Box<I32Expr>, Box<I32Expr>),
+    Mod(Box<I32Expr>, Box<I32Expr>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Operation {
     Write { fd: u32, data_index: usize },
-    Exit(i32),
+    Exit(I32Expr),
 }
 
 fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
@@ -208,7 +218,9 @@ fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
     }
 
     if !terminated {
-        program.operations.push(Operation::Exit(0));
+        program
+            .operations
+            .push(Operation::Exit(I32Expr::Literal(0)));
     }
 
     Ok(program)
@@ -246,9 +258,18 @@ fn lower_pure_value(
     program: &mut LoweredProgram,
 ) -> Result<Value> {
     match term {
+        Term::Group(inner) => lower_pure_value(inner, environment, program),
         Term::StringLiteral(literal) => {
             let data_index = intern_data(program, literal.as_bytes().to_vec());
             Ok(Value::ByteString(data_index))
+        }
+        Term::IntegerLiteral(_) | Term::Application { .. } => {
+            if let Ok(expr) = lower_i32_expr(term, environment) {
+                return Ok(Value::I32(expr));
+            }
+            Err(Error::Unsupported(format!(
+                "unsupported pure expression in entrypoint body: {term:?}"
+            )))
         }
         Term::MethodCall { receiver, method } if method == "as_bytes" => {
             match resolve_value(receiver.as_ref(), environment)? {
@@ -262,6 +283,107 @@ fn lower_pure_value(
         _ => Err(Error::Unsupported(format!(
             "unsupported pure expression in entrypoint body: {term:?}"
         ))),
+    }
+}
+
+pub(crate) fn lower_i32_expr(term: &Term, environment: &HashMap<String, Value>) -> Result<I32Expr> {
+    match term {
+        Term::Group(inner) => lower_i32_expr(inner, environment),
+        Term::IntegerLiteral(literal) => parse_suffixed_i32_literal(literal),
+        Term::Path(_) => match resolve_value(term, environment)? {
+            Value::I32(expr) => Ok(expr),
+            other => Err(Error::Unsupported(format!(
+                "expected an `i32` value, got {other:?}"
+            ))),
+        },
+        Term::Application { callee, arguments } => {
+            if let Some(expr) = lower_i32_literal_application(callee, arguments)? {
+                return Ok(expr);
+            }
+            lower_i32_primitive_call(callee, arguments, environment)
+        }
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `i32` expression in entrypoint body: {term:?}"
+        ))),
+    }
+}
+
+fn lower_i32_literal_application(callee: &Term, arguments: &[Term]) -> Result<Option<I32Expr>> {
+    let [suffix] = arguments else {
+        return Ok(None);
+    };
+    let Term::IntegerLiteral(literal) = callee else {
+        return Ok(None);
+    };
+    if !is_i32_suffix_term(suffix) {
+        return Ok(None);
+    }
+    Ok(Some(parse_bare_i32_literal(literal)?))
+}
+
+fn lower_i32_primitive_call(
+    callee: &Term,
+    arguments: &[Term],
+    environment: &HashMap<String, Value>,
+) -> Result<I32Expr> {
+    let Term::Path(path) = callee else {
+        return Err(Error::Unsupported(
+            "unsupported `i32` callee in entrypoint body".to_string(),
+        ));
+    };
+
+    let segments: Vec<_> = path
+        .segments
+        .iter()
+        .map(|segment| segment.name.as_str())
+        .collect();
+    let [lhs, rhs] = arguments else {
+        return Err(Error::Unsupported(format!(
+            "`{}` must receive exactly two arguments",
+            segments.join("::")
+        )));
+    };
+    let lhs = Box::new(lower_i32_expr(lhs, environment)?);
+    let rhs = Box::new(lower_i32_expr(rhs, environment)?);
+
+    let primitive = segments.last().copied().unwrap_or_default();
+
+    match primitive {
+        "i32_add" => Ok(I32Expr::Add(lhs, rhs)),
+        "i32_sub" => Ok(I32Expr::Sub(lhs, rhs)),
+        "i32_mul" => Ok(I32Expr::Mul(lhs, rhs)),
+        "i32_div" => Ok(I32Expr::Div(lhs, rhs)),
+        "i32_mod" => Ok(I32Expr::Mod(lhs, rhs)),
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `i32` primitive call `{}`",
+            segments.join("::")
+        ))),
+    }
+}
+
+fn parse_suffixed_i32_literal(literal: &str) -> Result<I32Expr> {
+    let digits = literal.strip_suffix("i32").ok_or_else(|| {
+        Error::Unsupported("integer literal must use the `i32` suffix".to_string())
+    })?;
+    Ok(I32Expr::Literal(parse_i32_digits(digits, literal)?))
+}
+
+fn parse_bare_i32_literal(literal: &str) -> Result<I32Expr> {
+    Ok(I32Expr::Literal(parse_i32_digits(literal, literal)?))
+}
+
+fn parse_i32_digits(digits: &str, original: &str) -> Result<i32> {
+    digits.parse::<i32>().map_err(|_| {
+        Error::Unsupported(format!(
+            "integer literal `{original}` could not be parsed as i32"
+        ))
+    })
+}
+
+fn is_i32_suffix_term(term: &Term) -> bool {
+    match term {
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i32",
+        _ => false,
     }
 }
 
@@ -315,9 +437,9 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
     let mut code = Vec::new();
 
     for operation in &program.operations {
-        match *operation {
+        match operation {
             Operation::Write { fd, data_index } => {
-                let bytes = &program.data[data_index];
+                let bytes = &program.data[*data_index];
                 // mov eax, (imm32): 0xb8, (imm32)
                 // write syscall: 1
                 code.extend_from_slice(&[0xb8, 0x01, 0x00, 0x00, 0x00]);
@@ -326,7 +448,7 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
                 code.extend_from_slice(&fd.to_le_bytes());
                 // mov rsi, (imm64): 0x48, 0xbe, (imm64)
                 code.extend_from_slice(&[0x48, 0xbe]);
-                code.extend_from_slice(&addresses[data_index].to_le_bytes());
+                code.extend_from_slice(&addresses[*data_index].to_le_bytes());
                 // mov edx, (imm32): 0xba
                 code.push(0xba);
                 code.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
@@ -334,12 +456,12 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
                 code.extend_from_slice(&[0x0f, 0x05]);
             }
             Operation::Exit(exit_code) => {
+                emit_i32_expr_to_eax(exit_code, &mut code);
+                // mov edi, eax
+                code.extend_from_slice(&[0x89, 0xc7]);
                 // mov eax, (imm32): 0xb8, (imm32)
                 // exit syscall: 60
                 code.extend_from_slice(&[0xb8, 0x3c, 0x00, 0x00, 0x00]);
-                // mov edi, (imm32): 0xbf, (imm32)
-                code.push(0xbf);
-                code.extend_from_slice(&exit_code.to_le_bytes());
                 // syscall
                 code.extend_from_slice(&[0x0f, 0x05]);
             }
@@ -349,9 +471,70 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
     code
 }
 
+fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>) {
+    match expr {
+        I32Expr::Literal(value) => {
+            // mov eax, imm32
+            code.push(0xb8);
+            code.extend_from_slice(&value.to_le_bytes());
+        }
+        // add eax, ecx
+        I32Expr::Add(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, &[0x01, 0xc8]),
+        // sub eax, ecx
+        I32Expr::Sub(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, &[0x29, 0xc8]),
+        // imul eax, ecx
+        I32Expr::Mul(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, &[0x0f, 0xaf, 0xc1]),
+        I32Expr::Div(lhs, rhs) => emit_i32_div_mod_expr(lhs, rhs, code, false),
+        I32Expr::Mod(lhs, rhs) => emit_i32_div_mod_expr(lhs, rhs, code, true),
+    }
+}
+
+fn emit_i32_binary_expr(lhs: &I32Expr, rhs: &I32Expr, code: &mut Vec<u8>, opcode: &[u8]) {
+    emit_i32_expr_to_eax(lhs, code);
+    // Save the left operand while evaluating the right operand into eax.
+    // push rax
+    code.push(0x50);
+    emit_i32_expr_to_eax(rhs, code);
+    // Move the right operand into ecx.
+    // mov ecx, eax
+    code.extend_from_slice(&[0x89, 0xc1]);
+    // Restore the left operand into eax, then apply the binary opcode.
+    // pop rax
+    code.push(0x58);
+    code.extend_from_slice(opcode);
+}
+
+fn emit_i32_div_mod_expr(lhs: &I32Expr, rhs: &I32Expr, code: &mut Vec<u8>, modulo: bool) {
+    emit_i32_expr_to_eax(lhs, code);
+    // Save the dividend while evaluating the divisor.
+    // push rax
+    code.push(0x50);
+    emit_i32_expr_to_eax(rhs, code);
+    // Move the divisor into ecx.
+    // mov ecx, eax
+    code.extend_from_slice(&[0x89, 0xc1]);
+    // Restore the dividend into eax.
+    // pop rax
+    code.push(0x58);
+    // Sign-extend eax into edx:eax for signed division.
+    // cdq
+    code.push(0x99);
+    // Signed divide edx:eax by ecx. Quotient goes to eax, remainder to edx.
+    // idiv ecx
+    code.extend_from_slice(&[0xf7, 0xf9]);
+    if modulo {
+        // For modulo, return the remainder instead of the quotient.
+        // mov eax, edx
+        code.extend_from_slice(&[0x89, 0xd0]);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn repo_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -368,7 +551,10 @@ mod tests {
         };
 
         let program = lower_package_to_program(&package).expect("lower fixture");
-        assert_eq!(program.operations, vec![Operation::Exit(42)]);
+        assert_eq!(
+            program.operations,
+            vec![Operation::Exit(I32Expr::Literal(42))]
+        );
         assert!(program.data.is_empty());
     }
 
@@ -387,23 +573,54 @@ mod tests {
                     fd: 1,
                     data_index: 0
                 },
-                Operation::Exit(0)
+                Operation::Exit(I32Expr::Literal(0))
             ]
         );
         assert_eq!(program.data, vec![b"Hello, world!\n".to_vec()]);
     }
 
     #[test]
+    fn lowers_i32_ops_fixture_to_runtime_expression_tree() {
+        let root = repo_root().join("tests/testcases/i32-ops");
+        let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.operations,
+            vec![Operation::Exit(I32Expr::Mod(
+                Box::new(I32Expr::Div(
+                    Box::new(I32Expr::Mul(
+                        Box::new(I32Expr::Sub(
+                            Box::new(I32Expr::Add(
+                                Box::new(I32Expr::Literal(3)),
+                                Box::new(I32Expr::Literal(7)),
+                            )),
+                            Box::new(I32Expr::Literal(4)),
+                        )),
+                        Box::new(I32Expr::Literal(61)),
+                    )),
+                    Box::new(I32Expr::Literal(3)),
+                )),
+                Box::new(I32Expr::Literal(80)),
+            ))]
+        );
+        assert!(program.data.is_empty());
+    }
+
+    #[test]
     fn builds_elf_image_with_exit_syscall() {
         let program = LoweredProgram {
-            operations: vec![Operation::Exit(42)],
+            operations: vec![Operation::Exit(I32Expr::Literal(42))],
             data: Vec::new(),
         };
         let elf = build_linux_x86_64_program_executable(&program).to_bytes();
         assert_eq!(&elf[0..4], b"\x7FELF");
-        assert_eq!(&elf[0x1000..0x1005], &[0xb8, 0x3c, 0x00, 0x00, 0x00]);
-        assert_eq!(&elf[0x1005..0x100a], &[0xbf, 42, 0x00, 0x00, 0x00]);
-        assert_eq!(&elf[0x100a..0x100c], &[0x0f, 0x05]);
+        assert_eq!(&elf[0x1000..0x1005], &[0xb8, 42, 0x00, 0x00, 0x00]);
+        assert_eq!(&elf[0x1005..0x1007], &[0x89, 0xc7]);
+        assert_eq!(&elf[0x1007..0x100c], &[0xb8, 0x3c, 0x00, 0x00, 0x00]);
+        assert_eq!(&elf[0x100c..0x100e], &[0x0f, 0x05]);
     }
 
     #[test]
@@ -414,7 +631,7 @@ mod tests {
                     fd: 1,
                     data_index: 0,
                 },
-                Operation::Exit(0),
+                Operation::Exit(I32Expr::Literal(0)),
             ],
             data: vec![b"Hello, world!\n".to_vec()],
         };
@@ -427,10 +644,71 @@ mod tests {
         assert_eq!(&elf[0x100c..0x1014], &0x402000_u64.to_le_bytes());
         assert_eq!(&elf[0x1014..0x1019], &[0xba, 14, 0x00, 0x00, 0x00]);
         assert_eq!(&elf[0x1019..0x101b], &[0x0f, 0x05]);
-        assert_eq!(&elf[0x101b..0x1020], &[0xb8, 0x3c, 0x00, 0x00, 0x00]);
-        assert_eq!(&elf[0x1020..0x1025], &[0xbf, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(&elf[0x1025..0x1027], &[0x0f, 0x05]);
+        assert_eq!(&elf[0x101b..0x1020], &[0xb8, 0x00, 0x00, 0x00, 0x00]);
+        assert_eq!(&elf[0x1020..0x1022], &[0x89, 0xc7]);
+        assert_eq!(&elf[0x1022..0x1027], &[0xb8, 0x3c, 0x00, 0x00, 0x00]);
+        assert_eq!(&elf[0x1027..0x1029], &[0x0f, 0x05]);
         assert_eq!(&elf[0x2000..0x200e], b"Hello, world!\n");
+    }
+
+    #[test]
+    fn builds_elf_image_with_runtime_i32_ops() {
+        let program = LoweredProgram {
+            operations: vec![Operation::Exit(I32Expr::Mod(
+                Box::new(I32Expr::Div(
+                    Box::new(I32Expr::Mul(
+                        Box::new(I32Expr::Sub(
+                            Box::new(I32Expr::Add(
+                                Box::new(I32Expr::Literal(3)),
+                                Box::new(I32Expr::Literal(7)),
+                            )),
+                            Box::new(I32Expr::Literal(4)),
+                        )),
+                        Box::new(I32Expr::Literal(61)),
+                    )),
+                    Box::new(I32Expr::Literal(3)),
+                )),
+                Box::new(I32Expr::Literal(80)),
+            ))],
+            data: Vec::new(),
+        };
+        let elf = build_linux_x86_64_program_executable(&program).to_bytes();
+        let code = &elf[0x1000..];
+
+        assert!(code.windows(2).any(|window| window == [0x01, 0xc8]));
+        assert!(code.windows(2).any(|window| window == [0x29, 0xc8]));
+        assert!(code.windows(3).any(|window| window == [0x0f, 0xaf, 0xc1]));
+        assert!(code.windows(2).any(|window| window == [0xf7, 0xf9]));
+        assert!(code.windows(2).any(|window| window == [0x89, 0xd0]));
+        assert!(
+            !code
+                .windows(5)
+                .any(|window| window == [0xbf, 42, 0x00, 0x00, 0x00])
+        );
+        assert!(code.windows(2).any(|window| window == [0x89, 0xc7]));
+    }
+
+    #[test]
+    fn compiles_and_runs_i32_ops_fixture() {
+        let root = repo_root().join("tests/testcases/i32-ops");
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let output = std::env::temp_dir().join(format!("neco-rs-i32-ops-{unique}"));
+
+        compile_path_to_elf(&root, &output).expect("compile fixture");
+
+        let mut permissions = fs::metadata(&output)
+            .expect("binary metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&output, permissions).expect("binary permissions");
+
+        let status = Command::new(&output).status().expect("run binary");
+        assert_eq!(status.code(), Some(42));
+
+        fs::remove_file(&output).expect("cleanup binary");
     }
 
     #[test]
