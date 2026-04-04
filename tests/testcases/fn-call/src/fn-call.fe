@@ -1,0 +1,29 @@
+#use std::io::IO;
+#use std::primitive::i32::i32;
+#use std::primitive::i32::i32_add;
+#use std::primitive::i32::i32_sub;
+#use std::primitive::i32::i32_mul;
+#use std::primitive::i32::i32_div;
+#use std::primitive::i32::i32_mod;
+
+#entrypoint main;
+
+#fn f : (a : i32) -> i32 {
+    #let b = 7i32;
+    #let c = 4i32;
+    #let d = 61i32;
+    #let e = 3i32;
+    #let f = 80i32;
+    #let x1 = i32_add a b;
+    #let x2 = i32_sub x1 c;
+    #let x3 = i32_mul x2 d;
+    #let x4 = i32_div x3 e;
+    #let x5 = i32_mod x4 f;
+    x5
+}
+
+#fn main : () #with IO {
+    #let x = f 3i32;
+    #let _ <- IO::exit x;
+    ()
+}

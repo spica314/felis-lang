@@ -90,10 +90,7 @@ pub(crate) fn lower_io_call(
     }
 }
 
-fn parse_write_arguments(
-    arguments: &[Term],
-    state: &LoweringState,
-) -> Result<Operation> {
+fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Operation> {
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [fd_term, bytes_term, len_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
@@ -245,8 +242,9 @@ fn parse_array_new_arguments(arguments: &[Term]) -> Result<(ArrayElementType, us
     };
 
     let length = parse_i32_literal_term(length)?;
-    let length = usize::try_from(length)
-        .map_err(|_| Error::Unsupported("`IO::array_new` length must be non-negative".to_string()))?;
+    let length = usize::try_from(length).map_err(|_| {
+        Error::Unsupported("`IO::array_new` length must be non-negative".to_string())
+    })?;
     Ok((element_type, length))
 }
 

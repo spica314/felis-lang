@@ -132,6 +132,49 @@ fn parses_stdin_to_stdout_package_root() {
 }
 
 #[test]
+fn parses_fn_call_package_root() {
+    let root = repo_root().join("tests/testcases/fn-call");
+    let parsed = parse_root(&root).expect("fn-call package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "fn-call");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 10);
+
+    let Item::Function(function) = &syntax.items[8] else {
+        panic!("expected helper function");
+    };
+    assert!(function.effect.is_none());
+    assert_eq!(function.body.statements.len(), 10);
+
+    let Item::Function(main_fn) = &syntax.items[9] else {
+        panic!("expected entrypoint function");
+    };
+    assert!(main_fn.effect.is_some());
+    let Statement::Let(let_stmt) = &main_fn.body.statements[0] else {
+        panic!("expected let statement");
+    };
+    match let_stmt.value.as_ref() {
+        Term::Application { callee, arguments } => {
+            match callee.as_ref() {
+                Term::Path(path) => assert_eq!(path.segments[0].name, "f"),
+                other => panic!("expected path callee, got {other:?}"),
+            }
+            assert_eq!(arguments.len(), 2);
+        }
+        other => panic!("expected function application, got {other:?}"),
+    }
+}
+
+#[test]
 fn parses_std_package_with_nested_modules_and_theorems() {
     let root = repo_root().join("std");
     let parsed = parse_root(&root).expect("std parses");

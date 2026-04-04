@@ -1,0 +1,4 @@
+{
+    "name": "fn-call",
+    "felis-bin-entrypoints": ["src/fn-call.fe"]
+}

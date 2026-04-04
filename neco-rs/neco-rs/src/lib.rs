@@ -7,7 +7,10 @@ mod effect;
 
 use effect::{Value, bind_pattern, lower_effect, resolve_value};
 use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
-use neco_rs_parser::{Item, ParsedPackage, ParsedRoot, Statement, Term, parse_root};
+use neco_rs_parser::{
+    ArrowParameter, Block, FunctionDeclaration, Item, LetOperator, ParsedPackage, ParsedRoot,
+    Statement, Term, parse_root,
+};
 
 #[derive(Debug)]
 pub enum Error {
@@ -238,6 +241,13 @@ pub(crate) struct LoweringState {
     environment: HashMap<String, Value>,
     next_array_slot: usize,
     next_i32_slot: usize,
+    functions: HashMap<String, PureFunction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PureFunction {
+    parameters: Vec<String>,
+    body: Block,
 }
 
 impl LoweringState {
@@ -246,6 +256,7 @@ impl LoweringState {
             environment: HashMap::new(),
             next_array_slot: 0,
             next_i32_slot: 0,
+            functions: HashMap::new(),
         }
     }
 
@@ -310,6 +321,7 @@ fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
         i32_slots: 0,
     };
     let mut state = LoweringState::new();
+    state.functions = collect_pure_functions(package)?;
     let mut terminated = false;
 
     for statement in &main_fn.body.statements {
@@ -361,7 +373,7 @@ fn lower_statement(
 
 fn lower_pure_value(
     term: &Term,
-    state: &mut LoweringState,
+    state: &LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<Value> {
     match term {
@@ -371,6 +383,9 @@ fn lower_pure_value(
             Ok(Value::ByteString(data_index))
         }
         Term::IntegerLiteral(_) | Term::Application { .. } => {
+            if let Some(value) = lower_pure_function_call(term, state, program)? {
+                return Ok(value);
+            }
             if let Ok(expr) = lower_i32_expr(term, state) {
                 return Ok(Value::I32(expr));
             }
@@ -394,6 +409,137 @@ fn lower_pure_value(
             "unsupported pure expression in entrypoint body: {term:?}"
         ))),
     }
+}
+
+fn collect_pure_functions(package: &ParsedPackage) -> Result<HashMap<String, PureFunction>> {
+    let mut functions = HashMap::new();
+    for item in package
+        .source_files
+        .iter()
+        .flat_map(|file| file.syntax.items.iter())
+    {
+        let Item::Function(function) = item else {
+            continue;
+        };
+        if function.effect.is_some() {
+            continue;
+        }
+        functions.insert(
+            function.name.name.clone(),
+            pure_function_from_decl(function)?,
+        );
+    }
+    Ok(functions)
+}
+
+fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<PureFunction> {
+    let mut parameters = Vec::new();
+    let mut current = &function.ty;
+    while let Term::Arrow(arrow) = current {
+        let ArrowParameter::Binder(binder) = &arrow.parameter else {
+            return Err(Error::Unsupported(format!(
+                "pure function `{}` must use named parameters",
+                function.name.name
+            )));
+        };
+        parameters.push(binder.name.clone());
+        current = arrow.result.as_ref();
+    }
+    Ok(PureFunction {
+        parameters,
+        body: function.body.clone(),
+    })
+}
+
+fn lower_pure_function_call(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Option<Value>> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(None);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(None);
+    };
+    if path.starts_with_package || path.segments.len() != 1 || !path.segments[0].suffixes.is_empty()
+    {
+        return Ok(None);
+    }
+
+    let name = path.segments[0].name.as_str();
+    let Some(function) = state.functions.get(name) else {
+        return Ok(None);
+    };
+    if state.environment.contains_key(name) {
+        return Ok(None);
+    }
+    let normalized_arguments = normalize_numeric_literal_arguments(arguments);
+    if function.parameters.len() != normalized_arguments.len() {
+        return Err(Error::Unsupported(format!(
+            "pure function `{name}` must receive exactly {} arguments",
+            function.parameters.len()
+        )));
+    }
+
+    let mut scoped_environment = state.environment.clone();
+    for (parameter, argument) in function.parameters.iter().zip(normalized_arguments.iter()) {
+        let value = lower_pure_value(argument, state, program)?;
+        scoped_environment.insert(parameter.clone(), value);
+    }
+
+    let scoped_state = LoweringState {
+        environment: scoped_environment,
+        next_array_slot: state.next_array_slot,
+        next_i32_slot: state.next_i32_slot,
+        functions: state.functions.clone(),
+    };
+
+    lower_pure_block_value(&function.body, &scoped_state, program).map(Some)
+}
+
+fn lower_pure_block_value(
+    block: &Block,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Value> {
+    let mut scoped_state = LoweringState {
+        environment: state.environment.clone(),
+        next_array_slot: state.next_array_slot,
+        next_i32_slot: state.next_i32_slot,
+        functions: state.functions.clone(),
+    };
+
+    for statement in &block.statements {
+        match statement {
+            Statement::Let(let_stmt) if let_stmt.operator == LetOperator::Equals => {
+                let value = lower_pure_value(let_stmt.value.as_ref(), &scoped_state, program)?;
+                bind_pattern(&let_stmt.binder, value, &mut scoped_state.environment);
+            }
+            Statement::Let(_) => {
+                return Err(Error::Unsupported(
+                    "effectful statements are not supported in pure function bodies".to_string(),
+                ));
+            }
+            Statement::Expression(_) => {
+                return Err(Error::Unsupported(
+                    "expression statements are not supported in pure function bodies".to_string(),
+                ));
+            }
+            Statement::Item(_) => {
+                return Err(Error::Unsupported(
+                    "items inside pure function bodies are not supported".to_string(),
+                ));
+            }
+        }
+    }
+
+    let Some(tail) = block.tail.as_deref() else {
+        return Err(Error::Unsupported(
+            "pure function bodies must end with a value expression".to_string(),
+        ));
+    };
+    lower_pure_value(tail, &scoped_state, program)
 }
 
 pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Expr> {
@@ -837,7 +983,11 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
                 code.extend_from_slice(&[0x89, 0x85]);
                 code.extend_from_slice(&result_offset.to_le_bytes());
             }
-            Operation::WriteStatic { fd, data_index, len } => {
+            Operation::WriteStatic {
+                fd,
+                data_index,
+                len,
+            } => {
                 // mov edi, (imm32): 0xbf, (imm32)
                 code.push(0xbf);
                 code.extend_from_slice(&fd.to_le_bytes());
@@ -996,7 +1146,9 @@ fn emit_u8_expr_to_eax(expr: &U8Expr, code: &mut Vec<u8>, program: &LoweredProgr
         U8Expr::Mul(lhs, rhs) => emit_u8_mul_expr(lhs, rhs, code, program),
         U8Expr::Div(lhs, rhs) => emit_u8_div_mod_expr(lhs, rhs, code, program, false),
         U8Expr::Mod(lhs, rhs) => emit_u8_div_mod_expr(lhs, rhs, code, program, true),
-        U8Expr::ArrayGet { array_slot, index } => emit_u8_array_get(*array_slot, index, code, program),
+        U8Expr::ArrayGet { array_slot, index } => {
+            emit_u8_array_get(*array_slot, index, code, program)
+        }
     }
 }
 
@@ -1233,8 +1385,8 @@ mod tests {
     }
 
     fn runtime_test_runner(binary: &Path) -> Command {
-        let qemu = std::env::var_os("NECO_RS_TEST_QEMU")
-            .unwrap_or_else(|| OsString::from("qemu-x86_64"));
+        let qemu =
+            std::env::var_os("NECO_RS_TEST_QEMU").unwrap_or_else(|| OsString::from("qemu-x86_64"));
         let mut command = Command::new(&qemu);
         command.arg(binary);
         command
@@ -1570,6 +1722,38 @@ mod tests {
     }
 
     #[test]
+    fn lowers_fn_call_fixture_to_runtime_expression_tree() {
+        let root = repo_root().join("tests/testcases/fn-call");
+        let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.operations,
+            vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Mod(
+                Box::new(I32Expr::Div(
+                    Box::new(I32Expr::Mul(
+                        Box::new(I32Expr::Sub(
+                            Box::new(I32Expr::Add(
+                                Box::new(I32Expr::Literal(3)),
+                                Box::new(I32Expr::Literal(7)),
+                            )),
+                            Box::new(I32Expr::Literal(4)),
+                        )),
+                        Box::new(I32Expr::Literal(61)),
+                    )),
+                    Box::new(I32Expr::Literal(3)),
+                )),
+                Box::new(I32Expr::Literal(80)),
+            )))]
+        );
+        assert!(program.data.is_empty());
+        assert!(program.arrays.is_empty());
+        assert_eq!(program.i32_slots, 0);
+    }
+
+    #[test]
     fn builds_elf_image_with_exit_syscall() {
         let program = LoweredProgram {
             operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))],
@@ -1693,6 +1877,13 @@ mod tests {
         assert_eq!(run.status.code(), Some(0));
         assert_eq!(run.stdout, b"echo through stdin\n");
         assert!(run.stderr.is_empty());
+    }
+
+    #[test]
+    fn compiles_and_runs_fn_call_fixture() {
+        let root = repo_root().join("tests/testcases/fn-call");
+        let status = run_fixture_status(&root, "fn-call");
+        assert_eq!(status.code(), Some(42));
     }
 
     #[test]
