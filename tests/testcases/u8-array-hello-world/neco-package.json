@@ -1,0 +1,4 @@
+{
+    "name": "u8-array-hello-world",
+    "felis-bin-entrypoints": ["src/u8-array-hello-world.fe"]
+}

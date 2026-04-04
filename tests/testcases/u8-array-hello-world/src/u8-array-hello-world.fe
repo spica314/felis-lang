@@ -1,0 +1,24 @@
+#use std::io::IO;
+#use std::primitive::u8::u8;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let stdout <- IO::stdout;
+    #let _ @^ bytes_ref <- IO::array_new u8 13i32;
+    bytes_ref .> set 0i32 104u8;
+    bytes_ref .> set 1i32 101u8;
+    bytes_ref .> set 2i32 108u8;
+    bytes_ref .> set 3i32 108u8;
+    bytes_ref .> set 4i32 111u8;
+    bytes_ref .> set 5i32 44u8;
+    bytes_ref .> set 6i32 32u8;
+    bytes_ref .> set 7i32 119u8;
+    bytes_ref .> set 8i32 111u8;
+    bytes_ref .> set 9i32 114u8;
+    bytes_ref .> set 10i32 108u8;
+    bytes_ref .> set 11i32 100u8;
+    bytes_ref .> set 12i32 10u8;
+    #let _ <- IO::write stdout bytes_ref;
+    ()
+}

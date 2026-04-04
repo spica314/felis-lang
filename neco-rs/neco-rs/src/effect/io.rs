@@ -4,8 +4,8 @@ use neco_rs_parser::{BindingPattern, Term};
 
 use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::{
-    Error, ExitCodeExpr, LoweredProgram, LoweringState, Operation, Result, lower_i32_expr,
-    lower_u8_expr,
+    ArrayElementType, Error, ExitCodeExpr, LoweredProgram, LoweringState, Operation, Result,
+    lower_i32_expr, lower_u8_expr,
 };
 
 pub(crate) fn lower_io_reference(
@@ -31,11 +31,11 @@ pub(crate) fn lower_io_call(
 ) -> Option<Result<bool>> {
     match path {
         ["IO", "write"] => {
-            let (fd, data_index) = match parse_write_arguments(arguments, &state.environment) {
+            let operation = match parse_write_arguments(arguments, &state.environment) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
-            program.operations.push(Operation::Write { fd, data_index });
+            program.operations.push(operation);
             bind_pattern(binder, Value::Unit, &mut state.environment);
             Some(Ok(false))
         }
@@ -49,11 +49,19 @@ pub(crate) fn lower_io_call(
             Some(Ok(true))
         }
         ["IO", "array_new"] => {
-            let array_slot = match parse_array_new_arguments(arguments) {
-                Ok(length) => state.allocate_array(length, program),
+            let (element_type, length) = match parse_array_new_arguments(arguments) {
+                Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
-            bind_pattern(binder, Value::Array(array_slot), &mut state.environment);
+            let array_slot = state.allocate_array(element_type, length, program);
+            bind_pattern(
+                binder,
+                Value::Array {
+                    slot: array_slot,
+                    element_type,
+                },
+                &mut state.environment,
+            );
             Some(Ok(false))
         }
         _ => None,
@@ -63,7 +71,7 @@ pub(crate) fn lower_io_call(
 fn parse_write_arguments(
     arguments: &[Term],
     environment: &HashMap<String, Value>,
-) -> Result<(u32, usize)> {
+) -> Result<Operation> {
     let [fd_term, bytes_term] = arguments else {
         return Err(Error::Unsupported(
             "`IO::write` must receive a file descriptor and a byte string reference".to_string(),
@@ -79,16 +87,19 @@ fn parse_write_arguments(
         }
     };
 
-    let data_index = match resolve_value(bytes_term, environment)? {
-        Value::ByteString(data_index) => data_index,
-        other => {
-            return Err(Error::Unsupported(format!(
-                "`IO::write` expects a byte string reference as its second argument, got {other:?}"
-            )));
-        }
-    };
-
-    Ok((fd, data_index))
+    match resolve_value(bytes_term, environment)? {
+        Value::ByteString(data_index) => Ok(Operation::WriteStatic { fd, data_index }),
+        Value::Array {
+            slot,
+            element_type: ArrayElementType::U8,
+        } => Ok(Operation::WriteArray {
+            fd,
+            array_slot: slot,
+        }),
+        other => Err(Error::Unsupported(format!(
+            "`IO::write` expects a byte string reference or `u8` array as its second argument, got {other:?}"
+        ))),
+    }
 }
 
 fn parse_exit_code_arguments(arguments: &[Term], state: &LoweringState) -> Result<ExitCodeExpr> {
@@ -111,7 +122,7 @@ fn parse_exit_code_arguments(arguments: &[Term], state: &LoweringState) -> Resul
     }
 }
 
-fn parse_array_new_arguments(arguments: &[Term]) -> Result<usize> {
+fn parse_array_new_arguments(arguments: &[Term]) -> Result<(ArrayElementType, usize)> {
     let normalized = normalize_i32_literal_arguments(arguments);
     let [element_type, length] = normalized.as_slice() else {
         return Err(Error::Unsupported(
@@ -129,15 +140,20 @@ fn parse_array_new_arguments(arguments: &[Term]) -> Result<usize> {
             "`IO::array_new` element type must be a simple path".to_string(),
         ));
     };
-    if segment.name != "i32" {
-        return Err(Error::Unsupported(
-            "`IO::array_new` currently supports only `i32` arrays".to_string(),
-        ));
-    }
+    let element_type = match segment.name.as_str() {
+        "i32" => ArrayElementType::I32,
+        "u8" => ArrayElementType::U8,
+        _ => {
+            return Err(Error::Unsupported(
+                "`IO::array_new` currently supports only `i32` and `u8` arrays".to_string(),
+            ));
+        }
+    };
 
     let length = parse_i32_literal_term(length)?;
-    usize::try_from(length)
-        .map_err(|_| Error::Unsupported("`IO::array_new` length must be non-negative".to_string()))
+    let length = usize::try_from(length)
+        .map_err(|_| Error::Unsupported("`IO::array_new` length must be non-negative".to_string()))?;
+    Ok((element_type, length))
 }
 
 fn is_i32_suffix(term: &Term) -> bool {

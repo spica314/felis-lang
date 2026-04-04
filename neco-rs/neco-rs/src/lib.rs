@@ -176,6 +176,10 @@ pub(crate) enum U8Expr {
     Mul(Box<U8Expr>, Box<U8Expr>),
     Div(Box<U8Expr>, Box<U8Expr>),
     Mod(Box<U8Expr>, Box<U8Expr>),
+    ArrayGet {
+        array_slot: usize,
+        index: Box<I32Expr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -184,22 +188,38 @@ pub(crate) enum ExitCodeExpr {
     U8(U8Expr),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ArrayElementType {
+    I32,
+    U8,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ArrayAllocation {
     slot: usize,
     len: usize,
+    element_type: ArrayElementType,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Operation {
-    Write {
+    WriteStatic {
         fd: u32,
         data_index: usize,
     },
-    ArraySet {
+    WriteArray {
+        fd: u32,
+        array_slot: usize,
+    },
+    ArraySetI32 {
         array_slot: usize,
         index: I32Expr,
         value: I32Expr,
+    },
+    ArraySetU8 {
+        array_slot: usize,
+        index: I32Expr,
+        value: U8Expr,
     },
     Exit(ExitCodeExpr),
 }
@@ -217,10 +237,19 @@ impl LoweringState {
         }
     }
 
-    fn allocate_array(&mut self, len: usize, program: &mut LoweredProgram) -> usize {
+    fn allocate_array(
+        &mut self,
+        element_type: ArrayElementType,
+        len: usize,
+        program: &mut LoweredProgram,
+    ) -> usize {
         let slot = self.next_array_slot;
         self.next_array_slot += 1;
-        program.arrays.push(ArrayAllocation { slot, len });
+        program.arrays.push(ArrayAllocation {
+            slot,
+            len,
+            element_type,
+        });
         slot
     }
 }
@@ -385,6 +414,9 @@ pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr
             if let Some(expr) = lower_u8_literal_application(callee, arguments)? {
                 return Ok(expr);
             }
+            if let Some(expr) = lower_u8_array_get_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
             lower_u8_primitive_call(callee, arguments, state)
         }
         _ => Err(Error::Unsupported(format!(
@@ -511,7 +543,7 @@ fn lower_array_get_call(
         return Ok(None);
     }
 
-    let normalized = normalize_i32_literal_arguments(arguments);
+    let normalized = normalize_numeric_literal_arguments(arguments);
     let [index] = normalized.as_slice() else {
         return Err(Error::Unsupported(
             "`get` must receive exactly one index argument".to_string(),
@@ -519,15 +551,55 @@ fn lower_array_get_call(
     };
 
     let array_slot = match resolve_value(receiver.as_ref(), &state.environment)? {
-        Value::Array(slot) => slot,
+        Value::Array {
+            slot,
+            element_type: ArrayElementType::I32,
+        } => slot,
         other => {
             return Err(Error::Unsupported(format!(
-                "`get` expects an array reference, got {other:?}"
+                "`get` expects an `i32` array reference, got {other:?}"
             )));
         }
     };
 
     Ok(Some(I32Expr::ArrayGet {
+        array_slot,
+        index: Box::new(lower_i32_expr(index, state)?),
+    }))
+}
+
+fn lower_u8_array_get_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<U8Expr>> {
+    let Term::MethodCall { receiver, method } = callee else {
+        return Ok(None);
+    };
+    if method != "get" {
+        return Ok(None);
+    }
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [index] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`get` must receive exactly one index argument".to_string(),
+        ));
+    };
+
+    let array_slot = match resolve_value(receiver.as_ref(), &state.environment)? {
+        Value::Array {
+            slot,
+            element_type: ArrayElementType::U8,
+        } => slot,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`get` expects a `u8` array reference, got {other:?}"
+            )));
+        }
+    };
+
+    Ok(Some(U8Expr::ArrayGet {
         array_slot,
         index: Box::new(lower_i32_expr(index, state)?),
     }))
@@ -554,27 +626,37 @@ fn lower_expression_statement(
         )));
     }
 
-    let normalized = normalize_i32_literal_arguments(arguments);
+    let normalized = normalize_numeric_literal_arguments(arguments);
     let [index, value] = normalized.as_slice() else {
         return Err(Error::Unsupported(
             "`set` must receive exactly two arguments".to_string(),
         ));
     };
 
-    let array_slot = match resolve_value(receiver.as_ref(), &state.environment)? {
-        Value::Array(slot) => slot,
+    let index = lower_i32_expr(index, state)?;
+    match resolve_value(receiver.as_ref(), &state.environment)? {
+        Value::Array {
+            slot,
+            element_type: ArrayElementType::I32,
+        } => program.operations.push(Operation::ArraySetI32 {
+            array_slot: slot,
+            index,
+            value: lower_i32_expr(value, state)?,
+        }),
+        Value::Array {
+            slot,
+            element_type: ArrayElementType::U8,
+        } => program.operations.push(Operation::ArraySetU8 {
+            array_slot: slot,
+            index,
+            value: lower_u8_expr(value, state)?,
+        }),
         other => {
             return Err(Error::Unsupported(format!(
                 "`set` expects an array reference, got {other:?}"
             )));
         }
-    };
-
-    program.operations.push(Operation::ArraySet {
-        array_slot,
-        index: lower_i32_expr(index, state)?,
-        value: lower_i32_expr(value, state)?,
-    });
+    }
     Ok(())
 }
 
@@ -630,13 +712,14 @@ fn is_u8_suffix_term(term: &Term) -> bool {
     }
 }
 
-fn normalize_i32_literal_arguments(arguments: &[Term]) -> Vec<Term> {
+fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {
     let mut normalized = Vec::with_capacity(arguments.len());
     let mut index = 0;
     while index < arguments.len() {
         if index + 1 < arguments.len()
             && matches!(arguments[index], Term::IntegerLiteral(_))
-            && is_i32_suffix_term(&arguments[index + 1])
+            && (is_i32_suffix_term(&arguments[index + 1])
+                || is_u8_suffix_term(&arguments[index + 1]))
         {
             normalized.push(Term::Application {
                 callee: Box::new(arguments[index].clone()),
@@ -711,7 +794,7 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
 
     for operation in &program.operations {
         match operation {
-            Operation::Write { fd, data_index } => {
+            Operation::WriteStatic { fd, data_index } => {
                 let bytes = &program.data[*data_index];
                 // mov eax, (imm32): 0xb8, (imm32)
                 // write syscall: 1
@@ -728,11 +811,29 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
                 // syscall
                 code.extend_from_slice(&[0x0f, 0x05]);
             }
-            Operation::ArraySet {
+            Operation::WriteArray { fd, array_slot } => {
+                let array = array_allocation(program, *array_slot);
+                debug_assert_eq!(array.element_type, ArrayElementType::U8);
+                code.extend_from_slice(&[0xb8, 0x01, 0x00, 0x00, 0x00]);
+                code.push(0xbf);
+                code.extend_from_slice(&fd.to_le_bytes());
+                let slot_offset = array_slot_offset(*array_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+                code.push(0xba);
+                code.extend_from_slice(&(array.len as u32).to_le_bytes());
+                code.extend_from_slice(&[0x0f, 0x05]);
+            }
+            Operation::ArraySetI32 {
                 array_slot,
                 index,
                 value,
-            } => emit_array_set(*array_slot, index, value, &mut code, program),
+            } => emit_i32_array_set(*array_slot, index, value, &mut code, program),
+            Operation::ArraySetU8 {
+                array_slot,
+                index,
+                value,
+            } => emit_u8_array_set(*array_slot, index, value, &mut code, program),
             Operation::Exit(exit_code) => {
                 emit_exit_code_expr_to_eax(exit_code, &mut code, program);
                 // mov edi, eax
@@ -843,6 +944,7 @@ fn emit_u8_expr_to_eax(expr: &U8Expr, code: &mut Vec<u8>, program: &LoweredProgr
         U8Expr::Mul(lhs, rhs) => emit_u8_mul_expr(lhs, rhs, code, program),
         U8Expr::Div(lhs, rhs) => emit_u8_div_mod_expr(lhs, rhs, code, program, false),
         U8Expr::Mod(lhs, rhs) => emit_u8_div_mod_expr(lhs, rhs, code, program, true),
+        U8Expr::ArrayGet { array_slot, index } => emit_u8_array_get(*array_slot, index, code, program),
     }
 }
 
@@ -910,7 +1012,7 @@ fn emit_u8_div_mod_expr(
 
 fn stack_frame_size(program: &LoweredProgram) -> usize {
     let pointer_bytes = program.arrays.len() * 8;
-    let array_bytes: usize = program.arrays.iter().map(|array| array.len * 4).sum();
+    let array_bytes: usize = program.arrays.iter().map(array_storage_size).sum();
     pointer_bytes + array_bytes
 }
 
@@ -922,7 +1024,7 @@ fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
     let pointer_bytes = (program.arrays.len() * 8) as i32;
     let mut offset = pointer_bytes;
     for array in &program.arrays {
-        offset += (array.len * 4) as i32;
+        offset += array_storage_size(array) as i32;
         if array.slot == slot {
             return -offset;
         }
@@ -943,7 +1045,23 @@ fn emit_array_initializers(program: &LoweredProgram, code: &mut Vec<u8>) {
     }
 }
 
-fn emit_array_set(
+fn array_storage_size(array: &ArrayAllocation) -> usize {
+    let element_size = match array.element_type {
+        ArrayElementType::I32 => 4,
+        ArrayElementType::U8 => 1,
+    };
+    array.len * element_size
+}
+
+fn array_allocation(program: &LoweredProgram, slot: usize) -> &ArrayAllocation {
+    program
+        .arrays
+        .iter()
+        .find(|array| array.slot == slot)
+        .unwrap_or_else(|| panic!("unknown array slot {slot}"))
+}
+
+fn emit_i32_array_set(
     array_slot: usize,
     index: &I32Expr,
     value: &I32Expr,
@@ -970,6 +1088,25 @@ fn emit_array_set(
     code.extend_from_slice(&[0x89, 0x14, 0x0b]);
 }
 
+fn emit_u8_array_set(
+    array_slot: usize,
+    index: &I32Expr,
+    value: &U8Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    emit_i32_expr_to_eax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    code.push(0x51);
+    emit_u8_expr_to_eax(value, code, program);
+    code.extend_from_slice(&[0x89, 0xc2]);
+    code.push(0x59);
+    let slot_offset = array_slot_offset(array_slot);
+    code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
+    code.extend_from_slice(&slot_offset.to_le_bytes());
+    code.extend_from_slice(&[0x88, 0x14, 0x0b]);
+}
+
 fn emit_array_get(
     array_slot: usize,
     index: &I32Expr,
@@ -987,6 +1124,20 @@ fn emit_array_get(
     code.extend_from_slice(&slot_offset.to_le_bytes());
     // mov eax, [rbx + rcx]
     code.extend_from_slice(&[0x8b, 0x04, 0x0b]);
+}
+
+fn emit_u8_array_get(
+    array_slot: usize,
+    index: &I32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    emit_i32_expr_to_eax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    let slot_offset = array_slot_offset(array_slot);
+    code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
+    code.extend_from_slice(&slot_offset.to_le_bytes());
+    code.extend_from_slice(&[0x0f, 0xb6, 0x04, 0x0b]);
 }
 
 #[cfg(test)]
@@ -1030,7 +1181,7 @@ mod tests {
         assert_eq!(
             program.operations,
             vec![
-                Operation::Write {
+                Operation::WriteStatic {
                     fd: 1,
                     data_index: 0
                 },
@@ -1111,21 +1262,28 @@ mod tests {
         };
 
         let program = lower_package_to_program(&package).expect("lower fixture");
-        assert_eq!(program.arrays, vec![ArrayAllocation { slot: 0, len: 4 }]);
+        assert_eq!(
+            program.arrays,
+            vec![ArrayAllocation {
+                slot: 0,
+                len: 4,
+                element_type: ArrayElementType::I32,
+            }]
+        );
         assert_eq!(
             program.operations,
             vec![
-                Operation::ArraySet {
+                Operation::ArraySetI32 {
                     array_slot: 0,
                     index: I32Expr::Literal(0),
                     value: I32Expr::Literal(7),
                 },
-                Operation::ArraySet {
+                Operation::ArraySetI32 {
                     array_slot: 0,
                     index: I32Expr::Literal(1),
                     value: I32Expr::Literal(14),
                 },
-                Operation::ArraySet {
+                Operation::ArraySetI32 {
                     array_slot: 0,
                     index: I32Expr::Literal(2),
                     value: I32Expr::Literal(21),
@@ -1151,6 +1309,100 @@ mod tests {
     }
 
     #[test]
+    fn lowers_u8_array_hello_world_fixture_to_runtime_array_operations() {
+        let root = repo_root().join("tests/testcases/u8-array-hello-world");
+        let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.arrays,
+            vec![ArrayAllocation {
+                slot: 0,
+                len: 13,
+                element_type: ArrayElementType::U8,
+            }]
+        );
+        assert_eq!(
+            program.operations,
+            vec![
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(0),
+                    value: U8Expr::Literal(104),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(1),
+                    value: U8Expr::Literal(101),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(2),
+                    value: U8Expr::Literal(108),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(3),
+                    value: U8Expr::Literal(108),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(4),
+                    value: U8Expr::Literal(111),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(5),
+                    value: U8Expr::Literal(44),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(6),
+                    value: U8Expr::Literal(32),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(7),
+                    value: U8Expr::Literal(119),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(8),
+                    value: U8Expr::Literal(111),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(9),
+                    value: U8Expr::Literal(114),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(10),
+                    value: U8Expr::Literal(108),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(11),
+                    value: U8Expr::Literal(100),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(12),
+                    value: U8Expr::Literal(10),
+                },
+                Operation::WriteArray {
+                    fd: 1,
+                    array_slot: 0,
+                },
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
+            ]
+        );
+        assert!(program.data.is_empty());
+    }
+
+    #[test]
     fn builds_elf_image_with_exit_syscall() {
         let program = LoweredProgram {
             operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))],
@@ -1169,7 +1421,7 @@ mod tests {
     fn builds_elf_image_with_write_and_implicit_exit() {
         let program = LoweredProgram {
             operations: vec![
-                Operation::Write {
+                Operation::WriteStatic {
                     fd: 1,
                     data_index: 0,
                 },
@@ -1297,6 +1549,31 @@ mod tests {
 
         let status = Command::new(&output).status().expect("run binary");
         assert_eq!(status.code(), Some(42));
+
+        fs::remove_file(&output).expect("cleanup binary");
+    }
+
+    #[test]
+    fn compiles_and_runs_u8_array_hello_world_fixture() {
+        let root = repo_root().join("tests/testcases/u8-array-hello-world");
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let output = std::env::temp_dir().join(format!("neco-rs-u8-array-hello-world-{unique}"));
+
+        compile_path_to_elf(&root, &output).expect("compile fixture");
+
+        let mut permissions = fs::metadata(&output)
+            .expect("binary metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&output, permissions).expect("binary permissions");
+
+        let run = Command::new(&output).output().expect("run binary");
+        assert_eq!(run.status.code(), Some(0));
+        assert_eq!(run.stdout, b"hello, world\n");
+        assert!(run.stderr.is_empty());
 
         fs::remove_file(&output).expect("cleanup binary");
     }

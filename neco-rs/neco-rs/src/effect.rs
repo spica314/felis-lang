@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use neco_rs_parser::{BindingPattern, PathExpression, Term};
 
-use crate::{Error, I32Expr, LoweredProgram, LoweringState, Result, U8Expr};
+use crate::{ArrayElementType, Error, I32Expr, LoweredProgram, LoweringState, Result, U8Expr};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Value {
@@ -13,7 +13,10 @@ pub(crate) enum Value {
     ByteString(usize),
     I32(I32Expr),
     U8(U8Expr),
-    Array(usize),
+    Array {
+        slot: usize,
+        element_type: ArrayElementType,
+    },
 }
 
 pub(crate) fn lower_effect(
