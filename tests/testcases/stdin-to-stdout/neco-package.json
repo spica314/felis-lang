@@ -1,0 +1,4 @@
+{
+    "name": "stdin-to-stdout",
+    "felis-bin-entrypoints": ["src/stdin-to-stdout.fe"]
+}

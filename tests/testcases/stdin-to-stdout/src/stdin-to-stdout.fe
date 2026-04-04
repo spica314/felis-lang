@@ -1,0 +1,13 @@
+#use std::io::IO;
+#use std::primitive::u8::u8;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let stdin <- IO::stdin;
+    #let stdout <- IO::stdout;
+    #let _ @^ bytes_ref <- IO::array_new u8 1000i32;
+    #let len <- IO::read stdin bytes_ref 1000i32;
+    #let _ <- IO::write stdout bytes_ref len;
+    ()
+}

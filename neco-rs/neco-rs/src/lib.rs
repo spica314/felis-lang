@@ -152,11 +152,13 @@ pub(crate) struct LoweredProgram {
     operations: Vec<Operation>,
     data: Vec<Vec<u8>>,
     arrays: Vec<ArrayAllocation>,
+    i32_slots: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum I32Expr {
     Literal(i32),
+    Local(usize),
     Add(Box<I32Expr>, Box<I32Expr>),
     Sub(Box<I32Expr>, Box<I32Expr>),
     Mul(Box<I32Expr>, Box<I32Expr>),
@@ -203,13 +205,21 @@ pub(crate) struct ArrayAllocation {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Operation {
+    Read {
+        fd: u32,
+        array_slot: usize,
+        len: I32Expr,
+        result_slot: usize,
+    },
     WriteStatic {
         fd: u32,
         data_index: usize,
+        len: I32Expr,
     },
     WriteArray {
         fd: u32,
         array_slot: usize,
+        len: I32Expr,
     },
     ArraySetI32 {
         array_slot: usize,
@@ -227,6 +237,7 @@ enum Operation {
 pub(crate) struct LoweringState {
     environment: HashMap<String, Value>,
     next_array_slot: usize,
+    next_i32_slot: usize,
 }
 
 impl LoweringState {
@@ -234,6 +245,7 @@ impl LoweringState {
         Self {
             environment: HashMap::new(),
             next_array_slot: 0,
+            next_i32_slot: 0,
         }
     }
 
@@ -250,6 +262,12 @@ impl LoweringState {
             len,
             element_type,
         });
+        slot
+    }
+
+    fn allocate_i32_slot(&mut self) -> usize {
+        let slot = self.next_i32_slot;
+        self.next_i32_slot += 1;
         slot
     }
 }
@@ -289,6 +307,7 @@ fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
         operations: Vec::new(),
         data: Vec::new(),
         arrays: Vec::new(),
+        i32_slots: 0,
     };
     let mut state = LoweringState::new();
     let mut terminated = false;
@@ -308,6 +327,8 @@ fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
             .operations
             .push(Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))));
     }
+
+    program.i32_slots = state.next_i32_slot;
 
     Ok(program)
 }
@@ -794,34 +815,59 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
 
     for operation in &program.operations {
         match operation {
-            Operation::WriteStatic { fd, data_index } => {
-                let bytes = &program.data[*data_index];
-                // mov eax, (imm32): 0xb8, (imm32)
-                // write syscall: 1
-                code.extend_from_slice(&[0xb8, 0x01, 0x00, 0x00, 0x00]);
+            Operation::Read {
+                fd,
+                array_slot,
+                len,
+                result_slot,
+            } => {
+                code.push(0xbf);
+                code.extend_from_slice(&fd.to_le_bytes());
+                let slot_offset = array_slot_offset(*array_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+                emit_i32_expr_to_eax(len, &mut code, program);
+                // mov edx, eax
+                code.extend_from_slice(&[0x89, 0xc2]);
+                // read syscall: 0
+                code.extend_from_slice(&[0xb8, 0x00, 0x00, 0x00, 0x00]);
+                code.extend_from_slice(&[0x0f, 0x05]);
+                let result_offset = i32_slot_offset(program, *result_slot);
+                // mov [rbp + disp32], eax
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&result_offset.to_le_bytes());
+            }
+            Operation::WriteStatic { fd, data_index, len } => {
                 // mov edi, (imm32): 0xbf, (imm32)
                 code.push(0xbf);
                 code.extend_from_slice(&fd.to_le_bytes());
                 // mov rsi, (imm64): 0x48, 0xbe, (imm64)
                 code.extend_from_slice(&[0x48, 0xbe]);
                 code.extend_from_slice(&addresses[*data_index].to_le_bytes());
-                // mov edx, (imm32): 0xba
-                code.push(0xba);
-                code.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+                emit_i32_expr_to_eax(len, &mut code, program);
+                // mov edx, eax
+                code.extend_from_slice(&[0x89, 0xc2]);
+                // mov eax, (imm32): 0xb8, (imm32)
+                // write syscall: 1
+                code.extend_from_slice(&[0xb8, 0x01, 0x00, 0x00, 0x00]);
                 // syscall
                 code.extend_from_slice(&[0x0f, 0x05]);
             }
-            Operation::WriteArray { fd, array_slot } => {
+            Operation::WriteArray {
+                fd,
+                array_slot,
+                len,
+            } => {
                 let array = array_allocation(program, *array_slot);
                 debug_assert_eq!(array.element_type, ArrayElementType::U8);
-                code.extend_from_slice(&[0xb8, 0x01, 0x00, 0x00, 0x00]);
                 code.push(0xbf);
                 code.extend_from_slice(&fd.to_le_bytes());
                 let slot_offset = array_slot_offset(*array_slot);
                 code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
-                code.push(0xba);
-                code.extend_from_slice(&(array.len as u32).to_le_bytes());
+                emit_i32_expr_to_eax(len, &mut code, program);
+                code.extend_from_slice(&[0x89, 0xc2]);
+                code.extend_from_slice(&[0xb8, 0x01, 0x00, 0x00, 0x00]);
                 code.extend_from_slice(&[0x0f, 0x05]);
             }
             Operation::ArraySetI32 {
@@ -863,6 +909,12 @@ fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>, program: &LoweredPro
             // mov eax, imm32
             code.push(0xb8);
             code.extend_from_slice(&value.to_le_bytes());
+        }
+        I32Expr::Local(slot) => {
+            let slot_offset = i32_slot_offset(program, *slot);
+            // mov eax, [rbp + disp32]
+            code.extend_from_slice(&[0x8b, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
         }
         // add eax, ecx
         I32Expr::Add(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0x01, 0xc8]),
@@ -1012,8 +1064,9 @@ fn emit_u8_div_mod_expr(
 
 fn stack_frame_size(program: &LoweredProgram) -> usize {
     let pointer_bytes = program.arrays.len() * 8;
+    let i32_slot_bytes = program.i32_slots * 4;
     let array_bytes: usize = program.arrays.iter().map(array_storage_size).sum();
-    pointer_bytes + array_bytes
+    pointer_bytes + i32_slot_bytes + array_bytes
 }
 
 fn array_slot_offset(slot: usize) -> i32 {
@@ -1022,7 +1075,8 @@ fn array_slot_offset(slot: usize) -> i32 {
 
 fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
     let pointer_bytes = (program.arrays.len() * 8) as i32;
-    let mut offset = pointer_bytes;
+    let i32_slot_bytes = (program.i32_slots * 4) as i32;
+    let mut offset = pointer_bytes + i32_slot_bytes;
     for array in &program.arrays {
         offset += array_storage_size(array) as i32;
         if array.slot == slot {
@@ -1030,6 +1084,11 @@ fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
         }
     }
     panic!("unknown array slot {slot}");
+}
+
+fn i32_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
+    let pointer_bytes = (program.arrays.len() * 8) as i32;
+    -(pointer_bytes + 4 * (slot as i32 + 1))
 }
 
 fn emit_array_initializers(program: &LoweredProgram, code: &mut Vec<u8>) {
@@ -1199,6 +1258,28 @@ mod tests {
         run
     }
 
+    fn run_fixture_with_input(root: &Path, name: &str, stdin: &[u8]) -> Output {
+        use std::io::Write;
+        use std::process::Stdio;
+
+        let output = compile_fixture(root, name);
+        let mut child = runtime_test_runner(&output)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+        child
+            .stdin
+            .as_mut()
+            .expect("child stdin")
+            .write_all(stdin)
+            .expect("write child stdin");
+        let run = child.wait_with_output().expect("collect child output");
+        fs::remove_file(&output).expect("cleanup binary");
+        run
+    }
+
     #[test]
     fn lowers_exit_fixture_to_program() {
         let root = repo_root().join("tests/testcases/exit-42");
@@ -1228,13 +1309,15 @@ mod tests {
             vec![
                 Operation::WriteStatic {
                     fd: 1,
-                    data_index: 0
+                    data_index: 0,
+                    len: I32Expr::Literal(14),
                 },
                 Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0)))
             ]
         );
         assert_eq!(program.data, vec![b"Hello, world!\n".to_vec()]);
         assert!(program.arrays.is_empty());
+        assert_eq!(program.i32_slots, 0);
     }
 
     #[test]
@@ -1440,11 +1523,50 @@ mod tests {
                 Operation::WriteArray {
                     fd: 1,
                     array_slot: 0,
+                    len: I32Expr::Literal(13),
                 },
                 Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
             ]
         );
         assert!(program.data.is_empty());
+        assert_eq!(program.i32_slots, 0);
+    }
+
+    #[test]
+    fn lowers_stdin_to_stdout_fixture_to_runtime_io_operations() {
+        let root = repo_root().join("tests/testcases/stdin-to-stdout");
+        let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.arrays,
+            vec![ArrayAllocation {
+                slot: 0,
+                len: 1000,
+                element_type: ArrayElementType::U8,
+            }]
+        );
+        assert_eq!(
+            program.operations,
+            vec![
+                Operation::Read {
+                    fd: 0,
+                    array_slot: 0,
+                    len: I32Expr::Literal(1000),
+                    result_slot: 0,
+                },
+                Operation::WriteArray {
+                    fd: 1,
+                    array_slot: 0,
+                    len: I32Expr::Local(0),
+                },
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
+            ]
+        );
+        assert!(program.data.is_empty());
+        assert_eq!(program.i32_slots, 1);
     }
 
     #[test]
@@ -1453,6 +1575,7 @@ mod tests {
             operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))],
             data: Vec::new(),
             arrays: Vec::new(),
+            i32_slots: 0,
         };
         let elf = build_linux_x86_64_program_executable(&program).to_bytes();
         assert_eq!(&elf[0..4], b"\x7FELF");
@@ -1469,25 +1592,28 @@ mod tests {
                 Operation::WriteStatic {
                     fd: 1,
                     data_index: 0,
+                    len: I32Expr::Literal(14),
                 },
                 Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
             ],
             data: vec![b"Hello, world!\n".to_vec()],
             arrays: Vec::new(),
+            i32_slots: 0,
         };
         let elf = build_linux_x86_64_program_executable(&program).to_bytes();
 
         assert_eq!(&elf[0..4], b"\x7FELF");
-        assert_eq!(&elf[0x1000..0x1005], &[0xb8, 0x01, 0x00, 0x00, 0x00]);
-        assert_eq!(&elf[0x1005..0x100a], &[0xbf, 0x01, 0x00, 0x00, 0x00]);
-        assert_eq!(&elf[0x100a..0x100c], &[0x48, 0xbe]);
-        assert_eq!(&elf[0x100c..0x1014], &0x402000_u64.to_le_bytes());
-        assert_eq!(&elf[0x1014..0x1019], &[0xba, 14, 0x00, 0x00, 0x00]);
-        assert_eq!(&elf[0x1019..0x101b], &[0x0f, 0x05]);
-        assert_eq!(&elf[0x101b..0x1020], &[0xb8, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(&elf[0x1020..0x1022], &[0x89, 0xc7]);
-        assert_eq!(&elf[0x1022..0x1027], &[0xb8, 0x3c, 0x00, 0x00, 0x00]);
-        assert_eq!(&elf[0x1027..0x1029], &[0x0f, 0x05]);
+        assert_eq!(&elf[0x1000..0x1005], &[0xbf, 0x01, 0x00, 0x00, 0x00]);
+        assert_eq!(&elf[0x1005..0x1007], &[0x48, 0xbe]);
+        assert_eq!(&elf[0x1007..0x100f], &0x402000_u64.to_le_bytes());
+        assert_eq!(&elf[0x100f..0x1014], &[0xb8, 14, 0x00, 0x00, 0x00]);
+        assert_eq!(&elf[0x1014..0x1016], &[0x89, 0xc2]);
+        assert_eq!(&elf[0x1016..0x101b], &[0xb8, 0x01, 0x00, 0x00, 0x00]);
+        assert_eq!(&elf[0x101b..0x101d], &[0x0f, 0x05]);
+        assert_eq!(&elf[0x101d..0x1022], &[0xb8, 0x00, 0x00, 0x00, 0x00]);
+        assert_eq!(&elf[0x1022..0x1024], &[0x89, 0xc7]);
+        assert_eq!(&elf[0x1024..0x1029], &[0xb8, 0x3c, 0x00, 0x00, 0x00]);
+        assert_eq!(&elf[0x1029..0x102b], &[0x0f, 0x05]);
         assert_eq!(&elf[0x2000..0x200e], b"Hello, world!\n");
     }
 
@@ -1512,6 +1638,7 @@ mod tests {
             )))],
             data: Vec::new(),
             arrays: Vec::new(),
+            i32_slots: 0,
         };
         let elf = build_linux_x86_64_program_executable(&program).to_bytes();
         let code = &elf[0x1000..];
@@ -1556,6 +1683,15 @@ mod tests {
         let run = run_fixture_output(&root, "u8-array-hello-world");
         assert_eq!(run.status.code(), Some(0));
         assert_eq!(run.stdout, b"hello, world\n");
+        assert!(run.stderr.is_empty());
+    }
+
+    #[test]
+    fn compiles_and_runs_stdin_to_stdout_fixture() {
+        let root = repo_root().join("tests/testcases/stdin-to-stdout");
+        let run = run_fixture_with_input(&root, "stdin-to-stdout", b"echo through stdin\n");
+        assert_eq!(run.status.code(), Some(0));
+        assert_eq!(run.stdout, b"echo through stdin\n");
         assert!(run.stderr.is_empty());
     }
 

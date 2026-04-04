@@ -14,6 +14,10 @@ pub(crate) fn lower_io_reference(
     environment: &mut HashMap<String, Value>,
 ) -> Option<Result<bool>> {
     match path {
+        ["IO", "stdin"] => {
+            bind_pattern(binder, Value::FileDescriptor(0), environment);
+            Some(Ok(false))
+        }
         ["IO", "stdout"] => {
             bind_pattern(binder, Value::FileDescriptor(1), environment);
             Some(Ok(false))
@@ -30,8 +34,26 @@ pub(crate) fn lower_io_call(
     program: &mut LoweredProgram,
 ) -> Option<Result<bool>> {
     match path {
+        ["IO", "read"] => {
+            let (fd, array_slot, len, result_slot) = match parse_read_arguments(arguments, state) {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            program.operations.push(Operation::Read {
+                fd,
+                array_slot,
+                len,
+                result_slot,
+            });
+            bind_pattern(
+                binder,
+                Value::I32(crate::I32Expr::Local(result_slot)),
+                &mut state.environment,
+            );
+            Some(Ok(false))
+        }
         ["IO", "write"] => {
-            let operation = match parse_write_arguments(arguments, &state.environment) {
+            let operation = match parse_write_arguments(arguments, state) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
@@ -70,15 +92,17 @@ pub(crate) fn lower_io_call(
 
 fn parse_write_arguments(
     arguments: &[Term],
-    environment: &HashMap<String, Value>,
+    state: &LoweringState,
 ) -> Result<Operation> {
-    let [fd_term, bytes_term] = arguments else {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [fd_term, bytes_term, len_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::write` must receive a file descriptor and a byte string reference".to_string(),
+            "`IO::write` must receive a file descriptor, a byte string reference, and a length"
+                .to_string(),
         ));
     };
 
-    let fd = match resolve_value(fd_term, environment)? {
+    let fd = match resolve_value(fd_term, &state.environment)? {
         Value::FileDescriptor(fd) => fd,
         other => {
             return Err(Error::Unsupported(format!(
@@ -87,19 +111,89 @@ fn parse_write_arguments(
         }
     };
 
-    match resolve_value(bytes_term, environment)? {
-        Value::ByteString(data_index) => Ok(Operation::WriteStatic { fd, data_index }),
+    let len = lower_i32_expr(len_term, state).map_err(|_| {
+        Error::Unsupported("`IO::write` expects an `i32` length as its third argument".to_string())
+    })?;
+
+    match resolve_value(bytes_term, &state.environment)? {
+        Value::ByteString(data_index) => Ok(Operation::WriteStatic {
+            fd,
+            data_index,
+            len,
+        }),
         Value::Array {
             slot,
             element_type: ArrayElementType::U8,
         } => Ok(Operation::WriteArray {
             fd,
             array_slot: slot,
+            len,
         }),
         other => Err(Error::Unsupported(format!(
             "`IO::write` expects a byte string reference or `u8` array as its second argument, got {other:?}"
         ))),
     }
+}
+
+fn parse_read_arguments(
+    arguments: &[Term],
+    state: &mut LoweringState,
+) -> Result<(u32, usize, crate::I32Expr, usize)> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [fd_term, bytes_term, len_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::read` must receive a file descriptor, a `u8` array reference, and a length"
+                .to_string(),
+        ));
+    };
+
+    let fd = match resolve_value(fd_term, &state.environment)? {
+        Value::FileDescriptor(fd) => fd,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`IO::read` expects a file descriptor as its first argument, got {other:?}"
+            )));
+        }
+    };
+
+    let array_slot = match resolve_value(bytes_term, &state.environment)? {
+        Value::Array {
+            slot,
+            element_type: ArrayElementType::U8,
+        } => slot,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`IO::read` expects a `u8` array reference as its second argument, got {other:?}"
+            )));
+        }
+    };
+
+    let len = lower_i32_expr(len_term, state).map_err(|_| {
+        Error::Unsupported("`IO::read` expects an `i32` length as its third argument".to_string())
+    })?;
+    let result_slot = state.allocate_i32_slot();
+    Ok((fd, array_slot, len, result_slot))
+}
+
+fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {
+    let mut normalized = Vec::with_capacity(arguments.len());
+    let mut index = 0;
+    while index < arguments.len() {
+        if index + 1 < arguments.len()
+            && matches!(arguments[index], Term::IntegerLiteral(_))
+            && (is_i32_suffix(&arguments[index + 1]) || is_u8_suffix(&arguments[index + 1]))
+        {
+            normalized.push(Term::Application {
+                callee: Box::new(arguments[index].clone()),
+                arguments: vec![arguments[index + 1].clone()],
+            });
+            index += 2;
+            continue;
+        }
+        normalized.push(arguments[index].clone());
+        index += 1;
+    }
+    normalized
 }
 
 fn parse_exit_code_arguments(arguments: &[Term], state: &LoweringState) -> Result<ExitCodeExpr> {

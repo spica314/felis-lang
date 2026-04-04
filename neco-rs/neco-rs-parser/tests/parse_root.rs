@@ -107,6 +107,31 @@ fn parses_u8_array_hello_world_package_root() {
 }
 
 #[test]
+fn parses_stdin_to_stdout_package_root() {
+    let root = repo_root().join("tests/testcases/stdin-to-stdout");
+    let parsed = parse_root(&root).expect("stdin-to-stdout package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "stdin-to-stdout");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 4);
+    let Item::Function(main_fn) = &syntax.items[3] else {
+        panic!("expected function");
+    };
+    assert_eq!(main_fn.visibility, Visibility::Private);
+    assert!(main_fn.effect.is_some());
+    assert_eq!(main_fn.body.statements.len(), 5);
+}
+
+#[test]
 fn parses_std_package_with_nested_modules_and_theorems() {
     let root = repo_root().join("std");
     let parsed = parse_root(&root).expect("std parses");
