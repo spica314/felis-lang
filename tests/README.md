@@ -18,3 +18,10 @@ This directory is reserved for compiler-facing test cases.
 
 - `testcases/` contains compiler test inputs, including Felis source files and
   package-shaped fixtures.
+
+## Runtime Execution Tests
+
+- Tests that actually execute generated x86_64 ELF binaries are expected to run
+  them via `qemu-x86_64`.
+- The Rust bootstrap tests in `neco-rs/neco-rs` follow this policy so runtime
+  coverage does not depend on directly executing the host binary format.

@@ -1143,8 +1143,9 @@ fn emit_u8_array_get(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsString;
     use std::os::unix::fs::PermissionsExt;
-    use std::process::Command;
+    use std::process::{Command, Output};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn repo_root() -> PathBuf {
@@ -1152,6 +1153,50 @@ mod tests {
             .join("../..")
             .canonicalize()
             .expect("repo root")
+    }
+
+    fn compile_fixture(root: &Path, name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let output = std::env::temp_dir().join(format!("neco-rs-{name}-{unique}"));
+
+        compile_path_to_elf(root, &output).expect("compile fixture");
+
+        let mut permissions = fs::metadata(&output)
+            .expect("binary metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&output, permissions).expect("binary permissions");
+
+        output
+    }
+
+    fn runtime_test_runner(binary: &Path) -> Command {
+        let qemu = std::env::var_os("NECO_RS_TEST_QEMU")
+            .unwrap_or_else(|| OsString::from("qemu-x86_64"));
+        let mut command = Command::new(&qemu);
+        command.arg(binary);
+        command
+    }
+
+    fn run_fixture_status(root: &Path, name: &str) -> std::process::ExitStatus {
+        let output = compile_fixture(root, name);
+        let status = runtime_test_runner(&output)
+            .status()
+            .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+        fs::remove_file(&output).expect("cleanup binary");
+        status
+    }
+
+    fn run_fixture_output(root: &Path, name: &str) -> Output {
+        let output = compile_fixture(root, name);
+        let run = runtime_test_runner(&output)
+            .output()
+            .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+        fs::remove_file(&output).expect("cleanup binary");
+        run
     }
 
     #[test]
@@ -1487,95 +1532,31 @@ mod tests {
     #[test]
     fn compiles_and_runs_i32_ops_fixture() {
         let root = repo_root().join("tests/testcases/i32-ops");
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time")
-            .as_nanos();
-        let output = std::env::temp_dir().join(format!("neco-rs-i32-ops-{unique}"));
-
-        compile_path_to_elf(&root, &output).expect("compile fixture");
-
-        let mut permissions = fs::metadata(&output)
-            .expect("binary metadata")
-            .permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&output, permissions).expect("binary permissions");
-
-        let status = Command::new(&output).status().expect("run binary");
+        let status = run_fixture_status(&root, "i32-ops");
         assert_eq!(status.code(), Some(42));
-
-        fs::remove_file(&output).expect("cleanup binary");
     }
 
     #[test]
     fn compiles_and_runs_u8_ops_fixture() {
         let root = repo_root().join("tests/testcases/u8-ops");
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time")
-            .as_nanos();
-        let output = std::env::temp_dir().join(format!("neco-rs-u8-ops-{unique}"));
-
-        compile_path_to_elf(&root, &output).expect("compile fixture");
-
-        let mut permissions = fs::metadata(&output)
-            .expect("binary metadata")
-            .permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&output, permissions).expect("binary permissions");
-
-        let status = Command::new(&output).status().expect("run binary");
+        let status = run_fixture_status(&root, "u8-ops");
         assert_eq!(status.code(), Some(42));
-
-        fs::remove_file(&output).expect("cleanup binary");
     }
 
     #[test]
     fn compiles_and_runs_array_basic_fixture() {
         let root = repo_root().join("tests/testcases/array-basic");
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time")
-            .as_nanos();
-        let output = std::env::temp_dir().join(format!("neco-rs-array-basic-{unique}"));
-
-        compile_path_to_elf(&root, &output).expect("compile fixture");
-
-        let mut permissions = fs::metadata(&output)
-            .expect("binary metadata")
-            .permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&output, permissions).expect("binary permissions");
-
-        let status = Command::new(&output).status().expect("run binary");
+        let status = run_fixture_status(&root, "array-basic");
         assert_eq!(status.code(), Some(42));
-
-        fs::remove_file(&output).expect("cleanup binary");
     }
 
     #[test]
     fn compiles_and_runs_u8_array_hello_world_fixture() {
         let root = repo_root().join("tests/testcases/u8-array-hello-world");
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time")
-            .as_nanos();
-        let output = std::env::temp_dir().join(format!("neco-rs-u8-array-hello-world-{unique}"));
-
-        compile_path_to_elf(&root, &output).expect("compile fixture");
-
-        let mut permissions = fs::metadata(&output)
-            .expect("binary metadata")
-            .permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&output, permissions).expect("binary permissions");
-
-        let run = Command::new(&output).output().expect("run binary");
+        let run = run_fixture_output(&root, "u8-array-hello-world");
         assert_eq!(run.status.code(), Some(0));
         assert_eq!(run.stdout, b"hello, world\n");
         assert!(run.stderr.is_empty());
-
-        fs::remove_file(&output).expect("cleanup binary");
     }
 
     #[test]
