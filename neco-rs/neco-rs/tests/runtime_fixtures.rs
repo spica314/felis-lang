@@ -143,3 +143,10 @@ fn compiles_and_runs_if_else_false_fixture() {
     let status = run_fixture_status(&root, "if-else-false");
     assert_eq!(status.code(), Some(42));
 }
+
+#[test]
+fn compiles_and_runs_loop_fixture() {
+    let root = repo_root().join("tests/testcases/loop");
+    let status = run_fixture_status(&root, "loop");
+    assert_eq!(status.code(), Some(55));
+}

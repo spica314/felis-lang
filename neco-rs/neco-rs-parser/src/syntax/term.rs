@@ -58,6 +58,8 @@ pub struct Block {
 pub enum Statement {
     Let(LetStatement),
     If(IfStatement),
+    Loop(LoopStatement),
+    Break,
     Item(Box<Item>),
     Expression(Box<Term>),
 }
@@ -67,6 +69,11 @@ pub struct IfStatement {
     pub condition: Box<Term>,
     pub then_block: Block,
     pub else_block: Option<Block>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LoopStatement {
+    pub body: Block,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,6 +149,15 @@ impl Parse for Block {
                 statements.push(Statement::If(IfStatement::parse(parser)?.unwrap()));
                 continue;
             }
+            if parser.consume_keyword(Keyword::Loop) {
+                statements.push(Statement::Loop(LoopStatement::parse(parser)?.unwrap()));
+                continue;
+            }
+            if parser.consume_keyword(Keyword::Break) {
+                parser.expect_punctuation(TokenKind::Semicolon)?;
+                statements.push(Statement::Break);
+                continue;
+            }
 
             let expression = Term::parse(parser)?.unwrap();
             if parser.consume_punctuation(TokenKind::Semicolon) {
@@ -191,6 +207,14 @@ impl Parse for IfStatement {
             then_block,
             else_block,
         }))
+    }
+}
+
+impl Parse for LoopStatement {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
+        let body = Block::parse(parser)?.unwrap();
+        parser.expect_punctuation(TokenKind::Semicolon)?;
+        Ok(Some(Self { body }))
     }
 }
 

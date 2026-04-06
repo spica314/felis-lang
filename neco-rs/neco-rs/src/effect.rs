@@ -12,6 +12,7 @@ pub(crate) enum Value {
     FileDescriptor(u32),
     ByteString(usize),
     I32(I32Expr),
+    I32Reference(usize),
     U8(U8Expr),
     Array {
         slot: usize,

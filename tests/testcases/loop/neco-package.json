@@ -1,0 +1,4 @@
+{
+    "name": "loop",
+    "felis-bin-entrypoints": ["src/loop.fe"]
+}

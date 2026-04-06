@@ -45,6 +45,7 @@ pub enum TokenKind {
 pub enum Keyword {
     As,
     BindBuiltin,
+    Break,
     EntryPoint,
     Else,
     Fn,
@@ -56,6 +57,7 @@ pub enum Keyword {
     If,
     Match,
     Let,
+    Loop,
     Use,
     Mod,
     With,
@@ -242,6 +244,7 @@ impl Lexer {
         let keyword = match text.as_str() {
             "#as" => Keyword::As,
             "#bind_builtin" => Keyword::BindBuiltin,
+            "#break" => Keyword::Break,
             "#entrypoint" => Keyword::EntryPoint,
             "#else" => Keyword::Else,
             "#fn" => Keyword::Fn,
@@ -253,6 +256,7 @@ impl Lexer {
             "#if" => Keyword::If,
             "#match" => Keyword::Match,
             "#let" => Keyword::Let,
+            "#loop" => Keyword::Loop,
             "#use" => Keyword::Use,
             "#mod" => Keyword::Mod,
             "#with" => Keyword::With,

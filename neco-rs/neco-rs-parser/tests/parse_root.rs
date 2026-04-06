@@ -203,6 +203,29 @@ fn parses_if_package_root_with_else_branches() {
 }
 
 #[test]
+fn parses_loop_package_root() {
+    let root = repo_root().join("tests/testcases/loop");
+    let parsed = parse_root(&root).expect("loop package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "loop");
+    assert_eq!(package.source_files.len(), 1);
+    let syntax = &package.source_files[0].syntax;
+    let Item::Function(main_fn) = &syntax.items[4] else {
+        panic!("expected function");
+    };
+    assert_eq!(main_fn.body.statements.len(), 4);
+
+    let Statement::Loop(loop_stmt) = &main_fn.body.statements[2] else {
+        panic!("expected loop statement");
+    };
+    assert_eq!(loop_stmt.body.statements.len(), 5);
+    assert!(matches!(loop_stmt.body.statements[2], Statement::If(_)));
+}
+
+#[test]
 fn parses_std_package_with_nested_modules_and_theorems() {
     let root = repo_root().join("std");
     let parsed = parse_root(&root).expect("std parses");

@@ -259,6 +259,7 @@ fn keyword_name(keyword: Keyword) -> &'static str {
     match keyword {
         Keyword::As => "as",
         Keyword::BindBuiltin => "bind_builtin",
+        Keyword::Break => "break",
         Keyword::EntryPoint => "entrypoint",
         Keyword::Else => "else",
         Keyword::Fn => "fn",
@@ -270,6 +271,7 @@ fn keyword_name(keyword: Keyword) -> &'static str {
         Keyword::If => "if",
         Keyword::Match => "match",
         Keyword::Let => "let",
+        Keyword::Loop => "loop",
         Keyword::Use => "use",
         Keyword::Mod => "mod",
         Keyword::With => "with",

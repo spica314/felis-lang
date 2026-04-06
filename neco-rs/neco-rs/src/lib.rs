@@ -10,8 +10,8 @@ mod effect;
 use effect::{Value, bind_pattern, lower_effect, resolve_value};
 use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
 use neco_rs_parser::{
-    ArrowParameter, Block, FunctionDeclaration, FunctionKind, Item, LetOperator, ParsedPackage,
-    ParsedRoot, Statement, Term, parse_root,
+    ArrowParameter, BindingPattern, Block, FunctionDeclaration, FunctionKind, Item, LetOperator,
+    ParsedPackage, ParsedRoot, Statement, Term, parse_root,
 };
 
 #[derive(Debug)]
@@ -261,6 +261,10 @@ pub(crate) struct ArrayAllocation {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Operation {
+    StoreI32 {
+        slot: usize,
+        value: I32Expr,
+    },
     Read {
         fd: u32,
         array_slot: usize,
@@ -292,6 +296,10 @@ enum Operation {
         then_operations: Vec<Operation>,
         else_operations: Vec<Operation>,
     },
+    Loop {
+        body_operations: Vec<Operation>,
+    },
+    Break,
     Exit(ExitCodeExpr),
 }
 
@@ -300,6 +308,7 @@ pub(crate) struct LoweringState {
     next_array_slot: usize,
     next_i32_slot: usize,
     functions: HashMap<String, PureFunction>,
+    loop_depth: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -315,6 +324,7 @@ impl LoweringState {
             next_array_slot: 0,
             next_i32_slot: 0,
             functions: HashMap::new(),
+            loop_depth: 0,
         }
     }
 
@@ -411,8 +421,7 @@ fn lower_statement(
     match statement {
         Statement::Let(let_stmt) => match let_stmt.operator {
             neco_rs_parser::LetOperator::Equals => {
-                let value = lower_pure_value(let_stmt.value.as_ref(), state, program)?;
-                bind_pattern(&let_stmt.binder, value, &mut state.environment);
+                lower_let_equals_statement(&let_stmt.binder, let_stmt.value.as_ref(), state, program)?;
                 Ok(false)
             }
             neco_rs_parser::LetOperator::LeftArrow => {
@@ -430,6 +439,7 @@ fn lower_statement(
                 next_array_slot: state.next_array_slot,
                 next_i32_slot: state.next_i32_slot,
                 functions: state.functions.clone(),
+                loop_depth: state.loop_depth,
             };
             let mut then_operations = Vec::new();
             let mut then_program = LoweredProgram {
@@ -455,6 +465,7 @@ fn lower_statement(
                     next_array_slot: state.next_array_slot,
                     next_i32_slot: state.next_i32_slot,
                     functions: state.functions.clone(),
+                    loop_depth: state.loop_depth,
                 };
                 let mut else_program = LoweredProgram {
                     operations: Vec::new(),
@@ -487,10 +498,80 @@ fn lower_statement(
             });
             Ok(false)
         }
+        Statement::Loop(loop_stmt) => {
+            let mut loop_state = LoweringState {
+                environment: state.environment.clone(),
+                next_array_slot: state.next_array_slot,
+                next_i32_slot: state.next_i32_slot,
+                functions: state.functions.clone(),
+                loop_depth: state.loop_depth + 1,
+            };
+            let mut loop_program = LoweredProgram {
+                operations: Vec::new(),
+                data: std::mem::take(&mut program.data),
+                arrays: std::mem::take(&mut program.arrays),
+                i32_slots: program.i32_slots,
+            };
+            for statement in &loop_stmt.body.statements {
+                let terminated = lower_statement(statement, &mut loop_state, &mut loop_program)?;
+                if terminated {
+                    break;
+                }
+            }
+            program.data = loop_program.data;
+            program.arrays = loop_program.arrays;
+            state.next_array_slot = state.next_array_slot.max(loop_state.next_array_slot);
+            state.next_i32_slot = state.next_i32_slot.max(loop_state.next_i32_slot);
+            program.operations.push(Operation::Loop {
+                body_operations: loop_program.operations,
+            });
+            Ok(false)
+        }
+        Statement::Break => {
+            if state.loop_depth == 0 {
+                return Err(Error::Unsupported(
+                    "`#break` is only supported inside `#loop`".to_string(),
+                ));
+            }
+            program.operations.push(Operation::Break);
+            Ok(false)
+        }
         Statement::Item(_) => Err(Error::Unsupported(
             "items inside entrypoint bodies are not supported".to_string(),
         )),
     }
+}
+
+fn lower_let_equals_statement(
+    binder: &BindingPattern,
+    value_term: &Term,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<()> {
+    let value = lower_pure_value(value_term, state, program)?;
+    if let BindingPattern::ValueAndReference {
+        value: inner,
+        reference,
+        ..
+    } = binder
+    {
+        if let Value::I32(expr) = value {
+            let slot = state.allocate_i32_slot();
+            program.operations.push(Operation::StoreI32 { slot, value: expr });
+            bind_pattern(
+                inner.as_ref(),
+                Value::I32(I32Expr::Local(slot)),
+                &mut state.environment,
+            );
+            state
+                .environment
+                .insert(reference.clone(), Value::I32Reference(slot));
+            return Ok(());
+        }
+    }
+
+    bind_pattern(binder, value, &mut state.environment);
+    Ok(())
 }
 
 fn lower_pure_value(
@@ -615,6 +696,7 @@ fn lower_pure_function_call(
         next_array_slot: state.next_array_slot,
         next_i32_slot: state.next_i32_slot,
         functions: state.functions.clone(),
+        loop_depth: state.loop_depth,
     };
 
     lower_pure_block_value(&function.body, &scoped_state, program).map(Some)
@@ -630,6 +712,7 @@ fn lower_pure_block_value(
         next_array_slot: state.next_array_slot,
         next_i32_slot: state.next_i32_slot,
         functions: state.functions.clone(),
+        loop_depth: state.loop_depth,
     };
 
     for statement in &block.statements {
@@ -653,6 +736,16 @@ fn lower_pure_block_value(
                     "`#if` is not supported in pure function bodies".to_string(),
                 ));
             }
+            Statement::Loop(_) => {
+                return Err(Error::Unsupported(
+                    "`#loop` is not supported in pure function bodies".to_string(),
+                ));
+            }
+            Statement::Break => {
+                return Err(Error::Unsupported(
+                    "`#break` is not supported in pure function bodies".to_string(),
+                ));
+            }
             Statement::Item(_) => {
                 return Err(Error::Unsupported(
                     "items inside pure function bodies are not supported".to_string(),
@@ -673,6 +766,14 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
     match term {
         Term::Group(inner) => lower_i32_expr(inner, state),
         Term::IntegerLiteral(literal) => parse_suffixed_i32_literal(literal),
+        Term::MethodCall { receiver, method } if method == "get" => {
+            match resolve_value(receiver.as_ref(), &state.environment)? {
+                Value::I32Reference(slot) => Ok(I32Expr::Local(slot)),
+                other => Err(Error::Unsupported(format!(
+                    "`get` expects an `i32` reference, got {other:?}"
+                ))),
+            }
+        }
         Term::Path(_) => match resolve_value(term, &state.environment)? {
             Value::I32(expr) => Ok(expr),
             other => Err(Error::Unsupported(format!(
@@ -681,6 +782,9 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
         },
         Term::Application { callee, arguments } => {
             if let Some(expr) = lower_i32_literal_application(callee, arguments)? {
+                return Ok(expr);
+            }
+            if let Some(expr) = lower_i32_reference_get_call(callee, arguments, state)? {
                 return Ok(expr);
             }
             if let Some(expr) = lower_array_get_call(callee, arguments, state)? {
@@ -815,7 +919,8 @@ fn lower_i32_primitive_call(
         .iter()
         .map(|segment| segment.name.as_str())
         .collect();
-    let [lhs, rhs] = arguments else {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
             "`{}` must receive exactly two arguments",
             segments.join("::")
@@ -868,7 +973,8 @@ fn lower_u8_primitive_call(
         .iter()
         .map(|segment| segment.name.as_str())
         .collect();
-    let [lhs, rhs] = arguments else {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
             "`{}` must receive exactly two arguments",
             segments.join("::")
@@ -929,6 +1035,24 @@ fn lower_array_get_call(
     }))
 }
 
+fn lower_i32_reference_get_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<I32Expr>> {
+    let Term::MethodCall { receiver, method } = callee else {
+        return Ok(None);
+    };
+    if method != "get" || !arguments.is_empty() {
+        return Ok(None);
+    }
+
+    match resolve_value(receiver.as_ref(), &state.environment)? {
+        Value::I32Reference(slot) => Ok(Some(I32Expr::Local(slot))),
+        _ => Ok(None),
+    }
+}
+
 fn lower_u8_array_get_call(
     callee: &Term,
     arguments: &[Term],
@@ -987,34 +1111,54 @@ fn lower_expression_statement(
         )));
     }
 
-    let normalized = normalize_numeric_literal_arguments(arguments);
-    let [index, value] = normalized.as_slice() else {
-        return Err(Error::Unsupported(
-            "`set` must receive exactly two arguments".to_string(),
-        ));
-    };
-
-    let index = lower_i32_expr(index, state)?;
     match resolve_value(receiver.as_ref(), &state.environment)? {
+        Value::I32Reference(slot) => {
+            let normalized = normalize_numeric_literal_arguments(arguments);
+            let [value] = normalized.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`set` must receive exactly one argument for `i32` references".to_string(),
+                ));
+            };
+            program.operations.push(Operation::StoreI32 {
+                slot,
+                value: lower_i32_expr(value, state)?,
+            });
+        }
         Value::Array {
             slot,
             element_type: ArrayElementType::I32,
-        } => program.operations.push(Operation::ArraySetI32 {
-            array_slot: slot,
-            index,
-            value: lower_i32_expr(value, state)?,
-        }),
+        } => {
+            let normalized = normalize_numeric_literal_arguments(arguments);
+            let [index, value] = normalized.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`set` must receive exactly two arguments for arrays".to_string(),
+                ));
+            };
+            program.operations.push(Operation::ArraySetI32 {
+                array_slot: slot,
+                index: lower_i32_expr(index, state)?,
+                value: lower_i32_expr(value, state)?,
+            });
+        }
         Value::Array {
             slot,
             element_type: ArrayElementType::U8,
-        } => program.operations.push(Operation::ArraySetU8 {
-            array_slot: slot,
-            index,
-            value: lower_u8_expr(value, state)?,
-        }),
+        } => {
+            let normalized = normalize_numeric_literal_arguments(arguments);
+            let [index, value] = normalized.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`set` must receive exactly two arguments for arrays".to_string(),
+                ));
+            };
+            program.operations.push(Operation::ArraySetU8 {
+                array_slot: slot,
+                index: lower_i32_expr(index, state)?,
+                value: lower_u8_expr(value, state)?,
+            });
+        }
         other => {
             return Err(Error::Unsupported(format!(
-                "`set` expects an array reference, got {other:?}"
+                "`set` expects an `i32` reference or array reference, got {other:?}"
             )));
         }
     }
@@ -1153,7 +1297,7 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
         emit_array_initializers(program, &mut code);
     }
 
-    emit_operations(&program.operations, &mut code, program, &addresses);
+    emit_operations(&program.operations, &mut code, program, &addresses, None);
 
     code
 }
@@ -1163,9 +1307,16 @@ fn emit_operations(
     code: &mut Vec<u8>,
     program: &LoweredProgram,
     addresses: &[u64],
+    mut break_patches: Option<&mut Vec<usize>>,
 ) {
     for operation in operations {
         match operation {
+            Operation::StoreI32 { slot, value } => {
+                emit_i32_expr_to_eax(value, code, program);
+                let slot_offset = i32_slot_offset(program, *slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+            }
             Operation::Read {
                 fd,
                 array_slot,
@@ -1234,7 +1385,7 @@ fn emit_operations(
                 let false_patch_at = code.len();
                 code.extend_from_slice(&0i32.to_le_bytes());
                 let then_start = code.len();
-                emit_operations(then_operations, code, program, addresses);
+                emit_operations(then_operations, code, program, addresses, break_patches.as_deref_mut());
                 if else_operations.is_empty() {
                     let end = code.len();
                     let false_jump_len = (end - then_start) as i32;
@@ -1245,7 +1396,7 @@ fn emit_operations(
                     let end_patch_at = code.len();
                     code.extend_from_slice(&0i32.to_le_bytes());
                     let else_start = code.len();
-                    emit_operations(else_operations, code, program, addresses);
+                    emit_operations(else_operations, code, program, addresses, break_patches.as_deref_mut());
                     let end = code.len();
                     let false_jump_len = (else_start - then_start) as i32;
                     code[false_patch_at..false_patch_at + 4]
@@ -1265,6 +1416,37 @@ fn emit_operations(
                 index,
                 value,
             } => emit_u8_array_set(*array_slot, index, value, code, program),
+            Operation::Loop { body_operations } => {
+                let loop_start = code.len();
+                let mut loop_break_patches = Vec::new();
+                emit_operations(
+                    body_operations,
+                    code,
+                    program,
+                    addresses,
+                    Some(&mut loop_break_patches),
+                );
+                code.push(0xe9);
+                let back_patch_at = code.len();
+                code.extend_from_slice(&0i32.to_le_bytes());
+                let loop_end = code.len();
+                let back_jump_len = loop_start as i32 - loop_end as i32;
+                code[back_patch_at..back_patch_at + 4]
+                    .copy_from_slice(&back_jump_len.to_le_bytes());
+                for patch_at in loop_break_patches {
+                    let break_jump_len = loop_end as i32 - (patch_at as i32 + 4);
+                    code[patch_at..patch_at + 4].copy_from_slice(&break_jump_len.to_le_bytes());
+                }
+            }
+            Operation::Break => {
+                code.push(0xe9);
+                let patch_at = code.len();
+                code.extend_from_slice(&0i32.to_le_bytes());
+                break_patches
+                    .as_deref_mut()
+                    .expect("break must be lowered inside a loop")
+                    .push(patch_at);
+            }
             Operation::Exit(exit_code) => {
                 emit_exit_code_expr_to_eax(exit_code, code, program);
                 // mov edi, eax
@@ -1933,6 +2115,58 @@ mod tests {
                 Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
             ]
         );
+    }
+
+    #[test]
+    fn lowers_loop_fixture_to_runtime_operations() {
+        let root = repo_root().join("tests/testcases/loop");
+        let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.operations,
+            vec![
+                Operation::StoreI32 {
+                    slot: 0,
+                    value: I32Expr::Literal(1),
+                },
+                Operation::StoreI32 {
+                    slot: 1,
+                    value: I32Expr::Literal(0),
+                },
+                Operation::Loop {
+                    body_operations: vec![
+                        Operation::StoreI32 {
+                            slot: 1,
+                            value: I32Expr::Add(
+                                Box::new(I32Expr::Local(1)),
+                                Box::new(I32Expr::Local(0)),
+                            ),
+                        },
+                        Operation::If {
+                            condition: ConditionExpr::I32 {
+                                kind: ComparisonKind::Eq,
+                                lhs: I32Expr::Local(0),
+                                rhs: I32Expr::Literal(10),
+                            },
+                            then_operations: vec![Operation::Break],
+                            else_operations: vec![],
+                        },
+                        Operation::StoreI32 {
+                            slot: 0,
+                            value: I32Expr::Add(
+                                Box::new(I32Expr::Local(0)),
+                                Box::new(I32Expr::Literal(1)),
+                            ),
+                        },
+                    ],
+                },
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(1))),
+            ]
+        );
+        assert_eq!(program.i32_slots, 2);
     }
 
     #[test]

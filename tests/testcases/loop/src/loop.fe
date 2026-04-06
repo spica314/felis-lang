@@ -1,0 +1,21 @@
+#use std::io::IO;
+#use std::primitive::i32::i32_add;
+#use std::primitive::i32::i32_eq;
+
+#entrypoint main;
+
+#proc main : () #with IO {
+    #let _ @^ counter = 1i32;
+    #let _ @^ sum = 0i32;
+    #loop {
+        #let new_sum = i32_add (sum .> get) (counter .> get);
+        sum .> set new_sum;
+        #if i32_eq (counter .> get) 10i32 {
+            #break;
+        };
+        #let new_counter = i32_add (counter .> get) 1i32;
+        counter .> set new_counter;
+    };
+    #let _ <- IO::exit (sum .> get);
+    ()
+}
