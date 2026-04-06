@@ -175,6 +175,34 @@ fn parses_fn_call_package_root() {
 }
 
 #[test]
+fn parses_if_package_root_with_else_branches() {
+    let root = repo_root().join("tests/testcases/if");
+    let parsed = parse_root(&root).expect("if package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "if");
+    assert_eq!(package.source_files.len(), 4);
+
+    let else_true = package
+        .source_files
+        .iter()
+        .find(|file| {
+            file.path
+                .ends_with("tests/testcases/if/src/if-else-true.fe")
+        })
+        .expect("if-else-true file");
+    let Item::Function(main_fn) = &else_true.syntax.items[3] else {
+        panic!("expected function");
+    };
+    let Statement::If(if_stmt) = &main_fn.body.statements[0] else {
+        panic!("expected if statement");
+    };
+    assert!(if_stmt.else_block.is_some());
+}
+
+#[test]
 fn parses_std_package_with_nested_modules_and_theorems() {
     let root = repo_root().join("std");
     let parsed = parse_root(&root).expect("std parses");

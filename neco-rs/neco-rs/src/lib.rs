@@ -268,6 +268,7 @@ enum Operation {
     If {
         condition: ConditionExpr,
         then_operations: Vec<Operation>,
+        else_operations: Vec<Operation>,
     },
     Exit(ExitCodeExpr),
 }
@@ -402,7 +403,7 @@ fn lower_statement(
         }
         Statement::If(if_stmt) => {
             let condition = lower_condition_expr(if_stmt.condition.as_ref(), state)?;
-            let mut scoped_state = LoweringState {
+            let mut then_state = LoweringState {
                 environment: state.environment.clone(),
                 next_array_slot: state.next_array_slot,
                 next_i32_slot: state.next_i32_slot,
@@ -416,19 +417,51 @@ fn lower_statement(
                 i32_slots: program.i32_slots,
             };
             for statement in &if_stmt.then_block.statements {
-                let terminated = lower_statement(statement, &mut scoped_state, &mut then_program)?;
+                let terminated = lower_statement(statement, &mut then_state, &mut then_program)?;
                 if terminated {
                     break;
                 }
             }
             then_operations.append(&mut then_program.operations);
-            program.data = then_program.data;
-            program.arrays = then_program.arrays;
-            state.next_array_slot = scoped_state.next_array_slot;
-            state.next_i32_slot = scoped_state.next_i32_slot;
+            let mut else_operations = Vec::new();
+            let mut next_array_slot = then_state.next_array_slot;
+            let mut next_i32_slot = then_state.next_i32_slot;
+
+            if let Some(else_block) = &if_stmt.else_block {
+                let mut else_state = LoweringState {
+                    environment: state.environment.clone(),
+                    next_array_slot: state.next_array_slot,
+                    next_i32_slot: state.next_i32_slot,
+                    functions: state.functions.clone(),
+                };
+                let mut else_program = LoweredProgram {
+                    operations: Vec::new(),
+                    data: then_program.data,
+                    arrays: then_program.arrays,
+                    i32_slots: then_program.i32_slots,
+                };
+                for statement in &else_block.statements {
+                    let terminated =
+                        lower_statement(statement, &mut else_state, &mut else_program)?;
+                    if terminated {
+                        break;
+                    }
+                }
+                else_operations.append(&mut else_program.operations);
+                program.data = else_program.data;
+                program.arrays = else_program.arrays;
+                next_array_slot = next_array_slot.max(else_state.next_array_slot);
+                next_i32_slot = next_i32_slot.max(else_state.next_i32_slot);
+            } else {
+                program.data = then_program.data;
+                program.arrays = then_program.arrays;
+            }
+            state.next_array_slot = next_array_slot;
+            state.next_i32_slot = next_i32_slot;
             program.operations.push(Operation::If {
                 condition,
                 then_operations,
+                else_operations,
             });
             Ok(false)
         }
@@ -1173,14 +1206,32 @@ fn emit_operations(
             Operation::If {
                 condition,
                 then_operations,
+                else_operations,
             } => {
                 emit_condition_false_jump(condition, code, program);
-                let patch_at = code.len();
+                let false_patch_at = code.len();
                 code.extend_from_slice(&0i32.to_le_bytes());
-                let body_start = code.len();
+                let then_start = code.len();
                 emit_operations(then_operations, code, program, addresses);
-                let body_len = (code.len() - body_start) as i32;
-                code[patch_at..patch_at + 4].copy_from_slice(&body_len.to_le_bytes());
+                if else_operations.is_empty() {
+                    let end = code.len();
+                    let false_jump_len = (end - then_start) as i32;
+                    code[false_patch_at..false_patch_at + 4]
+                        .copy_from_slice(&false_jump_len.to_le_bytes());
+                } else {
+                    code.extend_from_slice(&[0xe9]);
+                    let end_patch_at = code.len();
+                    code.extend_from_slice(&0i32.to_le_bytes());
+                    let else_start = code.len();
+                    emit_operations(else_operations, code, program, addresses);
+                    let end = code.len();
+                    let false_jump_len = (else_start - then_start) as i32;
+                    code[false_patch_at..false_patch_at + 4]
+                        .copy_from_slice(&false_jump_len.to_le_bytes());
+                    let end_jump_len = (end - else_start) as i32;
+                    code[end_patch_at..end_patch_at + 4]
+                        .copy_from_slice(&end_jump_len.to_le_bytes());
+                }
             }
             Operation::ArraySetI32 {
                 array_slot,
@@ -1817,6 +1868,49 @@ mod tests {
         );
         assert!(program.data.is_empty());
         assert_eq!(program.i32_slots, 0);
+    }
+
+    #[test]
+    fn lowers_if_else_true_fixture_to_program() {
+        let root = repo_root().join("tests/testcases/if");
+        let source_path = root.join("src/if-else-true.fe");
+        let source = std::fs::read_to_string(&source_path).expect("read fixture source");
+        let (tokens, syntax) = neco_rs_parser::parse_source(&source).expect("parse source");
+        let package = ParsedPackage {
+            root_dir: root.clone(),
+            manifest_path: root.join("neco-package.json"),
+            manifest: neco_rs_parser::PackageManifest {
+                name: "if".to_string(),
+                dependencies: Vec::new(),
+                felis_lib_entrypoint: None,
+                felis_bin_entrypoints: vec![PathBuf::from("src/if-else-true.fe")],
+            },
+            source_files: vec![neco_rs_parser::ParsedSourceFile {
+                path: source_path,
+                role: neco_rs_parser::SourceFileRole::BinaryEntrypoint,
+                tokens,
+                syntax: syntax.expect("source file syntax"),
+            }],
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.operations,
+            vec![
+                Operation::If {
+                    condition: ConditionExpr::I32 {
+                        kind: ComparisonKind::Eq,
+                        lhs: I32Expr::Literal(3),
+                        rhs: I32Expr::Literal(3),
+                    },
+                    then_operations: vec![Operation::Exit(ExitCodeExpr::I32(
+                        I32Expr::Literal(42,)
+                    ))],
+                    else_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(1,)))],
+                },
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
+            ]
+        );
     }
 
     #[test]

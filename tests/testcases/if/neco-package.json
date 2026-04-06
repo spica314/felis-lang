@@ -2,6 +2,8 @@
     "name": "if",
     "felis-bin-entrypoints": [
         "src/if-true.fe",
-        "src/if-false.fe"
+        "src/if-false.fe",
+        "src/if-else-true.fe",
+        "src/if-else-false.fe"
     ]
 }
