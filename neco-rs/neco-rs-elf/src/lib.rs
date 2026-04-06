@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SegmentFlags {
     readable: bool,
@@ -41,6 +43,24 @@ pub struct Elf64Executable {
     load_segments: Vec<LoadSegment>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Error {
+    InvalidFirstLoadSegmentAlignment { alignment: u64 },
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidFirstLoadSegmentAlignment { alignment } => write!(
+                f,
+                "the first load segment alignment must be 0, found {alignment}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
 impl LoadSegment {
     pub fn new(virtual_address: u64, alignment: u64, flags: SegmentFlags, data: Vec<u8>) -> Self {
         Self {
@@ -64,10 +84,20 @@ impl Elf64Executable {
         self.load_segments.push(segment);
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
         // This crate currently emits only ELF64 little-endian / System V ABI / x86_64 / ET_EXEC images.
         const ELF_HEADER_SIZE: usize = 64;
         const PROGRAM_HEADER_SIZE: usize = 56;
+
+        if let Some(segment) = self.load_segments.first()
+            // Some loaders reject the first PT_LOAD when p_align is non-zero, so this
+            // crate keeps the first load segment's alignment fixed at 0.
+            && segment.alignment != 0
+        {
+            return Err(Error::InvalidFirstLoadSegmentAlignment {
+                alignment: segment.alignment,
+            });
+        }
 
         let phoff = ELF_HEADER_SIZE;
         let header_region_size = ELF_HEADER_SIZE + PROGRAM_HEADER_SIZE * self.load_segments.len();
@@ -75,8 +105,12 @@ impl Elf64Executable {
         let mut segment_offsets = Vec::with_capacity(self.load_segments.len());
         let mut file_size = header_region_size;
 
-        for segment in &self.load_segments {
-            file_size = align_usize(file_size, segment.alignment as usize);
+        for (index, segment) in self.load_segments.iter().enumerate() {
+            file_size = if index == 0 {
+                align_first_load_segment_offset(file_size, segment.virtual_address)
+            } else {
+                align_usize(file_size, segment.alignment as usize)
+            };
             segment_offsets.push(file_size);
             file_size += segment.data.len();
         }
@@ -160,7 +194,7 @@ impl Elf64Executable {
             elf[offset..offset + segment.data.len()].copy_from_slice(&segment.data);
         }
 
-        elf
+        Ok(elf)
     }
 }
 
@@ -173,6 +207,23 @@ fn align_usize(value: usize, alignment: usize) -> usize {
         value
     } else {
         value + (alignment - remainder)
+    }
+}
+
+fn align_first_load_segment_offset(value: usize, virtual_address: u64) -> usize {
+    // This crate emits only Linux x86_64 ELF images, so PT_LOAD file offsets need to
+    // stay congruent with virtual addresses modulo the 4 KiB page size even when
+    // p_align is 0 for the first segment.
+    const PAGE_SIZE: usize = 0x1000;
+
+    let required_remainder = virtual_address as usize % PAGE_SIZE;
+    let value_remainder = value % PAGE_SIZE;
+    if value_remainder == required_remainder {
+        value
+    } else if value_remainder < required_remainder {
+        value + (required_remainder - value_remainder)
+    } else {
+        value + (PAGE_SIZE - (value_remainder - required_remainder))
     }
 }
 
@@ -190,25 +241,42 @@ fn write_u64(buffer: &mut [u8], offset: usize, value: u64) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Elf64Executable, LoadSegment, SegmentFlags};
+    use super::{Elf64Executable, Error, LoadSegment, SegmentFlags};
 
     #[test]
     fn serializes_single_load_segment_executable() {
         let mut elf = Elf64Executable::new(0x401000);
         elf.add_load_segment(LoadSegment::new(
             0x401000,
-            0x1000,
+            0,
             SegmentFlags::READ_EXECUTE,
             vec![
                 0xb8, 0x3c, 0x00, 0x00, 0x00, 0xbf, 42, 0x00, 0x00, 0x00, 0x0f, 0x05,
             ],
         ));
 
-        let bytes = elf.to_bytes();
+        let bytes = elf.to_bytes().expect("serialize ELF");
 
         assert_eq!(&bytes[0..4], b"\x7FELF");
         assert_eq!(&bytes[0x1000..0x1005], &[0xb8, 0x3c, 0x00, 0x00, 0x00]);
         assert_eq!(&bytes[0x1005..0x100a], &[0xbf, 42, 0x00, 0x00, 0x00]);
         assert_eq!(&bytes[0x100a..0x100c], &[0x0f, 0x05]);
+        assert_eq!(&bytes[112..120], &0_u64.to_le_bytes());
+    }
+
+    #[test]
+    fn rejects_non_zero_alignment_for_first_load_segment() {
+        let mut elf = Elf64Executable::new(0x401000);
+        elf.add_load_segment(LoadSegment::new(
+            0x401000,
+            0x1000,
+            SegmentFlags::READ_EXECUTE,
+            vec![0x0f, 0x05],
+        ));
+
+        assert_eq!(
+            elf.to_bytes(),
+            Err(Error::InvalidFirstLoadSegmentAlignment { alignment: 0x1000 })
+        );
     }
 }

@@ -19,6 +19,7 @@ pub enum Error {
         path: Option<PathBuf>,
         source: std::io::Error,
     },
+    Elf(neco_rs_elf::Error),
     Parse(neco_rs_parser::Error),
     Unsupported(String),
 }
@@ -32,6 +33,7 @@ impl fmt::Display for Error {
                 source,
             } => write!(f, "{}: {}", path.display(), source),
             Self::Io { path: None, source } => source.fmt(f),
+            Self::Elf(source) => source.fmt(f),
             Self::Parse(source) => source.fmt(f),
         }
     }
@@ -42,6 +44,12 @@ impl std::error::Error for Error {}
 impl From<neco_rs_parser::Error> for Error {
     fn from(value: neco_rs_parser::Error) -> Self {
         Self::Parse(value)
+    }
+}
+
+impl From<neco_rs_elf::Error> for Error {
+    fn from(value: neco_rs_elf::Error) -> Self {
+        Self::Elf(value)
     }
 }
 
@@ -67,7 +75,7 @@ pub fn compile_path_to_elf(input: &Path, output: &Path) -> Result<()> {
     };
 
     let program = lower_package_to_program(&package)?;
-    let elf = build_linux_x86_64_program_executable(&program).to_bytes();
+    let elf = build_linux_x86_64_program_executable(&program).to_bytes()?;
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent).map_err(|source| Error::Io {
             path: Some(parent.to_path_buf()),
@@ -912,7 +920,7 @@ fn build_linux_x86_64_program_executable(program: &LoweredProgram) -> Elf64Execu
     let mut elf = Elf64Executable::new(code_virtual_address);
     elf.add_load_segment(LoadSegment::new(
         code_virtual_address,
-        0x1000,
+        0,
         SegmentFlags::READ_EXECUTE,
         program_syscall_code(program, data_virtual_address),
     ));
@@ -1691,7 +1699,9 @@ mod tests {
             arrays: Vec::new(),
             i32_slots: 0,
         };
-        let elf = build_linux_x86_64_program_executable(&program).to_bytes();
+        let elf = build_linux_x86_64_program_executable(&program)
+            .to_bytes()
+            .expect("serialize ELF");
         assert_eq!(&elf[0..4], b"\x7FELF");
         assert_eq!(&elf[0x1000..0x1005], &[0xb8, 42, 0x00, 0x00, 0x00]);
         assert_eq!(&elf[0x1005..0x1007], &[0x89, 0xc7]);
@@ -1714,7 +1724,9 @@ mod tests {
             arrays: Vec::new(),
             i32_slots: 0,
         };
-        let elf = build_linux_x86_64_program_executable(&program).to_bytes();
+        let elf = build_linux_x86_64_program_executable(&program)
+            .to_bytes()
+            .expect("serialize ELF");
 
         assert_eq!(&elf[0..4], b"\x7FELF");
         assert_eq!(&elf[0x1000..0x1005], &[0xbf, 0x01, 0x00, 0x00, 0x00]);
@@ -1754,7 +1766,9 @@ mod tests {
             arrays: Vec::new(),
             i32_slots: 0,
         };
-        let elf = build_linux_x86_64_program_executable(&program).to_bytes();
+        let elf = build_linux_x86_64_program_executable(&program)
+            .to_bytes()
+            .expect("serialize ELF");
         let code = &elf[0x1000..];
 
         assert!(code.windows(2).any(|window| window == [0x01, 0xc8]));
