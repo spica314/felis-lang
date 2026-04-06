@@ -23,7 +23,9 @@ fn compile_fixture(root: &Path, name: &str) -> PathBuf {
 
     compile_path_to_elf(root, &output).expect("compile fixture");
 
-    let mut permissions = fs::metadata(&output).expect("binary metadata").permissions();
+    let mut permissions = fs::metadata(&output)
+        .expect("binary metadata")
+        .permissions();
     permissions.set_mode(0o755);
     fs::set_permissions(&output, permissions).expect("binary permissions");
 
@@ -31,7 +33,8 @@ fn compile_fixture(root: &Path, name: &str) -> PathBuf {
 }
 
 fn runtime_test_runner(binary: &Path) -> Command {
-    let qemu = std::env::var_os("NECO_RS_TEST_QEMU").unwrap_or_else(|| OsString::from("qemu-x86_64"));
+    let qemu =
+        std::env::var_os("NECO_RS_TEST_QEMU").unwrap_or_else(|| OsString::from("qemu-x86_64"));
     let mut command = Command::new(&qemu);
     command.arg(binary);
     command
@@ -117,5 +120,19 @@ fn compiles_and_runs_stdin_to_stdout_fixture() {
 fn compiles_and_runs_fn_call_fixture() {
     let root = repo_root().join("tests/testcases/fn-call");
     let status = run_fixture_status(&root, "fn-call");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_if_true_fixture() {
+    let root = repo_root().join("tests/testcases/if");
+    let status = run_fixture_status(&root, "if-true");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_if_false_fixture() {
+    let root = repo_root().join("tests/testcases/if");
+    let status = run_fixture_status(&root, "if-false");
     assert_eq!(status.code(), Some(42));
 }

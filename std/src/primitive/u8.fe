@@ -4,6 +4,11 @@
 #bind_builtin "u8_mul" #as u8_mul;
 #bind_builtin "u8_div" #as u8_div;
 #bind_builtin "u8_mod" #as u8_mod;
+#bind_builtin "u8_eq" #as u8_eq;
+#bind_builtin "u8_lte" #as u8_lte;
+#bind_builtin "u8_lt" #as u8_lt;
+#bind_builtin "u8_gte" #as u8_gte;
+#bind_builtin "u8_gt" #as u8_gt;
 
 #pub #use u8;
 #pub #use u8_add;
@@ -11,3 +16,8 @@
 #pub #use u8_mul;
 #pub #use u8_div;
 #pub #use u8_mod;
+#pub #use u8_eq;
+#pub #use u8_lte;
+#pub #use u8_lt;
+#pub #use u8_gte;
+#pub #use u8_gt;

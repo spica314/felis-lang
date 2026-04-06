@@ -8,6 +8,7 @@ pub struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
     stop_at_match_arm_boundary: bool,
+    stop_at_left_brace: bool,
 }
 
 impl Parser {
@@ -16,6 +17,7 @@ impl Parser {
             tokens,
             cursor: 0,
             stop_at_match_arm_boundary: false,
+            stop_at_left_brace: false,
         }
     }
 
@@ -33,6 +35,22 @@ impl Parser {
 
     pub(crate) fn stop_at_match_arm_boundary(&self) -> bool {
         self.stop_at_match_arm_boundary
+    }
+
+    pub(crate) fn with_left_brace_boundary<T>(
+        &mut self,
+        stop_at_left_brace: bool,
+        f: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        let previous = self.stop_at_left_brace;
+        self.stop_at_left_brace = stop_at_left_brace;
+        let result = f(self);
+        self.stop_at_left_brace = previous;
+        result
+    }
+
+    pub(crate) fn stop_at_left_brace(&self) -> bool {
+        self.stop_at_left_brace
     }
 
     pub(crate) fn looks_like_typed_binder(&self) -> bool {
@@ -99,6 +117,7 @@ impl Parser {
                     | Keyword::Mod
                     | Keyword::BindBuiltin
                     | Keyword::Fn
+                    | Keyword::Proc
                     | Keyword::Type
                     | Keyword::Prop
                     | Keyword::Theorem
@@ -242,10 +261,12 @@ fn keyword_name(keyword: Keyword) -> &'static str {
         Keyword::BindBuiltin => "bind_builtin",
         Keyword::EntryPoint => "entrypoint",
         Keyword::Fn => "fn",
+        Keyword::Proc => "proc",
         Keyword::Pub => "pub",
         Keyword::Type => "type",
         Keyword::Theorem => "theorem",
         Keyword::Prop => "prop",
+        Keyword::If => "if",
         Keyword::Match => "match",
         Keyword::Let => "let",
         Keyword::Use => "use",

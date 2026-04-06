@@ -4,6 +4,11 @@
 #bind_builtin "i32_mul" #as i32_mul;
 #bind_builtin "i32_div" #as i32_div;
 #bind_builtin "i32_mod" #as i32_mod;
+#bind_builtin "i32_eq" #as i32_eq;
+#bind_builtin "i32_lte" #as i32_lte;
+#bind_builtin "i32_lt" #as i32_lt;
+#bind_builtin "i32_gte" #as i32_gte;
+#bind_builtin "i32_gt" #as i32_gt;
 
 #pub #use i32;
 #pub #use i32_add;
@@ -11,3 +16,8 @@
 #pub #use i32_mul;
 #pub #use i32_div;
 #pub #use i32_mod;
+#pub #use i32_eq;
+#pub #use i32_lte;
+#pub #use i32_lt;
+#pub #use i32_gte;
+#pub #use i32_gt;

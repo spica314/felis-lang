@@ -8,8 +8,8 @@ mod effect;
 use effect::{Value, bind_pattern, lower_effect, resolve_value};
 use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
 use neco_rs_parser::{
-    ArrowParameter, Block, FunctionDeclaration, Item, LetOperator, ParsedPackage, ParsedRoot,
-    Statement, Term, parse_root,
+    ArrowParameter, Block, FunctionDeclaration, FunctionKind, Item, LetOperator, ParsedPackage,
+    ParsedRoot, Statement, Term, parse_root,
 };
 
 #[derive(Debug)]
@@ -181,6 +181,29 @@ pub(crate) enum I32Expr {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ComparisonKind {
+    Eq,
+    Lte,
+    Lt,
+    Gte,
+    Gt,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ConditionExpr {
+    I32 {
+        kind: ComparisonKind,
+        lhs: I32Expr,
+        rhs: I32Expr,
+    },
+    U8 {
+        kind: ComparisonKind,
+        lhs: U8Expr,
+        rhs: U8Expr,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum U8Expr {
     Literal(u8),
@@ -241,6 +264,10 @@ enum Operation {
         array_slot: usize,
         index: I32Expr,
         value: U8Expr,
+    },
+    If {
+        condition: ConditionExpr,
+        then_operations: Vec<Operation>,
     },
     Exit(ExitCodeExpr),
 }
@@ -373,6 +400,38 @@ fn lower_statement(
             lower_expression_statement(term.as_ref(), state, program)?;
             Ok(false)
         }
+        Statement::If(if_stmt) => {
+            let condition = lower_condition_expr(if_stmt.condition.as_ref(), state)?;
+            let mut scoped_state = LoweringState {
+                environment: state.environment.clone(),
+                next_array_slot: state.next_array_slot,
+                next_i32_slot: state.next_i32_slot,
+                functions: state.functions.clone(),
+            };
+            let mut then_operations = Vec::new();
+            let mut then_program = LoweredProgram {
+                operations: Vec::new(),
+                data: std::mem::take(&mut program.data),
+                arrays: std::mem::take(&mut program.arrays),
+                i32_slots: program.i32_slots,
+            };
+            for statement in &if_stmt.then_block.statements {
+                let terminated = lower_statement(statement, &mut scoped_state, &mut then_program)?;
+                if terminated {
+                    break;
+                }
+            }
+            then_operations.append(&mut then_program.operations);
+            program.data = then_program.data;
+            program.arrays = then_program.arrays;
+            state.next_array_slot = scoped_state.next_array_slot;
+            state.next_i32_slot = scoped_state.next_i32_slot;
+            program.operations.push(Operation::If {
+                condition,
+                then_operations,
+            });
+            Ok(false)
+        }
         Statement::Item(_) => Err(Error::Unsupported(
             "items inside entrypoint bodies are not supported".to_string(),
         )),
@@ -429,7 +488,7 @@ fn collect_pure_functions(package: &ParsedPackage) -> Result<HashMap<String, Pur
         let Item::Function(function) = item else {
             continue;
         };
-        if function.effect.is_some() {
+        if function.kind != FunctionKind::Fn || function.effect.is_some() {
             continue;
         }
         functions.insert(
@@ -534,6 +593,11 @@ fn lower_pure_block_value(
                     "expression statements are not supported in pure function bodies".to_string(),
                 ));
             }
+            Statement::If(_) => {
+                return Err(Error::Unsupported(
+                    "`#if` is not supported in pure function bodies".to_string(),
+                ));
+            }
             Statement::Item(_) => {
                 return Err(Error::Unsupported(
                     "items inside pure function bodies are not supported".to_string(),
@@ -611,6 +675,73 @@ fn lower_i32_literal_application(callee: &Term, arguments: &[Term]) -> Result<Op
         return Ok(None);
     }
     Ok(Some(parse_bare_i32_literal(literal)?))
+}
+
+fn lower_condition_expr(term: &Term, state: &LoweringState) -> Result<ConditionExpr> {
+    let Term::Application { callee, arguments } = term else {
+        return Err(Error::Unsupported(
+            "`#if` condition must be a comparison call".to_string(),
+        ));
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Err(Error::Unsupported(
+            "`#if` condition must use a path callee".to_string(),
+        ));
+    };
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [lhs, rhs] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`#if` condition must receive exactly two arguments".to_string(),
+        ));
+    };
+
+    let primitive = path
+        .segments
+        .last()
+        .map(|segment| segment.name.as_str())
+        .unwrap_or_default();
+
+    if let Some(kind) = i32_comparison_kind(primitive) {
+        return Ok(ConditionExpr::I32 {
+            kind,
+            lhs: lower_i32_expr(lhs, state)?,
+            rhs: lower_i32_expr(rhs, state)?,
+        });
+    }
+    if let Some(kind) = u8_comparison_kind(primitive) {
+        return Ok(ConditionExpr::U8 {
+            kind,
+            lhs: lower_u8_expr(lhs, state)?,
+            rhs: lower_u8_expr(rhs, state)?,
+        });
+    }
+
+    Err(Error::Unsupported(format!(
+        "unsupported `#if` condition `{primitive}`"
+    )))
+}
+
+fn i32_comparison_kind(name: &str) -> Option<ComparisonKind> {
+    match name {
+        "i32_eq" => Some(ComparisonKind::Eq),
+        "i32_lte" => Some(ComparisonKind::Lte),
+        "i32_lt" => Some(ComparisonKind::Lt),
+        "i32_gte" => Some(ComparisonKind::Gte),
+        "i32_gt" => Some(ComparisonKind::Gt),
+        _ => None,
+    }
+}
+
+fn u8_comparison_kind(name: &str) -> Option<ComparisonKind> {
+    match name {
+        "u8_eq" => Some(ComparisonKind::Eq),
+        "u8_lte" => Some(ComparisonKind::Lte),
+        "u8_lt" => Some(ComparisonKind::Lt),
+        "u8_gte" => Some(ComparisonKind::Gte),
+        "u8_gt" => Some(ComparisonKind::Gt),
+        _ => None,
+    }
 }
 
 fn lower_i32_primitive_call(
@@ -967,7 +1098,18 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
         emit_array_initializers(program, &mut code);
     }
 
-    for operation in &program.operations {
+    emit_operations(&program.operations, &mut code, program, &addresses);
+
+    code
+}
+
+fn emit_operations(
+    operations: &[Operation],
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+    addresses: &[u64],
+) {
+    for operation in operations {
         match operation {
             Operation::Read {
                 fd,
@@ -980,7 +1122,7 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
                 let slot_offset = array_slot_offset(*array_slot);
                 code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
-                emit_i32_expr_to_eax(len, &mut code, program);
+                emit_i32_expr_to_eax(len, code, program);
                 // mov edx, eax
                 code.extend_from_slice(&[0x89, 0xc2]);
                 // read syscall: 0
@@ -1002,7 +1144,7 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
                 // mov rsi, (imm64): 0x48, 0xbe, (imm64)
                 code.extend_from_slice(&[0x48, 0xbe]);
                 code.extend_from_slice(&addresses[*data_index].to_le_bytes());
-                emit_i32_expr_to_eax(len, &mut code, program);
+                emit_i32_expr_to_eax(len, code, program);
                 // mov edx, eax
                 code.extend_from_slice(&[0x89, 0xc2]);
                 // mov eax, (imm32): 0xb8, (imm32)
@@ -1023,23 +1165,35 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
                 let slot_offset = array_slot_offset(*array_slot);
                 code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
-                emit_i32_expr_to_eax(len, &mut code, program);
+                emit_i32_expr_to_eax(len, code, program);
                 code.extend_from_slice(&[0x89, 0xc2]);
                 code.extend_from_slice(&[0xb8, 0x01, 0x00, 0x00, 0x00]);
                 code.extend_from_slice(&[0x0f, 0x05]);
+            }
+            Operation::If {
+                condition,
+                then_operations,
+            } => {
+                emit_condition_false_jump(condition, code, program);
+                let patch_at = code.len();
+                code.extend_from_slice(&0i32.to_le_bytes());
+                let body_start = code.len();
+                emit_operations(then_operations, code, program, addresses);
+                let body_len = (code.len() - body_start) as i32;
+                code[patch_at..patch_at + 4].copy_from_slice(&body_len.to_le_bytes());
             }
             Operation::ArraySetI32 {
                 array_slot,
                 index,
                 value,
-            } => emit_i32_array_set(*array_slot, index, value, &mut code, program),
+            } => emit_i32_array_set(*array_slot, index, value, code, program),
             Operation::ArraySetU8 {
                 array_slot,
                 index,
                 value,
-            } => emit_u8_array_set(*array_slot, index, value, &mut code, program),
+            } => emit_u8_array_set(*array_slot, index, value, code, program),
             Operation::Exit(exit_code) => {
-                emit_exit_code_expr_to_eax(exit_code, &mut code, program);
+                emit_exit_code_expr_to_eax(exit_code, code, program);
                 // mov edi, eax
                 code.extend_from_slice(&[0x89, 0xc7]);
                 // mov eax, (imm32): 0xb8, (imm32)
@@ -1050,8 +1204,51 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
             }
         }
     }
+}
 
-    code
+fn emit_condition_false_jump(
+    condition: &ConditionExpr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    match condition {
+        ConditionExpr::I32 { kind, lhs, rhs } => {
+            emit_i32_expr_to_eax(lhs, code, program);
+            code.push(0x50);
+            emit_i32_expr_to_eax(rhs, code, program);
+            code.extend_from_slice(&[0x89, 0xc1]);
+            code.push(0x58);
+            code.extend_from_slice(&[0x39, 0xc8]);
+            emit_jcc_false(*kind, false, code);
+        }
+        ConditionExpr::U8 { kind, lhs, rhs } => {
+            emit_u8_expr_to_eax(lhs, code, program);
+            code.push(0x50);
+            emit_u8_expr_to_eax(rhs, code, program);
+            code.extend_from_slice(&[0x89, 0xc1]);
+            code.push(0x58);
+            code.extend_from_slice(&[0x39, 0xc8]);
+            emit_jcc_false(*kind, true, code);
+        }
+    }
+}
+
+fn emit_jcc_false(kind: ComparisonKind, unsigned: bool, code: &mut Vec<u8>) {
+    code.extend_from_slice(&[0x0f, false_jump_opcode(kind, unsigned)]);
+}
+
+fn false_jump_opcode(kind: ComparisonKind, unsigned: bool) -> u8 {
+    match (kind, unsigned) {
+        (ComparisonKind::Eq, _) => 0x85,
+        (ComparisonKind::Lte, false) => 0x8f,
+        (ComparisonKind::Lt, false) => 0x8d,
+        (ComparisonKind::Gte, false) => 0x8c,
+        (ComparisonKind::Gt, false) => 0x8e,
+        (ComparisonKind::Lte, true) => 0x87,
+        (ComparisonKind::Lt, true) => 0x83,
+        (ComparisonKind::Gte, true) => 0x82,
+        (ComparisonKind::Gt, true) => 0x86,
+    }
 }
 
 fn emit_exit_code_expr_to_eax(expr: &ExitCodeExpr, code: &mut Vec<u8>, program: &LoweredProgram) {

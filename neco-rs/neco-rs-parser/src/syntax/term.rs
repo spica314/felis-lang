@@ -57,8 +57,15 @@ pub struct Block {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement {
     Let(LetStatement),
+    If(IfStatement),
     Item(Box<Item>),
     Expression(Box<Term>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IfStatement {
+    pub condition: Box<Term>,
+    pub then_block: Block,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -130,6 +137,10 @@ impl Parse for Block {
                 statements.push(Statement::Let(LetStatement::parse(parser)?.unwrap()));
                 continue;
             }
+            if parser.consume_keyword(Keyword::If) {
+                statements.push(Statement::If(IfStatement::parse(parser)?.unwrap()));
+                continue;
+            }
 
             let expression = Term::parse(parser)?.unwrap();
             if parser.consume_punctuation(TokenKind::Semicolon) {
@@ -160,6 +171,18 @@ impl Parse for LetStatement {
             binder,
             operator,
             value: Box::new(value),
+        }))
+    }
+}
+
+impl Parse for IfStatement {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
+        let condition = parser.with_left_brace_boundary(true, Term::parse)?.unwrap();
+        let then_block = Block::parse(parser)?.unwrap();
+        parser.expect_punctuation(TokenKind::Semicolon)?;
+        Ok(Some(Self {
+            condition: Box::new(condition),
+            then_block,
         }))
     }
 }
@@ -255,6 +278,9 @@ fn parse_application_term(parser: &mut Parser) -> Result<Term> {
                 method,
             };
             continue;
+        }
+        if parser.stop_at_left_brace() && parser.check_punctuation(TokenKind::LeftBrace) {
+            break;
         }
         if parser.stop_at_match_arm_boundary() && parser.looks_like_match_arm_boundary() {
             break;

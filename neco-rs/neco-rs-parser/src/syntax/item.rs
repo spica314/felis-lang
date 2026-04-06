@@ -47,10 +47,17 @@ pub struct BindBuiltinDeclaration {
 pub struct FunctionDeclaration {
     pub attributes: Vec<Attribute>,
     pub visibility: Visibility,
+    pub kind: FunctionKind,
     pub name: DeclaredName,
     pub ty: Term,
     pub effect: Option<Term>,
     pub body: Block,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FunctionKind {
+    Fn,
+    Proc,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -141,7 +148,14 @@ impl Parse for Item {
                 alias,
             })));
         }
-        if parser.consume_keyword(Keyword::Fn) {
+        let kind = if parser.consume_keyword(Keyword::Fn) {
+            Some(FunctionKind::Fn)
+        } else if parser.consume_keyword(Keyword::Proc) {
+            Some(FunctionKind::Proc)
+        } else {
+            None
+        };
+        if let Some(kind) = kind {
             let name = DeclaredName::parse(parser)?.unwrap();
             parser.expect_punctuation(TokenKind::Colon)?;
             let ty = Term::parse(parser)?.unwrap();
@@ -154,6 +168,7 @@ impl Parse for Item {
             return Ok(Some(Self::Function(FunctionDeclaration {
                 attributes,
                 visibility,
+                kind,
                 name,
                 ty,
                 effect,
