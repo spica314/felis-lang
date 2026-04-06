@@ -2,7 +2,6 @@ use neco_rs::compile_path_to_elf;
 use std::ffi::OsString;
 use std::fs;
 use std::io::Write;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -22,12 +21,6 @@ fn compile_fixture(root: &Path, name: &str) -> PathBuf {
     let output = std::env::temp_dir().join(format!("neco-rs-{name}-{unique}"));
 
     compile_path_to_elf(root, &output).expect("compile fixture");
-
-    let mut permissions = fs::metadata(&output)
-        .expect("binary metadata")
-        .permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(&output, permissions).expect("binary permissions");
 
     output
 }

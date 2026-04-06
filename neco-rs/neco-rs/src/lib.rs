@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 mod effect;
@@ -86,6 +88,26 @@ pub fn compile_path_to_elf(input: &Path, output: &Path) -> Result<()> {
         path: Some(output.to_path_buf()),
         source,
     })?;
+    set_output_executable(output)?;
+    Ok(())
+}
+
+fn set_output_executable(output: &Path) -> Result<()> {
+    #[cfg(unix)]
+    {
+        let mut permissions = fs::metadata(output)
+            .map_err(|source| Error::Io {
+                path: Some(output.to_path_buf()),
+                source,
+            })?
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(output, permissions).map_err(|source| Error::Io {
+            path: Some(output.to_path_buf()),
+            source,
+        })?;
+    }
+
     Ok(())
 }
 
