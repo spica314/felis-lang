@@ -390,6 +390,7 @@ enum Operation {
         body_operations: Vec<Operation>,
     },
     Break,
+    Continue,
     Exit(ExitCodeExpr),
 }
 
@@ -626,6 +627,15 @@ fn lower_statement(
             program.operations.push(Operation::Break);
             Ok(false)
         }
+        Statement::Continue => {
+            if state.loop_depth == 0 {
+                return Err(Error::Unsupported(
+                    "`#continue` is only supported inside `#loop`".to_string(),
+                ));
+            }
+            program.operations.push(Operation::Continue);
+            Ok(false)
+        }
         Statement::Item(_) => Err(Error::Unsupported(
             "items inside entrypoint bodies are not supported".to_string(),
         )),
@@ -834,6 +844,11 @@ fn lower_pure_block_value(
             Statement::Break => {
                 return Err(Error::Unsupported(
                     "`#break` is not supported in pure function bodies".to_string(),
+                ));
+            }
+            Statement::Continue => {
+                return Err(Error::Unsupported(
+                    "`#continue` is not supported in pure function bodies".to_string(),
                 ));
             }
             Statement::Item(_) => {
@@ -1387,7 +1402,7 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
         emit_array_initializers(program, &mut code);
     }
 
-    emit_operations(&program.operations, &mut code, program, &addresses, None);
+    emit_operations(&program.operations, &mut code, program, &addresses, None, None);
 
     code
 }
@@ -1398,6 +1413,7 @@ fn emit_operations(
     program: &LoweredProgram,
     addresses: &[u64],
     mut break_patches: Option<&mut Vec<usize>>,
+    mut continue_patches: Option<&mut Vec<usize>>,
 ) {
     for operation in operations {
         match operation {
@@ -1475,7 +1491,14 @@ fn emit_operations(
                 let false_patch_at = code.len();
                 code.extend_from_slice(&0i32.to_le_bytes());
                 let then_start = code.len();
-                emit_operations(then_operations, code, program, addresses, break_patches.as_deref_mut());
+                emit_operations(
+                    then_operations,
+                    code,
+                    program,
+                    addresses,
+                    break_patches.as_deref_mut(),
+                    continue_patches.as_deref_mut(),
+                );
                 if else_operations.is_empty() {
                     let end = code.len();
                     let false_jump_len = (end - then_start) as i32;
@@ -1486,7 +1509,14 @@ fn emit_operations(
                     let end_patch_at = code.len();
                     code.extend_from_slice(&0i32.to_le_bytes());
                     let else_start = code.len();
-                    emit_operations(else_operations, code, program, addresses, break_patches.as_deref_mut());
+                    emit_operations(
+                        else_operations,
+                        code,
+                        program,
+                        addresses,
+                        break_patches.as_deref_mut(),
+                        continue_patches.as_deref_mut(),
+                    );
                     let end = code.len();
                     let false_jump_len = (else_start - then_start) as i32;
                     code[false_patch_at..false_patch_at + 4]
@@ -1509,12 +1539,14 @@ fn emit_operations(
             Operation::Loop { body_operations } => {
                 let loop_start = code.len();
                 let mut loop_break_patches = Vec::new();
+                let mut loop_continue_patches = Vec::new();
                 emit_operations(
                     body_operations,
                     code,
                     program,
                     addresses,
                     Some(&mut loop_break_patches),
+                    Some(&mut loop_continue_patches),
                 );
                 code.push(0xe9);
                 let back_patch_at = code.len();
@@ -1523,6 +1555,11 @@ fn emit_operations(
                 let back_jump_len = loop_start as i32 - loop_end as i32;
                 code[back_patch_at..back_patch_at + 4]
                     .copy_from_slice(&back_jump_len.to_le_bytes());
+                for patch_at in loop_continue_patches {
+                    let continue_jump_len = loop_start as i32 - (patch_at as i32 + 4);
+                    code[patch_at..patch_at + 4]
+                        .copy_from_slice(&continue_jump_len.to_le_bytes());
+                }
                 for patch_at in loop_break_patches {
                     let break_jump_len = loop_end as i32 - (patch_at as i32 + 4);
                     code[patch_at..patch_at + 4].copy_from_slice(&break_jump_len.to_le_bytes());
@@ -1535,6 +1572,15 @@ fn emit_operations(
                 break_patches
                     .as_deref_mut()
                     .expect("break must be lowered inside a loop")
+                    .push(patch_at);
+            }
+            Operation::Continue => {
+                code.push(0xe9);
+                let patch_at = code.len();
+                code.extend_from_slice(&0i32.to_le_bytes());
+                continue_patches
+                    .as_deref_mut()
+                    .expect("continue must be lowered inside a loop")
                     .push(patch_at);
             }
             Operation::Exit(exit_code) => {
@@ -2250,6 +2296,67 @@ mod tests {
                                 Box::new(I32Expr::Local(0)),
                                 Box::new(I32Expr::Literal(1)),
                             ),
+                        },
+                    ],
+                },
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(1))),
+            ]
+        );
+        assert_eq!(program.i32_slots, 2);
+    }
+
+    #[test]
+    fn lowers_continue_fixture_to_runtime_operations() {
+        let root = repo_root().join("tests/testcases/continue");
+        let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.operations,
+            vec![
+                Operation::StoreI32 {
+                    slot: 0,
+                    value: I32Expr::Literal(0),
+                },
+                Operation::StoreI32 {
+                    slot: 1,
+                    value: I32Expr::Literal(0),
+                },
+                Operation::Loop {
+                    body_operations: vec![
+                        Operation::StoreI32 {
+                            slot: 0,
+                            value: I32Expr::Add(
+                                Box::new(I32Expr::Local(0)),
+                                Box::new(I32Expr::Literal(1)),
+                            ),
+                        },
+                        Operation::If {
+                            condition: ConditionExpr::I32 {
+                                kind: ComparisonKind::Eq,
+                                lhs: I32Expr::Local(0),
+                                rhs: I32Expr::Literal(5),
+                            },
+                            then_operations: vec![Operation::Continue],
+                            else_operations: vec![],
+                        },
+                        Operation::StoreI32 {
+                            slot: 1,
+                            value: I32Expr::Add(
+                                Box::new(I32Expr::Local(1)),
+                                Box::new(I32Expr::Local(0)),
+                            ),
+                        },
+                        Operation::If {
+                            condition: ConditionExpr::I32 {
+                                kind: ComparisonKind::Eq,
+                                lhs: I32Expr::Local(0),
+                                rhs: I32Expr::Literal(10),
+                            },
+                            then_operations: vec![Operation::Break],
+                            else_operations: vec![],
                         },
                     ],
                 },

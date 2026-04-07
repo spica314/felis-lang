@@ -60,6 +60,7 @@ pub enum Statement {
     If(IfStatement),
     Loop(LoopStatement),
     Break,
+    Continue,
     Item(Box<Item>),
     Expression(Box<Term>),
 }
@@ -156,6 +157,11 @@ impl Parse for Block {
             if parser.consume_keyword(Keyword::Break) {
                 parser.expect_punctuation(TokenKind::Semicolon)?;
                 statements.push(Statement::Break);
+                continue;
+            }
+            if parser.consume_keyword(Keyword::Continue) {
+                parser.expect_punctuation(TokenKind::Semicolon)?;
+                statements.push(Statement::Continue);
                 continue;
             }
 

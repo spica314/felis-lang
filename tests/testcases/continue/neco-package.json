@@ -1,0 +1,4 @@
+{
+    "name": "continue",
+    "felis-bin-entrypoints": ["src/continue.fe"]
+}

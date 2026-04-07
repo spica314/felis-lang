@@ -226,6 +226,34 @@ fn parses_loop_package_root() {
 }
 
 #[test]
+fn parses_continue_package_root() {
+    let root = repo_root().join("tests/testcases/continue");
+    let parsed = parse_root(&root).expect("continue package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "continue");
+    assert_eq!(package.source_files.len(), 1);
+    let syntax = &package.source_files[0].syntax;
+    let Item::Function(main_fn) = &syntax.items[4] else {
+        panic!("expected function");
+    };
+    assert_eq!(main_fn.body.statements.len(), 4);
+
+    let Statement::Loop(loop_stmt) = &main_fn.body.statements[2] else {
+        panic!("expected loop statement");
+    };
+    assert_eq!(loop_stmt.body.statements.len(), 6);
+    assert!(matches!(loop_stmt.body.statements[0], Statement::Let(_)));
+    assert!(matches!(loop_stmt.body.statements[1], Statement::Expression(_)));
+    assert!(matches!(loop_stmt.body.statements[2], Statement::If(_)));
+    assert!(matches!(loop_stmt.body.statements[3], Statement::Let(_)));
+    assert!(matches!(loop_stmt.body.statements[4], Statement::Expression(_)));
+    assert!(matches!(loop_stmt.body.statements[5], Statement::If(_)));
+}
+
+#[test]
 fn parses_std_workspace_packages_with_nested_modules_and_theorems() {
     let root = repo_root().join("std");
     let parsed = parse_root(&root).expect("std parses");

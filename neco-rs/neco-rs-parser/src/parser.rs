@@ -257,6 +257,7 @@ fn keyword_name(keyword: Keyword) -> &'static str {
         Keyword::As => "as",
         Keyword::BindBuiltin => "bind_builtin",
         Keyword::Break => "break",
+        Keyword::Continue => "continue",
         Keyword::EntryPoint => "entrypoint",
         Keyword::Else => "else",
         Keyword::Fn => "fn",

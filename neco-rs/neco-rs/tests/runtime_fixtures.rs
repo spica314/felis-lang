@@ -150,3 +150,10 @@ fn compiles_and_runs_loop_fixture() {
     let status = run_fixture_status(&root, "loop");
     assert_eq!(status.code(), Some(55));
 }
+
+#[test]
+fn compiles_and_runs_continue_fixture() {
+    let root = repo_root().join("tests/testcases/continue");
+    let status = run_fixture_status(&root, "continue");
+    assert_eq!(status.code(), Some(50));
+}
