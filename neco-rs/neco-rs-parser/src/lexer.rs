@@ -16,7 +16,6 @@ pub struct Token {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind {
     Keyword(Keyword),
-    AttributeStart,
     Identifier(String),
     StringLiteral(String),
     IntegerLiteral(String),
@@ -63,8 +62,6 @@ pub enum Keyword {
     With,
     Forall,
     Package,
-    Cfg,
-    Not,
 }
 
 pub(crate) struct Lexer {
@@ -120,17 +117,6 @@ impl Lexer {
 
     fn next_token(&mut self) -> Result<Token> {
         let start = self.offset;
-        if self.starts_with("#[") {
-            self.offset += 2;
-            return Ok(Token {
-                kind: TokenKind::AttributeStart,
-                span: Span {
-                    start,
-                    end: self.offset,
-                },
-                lexeme: "#[".to_string(),
-            });
-        }
         if self.starts_with("::") {
             self.offset += 2;
             return Ok(simple_token(
@@ -262,8 +248,6 @@ impl Lexer {
             "#with" => Keyword::With,
             "#forall" => Keyword::Forall,
             "#package" => Keyword::Package,
-            "#cfg" => Keyword::Cfg,
-            "#not" => Keyword::Not,
             _ => {
                 return Err(
                     Error::new(format!("unknown keyword `{text}`")).with_span(Span {

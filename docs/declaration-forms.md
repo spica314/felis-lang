@@ -25,13 +25,6 @@ The documented shape is:
 #entrypoint <name>;
 ```
 
-## Declaration Attributes
-
-Declarations can be preceded by attribute lines such as `#[cfg(...)]`.
-
-The currently documented conditional-compilation attribute is described in
-[`docs/cfg-attributes.md`](./cfg-attributes.md).
-
 ## Public Function Declarations
 
 `#fn` declares a function. `#pub #fn` declares a public function that becomes

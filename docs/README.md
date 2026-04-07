@@ -20,8 +20,6 @@ workflows.
   in [`docs/language-design.md`](./language-design.md).
 - Declaration forms used by the standard library are documented in
   [`docs/declaration-forms.md`](./declaration-forms.md).
-- Conditional compilation attributes used by the standard library are
-  documented in [`docs/cfg-attributes.md`](./cfg-attributes.md).
 - Module visibility and public re-exports are documented in
   [`docs/module-visibility.md`](./module-visibility.md).
 - The documented standard-library surface is summarized in

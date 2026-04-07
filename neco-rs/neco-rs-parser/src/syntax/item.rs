@@ -1,8 +1,8 @@
 use crate::{Keyword, Parse, Parser, Result, TokenKind};
 
-use super::attribute::{parse_attributes, parse_visibility};
+use super::attribute::parse_visibility;
 use super::path::parse_suffixes;
-use super::{Attribute, Block, PathExpression, Term};
+use super::{Block, PathExpression, Term};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Item {
@@ -18,34 +18,29 @@ pub enum Item {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EntryPointDeclaration {
-    pub attributes: Vec<Attribute>,
     pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UseDeclaration {
-    pub attributes: Vec<Attribute>,
     pub visibility: Visibility,
     pub path: PathExpression,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleDeclaration {
-    pub attributes: Vec<Attribute>,
     pub visibility: Visibility,
     pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BindBuiltinDeclaration {
-    pub attributes: Vec<Attribute>,
     pub builtin_name: String,
     pub alias: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionDeclaration {
-    pub attributes: Vec<Attribute>,
     pub visibility: Visibility,
     pub kind: FunctionKind,
     pub name: DeclaredName,
@@ -62,7 +57,6 @@ pub enum FunctionKind {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeDeclaration {
-    pub attributes: Vec<Attribute>,
     pub visibility: Visibility,
     pub name: DeclaredName,
     pub modifier: Option<String>,
@@ -72,7 +66,6 @@ pub struct TypeDeclaration {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PropDeclaration {
-    pub attributes: Vec<Attribute>,
     pub visibility: Visibility,
     pub name: DeclaredName,
     pub ty: Term,
@@ -81,7 +74,6 @@ pub struct PropDeclaration {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TheoremDeclaration {
-    pub attributes: Vec<Attribute>,
     pub visibility: Visibility,
     pub name: DeclaredName,
     pub statement: Term,
@@ -108,34 +100,22 @@ pub enum Visibility {
 
 impl Parse for Item {
     fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let attributes = parse_attributes(parser)?;
         let visibility = parse_visibility(parser);
 
         if parser.consume_keyword(Keyword::EntryPoint) {
             let name = parser.expect_identifier()?;
             parser.expect_punctuation(TokenKind::Semicolon)?;
-            return Ok(Some(Self::EntryPoint(EntryPointDeclaration {
-                attributes,
-                name,
-            })));
+            return Ok(Some(Self::EntryPoint(EntryPointDeclaration { name })));
         }
         if parser.consume_keyword(Keyword::Use) {
             let path = PathExpression::parse(parser)?.unwrap();
             parser.expect_punctuation(TokenKind::Semicolon)?;
-            return Ok(Some(Self::Use(UseDeclaration {
-                attributes,
-                visibility,
-                path,
-            })));
+            return Ok(Some(Self::Use(UseDeclaration { visibility, path })));
         }
         if parser.consume_keyword(Keyword::Mod) {
             let name = parser.expect_identifier()?;
             parser.expect_punctuation(TokenKind::Semicolon)?;
-            return Ok(Some(Self::Mod(ModuleDeclaration {
-                attributes,
-                visibility,
-                name,
-            })));
+            return Ok(Some(Self::Mod(ModuleDeclaration { visibility, name })));
         }
         if parser.consume_keyword(Keyword::BindBuiltin) {
             let builtin_name = parser.expect_string_literal()?;
@@ -143,7 +123,6 @@ impl Parse for Item {
             let alias = parser.expect_identifier()?;
             parser.expect_punctuation(TokenKind::Semicolon)?;
             return Ok(Some(Self::BindBuiltin(BindBuiltinDeclaration {
-                attributes,
                 builtin_name,
                 alias,
             })));
@@ -166,7 +145,6 @@ impl Parse for Item {
             };
             let body = Block::parse(parser)?.unwrap();
             return Ok(Some(Self::Function(FunctionDeclaration {
-                attributes,
                 visibility,
                 kind,
                 name,
@@ -188,7 +166,6 @@ impl Parse for Item {
             let ty = Term::parse(parser)?.unwrap();
             let constructors = parse_constructor_block(parser)?.unwrap();
             return Ok(Some(Self::Type(TypeDeclaration {
-                attributes,
                 visibility,
                 name,
                 modifier,
@@ -202,7 +179,6 @@ impl Parse for Item {
             let ty = Term::parse(parser)?.unwrap();
             let constructors = parse_constructor_block(parser)?.unwrap();
             return Ok(Some(Self::Prop(PropDeclaration {
-                attributes,
                 visibility,
                 name,
                 ty,
@@ -215,7 +191,6 @@ impl Parse for Item {
             let statement = Term::parse(parser)?.unwrap();
             let body = Block::parse(parser)?.unwrap();
             return Ok(Some(Self::Theorem(TheoremDeclaration {
-                attributes,
                 visibility,
                 name,
                 statement,

@@ -417,27 +417,6 @@
           ]
         },
         {
-          "id": "FR-006-008",
-          "title": "Conditional Compilation Attributes",
-          "description": "Source code can conditionally include declarations through `cfg` attributes.",
-          "acceptanceCriteria": [
-            {
-              "description": "A declaration can be preceded by `#[cfg(<predicate>)]` so that the declaration is included only when the predicate evaluates to true."
-            },
-            {
-              "description": "A `cfg` predicate can test a named feature with a form such as `feature=\"bootstrap\"`."
-            },
-            {
-              "description": "A `cfg` predicate can negate another predicate with `not(...)`."
-            }
-          ],
-          "notes": "This captures the observable conditional-compilation form currently used by the standard library root module without constraining a larger future attribute system.",
-          "docs": [
-            "docs/cfg-attributes.md",
-            "docs/standard-library.md"
-          ]
-        },
-        {
           "id": "FR-006-009",
           "title": "Entrypoint Declarations",
           "description": "Source code can mark a named function as a binary entrypoint.",

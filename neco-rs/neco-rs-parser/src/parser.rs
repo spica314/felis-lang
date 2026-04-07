@@ -106,10 +106,7 @@ impl Parser {
     }
 
     pub(crate) fn is_item_start(&self) -> bool {
-        matches!(
-            self.peek_kind(),
-            TokenKind::AttributeStart | TokenKind::Keyword(Keyword::Pub)
-        ) || matches!(
+        self.check_keyword(Keyword::Pub) || matches!(
             self.peek_kind(),
             TokenKind::Keyword(
                 Keyword::EntryPoint
@@ -277,14 +274,11 @@ fn keyword_name(keyword: Keyword) -> &'static str {
         Keyword::With => "with",
         Keyword::Forall => "forall",
         Keyword::Package => "package",
-        Keyword::Cfg => "cfg",
-        Keyword::Not => "not",
     }
 }
 
 fn punctuation_name(kind: &TokenKind) -> &'static str {
     match kind {
-        TokenKind::AttributeStart => "#[",
         TokenKind::LeftParen => "(",
         TokenKind::RightParen => ")",
         TokenKind::LeftBrace => "{",
