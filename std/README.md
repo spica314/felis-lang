@@ -17,7 +17,7 @@ This directory is reserved for the Felis standard library.
 
 ## Current Layout
 
-- `src/lib.fe` exposes the package root surface.
-- `src/primitive.fe` and `src/primitive/` contain primitive builtin bindings.
-- `src/math.fe` and `src/math/` contain mathematics-oriented modules such as
-  natural numbers and equality.
+- `neco-package.json` is a workspace root manifest.
+- `std_core/` contains primitive builtin bindings and the `IO` effect package.
+- `std_math/` contains mathematics-oriented modules such as natural numbers
+  and equality.

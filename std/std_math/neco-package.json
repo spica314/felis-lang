@@ -1,0 +1,4 @@
+{
+    "name": "std_math",
+    "felis-lib-entrypoint": "src/lib.fe"
+}

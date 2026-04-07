@@ -1,10 +1,10 @@
-#use std::io::IO;
-#use std::primitive::u8::u8;
-#use std::primitive::u8::u8_add;
-#use std::primitive::u8::u8_sub;
-#use std::primitive::u8::u8_mul;
-#use std::primitive::u8::u8_div;
-#use std::primitive::u8::u8_mod;
+#use std_core::io::IO;
+#use std_core::primitive::u8::u8;
+#use std_core::primitive::u8::u8_add;
+#use std_core::primitive::u8::u8_sub;
+#use std_core::primitive::u8::u8_mul;
+#use std_core::primitive::u8::u8_div;
+#use std_core::primitive::u8::u8_mod;
 
 #entrypoint main;
 

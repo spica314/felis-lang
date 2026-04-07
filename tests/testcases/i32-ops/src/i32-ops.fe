@@ -1,10 +1,10 @@
-#use std::io::IO;
-#use std::primitive::i32::i32;
-#use std::primitive::i32::i32_add;
-#use std::primitive::i32::i32_sub;
-#use std::primitive::i32::i32_mul;
-#use std::primitive::i32::i32_div;
-#use std::primitive::i32::i32_mod;
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_sub;
+#use std_core::primitive::i32::i32_mul;
+#use std_core::primitive::i32::i32_div;
+#use std_core::primitive::i32::i32_mod;
 
 #entrypoint main;
 

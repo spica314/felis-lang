@@ -38,7 +38,7 @@ For example:
 
 ```json
 {
-  "name": "std",
+  "name": "std_core",
   "felis-lib-entrypoint": "src/lib.fe"
 }
 ```

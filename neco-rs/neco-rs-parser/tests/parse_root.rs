@@ -226,18 +226,33 @@ fn parses_loop_package_root() {
 }
 
 #[test]
-fn parses_std_package_with_nested_modules_and_theorems() {
+fn parses_std_workspace_packages_with_nested_modules_and_theorems() {
     let root = repo_root().join("std");
     let parsed = parse_root(&root).expect("std parses");
-    let ParsedRoot::Package(package) = parsed else {
-        panic!("expected package root");
+    let ParsedRoot::Workspace(workspace) = parsed else {
+        panic!("expected workspace root");
     };
 
-    assert!(package.source_files.len() >= 6);
-    let nat_add_file = package
+    assert_eq!(workspace.packages.len(), 2);
+
+    let core = workspace
+        .packages
+        .iter()
+        .find(|package| package.manifest.name == "std_core")
+        .expect("std_core package");
+    assert_eq!(core.manifest.felis_lib_entrypoint, Some(PathBuf::from("src/lib.fe")));
+
+    let math = workspace
+        .packages
+        .iter()
+        .find(|package| package.manifest.name == "std_math")
+        .expect("std_math package");
+
+    assert!(math.source_files.len() >= 5);
+    let nat_add_file = math
         .source_files
         .iter()
-        .find(|file| file.path.ends_with("std/src/math/nat/nat_add.fe"))
+        .find(|file| file.path.ends_with("std/std_math/src/math/nat/nat_add.fe"))
         .expect("nat_add file");
 
     let theorem = nat_add_file

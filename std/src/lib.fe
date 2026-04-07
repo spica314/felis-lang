@@ -1,5 +1,0 @@
-#pub #mod primitive;
-#pub #mod io;
-
-#[cfg(not(feature="bootstrap"))]
-#pub #mod math;

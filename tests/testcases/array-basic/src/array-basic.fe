@@ -1,6 +1,6 @@
-#use std::io::IO;
-#use std::primitive::i32::i32;
-#use std::primitive::i32::i32_add;
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
 
 #entrypoint main;
 

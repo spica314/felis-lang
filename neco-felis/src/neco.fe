@@ -1,4 +1,4 @@
-#use std::io::IO;
+#use std_core::io::IO;
 
 #entrypoint main;
 

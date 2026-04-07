@@ -67,14 +67,7 @@ where
 
 pub fn compile_path_to_elf(input: &Path, output: &Path) -> Result<()> {
     let parsed = parse_root(input)?;
-    let package = match parsed {
-        ParsedRoot::Package(package) => package,
-        ParsedRoot::Workspace(_) => {
-            return Err(Error::Unsupported(
-                "workspace root is not supported yet; pass a package root".to_string(),
-            ));
-        }
-    };
+    let package = select_package_for_build(parsed, output)?;
 
     let program = lower_package_to_program(&package)?;
     let elf = build_linux_x86_64_program_executable(&program).to_bytes()?;
@@ -90,6 +83,103 @@ pub fn compile_path_to_elf(input: &Path, output: &Path) -> Result<()> {
     })?;
     set_output_executable(output)?;
     Ok(())
+}
+
+fn select_package_for_build(parsed: ParsedRoot, output: &Path) -> Result<ParsedPackage> {
+    match parsed {
+        ParsedRoot::Package(package) => select_binary_from_package(package, output),
+        ParsedRoot::Workspace(workspace) => {
+            let binary_packages: Vec<_> = workspace
+                .packages
+                .into_iter()
+                .filter(|package| !package.manifest.felis_bin_entrypoints.is_empty())
+                .collect();
+
+            match binary_packages.len() {
+                0 => Err(Error::Unsupported(
+                    "workspace root does not contain a binary package".to_string(),
+                )),
+                1 => select_binary_from_package(binary_packages.into_iter().next().unwrap(), output),
+                _ => {
+                    let output_name = output_selection_name(output);
+                    let mut matches = binary_packages
+                        .into_iter()
+                        .filter(|package| output_name_matches(&output_name, &package.manifest.name))
+                        .collect::<Vec<_>>();
+                    if matches.len() == 1 {
+                        return select_binary_from_package(matches.remove(0), output);
+                    }
+
+                    Err(Error::Unsupported(
+                        "workspace root resolves to multiple binary packages; choose an output path that identifies the target package".to_string(),
+                    ))
+                }
+            }
+        }
+    }
+}
+
+fn select_binary_from_package(package: ParsedPackage, output: &Path) -> Result<ParsedPackage> {
+    match package.manifest.felis_bin_entrypoints.len() {
+        0 => Ok(package),
+        1 => Ok(package),
+        _ => {
+            let output_name = output_selection_name(output);
+            let mut matches = package
+                .manifest
+                .felis_bin_entrypoints
+                .iter()
+                .filter(|path| output_name_matches(&output_name, &binary_name(path)))
+                .cloned()
+                .collect::<Vec<_>>();
+
+            if matches.len() != 1 {
+                return Err(Error::Unsupported(
+                    "package contains multiple binary entrypoints; choose an output path that identifies the target binary".to_string(),
+                ));
+            }
+
+            let selected = matches.remove(0);
+            let selected_path = package.root_dir.join(&selected);
+            let source_files = package
+                .source_files
+                .into_iter()
+                .filter(|file| {
+                    file.role != neco_rs_parser::SourceFileRole::BinaryEntrypoint
+                        || file.path == selected_path
+                })
+                .collect();
+            let mut manifest = package.manifest;
+            manifest.felis_bin_entrypoints = vec![selected];
+
+            Ok(ParsedPackage {
+                root_dir: package.root_dir,
+                manifest_path: package.manifest_path,
+                manifest,
+                source_files,
+            })
+        }
+    }
+}
+
+fn binary_name(path: &Path) -> String {
+    path.file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn output_selection_name(output: &Path) -> String {
+    output
+        .file_name()
+        .or_else(|| output.file_stem())
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn output_name_matches(output_name: &str, candidate: &str) -> bool {
+    output_name == candidate || output_name.contains(candidate)
 }
 
 fn set_output_executable(output: &Path) -> Result<()> {
