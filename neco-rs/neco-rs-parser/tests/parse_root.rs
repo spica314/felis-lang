@@ -248,12 +248,13 @@ fn parses_type_rc_match_package_root() {
     };
 
     assert_eq!(package.manifest.name, "type-rc-match");
-    assert_eq!(package.source_files.len(), 2);
+    assert_eq!(package.source_files.len(), 3);
     assert_eq!(
         package.manifest.felis_bin_entrypoints,
         vec![
             PathBuf::from("src/type-rc-match-single.fe"),
             PathBuf::from("src/type-rc-match-pair.fe"),
+            PathBuf::from("src/type-rc-match-list.fe"),
         ]
     );
 
@@ -271,51 +272,84 @@ fn parses_type_rc_match_package_root() {
             })
             .expect("type declaration");
         assert_eq!(type_decl.modifier.as_deref(), Some("rc"));
-        assert_eq!(type_decl.name.name, "Value");
         assert_eq!(type_decl.constructors.len(), 2);
+        if source_file.path.ends_with("src/type-rc-match-list.fe") {
+            assert_eq!(type_decl.name.name, "List");
 
-        let function = syntax
-            .items
-            .iter()
-            .find_map(|item| match item {
-                Item::Function(function) if function.name.name == "value_code" => Some(function),
-                _ => None,
-            })
-            .expect("pure function");
-        let Some(Term::Match(match_expr)) = function.body.tail.as_deref() else {
-            panic!("expected match expression");
-        };
-        assert_eq!(match_expr.arms.len(), 2);
+            let function = syntax
+                .items
+                .iter()
+                .find_map(|item| match item {
+                    Item::Function(function) if function.name.name == "list_sum" => Some(function),
+                    _ => None,
+                })
+                .expect("pure function");
+            let Some(Term::Match(match_expr)) = function.body.tail.as_deref() else {
+                panic!("expected match expression");
+            };
+            assert_eq!(match_expr.arms.len(), 2);
 
-        let Pattern::Constructor { subpatterns, .. } = &match_expr.arms[0].pattern else {
-            panic!("expected constructor pattern");
-        };
-        assert_eq!(subpatterns.len(), 1);
-        assert!(matches!(&subpatterns[0], Pattern::Bind(name) if name == "x"));
+            let Pattern::Constructor { subpatterns, .. } = &match_expr.arms[0].pattern else {
+                panic!("expected constructor pattern");
+            };
+            assert!(subpatterns.is_empty());
 
-        let Pattern::Constructor { subpatterns, .. } = &match_expr.arms[1].pattern else {
-            panic!("expected constructor pattern");
-        };
-        assert_eq!(subpatterns.len(), 2);
-        assert!(matches!(&subpatterns[0], Pattern::Bind(name) if name == "x"));
-        assert!(matches!(&subpatterns[1], Pattern::Bind(name) if name == "y"));
+            let Pattern::Constructor { subpatterns, .. } = &match_expr.arms[1].pattern else {
+                panic!("expected constructor pattern");
+            };
+            assert_eq!(subpatterns.len(), 2);
+            assert!(matches!(&subpatterns[0], Pattern::Bind(name) if name == "x"));
+            assert!(matches!(&subpatterns[1], Pattern::Bind(name) if name == "xs"));
 
-        let Term::Path(path) = match_expr.arms[0].result.as_ref() else {
-            panic!("expected bound value in first arm");
-        };
-        assert_eq!(path.segments.len(), 1);
-        assert_eq!(path.segments[0].name, "x");
+            assert!(matches!(match_expr.arms[1].result.as_ref(), Term::Block(_)));
+        } else {
+            assert_eq!(type_decl.name.name, "Value");
 
-        let Term::Application { arguments, .. } = match_expr.arms[1].result.as_ref() else {
-            panic!("expected i32_add application in second arm");
-        };
-        assert_eq!(arguments.len(), 2);
-        assert!(
-            matches!(&arguments[0], Term::Path(path) if path.segments.len() == 1 && path.segments[0].name == "x")
-        );
-        assert!(
-            matches!(&arguments[1], Term::Path(path) if path.segments.len() == 1 && path.segments[0].name == "y")
-        );
+            let function = syntax
+                .items
+                .iter()
+                .find_map(|item| match item {
+                    Item::Function(function) if function.name.name == "value_code" => {
+                        Some(function)
+                    }
+                    _ => None,
+                })
+                .expect("pure function");
+            let Some(Term::Match(match_expr)) = function.body.tail.as_deref() else {
+                panic!("expected match expression");
+            };
+            assert_eq!(match_expr.arms.len(), 2);
+
+            let Pattern::Constructor { subpatterns, .. } = &match_expr.arms[0].pattern else {
+                panic!("expected constructor pattern");
+            };
+            assert_eq!(subpatterns.len(), 1);
+            assert!(matches!(&subpatterns[0], Pattern::Bind(name) if name == "x"));
+
+            let Pattern::Constructor { subpatterns, .. } = &match_expr.arms[1].pattern else {
+                panic!("expected constructor pattern");
+            };
+            assert_eq!(subpatterns.len(), 2);
+            assert!(matches!(&subpatterns[0], Pattern::Bind(name) if name == "x"));
+            assert!(matches!(&subpatterns[1], Pattern::Bind(name) if name == "y"));
+
+            let Term::Path(path) = match_expr.arms[0].result.as_ref() else {
+                panic!("expected bound value in first arm");
+            };
+            assert_eq!(path.segments.len(), 1);
+            assert_eq!(path.segments[0].name, "x");
+
+            let Term::Application { arguments, .. } = match_expr.arms[1].result.as_ref() else {
+                panic!("expected i32_add application in second arm");
+            };
+            assert_eq!(arguments.len(), 2);
+            assert!(
+                matches!(&arguments[0], Term::Path(path) if path.segments.len() == 1 && path.segments[0].name == "x")
+            );
+            assert!(
+                matches!(&arguments[1], Term::Path(path) if path.segments.len() == 1 && path.segments[0].name == "y")
+            );
+        }
     }
 }
 

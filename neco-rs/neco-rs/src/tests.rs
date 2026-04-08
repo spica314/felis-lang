@@ -450,6 +450,92 @@ fn lowers_type_rc_match_pair_fixture_to_runtime_exit() {
 }
 
 #[test]
+fn lowers_type_rc_match_list_fixture_to_runtime_exit() {
+    let root = repo_root().join("tests/testcases/type-rc-match");
+    let package = selected_fixture_package(&root, "type-rc-match-list");
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::Mmap {
+                len: I32Expr::Literal(8),
+                result_slot: 0,
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 0,
+                byte_offset: 0,
+                value: I32Expr::Literal(0),
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 0,
+                byte_offset: 4,
+                value: I32Expr::Literal(0),
+            },
+            Operation::Mmap {
+                len: I32Expr::Literal(20),
+                result_slot: 1,
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 1,
+                byte_offset: 0,
+                value: I32Expr::Literal(1),
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 1,
+                byte_offset: 4,
+                value: I32Expr::Literal(0),
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 1,
+                byte_offset: 8,
+                value: I32Expr::Literal(22),
+            },
+            Operation::HeapStorePtr {
+                heap_slot: 1,
+                byte_offset: 12,
+                source_heap_slot: 0,
+            },
+            Operation::Mmap {
+                len: I32Expr::Literal(20),
+                result_slot: 2,
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 2,
+                byte_offset: 0,
+                value: I32Expr::Literal(1),
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 2,
+                byte_offset: 4,
+                value: I32Expr::Literal(0),
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 2,
+                byte_offset: 8,
+                value: I32Expr::Literal(20),
+            },
+            Operation::HeapStorePtr {
+                heap_slot: 2,
+                byte_offset: 12,
+                source_heap_slot: 1,
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
+                Box::new(I32Expr::Literal(20)),
+                Box::new(I32Expr::Add(
+                    Box::new(I32Expr::Literal(22)),
+                    Box::new(I32Expr::Literal(0)),
+                )),
+            ))),
+        ]
+    );
+    assert!(program.arrays.is_empty());
+    assert!(program.data.is_empty());
+    assert_eq!(program.i32_slots, 0);
+    assert_eq!(program.heap_slots, 3);
+}
+
+#[test]
 fn lowers_if_else_true_fixture_to_program() {
     let root = repo_root().join("tests/testcases/if");
     let source_path = root.join("src/if-else-true.fe");

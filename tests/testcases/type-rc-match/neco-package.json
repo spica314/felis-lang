@@ -2,6 +2,7 @@
     "name": "type-rc-match",
     "felis-bin-entrypoints": [
         "src/type-rc-match-single.fe",
-        "src/type-rc-match-pair.fe"
+        "src/type-rc-match-pair.fe",
+        "src/type-rc-match-list.fe"
     ]
 }

@@ -113,6 +113,21 @@ fn emit_operations(
                 code.extend_from_slice(&[0x89, 0x93]);
                 code.extend_from_slice(&byte_offset.to_le_bytes());
             }
+            Operation::HeapStorePtr {
+                heap_slot,
+                byte_offset,
+                source_heap_slot,
+            } => {
+                let source_slot_offset = heap_slot_offset(*source_heap_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0x85]);
+                code.extend_from_slice(&source_slot_offset.to_le_bytes());
+                code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+                let target_slot_offset = heap_slot_offset(*heap_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0x95]);
+                code.extend_from_slice(&target_slot_offset.to_le_bytes());
+                code.extend_from_slice(&[0x48, 0x89, 0x8a]);
+                code.extend_from_slice(&byte_offset.to_le_bytes());
+            }
             Operation::Open {
                 path_data_index,
                 flags,

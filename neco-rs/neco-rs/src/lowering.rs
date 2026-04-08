@@ -368,7 +368,7 @@ fn lower_pure_value(
                 "unsupported pure expression in entrypoint body: {term:?}"
             )))
         }
-        Term::Path(path) => lower_path_value(path, state),
+        Term::Path(path) => lower_path_value(path, state, program),
         _ => Err(Error::Unsupported(format!(
             "unsupported pure expression in entrypoint body: {term:?}"
         ))),
@@ -478,7 +478,11 @@ fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<PureFunctio
     })
 }
 
-fn lower_path_value(path: &PathExpression, state: &LoweringState) -> Result<Value> {
+fn lower_path_value(
+    path: &PathExpression,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Value> {
     if !path.starts_with_package && path.segments.len() == 1 && path.segments[0].suffixes.is_empty()
     {
         let name = path.segments[0].name.as_str();
@@ -497,6 +501,31 @@ fn lower_path_value(path: &PathExpression, state: &LoweringState) -> Result<Valu
             signature.type_name, signature.constructor_name, signature.arity
         )));
     }
+    if signature.is_rc {
+        let heap_slot = allocate_heap_slot(program);
+        program.operations.push(Operation::Mmap {
+            len: I32Expr::Literal(8),
+            result_slot: heap_slot,
+        });
+        program.operations.push(Operation::HeapStoreI32 {
+            heap_slot,
+            byte_offset: 0,
+            value: I32Expr::Literal(signature.tag),
+        });
+        // TODO: Replace this reserved header word with an actual reference count.
+        program.operations.push(Operation::HeapStoreI32 {
+            heap_slot,
+            byte_offset: 4,
+            value: I32Expr::Literal(0),
+        });
+        return Ok(Value::Constructor(ConstructorValue {
+            type_name: signature.type_name,
+            constructor_name: signature.constructor_name,
+            heap_slot: Some(heap_slot),
+            fields: Vec::new(),
+        }));
+    }
+
     Ok(Value::Constructor(ConstructorValue {
         type_name: signature.type_name,
         constructor_name: signature.constructor_name,
@@ -652,7 +681,21 @@ fn lower_constructor_application(
 
     if signature.is_rc {
         let heap_slot = allocate_heap_slot(program);
-        let object_len = 8 + normalized_arguments.len() as i32 * 4;
+        let object_len = 8 + fields
+            .iter()
+            .map(|field| match field {
+                Value::I32(_) => Ok(4),
+                Value::Constructor(ConstructorValue {
+                    heap_slot: Some(_), ..
+                }) => Ok(8),
+                _ => Err(Error::Unsupported(
+                    "`type(rc)` currently supports only `i32` and nested `type(rc)` payload fields"
+                        .to_string(),
+                )),
+            })
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .sum::<i32>();
         program.operations.push(Operation::Mmap {
             len: I32Expr::Literal(object_len),
             result_slot: heap_slot,
@@ -668,17 +711,35 @@ fn lower_constructor_application(
             byte_offset: 4,
             value: I32Expr::Literal(0),
         });
-        for (index, field) in fields.iter().enumerate() {
-            let Value::I32(value) = field else {
-                return Err(Error::Unsupported(
-                    "`type(rc)` currently supports only `i32` payload fields".to_string(),
-                ));
-            };
-            program.operations.push(Operation::HeapStoreI32 {
-                heap_slot,
-                byte_offset: 8 + index as i32 * 4,
-                value: value.clone(),
-            });
+        let mut byte_offset = 8;
+        for field in &fields {
+            match field {
+                Value::I32(value) => {
+                    program.operations.push(Operation::HeapStoreI32 {
+                        heap_slot,
+                        byte_offset,
+                        value: value.clone(),
+                    });
+                    byte_offset += 4;
+                }
+                Value::Constructor(ConstructorValue {
+                    heap_slot: Some(source_heap_slot),
+                    ..
+                }) => {
+                    program.operations.push(Operation::HeapStorePtr {
+                        heap_slot,
+                        byte_offset,
+                        source_heap_slot: *source_heap_slot,
+                    });
+                    byte_offset += 8;
+                }
+                _ => {
+                    return Err(Error::Unsupported(
+                        "`type(rc)` currently supports only `i32` and nested `type(rc)` payload fields"
+                            .to_string(),
+                    ));
+                }
+            }
         }
 
         return Ok(Some(Value::Constructor(ConstructorValue {

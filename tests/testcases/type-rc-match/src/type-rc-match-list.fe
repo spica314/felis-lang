@@ -1,0 +1,26 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#type(rc) List : Type[0] {
+    nil : List,
+    cons : i32 -> List -> List,
+}
+
+#fn list_sum : (list : List) -> i32 {
+    #match list {
+        List::nil => 0i32,
+        List::cons x xs => {
+            #let tail_sum = list_sum xs;
+            i32_add x tail_sum
+        }
+    }
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let code = list_sum (List::cons 20i32 (List::cons 22i32 List::nil));
+    #let _ <- IO::exit code;
+    ()
+}

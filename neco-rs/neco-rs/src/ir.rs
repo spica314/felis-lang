@@ -93,6 +93,11 @@ pub(crate) enum Operation {
         byte_offset: i32,
         value: I32Expr,
     },
+    HeapStorePtr {
+        heap_slot: usize,
+        byte_offset: i32,
+        source_heap_slot: usize,
+    },
     Open {
         path_data_index: usize,
         flags: I32Expr,
