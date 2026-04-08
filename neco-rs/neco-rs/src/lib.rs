@@ -99,7 +99,9 @@ fn select_package_for_build(parsed: ParsedRoot, output: &Path) -> Result<ParsedP
                 0 => Err(Error::Unsupported(
                     "workspace root does not contain a binary package".to_string(),
                 )),
-                1 => select_binary_from_package(binary_packages.into_iter().next().unwrap(), output),
+                1 => {
+                    select_binary_from_package(binary_packages.into_iter().next().unwrap(), output)
+                }
                 _ => {
                     let output_name = output_selection_name(output);
                     let mut matches = binary_packages
@@ -521,7 +523,12 @@ fn lower_statement(
     match statement {
         Statement::Let(let_stmt) => match let_stmt.operator {
             neco_rs_parser::LetOperator::Equals => {
-                lower_let_equals_statement(&let_stmt.binder, let_stmt.value.as_ref(), state, program)?;
+                lower_let_equals_statement(
+                    &let_stmt.binder,
+                    let_stmt.value.as_ref(),
+                    state,
+                    program,
+                )?;
                 Ok(false)
             }
             neco_rs_parser::LetOperator::LeftArrow => {
@@ -666,7 +673,9 @@ fn lower_let_equals_statement(
     {
         if let Value::I32(expr) = value {
             let slot = state.allocate_i32_slot();
-            program.operations.push(Operation::StoreI32 { slot, value: expr });
+            program
+                .operations
+                .push(Operation::StoreI32 { slot, value: expr });
             bind_pattern(
                 inner.as_ref(),
                 Value::I32(I32Expr::Local(slot)),
@@ -1417,7 +1426,14 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
         emit_array_initializers(program, &mut code);
     }
 
-    emit_operations(&program.operations, &mut code, program, &addresses, None, None);
+    emit_operations(
+        &program.operations,
+        &mut code,
+        program,
+        &addresses,
+        None,
+        None,
+    );
 
     code
 }
@@ -1595,8 +1611,7 @@ fn emit_operations(
                     .copy_from_slice(&back_jump_len.to_le_bytes());
                 for patch_at in loop_continue_patches {
                     let continue_jump_len = loop_start as i32 - (patch_at as i32 + 4);
-                    code[patch_at..patch_at + 4]
-                        .copy_from_slice(&continue_jump_len.to_le_bytes());
+                    code[patch_at..patch_at + 4].copy_from_slice(&continue_jump_len.to_le_bytes());
                 }
                 for patch_at in loop_break_patches {
                     let break_jump_len = loop_end as i32 - (patch_at as i32 + 4);
@@ -2483,10 +2498,7 @@ mod tests {
                 Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
             ]
         );
-        assert_eq!(
-            program.data,
-            vec![b"message.txt\0".to_vec()]
-        );
+        assert_eq!(program.data, vec![b"message.txt\0".to_vec()]);
         assert_eq!(program.i32_slots, 2);
     }
 

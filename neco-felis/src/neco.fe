@@ -1,7 +1,46 @@
 #use std_core::io::IO;
+#use std_core::primitive::u8::u8;
 
 #entrypoint main;
 
 #fn main : () #with IO {
+    #let _ @ path_ref = "a.out";
+    #let path_bytes_ref = path_ref .> as_bytes;
+    #let fd <- IO::open path_bytes_ref 577i32 493i32;
+    #let _ @^ elf_ref <- IO::array_new u8 4110i32;
+    elf_ref .> set 0i32 127u8;
+    elf_ref .> set 1i32 69u8;
+    elf_ref .> set 2i32 76u8;
+    elf_ref .> set 3i32 70u8;
+    elf_ref .> set 4i32 2u8;
+    elf_ref .> set 5i32 1u8;
+    elf_ref .> set 6i32 1u8;
+    elf_ref .> set 16i32 2u8;
+    elf_ref .> set 18i32 62u8;
+    elf_ref .> set 20i32 1u8;
+    elf_ref .> set 25i32 16u8;
+    elf_ref .> set 26i32 64u8;
+    elf_ref .> set 32i32 64u8;
+    elf_ref .> set 52i32 64u8;
+    elf_ref .> set 54i32 56u8;
+    elf_ref .> set 56i32 1u8;
+    elf_ref .> set 64i32 1u8;
+    elf_ref .> set 68i32 5u8;
+    elf_ref .> set 73i32 16u8;
+    elf_ref .> set 81i32 16u8;
+    elf_ref .> set 82i32 64u8;
+    elf_ref .> set 89i32 16u8;
+    elf_ref .> set 90i32 64u8;
+    elf_ref .> set 96i32 14u8;
+    elf_ref .> set 104i32 14u8;
+    elf_ref .> set 4096i32 184u8;
+    elf_ref .> set 4101i32 137u8;
+    elf_ref .> set 4102i32 199u8;
+    elf_ref .> set 4103i32 184u8;
+    elf_ref .> set 4104i32 60u8;
+    elf_ref .> set 4108i32 15u8;
+    elf_ref .> set 4109i32 5u8;
+    #let _ <- IO::write fd elf_ref 4110i32;
+    #let _ <- IO::close fd;
     ()
 }

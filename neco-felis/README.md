@@ -4,5 +4,7 @@ This directory contains the Felis implementation of the neco compiler.
 
 ## Current Status
 
-The package skeleton exists, but the compiler implementation is not in place
-yet.
+The current bootstrap binary writes `./a.out` in the current directory.
+
+The emitted `a.out` is a minimal Linux x86_64 ELF executable whose only
+behavior is `exit(0)` via syscall 60.

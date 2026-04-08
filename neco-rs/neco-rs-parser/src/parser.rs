@@ -106,20 +106,21 @@ impl Parser {
     }
 
     pub(crate) fn is_item_start(&self) -> bool {
-        self.check_keyword(Keyword::Pub) || matches!(
-            self.peek_kind(),
-            TokenKind::Keyword(
-                Keyword::EntryPoint
-                    | Keyword::Use
-                    | Keyword::Mod
-                    | Keyword::BindBuiltin
-                    | Keyword::Fn
-                    | Keyword::Proc
-                    | Keyword::Type
-                    | Keyword::Prop
-                    | Keyword::Theorem
+        self.check_keyword(Keyword::Pub)
+            || matches!(
+                self.peek_kind(),
+                TokenKind::Keyword(
+                    Keyword::EntryPoint
+                        | Keyword::Use
+                        | Keyword::Mod
+                        | Keyword::BindBuiltin
+                        | Keyword::Fn
+                        | Keyword::Proc
+                        | Keyword::Type
+                        | Keyword::Prop
+                        | Keyword::Theorem
+                )
             )
-        )
     }
 
     pub(crate) fn is_term_start(&self) -> bool {
