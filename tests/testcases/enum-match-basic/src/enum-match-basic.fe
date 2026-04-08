@@ -1,0 +1,24 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+
+#type Color : Type[0] {
+    red : Color,
+    blue : Color,
+    green : Color,
+}
+
+#fn color_code : (color : Color) -> i32 {
+    #match color {
+        Color::red => 1i32
+        Color::blue => 2i32
+        Color::green => 42i32
+    }
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let code = color_code Color::green;
+    #let _ <- IO::exit code;
+    ()
+}

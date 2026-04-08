@@ -1,0 +1,4 @@
+{
+    "name": "enum-match-basic",
+    "felis-bin-entrypoints": ["src/enum-match-basic.fe"]
+}

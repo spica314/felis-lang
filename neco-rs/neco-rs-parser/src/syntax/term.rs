@@ -319,7 +319,10 @@ fn parse_application_term(parser: &mut Parser) -> Result<Term> {
         if parser.stop_at_left_brace() && parser.check_punctuation(TokenKind::LeftBrace) {
             break;
         }
-        if parser.stop_at_match_arm_boundary() && parser.looks_like_match_arm_boundary() {
+        if parser.stop_at_match_arm_boundary()
+            && parser.looks_like_match_arm_boundary()
+            && !looks_like_numeric_literal_suffix_continuation(&term, parser)
+        {
             break;
         }
         if parser.is_term_start() {
@@ -342,6 +345,14 @@ fn parse_application_term(parser: &mut Parser) -> Result<Term> {
         break;
     }
     Ok(term)
+}
+
+fn looks_like_numeric_literal_suffix_continuation(term: &Term, parser: &Parser) -> bool {
+    matches!(term, Term::IntegerLiteral(_))
+        && matches!(
+            parser.peek_kind(),
+            TokenKind::Identifier(name) if name == "i32" || name == "u8"
+        )
 }
 
 fn parse_primary_term(parser: &mut Parser) -> Result<Term> {

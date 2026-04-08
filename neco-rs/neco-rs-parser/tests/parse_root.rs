@@ -132,6 +132,52 @@ fn parses_hex_literals_package_root() {
 }
 
 #[test]
+fn parses_enum_match_basic_package_root() {
+    let root = repo_root().join("tests/testcases/enum-match-basic");
+    let parsed = parse_root(&root).expect("enum-match-basic package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "enum-match-basic");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 6);
+
+    let Item::Type(type_decl) = &syntax.items[2] else {
+        panic!("expected type declaration");
+    };
+    assert_eq!(type_decl.name.name, "Color");
+    assert_eq!(type_decl.constructors.len(), 3);
+
+    let Item::Function(function) = &syntax.items[3] else {
+        panic!("expected pure function");
+    };
+    let Some(Term::Match(match_expr)) = function.body.tail.as_deref() else {
+        panic!("expected match expression");
+    };
+    assert_eq!(match_expr.arms.len(), 3);
+    for arm in &match_expr.arms {
+        let Pattern::Constructor { subpatterns, .. } = &arm.pattern else {
+            panic!("expected constructor pattern");
+        };
+        assert!(subpatterns.is_empty());
+    }
+
+    let Item::Function(main_fn) = &syntax.items[5] else {
+        panic!("expected main function");
+    };
+    assert_eq!(main_fn.visibility, Visibility::Private);
+    assert!(main_fn.effect.is_some());
+    assert_eq!(main_fn.body.statements.len(), 2);
+}
+
+#[test]
 fn parses_stdin_to_stdout_package_root() {
     let root = repo_root().join("tests/testcases/stdin-to-stdout");
     let parsed = parse_root(&root).expect("stdin-to-stdout package parses");

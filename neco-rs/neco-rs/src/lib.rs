@@ -10,8 +10,9 @@ mod effect;
 use effect::{Value, bind_pattern, lower_effect, resolve_value};
 use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
 use neco_rs_parser::{
-    ArrowParameter, BindingPattern, Block, FunctionDeclaration, FunctionKind, Item, LetOperator,
-    ParsedPackage, ParsedRoot, Statement, Term, parse_root,
+    ArrowParameter, BindingPattern, Block, ConstructorDeclaration, DeclaredName,
+    FunctionDeclaration, FunctionKind, Item, LetOperator, MatchExpression, ParsedPackage,
+    ParsedRoot, PathExpression, Pattern, Statement, Term, parse_root,
 };
 
 #[derive(Debug)]
@@ -410,6 +411,7 @@ pub(crate) struct LoweringState {
     next_array_slot: usize,
     next_i32_slot: usize,
     functions: HashMap<String, PureFunction>,
+    constructors: HashMap<String, ConstructorValue>,
     loop_depth: usize,
 }
 
@@ -419,6 +421,12 @@ struct PureFunction {
     body: Block,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ConstructorValue {
+    type_name: String,
+    constructor_name: String,
+}
+
 impl LoweringState {
     fn new() -> Self {
         Self {
@@ -426,6 +434,7 @@ impl LoweringState {
             next_array_slot: 0,
             next_i32_slot: 0,
             functions: HashMap::new(),
+            constructors: HashMap::new(),
             loop_depth: 0,
         }
     }
@@ -492,6 +501,7 @@ fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
     };
     let mut state = LoweringState::new();
     state.functions = collect_pure_functions(package)?;
+    state.constructors = collect_nullary_constructors(package)?;
     let mut terminated = false;
 
     for statement in &main_fn.body.statements {
@@ -546,6 +556,7 @@ fn lower_statement(
                 next_array_slot: state.next_array_slot,
                 next_i32_slot: state.next_i32_slot,
                 functions: state.functions.clone(),
+                constructors: state.constructors.clone(),
                 loop_depth: state.loop_depth,
             };
             let mut then_operations = Vec::new();
@@ -572,6 +583,7 @@ fn lower_statement(
                     next_array_slot: state.next_array_slot,
                     next_i32_slot: state.next_i32_slot,
                     functions: state.functions.clone(),
+                    constructors: state.constructors.clone(),
                     loop_depth: state.loop_depth,
                 };
                 let mut else_program = LoweredProgram {
@@ -611,6 +623,7 @@ fn lower_statement(
                 next_array_slot: state.next_array_slot,
                 next_i32_slot: state.next_i32_slot,
                 functions: state.functions.clone(),
+                constructors: state.constructors.clone(),
                 loop_depth: state.loop_depth + 1,
             };
             let mut loop_program = LoweredProgram {
@@ -699,6 +712,8 @@ fn lower_pure_value(
 ) -> Result<Value> {
     match term {
         Term::Group(inner) => lower_pure_value(inner, state, program),
+        Term::Block(block) => lower_pure_block_value(block, state, program),
+        Term::Match(match_expr) => lower_match_value(match_expr, state, program),
         Term::StringLiteral(literal) => {
             let data_index = intern_data(program, nul_terminated_bytes(literal));
             Ok(Value::ByteString(data_index))
@@ -725,7 +740,7 @@ fn lower_pure_value(
                 ))),
             }
         }
-        Term::Path(_) => resolve_value(term, &state.environment),
+        Term::Path(path) => lower_path_value(path, state),
         _ => Err(Error::Unsupported(format!(
             "unsupported pure expression in entrypoint body: {term:?}"
         ))),
@@ -753,6 +768,53 @@ fn collect_pure_functions(package: &ParsedPackage) -> Result<HashMap<String, Pur
     Ok(functions)
 }
 
+fn collect_nullary_constructors(
+    package: &ParsedPackage,
+) -> Result<HashMap<String, ConstructorValue>> {
+    let mut constructors = HashMap::new();
+    for item in package
+        .source_files
+        .iter()
+        .flat_map(|file| file.syntax.items.iter())
+    {
+        let Item::Type(type_decl) = item else {
+            continue;
+        };
+
+        for constructor in &type_decl.constructors {
+            if !constructor_is_nullary(constructor, &type_decl.name) {
+                continue;
+            }
+
+            let key = constructor_key(&type_decl.name.name, &constructor.name.name);
+            let value = ConstructorValue {
+                type_name: type_decl.name.name.clone(),
+                constructor_name: constructor.name.name.clone(),
+            };
+            if constructors.insert(key.clone(), value).is_some() {
+                return Err(Error::Unsupported(format!(
+                    "duplicate nullary constructor `{key}` is not supported"
+                )));
+            }
+        }
+    }
+    Ok(constructors)
+}
+
+fn constructor_is_nullary(constructor: &ConstructorDeclaration, type_name: &DeclaredName) -> bool {
+    let Term::Path(path) = &constructor.ty else {
+        return false;
+    };
+    !path.starts_with_package
+        && path.segments.len() == 1
+        && path.segments[0].name == type_name.name
+        && path.segments[0].suffixes == type_name.suffixes
+}
+
+fn constructor_key(type_name: &str, constructor_name: &str) -> String {
+    format!("{type_name}::{constructor_name}")
+}
+
 fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<PureFunction> {
     let mut parameters = Vec::new();
     let mut current = &function.ty;
@@ -770,6 +832,93 @@ fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<PureFunctio
         parameters,
         body: function.body.clone(),
     })
+}
+
+fn lower_path_value(path: &PathExpression, state: &LoweringState) -> Result<Value> {
+    if !path.starts_with_package && path.segments.len() == 1 && path.segments[0].suffixes.is_empty()
+    {
+        let name = path.segments[0].name.as_str();
+        if let Some(value) = state.environment.get(name) {
+            return Ok(value.clone());
+        }
+        return Err(Error::Unsupported(format!(
+            "unknown entrypoint local `{name}`"
+        )));
+    }
+
+    lower_constructor_value(path, &state.constructors)
+}
+
+fn lower_constructor_value(
+    path: &PathExpression,
+    constructors: &HashMap<String, ConstructorValue>,
+) -> Result<Value> {
+    if path.starts_with_package {
+        return Err(Error::Unsupported(
+            "package-qualified constructor paths are not supported in entrypoint lowering"
+                .to_string(),
+        ));
+    }
+    if path.segments.len() != 2
+        || path
+            .segments
+            .iter()
+            .any(|segment| !segment.suffixes.is_empty())
+    {
+        return Err(Error::Unsupported(
+            "only simple `Type::constructor` paths are supported in entrypoint lowering"
+                .to_string(),
+        ));
+    }
+
+    let key = constructor_key(&path.segments[0].name, &path.segments[1].name);
+    constructors
+        .get(&key)
+        .cloned()
+        .map(Value::Constructor)
+        .ok_or_else(|| Error::Unsupported(format!("unknown constructor `{key}`")))
+}
+
+fn lower_match_value(
+    match_expr: &MatchExpression,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Value> {
+    let scrutinee = lower_pure_value(match_expr.scrutinee.as_ref(), state, program)?;
+    for arm in &match_expr.arms {
+        if pattern_matches_value(&arm.pattern, &scrutinee, &state.constructors)? {
+            return lower_pure_value(arm.result.as_ref(), state, program);
+        }
+    }
+
+    Err(Error::Unsupported(
+        "`#match` did not match any constructor arm".to_string(),
+    ))
+}
+
+fn pattern_matches_value(
+    pattern: &Pattern,
+    value: &Value,
+    constructors: &HashMap<String, ConstructorValue>,
+) -> Result<bool> {
+    match pattern {
+        Pattern::Wildcard => Ok(true),
+        Pattern::Constructor { path, subpatterns } => {
+            if !subpatterns.is_empty() {
+                return Err(Error::Unsupported(
+                    "constructor subpatterns are not supported in entrypoint lowering".to_string(),
+                ));
+            }
+
+            let Value::Constructor(expected) = lower_constructor_value(path, constructors)? else {
+                unreachable!();
+            };
+            let Value::Constructor(actual) = value else {
+                return Ok(false);
+            };
+            Ok(actual == &expected)
+        }
+    }
 }
 
 fn lower_pure_function_call(
@@ -814,6 +963,7 @@ fn lower_pure_function_call(
         next_array_slot: state.next_array_slot,
         next_i32_slot: state.next_i32_slot,
         functions: state.functions.clone(),
+        constructors: state.constructors.clone(),
         loop_depth: state.loop_depth,
     };
 
@@ -830,6 +980,7 @@ fn lower_pure_block_value(
         next_array_slot: state.next_array_slot,
         next_i32_slot: state.next_i32_slot,
         functions: state.functions.clone(),
+        constructors: state.constructors.clone(),
         loop_depth: state.loop_depth,
     };
 
@@ -2322,6 +2473,23 @@ mod tests {
                 Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
             ]
         );
+        assert!(program.data.is_empty());
+        assert_eq!(program.i32_slots, 0);
+    }
+
+    #[test]
+    fn lowers_enum_match_basic_fixture_to_runtime_exit() {
+        let root = repo_root().join("tests/testcases/enum-match-basic");
+        let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.operations,
+            vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))]
+        );
+        assert!(program.arrays.is_empty());
         assert!(program.data.is_empty());
         assert_eq!(program.i32_slots, 0);
     }

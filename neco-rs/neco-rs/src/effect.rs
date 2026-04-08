@@ -4,11 +4,15 @@ use std::collections::HashMap;
 
 use neco_rs_parser::{BindingPattern, PathExpression, Term};
 
-use crate::{ArrayElementType, Error, I32Expr, LoweredProgram, LoweringState, Result, U8Expr};
+use crate::{
+    ArrayElementType, ConstructorValue, Error, I32Expr, LoweredProgram, LoweringState, Result,
+    U8Expr,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Value {
     Unit,
+    Constructor(ConstructorValue),
     FileDescriptor(I32Expr),
     ByteString(usize),
     I32(I32Expr),
