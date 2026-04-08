@@ -278,6 +278,7 @@ pub(crate) struct LoweredProgram {
     operations: Vec<Operation>,
     data: Vec<Vec<u8>>,
     arrays: Vec<ArrayAllocation>,
+    heap_slots: usize,
     i32_slots: usize,
 }
 
@@ -358,6 +359,15 @@ enum Operation {
         slot: usize,
         value: I32Expr,
     },
+    Mmap {
+        len: I32Expr,
+        result_slot: usize,
+    },
+    HeapStoreI32 {
+        heap_slot: usize,
+        byte_offset: i32,
+        value: I32Expr,
+    },
     Open {
         path_data_index: usize,
         flags: I32Expr,
@@ -425,6 +435,7 @@ struct PureFunction {
 pub(crate) struct ConstructorValue {
     type_name: String,
     constructor_name: String,
+    heap_slot: Option<usize>,
     fields: Vec<Value>,
 }
 
@@ -433,6 +444,8 @@ struct ConstructorSignature {
     type_name: String,
     constructor_name: String,
     arity: usize,
+    is_rc: bool,
+    tag: i32,
 }
 
 impl LoweringState {
@@ -470,6 +483,12 @@ impl LoweringState {
     }
 }
 
+fn allocate_heap_slot(program: &mut LoweredProgram) -> usize {
+    let slot = program.heap_slots;
+    program.heap_slots += 1;
+    slot
+}
+
 fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
     let entrypoint_name = package
         .source_files
@@ -505,6 +524,7 @@ fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
         operations: Vec::new(),
         data: Vec::new(),
         arrays: Vec::new(),
+        heap_slots: 0,
         i32_slots: 0,
     };
     let mut state = LoweringState::new();
@@ -572,6 +592,7 @@ fn lower_statement(
                 operations: Vec::new(),
                 data: std::mem::take(&mut program.data),
                 arrays: std::mem::take(&mut program.arrays),
+                heap_slots: program.heap_slots,
                 i32_slots: program.i32_slots,
             };
             for statement in &if_stmt.then_block.statements {
@@ -598,6 +619,7 @@ fn lower_statement(
                     operations: Vec::new(),
                     data: then_program.data,
                     arrays: then_program.arrays,
+                    heap_slots: then_program.heap_slots,
                     i32_slots: then_program.i32_slots,
                 };
                 for statement in &else_block.statements {
@@ -610,11 +632,13 @@ fn lower_statement(
                 else_operations.append(&mut else_program.operations);
                 program.data = else_program.data;
                 program.arrays = else_program.arrays;
+                program.heap_slots = program.heap_slots.max(else_program.heap_slots);
                 next_array_slot = next_array_slot.max(else_state.next_array_slot);
                 next_i32_slot = next_i32_slot.max(else_state.next_i32_slot);
             } else {
                 program.data = then_program.data;
                 program.arrays = then_program.arrays;
+                program.heap_slots = program.heap_slots.max(then_program.heap_slots);
             }
             state.next_array_slot = next_array_slot;
             state.next_i32_slot = next_i32_slot;
@@ -638,6 +662,7 @@ fn lower_statement(
                 operations: Vec::new(),
                 data: std::mem::take(&mut program.data),
                 arrays: std::mem::take(&mut program.arrays),
+                heap_slots: program.heap_slots,
                 i32_slots: program.i32_slots,
             };
             for statement in &loop_stmt.body.statements {
@@ -648,6 +673,7 @@ fn lower_statement(
             }
             program.data = loop_program.data;
             program.arrays = loop_program.arrays;
+            program.heap_slots = program.heap_slots.max(loop_program.heap_slots);
             state.next_array_slot = state.next_array_slot.max(loop_state.next_array_slot);
             state.next_i32_slot = state.next_i32_slot.max(loop_state.next_i32_slot);
             program.operations.push(Operation::Loop {
@@ -726,7 +752,15 @@ fn lower_pure_value(
             let data_index = intern_data(program, nul_terminated_bytes(literal));
             Ok(Value::ByteString(data_index))
         }
-        Term::IntegerLiteral(_) | Term::Application { .. } => {
+        Term::MethodCall { receiver, method } if method == "as_bytes" => {
+            match resolve_value(receiver.as_ref(), &state.environment)? {
+                Value::ByteString(data_index) => Ok(Value::ByteString(data_index)),
+                other => Err(Error::Unsupported(format!(
+                    "`as_bytes` expects a string reference, got {other:?}"
+                ))),
+            }
+        }
+        Term::IntegerLiteral(_) | Term::Application { .. } | Term::MethodCall { .. } => {
             if let Term::Application { callee, arguments } = term {
                 if let Some(value) =
                     lower_constructor_application(callee.as_ref(), arguments, state, program)?
@@ -746,14 +780,6 @@ fn lower_pure_value(
             Err(Error::Unsupported(format!(
                 "unsupported pure expression in entrypoint body: {term:?}"
             )))
-        }
-        Term::MethodCall { receiver, method } if method == "as_bytes" => {
-            match resolve_value(receiver.as_ref(), &state.environment)? {
-                Value::ByteString(data_index) => Ok(Value::ByteString(data_index)),
-                other => Err(Error::Unsupported(format!(
-                    "`as_bytes` expects a string reference, got {other:?}"
-                ))),
-            }
         }
         Term::Path(path) => lower_path_value(path, state),
         _ => Err(Error::Unsupported(format!(
@@ -804,6 +830,8 @@ fn collect_constructors(package: &ParsedPackage) -> Result<HashMap<String, Const
                 type_name: type_decl.name.name.clone(),
                 constructor_name: constructor.name.name.clone(),
                 arity,
+                is_rc: type_decl.modifier.as_deref() == Some("rc"),
+                tag: constructors.len() as i32,
             };
             if constructors.insert(key.clone(), value).is_some() {
                 return Err(Error::Unsupported(format!(
@@ -882,6 +910,7 @@ fn lower_path_value(path: &PathExpression, state: &LoweringState) -> Result<Valu
     Ok(Value::Constructor(ConstructorValue {
         type_name: signature.type_name,
         constructor_name: signature.constructor_name,
+        heap_slot: None,
         fields: Vec::new(),
     }))
 }
@@ -949,10 +978,22 @@ fn pattern_match_bindings(
     value: &Value,
     constructors: &HashMap<String, ConstructorSignature>,
 ) -> Result<Option<HashMap<String, Value>>> {
+    pattern_match_bindings_with_mode(pattern, value, constructors, false)
+}
+
+fn pattern_match_bindings_with_mode(
+    pattern: &Pattern,
+    value: &Value,
+    constructors: &HashMap<String, ConstructorSignature>,
+    bind_as_reference: bool,
+) -> Result<Option<HashMap<String, Value>>> {
     match pattern {
         Pattern::Wildcard => Ok(Some(HashMap::new())),
         Pattern::Bind(name) => {
             let mut bindings = HashMap::new();
+            if bind_as_reference {
+                // TODO: If `type(rc)` later grows borrowed-match semantics, thread them here.
+            }
             bindings.insert(name.clone(), value.clone());
             Ok(Some(bindings))
         }
@@ -970,9 +1011,17 @@ fn pattern_match_bindings(
             }
 
             let mut bindings = HashMap::new();
-            for (subpattern, field) in subpatterns.iter().zip(actual.fields.iter()) {
-                let Some(sub_bindings) =
-                    pattern_match_bindings(subpattern, field, constructors)?
+            for (index, (subpattern, field)) in
+                subpatterns.iter().zip(actual.fields.iter()).enumerate()
+            {
+                let _ = (index, actual.heap_slot);
+                let field_value = field.clone();
+                let Some(sub_bindings) = pattern_match_bindings_with_mode(
+                    subpattern,
+                    &field_value,
+                    constructors,
+                    expected.is_rc,
+                )?
                 else {
                     return Ok(None);
                 };
@@ -1011,9 +1060,49 @@ fn lower_constructor_application(
         fields.push(lower_pure_value(argument, state, program)?);
     }
 
+    if signature.is_rc {
+        let heap_slot = allocate_heap_slot(program);
+        let object_len = 8 + normalized_arguments.len() as i32 * 4;
+        program.operations.push(Operation::Mmap {
+            len: I32Expr::Literal(object_len),
+            result_slot: heap_slot,
+        });
+        program.operations.push(Operation::HeapStoreI32 {
+            heap_slot,
+            byte_offset: 0,
+            value: I32Expr::Literal(signature.tag),
+        });
+        // TODO: Replace this reserved header word with an actual reference count.
+        program.operations.push(Operation::HeapStoreI32 {
+            heap_slot,
+            byte_offset: 4,
+            value: I32Expr::Literal(0),
+        });
+        for (index, field) in fields.iter().enumerate() {
+            let Value::I32(value) = field else {
+                return Err(Error::Unsupported(
+                    "`type(rc)` currently supports only `i32` payload fields".to_string(),
+                ));
+            };
+            program.operations.push(Operation::HeapStoreI32 {
+                heap_slot,
+                byte_offset: 8 + index as i32 * 4,
+                value: value.clone(),
+            });
+        }
+
+        return Ok(Some(Value::Constructor(ConstructorValue {
+            type_name: signature.type_name,
+            constructor_name: signature.constructor_name,
+            heap_slot: Some(heap_slot),
+            fields,
+        })));
+    }
+
     Ok(Some(Value::Constructor(ConstructorValue {
         type_name: signature.type_name,
         constructor_name: signature.constructor_name,
+        heap_slot: None,
         fields,
     })))
 }
@@ -1724,6 +1813,33 @@ fn emit_operations(
                 code.extend_from_slice(&[0x89, 0x85]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
             }
+            Operation::Mmap { len, result_slot } => {
+                code.extend_from_slice(&[0x31, 0xff]);
+                emit_i32_expr_to_eax(len, code, program);
+                code.extend_from_slice(&[0x89, 0xc6]);
+                code.extend_from_slice(&[0xba, 0x03, 0x00, 0x00, 0x00]);
+                code.extend_from_slice(&[0x41, 0xba, 0x22, 0x00, 0x00, 0x00]);
+                code.extend_from_slice(&[0x41, 0xb8, 0xff, 0xff, 0xff, 0xff]);
+                code.extend_from_slice(&[0x45, 0x31, 0xc9]);
+                code.extend_from_slice(&[0xb8, 0x09, 0x00, 0x00, 0x00]);
+                code.extend_from_slice(&[0x0f, 0x05]);
+                let slot_offset = heap_slot_offset(*result_slot);
+                code.extend_from_slice(&[0x48, 0x89, 0x85]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+            }
+            Operation::HeapStoreI32 {
+                heap_slot,
+                byte_offset,
+                value,
+            } => {
+                emit_i32_expr_to_eax(value, code, program);
+                code.extend_from_slice(&[0x89, 0xc2]);
+                let slot_offset = heap_slot_offset(*heap_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+                code.extend_from_slice(&[0x89, 0x93]);
+                code.extend_from_slice(&byte_offset.to_le_bytes());
+            }
             Operation::Open {
                 path_data_index,
                 flags,
@@ -1756,7 +1872,7 @@ fn emit_operations(
             } => {
                 emit_i32_expr_to_eax(fd, code, program);
                 code.extend_from_slice(&[0x89, 0xc7]);
-                let slot_offset = array_slot_offset(*array_slot);
+                let slot_offset = array_slot_offset(program, *array_slot);
                 code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
                 emit_i32_expr_to_eax(len, code, program);
@@ -1798,7 +1914,7 @@ fn emit_operations(
                 debug_assert_eq!(array.element_type, ArrayElementType::U8);
                 emit_i32_expr_to_eax(fd, code, program);
                 code.extend_from_slice(&[0x89, 0xc7]);
-                let slot_offset = array_slot_offset(*array_slot);
+                let slot_offset = array_slot_offset(program, *array_slot);
                 code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
                 emit_i32_expr_to_eax(len, code, program);
@@ -2134,18 +2250,22 @@ fn emit_u8_div_mod_expr(
 }
 
 fn stack_frame_size(program: &LoweredProgram) -> usize {
-    let pointer_bytes = program.arrays.len() * 8;
+    let pointer_bytes = (program.arrays.len() + program.heap_slots) * 8;
     let i32_slot_bytes = program.i32_slots * 4;
     let array_bytes: usize = program.arrays.iter().map(array_storage_size).sum();
     pointer_bytes + i32_slot_bytes + array_bytes
 }
 
-fn array_slot_offset(slot: usize) -> i32 {
+fn heap_slot_offset(slot: usize) -> i32 {
     -8 * (slot as i32 + 1)
 }
 
+fn array_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
+    -8 * (program.heap_slots as i32 + slot as i32 + 1)
+}
+
 fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
-    let pointer_bytes = (program.arrays.len() * 8) as i32;
+    let pointer_bytes = ((program.arrays.len() + program.heap_slots) * 8) as i32;
     let i32_slot_bytes = (program.i32_slots * 4) as i32;
     let mut offset = pointer_bytes + i32_slot_bytes;
     for array in &program.arrays {
@@ -2158,13 +2278,13 @@ fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
 }
 
 fn i32_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
-    let pointer_bytes = (program.arrays.len() * 8) as i32;
+    let pointer_bytes = ((program.arrays.len() + program.heap_slots) * 8) as i32;
     -(pointer_bytes + 4 * (slot as i32 + 1))
 }
 
 fn emit_array_initializers(program: &LoweredProgram, code: &mut Vec<u8>) {
     for array in &program.arrays {
-        let slot_offset = array_slot_offset(array.slot);
+        let slot_offset = array_slot_offset(program, array.slot);
         let data_offset = array_data_offset(program, array.slot);
         // lea rax, [rbp + disp32]
         code.extend_from_slice(&[0x48, 0x8d, 0x85]);
@@ -2210,7 +2330,7 @@ fn emit_i32_array_set(
     code.extend_from_slice(&[0x89, 0xc2]);
     // pop rcx
     code.push(0x59);
-    let slot_offset = array_slot_offset(array_slot);
+    let slot_offset = array_slot_offset(program, array_slot);
     // mov rbx, [rbp + disp32]
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());
@@ -2231,7 +2351,7 @@ fn emit_u8_array_set(
     emit_u8_expr_to_eax(value, code, program);
     code.extend_from_slice(&[0x89, 0xc2]);
     code.push(0x59);
-    let slot_offset = array_slot_offset(array_slot);
+    let slot_offset = array_slot_offset(program, array_slot);
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());
     code.extend_from_slice(&[0x88, 0x14, 0x0b]);
@@ -2248,7 +2368,7 @@ fn emit_array_get(
     code.extend_from_slice(&[0x48, 0x63, 0xc8]);
     // shl rcx, 2
     code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x02]);
-    let slot_offset = array_slot_offset(array_slot);
+    let slot_offset = array_slot_offset(program, array_slot);
     // mov rbx, [rbp + disp32]
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());
@@ -2264,7 +2384,7 @@ fn emit_u8_array_get(
 ) {
     emit_i32_expr_to_eax(index, code, program);
     code.extend_from_slice(&[0x48, 0x63, 0xc8]);
-    let slot_offset = array_slot_offset(array_slot);
+    let slot_offset = array_slot_offset(program, array_slot);
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());
     code.extend_from_slice(&[0x0f, 0xb6, 0x04, 0x0b]);
@@ -2632,6 +2752,88 @@ mod tests {
     }
 
     #[test]
+    fn lowers_type_rc_match_single_fixture_to_runtime_exit() {
+        let root = repo_root().join("tests/testcases/type-rc-match");
+        let package = selected_fixture_package(&root, "type-rc-match-single");
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.operations,
+            vec![
+                Operation::Mmap {
+                    len: I32Expr::Literal(12),
+                    result_slot: 0,
+                },
+                Operation::HeapStoreI32 {
+                    heap_slot: 0,
+                    byte_offset: 0,
+                    value: I32Expr::Literal(0),
+                },
+                Operation::HeapStoreI32 {
+                    heap_slot: 0,
+                    byte_offset: 4,
+                    value: I32Expr::Literal(0),
+                },
+                Operation::HeapStoreI32 {
+                    heap_slot: 0,
+                    byte_offset: 8,
+                    value: I32Expr::Literal(42),
+                },
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42))),
+            ]
+        );
+        assert!(program.arrays.is_empty());
+        assert!(program.data.is_empty());
+        assert_eq!(program.i32_slots, 0);
+        assert_eq!(program.heap_slots, 1);
+    }
+
+    #[test]
+    fn lowers_type_rc_match_pair_fixture_to_runtime_exit() {
+        let root = repo_root().join("tests/testcases/type-rc-match");
+        let package = selected_fixture_package(&root, "type-rc-match-pair");
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.operations,
+            vec![
+                Operation::Mmap {
+                    len: I32Expr::Literal(16),
+                    result_slot: 0,
+                },
+                Operation::HeapStoreI32 {
+                    heap_slot: 0,
+                    byte_offset: 0,
+                    value: I32Expr::Literal(1),
+                },
+                Operation::HeapStoreI32 {
+                    heap_slot: 0,
+                    byte_offset: 4,
+                    value: I32Expr::Literal(0),
+                },
+                Operation::HeapStoreI32 {
+                    heap_slot: 0,
+                    byte_offset: 8,
+                    value: I32Expr::Literal(20),
+                },
+                Operation::HeapStoreI32 {
+                    heap_slot: 0,
+                    byte_offset: 12,
+                    value: I32Expr::Literal(22),
+                },
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
+                    Box::new(I32Expr::Literal(20)),
+                    Box::new(I32Expr::Literal(22)),
+                ))),
+            ]
+        );
+        assert!(program.arrays.is_empty());
+        assert!(program.data.is_empty());
+        assert_eq!(program.i32_slots, 0);
+        assert_eq!(program.heap_slots, 1);
+    }
+
+    #[test]
     fn lowers_if_else_true_fixture_to_program() {
         let root = repo_root().join("tests/testcases/if");
         let source_path = root.join("src/if-else-true.fe");
@@ -2947,6 +3149,7 @@ mod tests {
             operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))],
             data: Vec::new(),
             arrays: Vec::new(),
+            heap_slots: 0,
             i32_slots: 0,
         };
         let elf = build_linux_x86_64_program_executable(&program)
@@ -2972,6 +3175,7 @@ mod tests {
             ],
             data: vec![b"Hello, world!\n\0".to_vec()],
             arrays: Vec::new(),
+            heap_slots: 0,
             i32_slots: 0,
         };
         let elf = build_linux_x86_64_program_executable(&program)
@@ -3015,6 +3219,7 @@ mod tests {
             )))],
             data: Vec::new(),
             arrays: Vec::new(),
+            heap_slots: 0,
             i32_slots: 0,
         };
         let elf = build_linux_x86_64_program_executable(&program)

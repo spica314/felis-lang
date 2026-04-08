@@ -1,0 +1,23 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#type(rc) Value : Type[0] {
+    single : i32 -> Value,
+    pair : i32 -> i32 -> Value,
+}
+
+#fn value_code : (value : Value) -> i32 {
+    #match value {
+        Value::single x => x,
+        Value::pair x y => i32_add x y,
+    }
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let code = value_code (Value::single 42i32);
+    #let _ <- IO::exit code;
+    ()
+}

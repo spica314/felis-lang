@@ -240,6 +240,82 @@ fn parses_enum_match_payload_package_root() {
 }
 
 #[test]
+fn parses_type_rc_match_package_root() {
+    let root = repo_root().join("tests/testcases/type-rc-match");
+    let parsed = parse_root(&root).expect("type-rc-match package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "type-rc-match");
+    assert_eq!(package.source_files.len(), 2);
+    assert_eq!(
+        package.manifest.felis_bin_entrypoints,
+        vec![
+            PathBuf::from("src/type-rc-match-single.fe"),
+            PathBuf::from("src/type-rc-match-pair.fe"),
+        ]
+    );
+
+    for source_file in &package.source_files {
+        assert_eq!(source_file.role, SourceFileRole::BinaryEntrypoint);
+        let syntax = &source_file.syntax;
+        assert_eq!(syntax.items.len(), 7);
+
+        let type_decl = syntax
+            .items
+            .iter()
+            .find_map(|item| match item {
+                Item::Type(type_decl) => Some(type_decl),
+                _ => None,
+            })
+            .expect("type declaration");
+        assert_eq!(type_decl.modifier.as_deref(), Some("rc"));
+        assert_eq!(type_decl.name.name, "Value");
+        assert_eq!(type_decl.constructors.len(), 2);
+
+        let function = syntax
+            .items
+            .iter()
+            .find_map(|item| match item {
+                Item::Function(function) if function.name.name == "value_code" => Some(function),
+                _ => None,
+            })
+            .expect("pure function");
+        let Some(Term::Match(match_expr)) = function.body.tail.as_deref() else {
+            panic!("expected match expression");
+        };
+        assert_eq!(match_expr.arms.len(), 2);
+
+        let Pattern::Constructor { subpatterns, .. } = &match_expr.arms[0].pattern else {
+            panic!("expected constructor pattern");
+        };
+        assert_eq!(subpatterns.len(), 1);
+        assert!(matches!(&subpatterns[0], Pattern::Bind(name) if name == "x"));
+
+        let Pattern::Constructor { subpatterns, .. } = &match_expr.arms[1].pattern else {
+            panic!("expected constructor pattern");
+        };
+        assert_eq!(subpatterns.len(), 2);
+        assert!(matches!(&subpatterns[0], Pattern::Bind(name) if name == "x"));
+        assert!(matches!(&subpatterns[1], Pattern::Bind(name) if name == "y"));
+
+        let Term::Path(path) = match_expr.arms[0].result.as_ref() else {
+            panic!("expected bound value in first arm");
+        };
+        assert_eq!(path.segments.len(), 1);
+        assert_eq!(path.segments[0].name, "x");
+
+        let Term::Application { arguments, .. } = match_expr.arms[1].result.as_ref() else {
+            panic!("expected i32_add application in second arm");
+        };
+        assert_eq!(arguments.len(), 2);
+        assert!(matches!(&arguments[0], Term::Path(path) if path.segments.len() == 1 && path.segments[0].name == "x"));
+        assert!(matches!(&arguments[1], Term::Path(path) if path.segments.len() == 1 && path.segments[0].name == "y"));
+    }
+}
+
+#[test]
 fn parses_stdin_to_stdout_package_root() {
     let root = repo_root().join("tests/testcases/stdin-to-stdout");
     let parsed = parse_root(&root).expect("stdin-to-stdout package parses");
