@@ -306,21 +306,22 @@ fn lower_let_equals_statement(
         reference,
         ..
     } = binder
-        && let Value::I32(expr) = value {
-            let slot = state.allocate_i32_slot();
-            program
-                .operations
-                .push(Operation::StoreI32 { slot, value: expr });
-            bind_pattern(
-                inner.as_ref(),
-                Value::I32(I32Expr::Local(slot)),
-                &mut state.environment,
-            );
-            state
-                .environment
-                .insert(reference.clone(), Value::I32Reference(slot));
-            return Ok(());
-        }
+        && let Value::I32(expr) = value
+    {
+        let slot = state.allocate_i32_slot();
+        program
+            .operations
+            .push(Operation::StoreI32 { slot, value: expr });
+        bind_pattern(
+            inner.as_ref(),
+            Value::I32(I32Expr::Local(slot)),
+            &mut state.environment,
+        );
+        state
+            .environment
+            .insert(reference.clone(), Value::I32Reference(slot));
+        return Ok(());
+    }
 
     bind_pattern(binder, value, &mut state.environment);
     Ok(())
@@ -351,9 +352,9 @@ fn lower_pure_value(
             if let Term::Application { callee, arguments } = term
                 && let Some(value) =
                     lower_constructor_application(callee.as_ref(), arguments, state, program)?
-                {
-                    return Ok(value);
-                }
+            {
+                return Ok(value);
+            }
             if let Some(value) = lower_pure_function_call(term, state, program)? {
                 return Ok(value);
             }
