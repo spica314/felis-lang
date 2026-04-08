@@ -1031,6 +1031,16 @@ fn lower_i32_primitive_call(
         .map(|segment| segment.name.as_str())
         .collect();
     let normalized = normalize_numeric_literal_arguments(arguments);
+    let primitive = segments.last().copied().unwrap_or_default();
+    if primitive == "i32_from_u8" {
+        let [value] = normalized.as_slice() else {
+            return Err(Error::Unsupported(format!(
+                "`{}` must receive exactly one argument",
+                segments.join("::")
+            )));
+        };
+        return Ok(I32Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
+    }
     let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
             "`{}` must receive exactly two arguments",
@@ -1039,8 +1049,6 @@ fn lower_i32_primitive_call(
     };
     let lhs = Box::new(lower_i32_expr(lhs, state)?);
     let rhs = Box::new(lower_i32_expr(rhs, state)?);
-
-    let primitive = segments.last().copied().unwrap_or_default();
 
     match primitive {
         "i32_add" => Ok(I32Expr::Add(lhs, rhs)),

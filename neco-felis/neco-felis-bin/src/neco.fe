@@ -1,13 +1,85 @@
 #use std_core::io::IO;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::i32::i32_from_u8;
+#use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_mul;
+#use std_core::primitive::i32::i32_sub;
 #use std_core::primitive::u8::u8;
+#use std_core::primitive::u8::u8_add;
+#use std_core::primitive::u8::u8_eq;
+#use std_core::primitive::u8::u8_gt;
+#use std_core::primitive::u8::u8_lt;
+#use std_core::primitive::u8::u8_mul;
+#use std_core::primitive::u8::u8_sub;
 
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let _ @ path_ref = "a.out";
-    #let path_bytes_ref = path_ref .> as_bytes;
-    #let fd <- IO::open path_bytes_ref 0x241i32 0x1edi32;
+    #let _ @ input_path_ref = "tests/testcases/exit-42/src/exit-42.fe";
+    #let input_path_bytes_ref = input_path_ref .> as_bytes;
+    #let input_fd <- IO::open input_path_bytes_ref 0i32 0i32;
+    #let _ @^ source_ref <- IO::array_new u8 0x100i32;
+    #let source_len <- IO::read input_fd source_ref 0x100i32;
+    #let _ <- IO::close input_fd;
+    #let _ @^ index_ref = 0i32;
+    #let _ @^ parsing_ref = 0i32;
+    #let _ @^ parsed_exit_code_ref = 0i32;
+    #let _ @^ exit_code_byte_ref <- IO::array_new u8 0x01i32;
+    exit_code_byte_ref .> set 0x00i32 0x00u8;
+    #loop {
+        #if i32_gte (index_ref .> get) source_len {
+            #break;
+        };
+        #let byte = source_ref .> get (index_ref .> get);
+        #if u8_lt byte 0x3au8 {
+            #if u8_gt byte 0x2fu8 {
+                #let digit_i32 = i32_sub (i32_from_u8 byte) 0x30i32;
+                #let next_exit_code = i32_add (i32_mul (parsed_exit_code_ref .> get) 10i32) digit_i32;
+                parsed_exit_code_ref .> set next_exit_code;
+                #let digit_u8 = u8_sub byte 0x30u8;
+                #let current_exit_code_byte = exit_code_byte_ref .> get 0x00i32;
+                #let next_exit_code_byte = u8_add (u8_mul current_exit_code_byte 0x0au8) digit_u8;
+                exit_code_byte_ref .> set 0x00i32 next_exit_code_byte;
+                parsing_ref .> set 1i32;
+            } #else {
+                #if i32_eq (parsing_ref .> get) 1i32 {
+                    #if u8_eq byte 0x69u8 {
+                        #break;
+                    } #else {
+                        parsed_exit_code_ref .> set 0i32;
+                        exit_code_byte_ref .> set 0x00i32 0x00u8;
+                        parsing_ref .> set 0i32;
+                    };
+                };
+            };
+        } #else {
+            #if i32_eq (parsing_ref .> get) 1i32 {
+                #if u8_eq byte 0x69u8 {
+                    #break;
+                } #else {
+                    parsed_exit_code_ref .> set 0i32;
+                    exit_code_byte_ref .> set 0x00i32 0x00u8;
+                    parsing_ref .> set 0i32;
+                };
+            };
+        };
+        #let next_index = i32_add (index_ref .> get) 1i32;
+        index_ref .> set next_index;
+    };
+    #let _ @ output_path_ref = "a.out";
+    #let output_path_bytes_ref = output_path_ref .> as_bytes;
+    #let fd <- IO::open output_path_bytes_ref 0x241i32 0x1edi32;
     #let _ @^ elf_ref <- IO::array_new u8 0x100ei32;
+    #let _ @^ elf_index_ref = 0i32;
+    #loop {
+        #if i32_gte (elf_index_ref .> get) 0x100ei32 {
+            #break;
+        };
+        elf_ref .> set (elf_index_ref .> get) 0x00u8;
+        #let next_elf_index = i32_add (elf_index_ref .> get) 1i32;
+        elf_index_ref .> set next_elf_index;
+    };
     elf_ref .> set 0x0i32 0x7fu8;
     elf_ref .> set 0x1i32 0x45u8;
     elf_ref .> set 0x2i32 0x4cu8;
@@ -34,6 +106,7 @@
     elf_ref .> set 0x60i32 0x0eu8;
     elf_ref .> set 0x68i32 0x0eu8;
     elf_ref .> set 0x1000i32 0xb8u8;
+    elf_ref .> set 0x1001i32 (exit_code_byte_ref .> get 0x00i32);
     elf_ref .> set 0x1005i32 0x89u8;
     elf_ref .> set 0x1006i32 0xc7u8;
     elf_ref .> set 0x1007i32 0xb8u8;

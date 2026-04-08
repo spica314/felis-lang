@@ -448,13 +448,13 @@ fn parses_neco_felis_workspace_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 4);
-    let Item::Function(main_fn) = &syntax.items[3] else {
+    assert_eq!(syntax.items.len(), 16);
+    let Item::Function(main_fn) = &syntax.items[15] else {
         panic!("expected function");
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 38);
+    assert_eq!(main_fn.body.statements.len(), 53);
 }
 
 #[test]

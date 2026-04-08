@@ -11,6 +11,7 @@ pub(crate) struct LoweredProgram {
 pub(crate) enum I32Expr {
     Literal(i32),
     Local(usize),
+    FromU8(Box<U8Expr>),
     Add(Box<I32Expr>, Box<I32Expr>),
     Sub(Box<I32Expr>, Box<I32Expr>),
     Mul(Box<I32Expr>, Box<I32Expr>),

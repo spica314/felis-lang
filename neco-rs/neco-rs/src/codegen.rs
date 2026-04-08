@@ -375,6 +375,7 @@ fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>, program: &LoweredPro
             code.extend_from_slice(&[0x8b, 0x85]);
             code.extend_from_slice(&slot_offset.to_le_bytes());
         }
+        I32Expr::FromU8(value) => emit_u8_expr_to_eax(value, code, program),
         I32Expr::Add(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0x01, 0xc8]),
         I32Expr::Sub(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0x29, 0xc8]),
         I32Expr::Mul(lhs, rhs) => {
