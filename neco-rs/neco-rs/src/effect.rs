@@ -9,7 +9,7 @@ use crate::{ArrayElementType, Error, I32Expr, LoweredProgram, LoweringState, Res
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Value {
     Unit,
-    FileDescriptor(u32),
+    FileDescriptor(I32Expr),
     ByteString(usize),
     I32(I32Expr),
     I32Reference(usize),

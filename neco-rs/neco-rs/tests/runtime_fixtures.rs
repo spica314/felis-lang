@@ -51,6 +51,16 @@ fn run_fixture_output(root: &Path, name: &str) -> Output {
     run
 }
 
+fn run_fixture_output_in_dir(root: &Path, name: &str, current_dir: &Path) -> Output {
+    let output = compile_fixture(root, name);
+    let run = runtime_test_runner(&output)
+        .current_dir(current_dir)
+        .output()
+        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+    fs::remove_file(&output).expect("cleanup binary");
+    run
+}
+
 fn run_fixture_with_input(root: &Path, name: &str, stdin: &[u8]) -> Output {
     let output = compile_fixture(root, name);
     let mut child = runtime_test_runner(&output)
@@ -106,6 +116,15 @@ fn compiles_and_runs_stdin_to_stdout_fixture() {
     let run = run_fixture_with_input(&root, "stdin-to-stdout", b"echo through stdin\n");
     assert_eq!(run.status.code(), Some(0));
     assert_eq!(run.stdout, b"echo through stdin\n");
+    assert!(run.stderr.is_empty());
+}
+
+#[test]
+fn compiles_and_runs_open_read_close_fixture() {
+    let root = repo_root().join("tests/testcases/open-read-close");
+    let run = run_fixture_output_in_dir(&root, "open-read-close", &root);
+    assert_eq!(run.status.code(), Some(0));
+    assert_eq!(run.stdout, b"open/read/close fixture\n");
     assert!(run.stderr.is_empty());
 }
 

@@ -15,11 +15,19 @@ pub(crate) fn lower_io_reference(
 ) -> Option<Result<bool>> {
     match path {
         ["IO", "stdin"] => {
-            bind_pattern(binder, Value::FileDescriptor(0), environment);
+            bind_pattern(
+                binder,
+                Value::FileDescriptor(crate::I32Expr::Literal(0)),
+                environment,
+            );
             Some(Ok(false))
         }
         ["IO", "stdout"] => {
-            bind_pattern(binder, Value::FileDescriptor(1), environment);
+            bind_pattern(
+                binder,
+                Value::FileDescriptor(crate::I32Expr::Literal(1)),
+                environment,
+            );
             Some(Ok(false))
         }
         _ => None,
@@ -50,6 +58,34 @@ pub(crate) fn lower_io_call(
                 Value::I32(crate::I32Expr::Local(result_slot)),
                 &mut state.environment,
             );
+            Some(Ok(false))
+        }
+        ["IO", "open"] => {
+            let (path_data_index, flags, mode, result_slot) =
+                match parse_open_arguments(arguments, state) {
+                    Ok(value) => value,
+                    Err(err) => return Some(Err(err)),
+                };
+            program.operations.push(Operation::Open {
+                path_data_index,
+                flags,
+                mode,
+                result_slot,
+            });
+            bind_pattern(
+                binder,
+                Value::FileDescriptor(crate::I32Expr::Local(result_slot)),
+                &mut state.environment,
+            );
+            Some(Ok(false))
+        }
+        ["IO", "close"] => {
+            let fd = match parse_close_arguments(arguments, state) {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            program.operations.push(Operation::Close { fd });
+            bind_pattern(binder, Value::Unit, &mut state.environment);
             Some(Ok(false))
         }
         ["IO", "write"] => {
@@ -135,7 +171,7 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
 fn parse_read_arguments(
     arguments: &[Term],
     state: &mut LoweringState,
-) -> Result<(u32, usize, crate::I32Expr, usize)> {
+) -> Result<(crate::I32Expr, usize, crate::I32Expr, usize)> {
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [fd_term, bytes_term, len_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
@@ -170,6 +206,53 @@ fn parse_read_arguments(
     })?;
     let result_slot = state.allocate_i32_slot();
     Ok((fd, array_slot, len, result_slot))
+}
+
+fn parse_open_arguments(
+    arguments: &[Term],
+    state: &mut LoweringState,
+) -> Result<(usize, crate::I32Expr, crate::I32Expr, usize)> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [path_term, flags_term, mode_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::open` must receive a byte string path, flags, and mode".to_string(),
+        ));
+    };
+
+    let path_data_index = match resolve_value(path_term, &state.environment)? {
+        Value::ByteString(data_index) => data_index,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`IO::open` expects a byte string path as its first argument, got {other:?}"
+            )));
+        }
+    };
+
+    let flags = lower_i32_expr(flags_term, state).map_err(|_| {
+        Error::Unsupported("`IO::open` expects `i32` flags as its second argument".to_string())
+    })?;
+    let mode = lower_i32_expr(mode_term, state).map_err(|_| {
+        Error::Unsupported("`IO::open` expects an `i32` mode as its third argument".to_string())
+    })?;
+
+    let result_slot = state.allocate_i32_slot();
+    Ok((path_data_index, flags, mode, result_slot))
+}
+
+fn parse_close_arguments(arguments: &[Term], state: &LoweringState) -> Result<crate::I32Expr> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [fd_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::close` must receive a file descriptor".to_string(),
+        ));
+    };
+
+    match resolve_value(fd_term, &state.environment)? {
+        Value::FileDescriptor(fd) => Ok(fd),
+        other => Err(Error::Unsupported(format!(
+            "`IO::close` expects a file descriptor, got {other:?}"
+        ))),
+    }
 }
 
 fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {

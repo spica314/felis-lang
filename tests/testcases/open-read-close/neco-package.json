@@ -1,0 +1,4 @@
+{
+    "name": "open-read-close",
+    "felis-bin-entrypoints": ["src/open-read-close.fe"]
+}

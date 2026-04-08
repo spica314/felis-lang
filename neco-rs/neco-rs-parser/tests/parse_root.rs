@@ -132,6 +132,31 @@ fn parses_stdin_to_stdout_package_root() {
 }
 
 #[test]
+fn parses_open_read_close_package_root() {
+    let root = repo_root().join("tests/testcases/open-read-close");
+    let parsed = parse_root(&root).expect("open-read-close package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "open-read-close");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 4);
+    let Item::Function(main_fn) = &syntax.items[3] else {
+        panic!("expected function");
+    };
+    assert_eq!(main_fn.visibility, Visibility::Private);
+    assert!(main_fn.effect.is_some());
+    assert_eq!(main_fn.body.statements.len(), 8);
+}
+
+#[test]
 fn parses_fn_call_package_root() {
     let root = repo_root().join("tests/testcases/fn-call");
     let parsed = parse_root(&root).expect("fn-call package parses");
