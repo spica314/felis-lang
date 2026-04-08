@@ -253,13 +253,17 @@ fn parses_open_write_close_package_root() {
 }
 
 #[test]
-fn parses_neco_felis_package_root() {
+fn parses_neco_felis_workspace_root() {
     let root = repo_root().join("neco-felis");
-    let parsed = parse_root(&root).expect("neco-felis package parses");
-    let ParsedRoot::Package(package) = parsed else {
-        panic!("expected package root");
+    let parsed = parse_root(&root).expect("neco-felis workspace parses");
+    let ParsedRoot::Workspace(workspace) = parsed else {
+        panic!("expected workspace root");
     };
 
+    assert_eq!(workspace.manifest.members.len(), 1);
+    assert_eq!(workspace.packages.len(), 1);
+
+    let package = &workspace.packages[0];
     assert_eq!(package.manifest.name, "neco-felis");
     assert_eq!(package.source_files.len(), 1);
     assert_eq!(

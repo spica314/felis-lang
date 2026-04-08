@@ -1,4 +1,7 @@
 {
-    "name": "neco-felis",
-    "felis-bin-entrypoints": ["src/neco.fe"]
+    "workspace": {
+        "members": [
+            "neco-felis-bin"
+        ]
+    }
 }

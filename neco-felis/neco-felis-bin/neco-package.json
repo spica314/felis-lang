@@ -1,0 +1,4 @@
+{
+    "name": "neco-felis",
+    "felis-bin-entrypoints": ["src/neco.fe"]
+}
