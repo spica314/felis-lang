@@ -1,0 +1,14 @@
+#use std_core::io::IO;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let _ @ path_ref = "created.txt";
+    #let path_bytes_ref = path_ref .> as_bytes;
+    #let fd <- IO::open path_bytes_ref 577i32 420i32;
+    #let _ @ message_ref = "open/write/close fixture\n";
+    #let message_bytes_ref = message_ref .> as_bytes;
+    #let _ <- IO::write fd message_bytes_ref 25i32;
+    #let _ <- IO::close fd;
+    ()
+}

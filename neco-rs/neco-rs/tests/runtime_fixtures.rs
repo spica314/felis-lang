@@ -25,6 +25,16 @@ fn compile_fixture(root: &Path, name: &str) -> PathBuf {
     output
 }
 
+fn runtime_temp_dir(name: &str) -> PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time")
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("neco-rs-runtime-{name}-{unique}"));
+    fs::create_dir_all(&dir).expect("create runtime temp dir");
+    dir
+}
+
 fn runtime_test_runner(binary: &Path) -> Command {
     let qemu =
         std::env::var_os("NECO_RS_TEST_QEMU").unwrap_or_else(|| OsString::from("qemu-x86_64"));
@@ -126,6 +136,20 @@ fn compiles_and_runs_open_read_close_fixture() {
     assert_eq!(run.status.code(), Some(0));
     assert_eq!(run.stdout, b"open/read/close fixture\n");
     assert!(run.stderr.is_empty());
+}
+
+#[test]
+fn compiles_and_runs_open_write_close_fixture() {
+    let root = repo_root().join("tests/testcases/open-write-close");
+    let temp_dir = runtime_temp_dir("open-write-close");
+    let run = run_fixture_output_in_dir(&root, "open-write-close", &temp_dir);
+    let written = fs::read(temp_dir.join("created.txt")).expect("read written file");
+    fs::remove_dir_all(&temp_dir).expect("cleanup runtime temp dir");
+
+    assert_eq!(run.status.code(), Some(0));
+    assert!(run.stdout.is_empty());
+    assert!(run.stderr.is_empty());
+    assert_eq!(written, b"open/write/close fixture\n");
 }
 
 #[test]

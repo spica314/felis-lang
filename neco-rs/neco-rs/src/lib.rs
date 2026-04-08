@@ -691,7 +691,7 @@ fn lower_pure_value(
     match term {
         Term::Group(inner) => lower_pure_value(inner, state, program),
         Term::StringLiteral(literal) => {
-            let data_index = intern_data(program, literal.as_bytes().to_vec());
+            let data_index = intern_data(program, nul_terminated_bytes(literal));
             Ok(Value::ByteString(data_index))
         }
         Term::IntegerLiteral(_) | Term::Application { .. } => {
@@ -1353,9 +1353,15 @@ fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {
     normalized
 }
 
-fn intern_data(program: &mut LoweredProgram, bytes: Vec<u8>) -> usize {
+pub(crate) fn intern_data(program: &mut LoweredProgram, bytes: Vec<u8>) -> usize {
     program.data.push(bytes);
     program.data.len() - 1
+}
+
+fn nul_terminated_bytes(value: &str) -> Vec<u8> {
+    let mut bytes = value.as_bytes().to_vec();
+    bytes.push(0);
+    bytes
 }
 
 fn build_linux_x86_64_program_executable(program: &LoweredProgram) -> Elf64Executable {
@@ -2025,7 +2031,7 @@ mod tests {
                 Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0)))
             ]
         );
-        assert_eq!(program.data, vec![b"Hello, world!\n".to_vec()]);
+        assert_eq!(program.data, vec![b"Hello, world!\n\0".to_vec()]);
         assert!(program.arrays.is_empty());
         assert_eq!(program.i32_slots, 0);
     }
@@ -2477,8 +2483,50 @@ mod tests {
                 Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
             ]
         );
-        assert_eq!(program.data, vec![b"message.txt".to_vec()]);
+        assert_eq!(
+            program.data,
+            vec![b"message.txt\0".to_vec()]
+        );
         assert_eq!(program.i32_slots, 2);
+    }
+
+    #[test]
+    fn lowers_open_write_close_fixture_to_runtime_io_operations() {
+        let root = repo_root().join("tests/testcases/open-write-close");
+        let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert!(program.arrays.is_empty());
+        assert_eq!(
+            program.operations,
+            vec![
+                Operation::Open {
+                    path_data_index: 0,
+                    flags: I32Expr::Literal(577),
+                    mode: I32Expr::Literal(420),
+                    result_slot: 0,
+                },
+                Operation::WriteStatic {
+                    fd: I32Expr::Local(0),
+                    data_index: 1,
+                    len: I32Expr::Literal(25),
+                },
+                Operation::Close {
+                    fd: I32Expr::Local(0),
+                },
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
+            ]
+        );
+        assert_eq!(
+            program.data,
+            vec![
+                b"created.txt\0".to_vec(),
+                b"open/write/close fixture\n\0".to_vec(),
+            ]
+        );
+        assert_eq!(program.i32_slots, 1);
     }
 
     #[test]
@@ -2542,7 +2590,7 @@ mod tests {
                 },
                 Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
             ],
-            data: vec![b"Hello, world!\n".to_vec()],
+            data: vec![b"Hello, world!\n\0".to_vec()],
             arrays: Vec::new(),
             i32_slots: 0,
         };

@@ -1,0 +1,4 @@
+{
+    "name": "open-write-close",
+    "felis-bin-entrypoints": ["src/open-write-close.fe"]
+}
