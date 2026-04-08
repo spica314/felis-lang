@@ -18,7 +18,9 @@ impl Parse for Pattern {
             return Ok(Some(Self::Wildcard));
         }
         let path = PathExpression::parse(parser)?.unwrap();
-        if !path.starts_with_package && path.segments.len() == 1 && path.segments[0].suffixes.is_empty()
+        if !path.starts_with_package
+            && path.segments.len() == 1
+            && path.segments[0].suffixes.is_empty()
         {
             return Ok(Some(Self::Bind(path.segments[0].name.clone())));
         }

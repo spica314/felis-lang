@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use neco_rs_parser::{BindingPattern, Term};
 
 use crate::effect::{Value, bind_pattern, resolve_value};
-use crate::{
-    ArrayElementType, Error, ExitCodeExpr, LoweredProgram, LoweringState, Operation, Result,
-    lower_i32_expr, lower_u8_expr,
-};
+use crate::ir::{ArrayElementType, ExitCodeExpr, I32Expr, LoweredProgram, Operation};
+use crate::lowering::{LoweringState, lower_i32_expr, lower_u8_expr};
+use crate::{Error, Result};
 
 pub(crate) fn lower_io_reference(
     binder: &BindingPattern,
@@ -17,7 +16,7 @@ pub(crate) fn lower_io_reference(
         ["IO", "stdin"] => {
             bind_pattern(
                 binder,
-                Value::FileDescriptor(crate::I32Expr::Literal(0)),
+                Value::FileDescriptor(I32Expr::Literal(0)),
                 environment,
             );
             Some(Ok(false))
@@ -25,7 +24,7 @@ pub(crate) fn lower_io_reference(
         ["IO", "stdout"] => {
             bind_pattern(
                 binder,
-                Value::FileDescriptor(crate::I32Expr::Literal(1)),
+                Value::FileDescriptor(I32Expr::Literal(1)),
                 environment,
             );
             Some(Ok(false))
@@ -55,7 +54,7 @@ pub(crate) fn lower_io_call(
             });
             bind_pattern(
                 binder,
-                Value::I32(crate::I32Expr::Local(result_slot)),
+                Value::I32(I32Expr::Local(result_slot)),
                 &mut state.environment,
             );
             Some(Ok(false))
@@ -74,7 +73,7 @@ pub(crate) fn lower_io_call(
             });
             bind_pattern(
                 binder,
-                Value::FileDescriptor(crate::I32Expr::Local(result_slot)),
+                Value::FileDescriptor(I32Expr::Local(result_slot)),
                 &mut state.environment,
             );
             Some(Ok(false))
@@ -171,7 +170,7 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
 fn parse_read_arguments(
     arguments: &[Term],
     state: &mut LoweringState,
-) -> Result<(crate::I32Expr, usize, crate::I32Expr, usize)> {
+) -> Result<(I32Expr, usize, I32Expr, usize)> {
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [fd_term, bytes_term, len_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
@@ -211,7 +210,7 @@ fn parse_read_arguments(
 fn parse_open_arguments(
     arguments: &[Term],
     state: &mut LoweringState,
-) -> Result<(usize, crate::I32Expr, crate::I32Expr, usize)> {
+) -> Result<(usize, I32Expr, I32Expr, usize)> {
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [path_term, flags_term, mode_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
@@ -239,7 +238,7 @@ fn parse_open_arguments(
     Ok((path_data_index, flags, mode, result_slot))
 }
 
-fn parse_close_arguments(arguments: &[Term], state: &LoweringState) -> Result<crate::I32Expr> {
+fn parse_close_arguments(arguments: &[Term], state: &LoweringState) -> Result<I32Expr> {
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [fd_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(

@@ -310,8 +310,12 @@ fn parses_type_rc_match_package_root() {
             panic!("expected i32_add application in second arm");
         };
         assert_eq!(arguments.len(), 2);
-        assert!(matches!(&arguments[0], Term::Path(path) if path.segments.len() == 1 && path.segments[0].name == "x"));
-        assert!(matches!(&arguments[1], Term::Path(path) if path.segments.len() == 1 && path.segments[0].name == "y"));
+        assert!(
+            matches!(&arguments[0], Term::Path(path) if path.segments.len() == 1 && path.segments[0].name == "x")
+        );
+        assert!(
+            matches!(&arguments[1], Term::Path(path) if path.segments.len() == 1 && path.segments[0].name == "y")
+        );
     }
 }
 
