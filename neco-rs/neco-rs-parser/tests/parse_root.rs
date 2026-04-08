@@ -132,6 +132,31 @@ fn parses_hex_literals_package_root() {
 }
 
 #[test]
+fn parses_comments_basic_package_root() {
+    let root = repo_root().join("tests/testcases/comments-basic");
+    let parsed = parse_root(&root).expect("comments-basic package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "comments-basic");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 3);
+    let Item::Function(main_fn) = &syntax.items[2] else {
+        panic!("expected function");
+    };
+    assert_eq!(main_fn.visibility, Visibility::Private);
+    assert!(main_fn.effect.is_some());
+    assert_eq!(main_fn.body.statements.len(), 4);
+}
+
+#[test]
 fn parses_enum_match_basic_package_root() {
     let root = repo_root().join("tests/testcases/enum-match-basic");
     let parsed = parse_root(&root).expect("enum-match-basic package parses");

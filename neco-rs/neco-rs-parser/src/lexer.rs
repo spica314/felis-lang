@@ -80,7 +80,7 @@ impl Lexer {
 
     pub(crate) fn lex(&mut self) -> Result<Vec<Token>> {
         let mut tokens = Vec::new();
-        while self.skip_trivia() {
+        while self.skip_trivia()? {
             if self.is_eof() {
                 break;
             }
@@ -97,7 +97,7 @@ impl Lexer {
         Ok(tokens)
     }
 
-    fn skip_trivia(&mut self) -> bool {
+    fn skip_trivia(&mut self) -> Result<bool> {
         while let Some(ch) = self.peek_char() {
             if ch.is_whitespace() {
                 self.bump_char();
@@ -111,9 +111,26 @@ impl Lexer {
                 }
                 continue;
             }
+            if self.starts_with("/*") {
+                let start = self.offset;
+                self.offset += 2;
+                while !self.starts_with("*/") {
+                    if self.bump_char().is_none() {
+                        break;
+                    }
+                }
+                if self.starts_with("*/") {
+                    self.offset += 2;
+                    continue;
+                }
+                return Err(Error::new("unterminated block comment").with_span(Span {
+                    start,
+                    end: self.source.len(),
+                }));
+            }
             break;
         }
-        true
+        Ok(true)
     }
 
     fn next_token(&mut self) -> Result<Token> {

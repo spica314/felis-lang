@@ -1,0 +1,4 @@
+{
+    "name": "comments-basic",
+    "felis-bin-entrypoints": ["src/comments-basic.fe"]
+}

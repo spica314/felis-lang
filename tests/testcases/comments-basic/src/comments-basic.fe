@@ -1,0 +1,15 @@
+#use std_core::io::IO; // import IO
+
+/* comments can appear between top-level items */
+#entrypoint main;
+
+/* comments can also wrap statement boundaries */
+#fn main : () #with IO {
+    #let stdout <- IO::stdout; // stdout fd
+    #let _ @ hello_ref =
+        /* comments can appear before a literal */
+        "Hello, world!\n";
+    #let hello_bytes_ref = hello_ref /* and between terms */ .> as_bytes;
+    #let _ <- IO::write stdout hello_bytes_ref 14i32; /* trailing block comment */
+    ()
+}

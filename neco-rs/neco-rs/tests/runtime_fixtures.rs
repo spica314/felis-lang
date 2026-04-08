@@ -130,6 +130,15 @@ fn compiles_and_runs_hex_literals_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_comments_basic_fixture() {
+    let root = repo_root().join("tests/testcases/comments-basic");
+    let run = run_fixture_output(&root, "comments-basic");
+    assert_eq!(run.status.code(), Some(0));
+    assert_eq!(run.stdout, b"Hello, world!\n");
+    assert!(run.stderr.is_empty());
+}
+
+#[test]
 fn compiles_and_runs_enum_match_basic_fixture() {
     let root = repo_root().join("tests/testcases/enum-match-basic");
     let status = run_fixture_status(&root, "enum-match-basic");

@@ -65,6 +65,30 @@ fn lowers_hello_world_fixture_to_program() {
 }
 
 #[test]
+fn lowers_comments_basic_fixture_to_program() {
+    let root = repo_root().join("tests/testcases/comments-basic");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::WriteStatic {
+                fd: I32Expr::Literal(1),
+                data_index: 0,
+                len: I32Expr::Literal(14),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0)))
+        ]
+    );
+    assert_eq!(program.data, vec![b"Hello, world!\n\0".to_vec()]);
+    assert!(program.arrays.is_empty());
+    assert_eq!(program.i32_slots, 0);
+}
+
+#[test]
 fn lowers_i32_ops_fixture_to_runtime_expression_tree() {
     let root = repo_root().join("tests/testcases/i32-ops");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
