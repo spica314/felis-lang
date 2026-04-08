@@ -411,7 +411,7 @@ pub(crate) struct LoweringState {
     next_array_slot: usize,
     next_i32_slot: usize,
     functions: HashMap<String, PureFunction>,
-    constructors: HashMap<String, ConstructorValue>,
+    constructors: HashMap<String, ConstructorSignature>,
     loop_depth: usize,
 }
 
@@ -425,6 +425,14 @@ struct PureFunction {
 pub(crate) struct ConstructorValue {
     type_name: String,
     constructor_name: String,
+    fields: Vec<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ConstructorSignature {
+    type_name: String,
+    constructor_name: String,
+    arity: usize,
 }
 
 impl LoweringState {
@@ -501,7 +509,7 @@ fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
     };
     let mut state = LoweringState::new();
     state.functions = collect_pure_functions(package)?;
-    state.constructors = collect_nullary_constructors(package)?;
+    state.constructors = collect_constructors(package)?;
     let mut terminated = false;
 
     for statement in &main_fn.body.statements {
@@ -719,6 +727,13 @@ fn lower_pure_value(
             Ok(Value::ByteString(data_index))
         }
         Term::IntegerLiteral(_) | Term::Application { .. } => {
+            if let Term::Application { callee, arguments } = term {
+                if let Some(value) =
+                    lower_constructor_application(callee.as_ref(), arguments, state, program)?
+                {
+                    return Ok(value);
+                }
+            }
             if let Some(value) = lower_pure_function_call(term, state, program)? {
                 return Ok(value);
             }
@@ -768,9 +783,7 @@ fn collect_pure_functions(package: &ParsedPackage) -> Result<HashMap<String, Pur
     Ok(functions)
 }
 
-fn collect_nullary_constructors(
-    package: &ParsedPackage,
-) -> Result<HashMap<String, ConstructorValue>> {
+fn collect_constructors(package: &ParsedPackage) -> Result<HashMap<String, ConstructorSignature>> {
     let mut constructors = HashMap::new();
     for item in package
         .source_files
@@ -782,18 +795,19 @@ fn collect_nullary_constructors(
         };
 
         for constructor in &type_decl.constructors {
-            if !constructor_is_nullary(constructor, &type_decl.name) {
+            let Some(arity) = constructor_arity(constructor, &type_decl.name) else {
                 continue;
-            }
+            };
 
             let key = constructor_key(&type_decl.name.name, &constructor.name.name);
-            let value = ConstructorValue {
+            let value = ConstructorSignature {
                 type_name: type_decl.name.name.clone(),
                 constructor_name: constructor.name.name.clone(),
+                arity,
             };
             if constructors.insert(key.clone(), value).is_some() {
                 return Err(Error::Unsupported(format!(
-                    "duplicate nullary constructor `{key}` is not supported"
+                    "duplicate constructor `{key}` is not supported"
                 )));
             }
         }
@@ -801,14 +815,26 @@ fn collect_nullary_constructors(
     Ok(constructors)
 }
 
-fn constructor_is_nullary(constructor: &ConstructorDeclaration, type_name: &DeclaredName) -> bool {
-    let Term::Path(path) = &constructor.ty else {
-        return false;
+fn constructor_arity(constructor: &ConstructorDeclaration, type_name: &DeclaredName) -> Option<usize> {
+    let mut arity = 0usize;
+    let mut current = &constructor.ty;
+    while let Term::Arrow(arrow) = current {
+        arity += 1;
+        current = arrow.result.as_ref();
+    }
+
+    let Term::Path(path) = current else {
+        return None;
     };
-    !path.starts_with_package
+    if !path.starts_with_package
         && path.segments.len() == 1
         && path.segments[0].name == type_name.name
         && path.segments[0].suffixes == type_name.suffixes
+    {
+        Some(arity)
+    } else {
+        None
+    }
 }
 
 fn constructor_key(type_name: &str, constructor_name: &str) -> String {
@@ -846,13 +872,24 @@ fn lower_path_value(path: &PathExpression, state: &LoweringState) -> Result<Valu
         )));
     }
 
-    lower_constructor_value(path, &state.constructors)
+    let signature = lower_constructor_value(path, &state.constructors)?;
+    if signature.arity != 0 {
+        return Err(Error::Unsupported(format!(
+            "constructor `{}::{}` requires {} arguments",
+            signature.type_name, signature.constructor_name, signature.arity
+        )));
+    }
+    Ok(Value::Constructor(ConstructorValue {
+        type_name: signature.type_name,
+        constructor_name: signature.constructor_name,
+        fields: Vec::new(),
+    }))
 }
 
 fn lower_constructor_value(
     path: &PathExpression,
-    constructors: &HashMap<String, ConstructorValue>,
-) -> Result<Value> {
+    constructors: &HashMap<String, ConstructorSignature>,
+) -> Result<ConstructorSignature> {
     if path.starts_with_package {
         return Err(Error::Unsupported(
             "package-qualified constructor paths are not supported in entrypoint lowering"
@@ -875,7 +912,6 @@ fn lower_constructor_value(
     constructors
         .get(&key)
         .cloned()
-        .map(Value::Constructor)
         .ok_or_else(|| Error::Unsupported(format!("unknown constructor `{key}`")))
 }
 
@@ -886,8 +922,20 @@ fn lower_match_value(
 ) -> Result<Value> {
     let scrutinee = lower_pure_value(match_expr.scrutinee.as_ref(), state, program)?;
     for arm in &match_expr.arms {
-        if pattern_matches_value(&arm.pattern, &scrutinee, &state.constructors)? {
-            return lower_pure_value(arm.result.as_ref(), state, program);
+        if let Some(bindings) =
+            pattern_match_bindings(&arm.pattern, &scrutinee, &state.constructors)?
+        {
+            let mut scoped_environment = state.environment.clone();
+            scoped_environment.extend(bindings);
+            let scoped_state = LoweringState {
+                environment: scoped_environment,
+                next_array_slot: state.next_array_slot,
+                next_i32_slot: state.next_i32_slot,
+                functions: state.functions.clone(),
+                constructors: state.constructors.clone(),
+                loop_depth: state.loop_depth,
+            };
+            return lower_pure_value(arm.result.as_ref(), &scoped_state, program);
         }
     }
 
@@ -896,29 +944,78 @@ fn lower_match_value(
     ))
 }
 
-fn pattern_matches_value(
+fn pattern_match_bindings(
     pattern: &Pattern,
     value: &Value,
-    constructors: &HashMap<String, ConstructorValue>,
-) -> Result<bool> {
+    constructors: &HashMap<String, ConstructorSignature>,
+) -> Result<Option<HashMap<String, Value>>> {
     match pattern {
-        Pattern::Wildcard => Ok(true),
+        Pattern::Wildcard => Ok(Some(HashMap::new())),
+        Pattern::Bind(name) => {
+            let mut bindings = HashMap::new();
+            bindings.insert(name.clone(), value.clone());
+            Ok(Some(bindings))
+        }
         Pattern::Constructor { path, subpatterns } => {
-            if !subpatterns.is_empty() {
-                return Err(Error::Unsupported(
-                    "constructor subpatterns are not supported in entrypoint lowering".to_string(),
-                ));
+            let expected = lower_constructor_value(path, constructors)?;
+            let Value::Constructor(actual) = value else {
+                return Ok(None);
+            };
+
+            if actual.type_name != expected.type_name
+                || actual.constructor_name != expected.constructor_name
+                || actual.fields.len() != subpatterns.len()
+            {
+                return Ok(None);
             }
 
-            let Value::Constructor(expected) = lower_constructor_value(path, constructors)? else {
-                unreachable!();
-            };
-            let Value::Constructor(actual) = value else {
-                return Ok(false);
-            };
-            Ok(actual == &expected)
+            let mut bindings = HashMap::new();
+            for (subpattern, field) in subpatterns.iter().zip(actual.fields.iter()) {
+                let Some(sub_bindings) =
+                    pattern_match_bindings(subpattern, field, constructors)?
+                else {
+                    return Ok(None);
+                };
+                bindings.extend(sub_bindings);
+            }
+            Ok(Some(bindings))
         }
     }
+}
+
+fn lower_constructor_application(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Option<Value>> {
+    let Term::Path(path) = callee else {
+        return Ok(None);
+    };
+    let signature = match lower_constructor_value(path, &state.constructors) {
+        Ok(signature) => signature,
+        Err(Error::Unsupported(_)) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+
+    let normalized_arguments = normalize_numeric_literal_arguments(arguments);
+    if signature.arity != normalized_arguments.len() {
+        return Err(Error::Unsupported(format!(
+            "constructor `{}::{}` must receive exactly {} arguments",
+            signature.type_name, signature.constructor_name, signature.arity
+        )));
+    }
+
+    let mut fields = Vec::with_capacity(normalized_arguments.len());
+    for argument in &normalized_arguments {
+        fields.push(lower_pure_value(argument, state, program)?);
+    }
+
+    Ok(Some(Value::Constructor(ConstructorValue {
+        type_name: signature.type_name,
+        constructor_name: signature.constructor_name,
+        fields,
+    })))
 }
 
 fn lower_pure_function_call(
@@ -2184,6 +2281,13 @@ mod tests {
             .expect("repo root")
     }
 
+    fn selected_fixture_package(root: &Path, binary_name: &str) -> ParsedPackage {
+        let ParsedRoot::Package(package) = parse_root(root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+        select_binary_from_package(package, &PathBuf::from(binary_name)).expect("select binary")
+    }
+
     #[test]
     fn lowers_exit_fixture_to_program() {
         let root = repo_root().join("tests/testcases/exit-42");
@@ -2488,6 +2592,39 @@ mod tests {
         assert_eq!(
             program.operations,
             vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))]
+        );
+        assert!(program.arrays.is_empty());
+        assert!(program.data.is_empty());
+        assert_eq!(program.i32_slots, 0);
+    }
+
+    #[test]
+    fn lowers_enum_match_payload_single_fixture_to_runtime_exit() {
+        let root = repo_root().join("tests/testcases/enum-match-payload");
+        let package = selected_fixture_package(&root, "enum-match-payload-single");
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.operations,
+            vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))]
+        );
+        assert!(program.arrays.is_empty());
+        assert!(program.data.is_empty());
+        assert_eq!(program.i32_slots, 0);
+    }
+
+    #[test]
+    fn lowers_enum_match_payload_pair_fixture_to_runtime_exit() {
+        let root = repo_root().join("tests/testcases/enum-match-payload");
+        let package = selected_fixture_package(&root, "enum-match-payload-pair");
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.operations,
+            vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
+                Box::new(I32Expr::Literal(20)),
+                Box::new(I32Expr::Literal(22)),
+            )))]
         );
         assert!(program.arrays.is_empty());
         assert!(program.data.is_empty());

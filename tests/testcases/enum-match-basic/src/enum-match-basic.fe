@@ -9,9 +9,9 @@
 
 #fn color_code : (color : Color) -> i32 {
     #match color {
-        Color::red => 1i32
-        Color::blue => 2i32
-        Color::green => 42i32
+        Color::red => 1i32,
+        Color::blue => 2i32,
+        Color::green => 42i32,
     }
 }
 

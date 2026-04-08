@@ -1,0 +1,7 @@
+{
+    "name": "enum-match-payload",
+    "felis-bin-entrypoints": [
+        "src/enum-match-payload-single.fe",
+        "src/enum-match-payload-pair.fe"
+    ]
+}

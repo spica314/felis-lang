@@ -269,6 +269,9 @@ impl Parse for MatchArm {
         let pattern = Pattern::parse(parser)?.unwrap();
         parser.expect_punctuation(TokenKind::FatArrow)?;
         let result = parser.with_match_arm_boundary(true, Term::parse)?.unwrap();
+        if !matches!(result, Term::Block(_)) {
+            parser.expect_punctuation(TokenKind::Comma)?;
+        }
         Ok(Some(Self {
             pattern,
             result: Box::new(result),

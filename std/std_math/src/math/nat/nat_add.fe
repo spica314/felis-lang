@@ -3,7 +3,7 @@
 
 #pub #fn nat_add : (x : Nat) -> (y : Nat) -> Nat {
     #match x {
-        Nat::zero => y
+        Nat::zero => y,
         Nat::succ p => {
             Nat::succ (nat_add p y)
         }
