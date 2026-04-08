@@ -272,14 +272,28 @@ impl Lexer {
     fn integer_literal(&mut self, start: usize, first: char) -> Token {
         let mut text = String::new();
         text.push(first);
-        while let Some(ch) = self.peek_char() {
-            if ch.is_ascii_digit() {
-                text.push(ch);
-                self.bump_char();
-            } else {
-                break;
+
+        if first == '0' && matches!(self.peek_char(), Some('x' | 'X')) {
+            text.push(self.bump_char().expect("peeked hexadecimal prefix"));
+            while let Some(ch) = self.peek_char() {
+                if ch.is_ascii_hexdigit() {
+                    text.push(ch);
+                    self.bump_char();
+                } else {
+                    break;
+                }
+            }
+        } else {
+            while let Some(ch) = self.peek_char() {
+                if ch.is_ascii_digit() {
+                    text.push(ch);
+                    self.bump_char();
+                } else {
+                    break;
+                }
             }
         }
+
         Token {
             kind: TokenKind::IntegerLiteral(text.clone()),
             span: Span {

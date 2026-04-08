@@ -1311,7 +1311,7 @@ fn parse_bare_u8_literal(literal: &str) -> Result<U8Expr> {
 }
 
 fn parse_i32_digits(digits: &str, original: &str) -> Result<i32> {
-    digits.parse::<i32>().map_err(|_| {
+    parse_prefixed_i32_digits(digits).map_err(|_| {
         Error::Unsupported(format!(
             "integer literal `{original}` could not be parsed as i32"
         ))
@@ -1319,11 +1319,33 @@ fn parse_i32_digits(digits: &str, original: &str) -> Result<i32> {
 }
 
 fn parse_u8_digits(digits: &str, original: &str) -> Result<u8> {
-    digits.parse::<u8>().map_err(|_| {
+    parse_prefixed_u8_digits(digits).map_err(|_| {
         Error::Unsupported(format!(
             "integer literal `{original}` could not be parsed as u8"
         ))
     })
+}
+
+fn parse_prefixed_i32_digits(digits: &str) -> std::result::Result<i32, std::num::ParseIntError> {
+    if let Some(hex) = digits
+        .strip_prefix("0x")
+        .or_else(|| digits.strip_prefix("0X"))
+    {
+        i32::from_str_radix(hex, 16)
+    } else {
+        digits.parse::<i32>()
+    }
+}
+
+fn parse_prefixed_u8_digits(digits: &str) -> std::result::Result<u8, std::num::ParseIntError> {
+    if let Some(hex) = digits
+        .strip_prefix("0x")
+        .or_else(|| digits.strip_prefix("0X"))
+    {
+        u8::from_str_radix(hex, 16)
+    } else {
+        digits.parse::<u8>()
+    }
 }
 
 fn is_i32_suffix_term(term: &Term) -> bool {
@@ -2255,6 +2277,47 @@ mod tests {
                     fd: I32Expr::Literal(1),
                     array_slot: 0,
                     len: I32Expr::Literal(13),
+                },
+                Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
+            ]
+        );
+        assert!(program.data.is_empty());
+        assert_eq!(program.i32_slots, 0);
+    }
+
+    #[test]
+    fn lowers_hex_literals_fixture_to_runtime_array_operations() {
+        let root = repo_root().join("tests/testcases/hex-literals");
+        let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+            panic!("expected package root");
+        };
+
+        let program = lower_package_to_program(&package).expect("lower fixture");
+        assert_eq!(
+            program.arrays,
+            vec![ArrayAllocation {
+                slot: 0,
+                len: 2,
+                element_type: ArrayElementType::U8,
+            }]
+        );
+        assert_eq!(
+            program.operations,
+            vec![
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(0),
+                    value: U8Expr::Literal(65),
+                },
+                Operation::ArraySetU8 {
+                    array_slot: 0,
+                    index: I32Expr::Literal(1),
+                    value: U8Expr::Literal(10),
+                },
+                Operation::WriteArray {
+                    fd: I32Expr::Literal(1),
+                    array_slot: 0,
+                    len: I32Expr::Literal(2),
                 },
                 Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
             ]

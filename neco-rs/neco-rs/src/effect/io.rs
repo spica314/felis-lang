@@ -373,9 +373,20 @@ fn parse_i32_literal_term(term: &Term) -> Result<i32> {
 }
 
 fn parse_bare_i32_digits(literal: &str) -> Result<i32> {
-    literal.parse::<i32>().map_err(|_| {
+    parse_prefixed_i32_digits(literal).map_err(|_| {
         Error::Unsupported("`IO::array_new` length must be a valid `i32` literal".to_string())
     })
+}
+
+fn parse_prefixed_i32_digits(literal: &str) -> std::result::Result<i32, std::num::ParseIntError> {
+    if let Some(hex) = literal
+        .strip_prefix("0x")
+        .or_else(|| literal.strip_prefix("0X"))
+    {
+        i32::from_str_radix(hex, 16)
+    } else {
+        literal.parse::<i32>()
+    }
 }
 
 fn normalize_i32_literal_arguments(arguments: &[Term]) -> Vec<Term> {

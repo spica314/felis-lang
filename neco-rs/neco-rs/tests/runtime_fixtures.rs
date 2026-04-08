@@ -121,6 +121,15 @@ fn compiles_and_runs_u8_array_hello_world_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_hex_literals_fixture() {
+    let root = repo_root().join("tests/testcases/hex-literals");
+    let run = run_fixture_output(&root, "hex-literals");
+    assert_eq!(run.status.code(), Some(0));
+    assert_eq!(run.stdout, b"A\n");
+    assert!(run.stderr.is_empty());
+}
+
+#[test]
 fn compiles_and_runs_stdin_to_stdout_fixture() {
     let root = repo_root().join("tests/testcases/stdin-to-stdout");
     let run = run_fixture_with_input(&root, "stdin-to-stdout", b"echo through stdin\n");
