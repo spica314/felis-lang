@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use neco_rs_parser::{BindingPattern, Term};
 
 use crate::effect::{Value, bind_pattern, resolve_value};
-use crate::ir::{ArrayElementType, ExitCodeExpr, I32Expr, LoweredProgram, Operation};
+use crate::ir::{ArrayElementType, ExitCodeExpr, I32Expr, LoweredProgram, OpenPath, Operation};
 use crate::lowering::{LoweringState, lower_i32_expr, lower_u8_expr};
 use crate::{Error, Result};
 
@@ -60,13 +60,13 @@ pub(crate) fn lower_io_call(
             Some(Ok(false))
         }
         ["IO", "open"] => {
-            let (path_data_index, flags, mode, result_slot) =
+            let (path, flags, mode, result_slot) =
                 match parse_open_arguments(arguments, state) {
                     Ok(value) => value,
                     Err(err) => return Some(Err(err)),
                 };
             program.operations.push(Operation::Open {
-                path_data_index,
+                path,
                 flags,
                 mode,
                 result_slot,
@@ -117,6 +117,18 @@ pub(crate) fn lower_io_call(
                     slot: array_slot,
                     element_type,
                 },
+                &mut state.environment,
+            );
+            Some(Ok(false))
+        }
+        ["IO", "arg"] => {
+            let arg_index = match parse_arg_arguments(arguments, state, program) {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            bind_pattern(
+                binder,
+                Value::RuntimeArg(arg_index),
                 &mut state.environment,
             );
             Some(Ok(false))
@@ -210,7 +222,7 @@ fn parse_read_arguments(
 fn parse_open_arguments(
     arguments: &[Term],
     state: &mut LoweringState,
-) -> Result<(usize, I32Expr, I32Expr, usize)> {
+) -> Result<(OpenPath, I32Expr, I32Expr, usize)> {
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [path_term, flags_term, mode_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
@@ -218,11 +230,12 @@ fn parse_open_arguments(
         ));
     };
 
-    let path_data_index = match resolve_value(path_term, &state.environment)? {
-        Value::ByteString(data_index) => data_index,
+    let path = match resolve_value(path_term, &state.environment)? {
+        Value::ByteString(data_index) => OpenPath::StaticData(data_index),
+        Value::RuntimeArg(arg_index) => OpenPath::RuntimeArg(arg_index),
         other => {
             return Err(Error::Unsupported(format!(
-                "`IO::open` expects a byte string path as its first argument, got {other:?}"
+                "`IO::open` expects a byte string path or CLI argument as its first argument, got {other:?}"
             )));
         }
     };
@@ -235,7 +248,7 @@ fn parse_open_arguments(
     })?;
 
     let result_slot = state.allocate_i32_slot();
-    Ok((path_data_index, flags, mode, result_slot))
+    Ok((path, flags, mode, result_slot))
 }
 
 fn parse_close_arguments(arguments: &[Term], state: &LoweringState) -> Result<I32Expr> {
@@ -328,6 +341,22 @@ fn parse_array_new_arguments(arguments: &[Term]) -> Result<(ArrayElementType, us
         Error::Unsupported("`IO::array_new` length must be non-negative".to_string())
     })?;
     Ok((element_type, length))
+}
+
+fn parse_arg_arguments(
+    arguments: &[Term],
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<I32Expr> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [arg_index] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::arg` must receive exactly one `i32` index".to_string(),
+        ));
+    };
+    program.requires_argv = true;
+    lower_i32_expr(arg_index, state)
+        .map_err(|_| Error::Unsupported("`IO::arg` expects an `i32` index".to_string()))
 }
 
 fn is_i32_suffix(term: &Term) -> bool {

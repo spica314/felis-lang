@@ -61,6 +61,16 @@ fn run_fixture_output(root: &Path, name: &str) -> Output {
     run
 }
 
+fn run_fixture_output_with_args(root: &Path, name: &str, args: &[&str]) -> Output {
+    let output = compile_fixture(root, name);
+    let run = runtime_test_runner(&output)
+        .args(args)
+        .output()
+        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+    fs::remove_file(&output).expect("cleanup binary");
+    run
+}
+
 fn run_fixture_output_in_dir(root: &Path, name: &str, current_dir: &Path) -> Output {
     let output = compile_fixture(root, name);
     let run = runtime_test_runner(&output)
@@ -294,4 +304,24 @@ fn compiles_and_runs_continue_fixture() {
     let root = repo_root().join("tests/testcases/continue");
     let status = run_fixture_status(&root, "continue");
     assert_eq!(status.code(), Some(50));
+}
+
+#[test]
+fn compiles_and_runs_cli_args_fixture() {
+    let root = repo_root().join("tests/testcases/cli-args");
+    let temp_dir = runtime_temp_dir("cli-args");
+    let input_path = temp_dir.join("argv-input.txt");
+    fs::write(&input_path, b"via argv\n").expect("write cli args input file");
+
+    let run = run_fixture_output_with_args(
+        &root,
+        "cli-args",
+        &[input_path.to_str().expect("utf-8 temp path"), "15"],
+    );
+
+    fs::remove_dir_all(&temp_dir).expect("cleanup runtime temp dir");
+
+    assert_eq!(run.status.code(), Some(102));
+    assert_eq!(run.stdout, b"via argv\n");
+    assert!(run.stderr.is_empty());
 }

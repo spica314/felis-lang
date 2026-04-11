@@ -115,6 +115,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,
+        requires_argv: false,
     };
     let mut state = LoweringState::new();
     state.functions = collect_pure_functions(package)?;
@@ -183,6 +184,7 @@ fn lower_statement(
                 arrays: std::mem::take(&mut program.arrays),
                 heap_slots: program.heap_slots,
                 i32_slots: program.i32_slots,
+                requires_argv: program.requires_argv,
             };
             for statement in &if_stmt.then_block.statements {
                 let terminated = lower_statement(statement, &mut then_state, &mut then_program)?;
@@ -210,6 +212,7 @@ fn lower_statement(
                     arrays: then_program.arrays,
                     heap_slots: then_program.heap_slots,
                     i32_slots: then_program.i32_slots,
+                    requires_argv: then_program.requires_argv,
                 };
                 for statement in &else_block.statements {
                     let terminated =
@@ -222,12 +225,14 @@ fn lower_statement(
                 program.data = else_program.data;
                 program.arrays = else_program.arrays;
                 program.heap_slots = program.heap_slots.max(else_program.heap_slots);
+                program.requires_argv = else_program.requires_argv;
                 next_array_slot = next_array_slot.max(else_state.next_array_slot);
                 next_i32_slot = next_i32_slot.max(else_state.next_i32_slot);
             } else {
                 program.data = then_program.data;
                 program.arrays = then_program.arrays;
                 program.heap_slots = program.heap_slots.max(then_program.heap_slots);
+                program.requires_argv = then_program.requires_argv;
             }
             state.next_array_slot = next_array_slot;
             state.next_i32_slot = next_i32_slot;
@@ -253,6 +258,7 @@ fn lower_statement(
                 arrays: std::mem::take(&mut program.arrays),
                 heap_slots: program.heap_slots,
                 i32_slots: program.i32_slots,
+                requires_argv: program.requires_argv,
             };
             for statement in &loop_stmt.body.statements {
                 let terminated = lower_statement(statement, &mut loop_state, &mut loop_program)?;
@@ -263,6 +269,7 @@ fn lower_statement(
             program.data = loop_program.data;
             program.arrays = loop_program.arrays;
             program.heap_slots = program.heap_slots.max(loop_program.heap_slots);
+            program.requires_argv = loop_program.requires_argv;
             state.next_array_slot = state.next_array_slot.max(loop_state.next_array_slot);
             state.next_i32_slot = state.next_i32_slot.max(loop_state.next_i32_slot);
             program.operations.push(Operation::Loop {
@@ -923,6 +930,9 @@ pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr
             if let Some(expr) = lower_u8_literal_application(callee, arguments)? {
                 return Ok(expr);
             }
+            if let Some(expr) = lower_runtime_arg_get_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
             if let Some(expr) = lower_u8_array_get_call(callee, arguments, state)? {
                 return Ok(expr);
             }
@@ -1207,6 +1217,34 @@ fn lower_u8_array_get_call(
         array_slot,
         index: Box::new(lower_i32_expr(index, state)?),
     }))
+}
+
+fn lower_runtime_arg_get_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<U8Expr>> {
+    let Term::MethodCall { receiver, method } = callee else {
+        return Ok(None);
+    };
+    if method != "get" {
+        return Ok(None);
+    }
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [index] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`get` must receive exactly one index argument".to_string(),
+        ));
+    };
+
+    match resolve_value(receiver.as_ref(), &state.environment)? {
+        Value::RuntimeArg(arg_index) => Ok(Some(U8Expr::RuntimeArgGet {
+            arg_index: Box::new(arg_index),
+            index: Box::new(lower_i32_expr(index, state)?),
+        })),
+        _ => Ok(None),
+    }
 }
 
 fn lower_expression_statement(

@@ -6,7 +6,7 @@ use crate::cli::{default_output_path, select_binary_from_package};
 use crate::codegen::build_linux_x86_64_program_executable;
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ComparisonKind, ConditionExpr, ExitCodeExpr, I32Expr,
-    LoweredProgram, Operation, U8Expr,
+    LoweredProgram, OpenPath, Operation, U8Expr,
 };
 use crate::lowering::lower_package_to_program;
 
@@ -770,7 +770,7 @@ fn lowers_open_read_close_fixture_to_runtime_io_operations() {
         program.operations,
         vec![
             Operation::Open {
-                path_data_index: 0,
+                path: OpenPath::StaticData(0),
                 flags: I32Expr::Literal(0),
                 mode: I32Expr::Literal(0),
                 result_slot: 0,
@@ -809,7 +809,7 @@ fn lowers_open_write_close_fixture_to_runtime_io_operations() {
         program.operations,
         vec![
             Operation::Open {
-                path_data_index: 0,
+                path: OpenPath::StaticData(0),
                 flags: I32Expr::Literal(577),
                 mode: I32Expr::Literal(420),
                 result_slot: 0,
@@ -833,6 +833,62 @@ fn lowers_open_write_close_fixture_to_runtime_io_operations() {
         ]
     );
     assert_eq!(program.i32_slots, 1);
+}
+
+#[test]
+fn lowers_cli_args_fixture_to_runtime_io_operations() {
+    let root = repo_root().join("tests/testcases/cli-args");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::Open {
+                path: OpenPath::RuntimeArg(I32Expr::Literal(1)),
+                flags: I32Expr::Literal(0),
+                mode: I32Expr::Literal(0),
+                result_slot: 0,
+            },
+            Operation::Read {
+                fd: I32Expr::Local(0),
+                array_slot: 0,
+                len: I32Expr::Literal(64),
+                result_slot: 1,
+            },
+            Operation::Close {
+                fd: I32Expr::Local(0),
+            },
+            Operation::WriteArray {
+                fd: I32Expr::Literal(1),
+                array_slot: 0,
+                len: I32Expr::Local(1),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
+                Box::new(I32Expr::FromU8(Box::new(U8Expr::RuntimeArgGet {
+                    arg_index: Box::new(I32Expr::Literal(2)),
+                    index: Box::new(I32Expr::Literal(0)),
+                }))),
+                Box::new(I32Expr::FromU8(Box::new(U8Expr::RuntimeArgGet {
+                    arg_index: Box::new(I32Expr::Literal(2)),
+                    index: Box::new(I32Expr::Literal(1)),
+                }))),
+            ))),
+        ]
+    );
+    assert!(program.data.is_empty());
+    assert_eq!(
+        program.arrays,
+        vec![ArrayAllocation {
+            slot: 0,
+            len: 64,
+            element_type: ArrayElementType::U8,
+        }]
+    );
+    assert_eq!(program.i32_slots, 2);
+    assert!(program.requires_argv);
 }
 
 #[test]
@@ -875,6 +931,7 @@ fn builds_elf_image_with_exit_syscall() {
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,
+        requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)
         .to_bytes()
@@ -901,6 +958,7 @@ fn builds_elf_image_with_write_and_implicit_exit() {
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,
+        requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)
         .to_bytes()
@@ -945,6 +1003,7 @@ fn builds_elf_image_with_runtime_i32_ops() {
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,
+        requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)
         .to_bytes()

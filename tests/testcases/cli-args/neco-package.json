@@ -1,0 +1,4 @@
+{
+    "name": "cli-args",
+    "felis-bin-entrypoints": ["src/cli-args.fe"]
+}

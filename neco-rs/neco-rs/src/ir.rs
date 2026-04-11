@@ -5,6 +5,13 @@ pub(crate) struct LoweredProgram {
     pub(crate) arrays: Vec<ArrayAllocation>,
     pub(crate) heap_slots: usize,
     pub(crate) i32_slots: usize,
+    pub(crate) requires_argv: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OpenPath {
+    StaticData(usize),
+    RuntimeArg(I32Expr),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,6 +61,10 @@ pub(crate) enum U8Expr {
     Mul(Box<U8Expr>, Box<U8Expr>),
     Div(Box<U8Expr>, Box<U8Expr>),
     Mod(Box<U8Expr>, Box<U8Expr>),
+    RuntimeArgGet {
+        arg_index: Box<I32Expr>,
+        index: Box<I32Expr>,
+    },
     ArrayGet {
         array_slot: usize,
         index: Box<I32Expr>,
@@ -100,7 +111,7 @@ pub(crate) enum Operation {
         source_heap_slot: usize,
     },
     Open {
-        path_data_index: usize,
+        path: OpenPath,
         flags: I32Expr,
         mode: I32Expr,
         result_slot: usize,

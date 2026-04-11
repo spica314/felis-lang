@@ -3,17 +3,26 @@ use std::fmt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SegmentFlags {
     readable: bool,
+    writable: bool,
     executable: bool,
 }
 
 impl SegmentFlags {
     pub const READ_ONLY: Self = Self {
         readable: true,
+        writable: false,
+        executable: false,
+    };
+
+    pub const READ_WRITE: Self = Self {
+        readable: true,
+        writable: true,
         executable: false,
     };
 
     pub const READ_EXECUTE: Self = Self {
         readable: true,
+        writable: false,
         executable: true,
     };
 
@@ -21,6 +30,9 @@ impl SegmentFlags {
         let mut bits = 0;
         if self.executable {
             bits |= 0x1;
+        }
+        if self.writable {
+            bits |= 0x2;
         }
         if self.readable {
             bits |= 0x4;

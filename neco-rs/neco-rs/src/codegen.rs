@@ -2,8 +2,10 @@ use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
 
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ComparisonKind, ConditionExpr, ExitCodeExpr, I32Expr,
-    LoweredProgram, Operation, U8Expr,
+    LoweredProgram, OpenPath, Operation, U8Expr,
 };
+
+const ARGV_GLOBAL_ADDRESS: u64 = 0x403000;
 
 pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) -> Elf64Executable {
     let code_virtual_address = 0x401000;
@@ -13,7 +15,11 @@ pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) ->
         code_virtual_address,
         0,
         SegmentFlags::READ_EXECUTE,
-        program_syscall_code(program, data_virtual_address),
+        program_syscall_code(
+            program,
+            data_virtual_address,
+            program.requires_argv.then_some(ARGV_GLOBAL_ADDRESS),
+        ),
     ));
     if !program.data.is_empty() {
         elf.add_load_segment(LoadSegment::new(
@@ -21,6 +27,14 @@ pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) ->
             0x1000,
             SegmentFlags::READ_ONLY,
             flatten_data(program),
+        ));
+    }
+    if program.requires_argv {
+        elf.add_load_segment(LoadSegment::new(
+            ARGV_GLOBAL_ADDRESS,
+            0x1000,
+            SegmentFlags::READ_WRITE,
+            vec![0; 8],
         ));
     }
     elf
@@ -45,10 +59,18 @@ fn data_addresses(program: &LoweredProgram, data_virtual_address: u64) -> Vec<u6
     addresses
 }
 
-fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> Vec<u8> {
+fn program_syscall_code(
+    program: &LoweredProgram,
+    data_virtual_address: u64,
+    argv_global_address: Option<u64>,
+) -> Vec<u8> {
     let addresses = data_addresses(program, data_virtual_address);
     let mut code = Vec::new();
     let stack_frame_size = stack_frame_size(program);
+
+    if let Some(argv_global_address) = argv_global_address {
+        emit_argv_global_init(&mut code, argv_global_address);
+    }
 
     if stack_frame_size > 0 {
         code.push(0x55);
@@ -63,6 +85,7 @@ fn program_syscall_code(program: &LoweredProgram, data_virtual_address: u64) -> 
         &mut code,
         program,
         &addresses,
+        argv_global_address,
         None,
         None,
     );
@@ -75,6 +98,7 @@ fn emit_operations(
     code: &mut Vec<u8>,
     program: &LoweredProgram,
     addresses: &[u64],
+    argv_global_address: Option<u64>,
     mut break_patches: Option<&mut Vec<usize>>,
     mut continue_patches: Option<&mut Vec<usize>>,
 ) {
@@ -129,13 +153,27 @@ fn emit_operations(
                 code.extend_from_slice(&byte_offset.to_le_bytes());
             }
             Operation::Open {
-                path_data_index,
+                path,
                 flags,
                 mode,
                 result_slot,
             } => {
-                code.extend_from_slice(&[0x48, 0xbf]);
-                code.extend_from_slice(&addresses[*path_data_index].to_le_bytes());
+                match path {
+                    OpenPath::StaticData(path_data_index) => {
+                        code.extend_from_slice(&[0x48, 0xbf]);
+                        code.extend_from_slice(&addresses[*path_data_index].to_le_bytes());
+                    }
+                    OpenPath::RuntimeArg(arg_index) => {
+                        emit_runtime_arg_ptr_to_rax(
+                            arg_index,
+                            code,
+                            program,
+                            argv_global_address
+                                .expect("runtime arg path requires argv global storage"),
+                        );
+                        code.extend_from_slice(&[0x48, 0x89, 0xc7]);
+                    }
+                }
                 emit_i32_expr_to_eax(flags, code, program);
                 code.extend_from_slice(&[0x89, 0xc6]);
                 emit_i32_expr_to_eax(mode, code, program);
@@ -216,6 +254,7 @@ fn emit_operations(
                     code,
                     program,
                     addresses,
+                    argv_global_address,
                     break_patches.as_deref_mut(),
                     continue_patches.as_deref_mut(),
                 );
@@ -234,6 +273,7 @@ fn emit_operations(
                         code,
                         program,
                         addresses,
+                        argv_global_address,
                         break_patches.as_deref_mut(),
                         continue_patches.as_deref_mut(),
                     );
@@ -265,6 +305,7 @@ fn emit_operations(
                     code,
                     program,
                     addresses,
+                    argv_global_address,
                     Some(&mut loop_break_patches),
                     Some(&mut loop_continue_patches),
                 );
@@ -434,6 +475,9 @@ fn emit_u8_expr_to_eax(expr: &U8Expr, code: &mut Vec<u8>, program: &LoweredProgr
         U8Expr::Mul(lhs, rhs) => emit_u8_mul_expr(lhs, rhs, code, program),
         U8Expr::Div(lhs, rhs) => emit_u8_div_mod_expr(lhs, rhs, code, program, false),
         U8Expr::Mod(lhs, rhs) => emit_u8_div_mod_expr(lhs, rhs, code, program, true),
+        U8Expr::RuntimeArgGet { arg_index, index } => {
+            emit_runtime_arg_u8_get(arg_index, index, code, program, ARGV_GLOBAL_ADDRESS)
+        }
         U8Expr::ArrayGet { array_slot, index } => {
             emit_u8_array_get(*array_slot, index, code, program)
         }
@@ -484,6 +528,43 @@ fn emit_u8_div_mod_expr(
         code.extend_from_slice(&[0x89, 0xd0]);
     }
     code.extend_from_slice(&[0x0f, 0xb6, 0xc0]);
+}
+
+fn emit_argv_global_init(code: &mut Vec<u8>, argv_global_address: u64) {
+    code.extend_from_slice(&[0x48, 0x8d, 0x44, 0x24, 0x08]);
+    code.extend_from_slice(&[0x48, 0xa3]);
+    code.extend_from_slice(&argv_global_address.to_le_bytes());
+}
+
+fn emit_runtime_arg_ptr_to_rax(
+    arg_index: &I32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+    argv_global_address: u64,
+) {
+    emit_i32_expr_to_eax(arg_index, code, program);
+    code.extend_from_slice(&[0x48, 0x98]);
+    code.extend_from_slice(&[0x48, 0xc1, 0xe0, 0x03]);
+    code.extend_from_slice(&[0x49, 0x89, 0xc3]);
+    code.extend_from_slice(&[0x48, 0xa1]);
+    code.extend_from_slice(&argv_global_address.to_le_bytes());
+    code.extend_from_slice(&[0x4c, 0x01, 0xd8]);
+    code.extend_from_slice(&[0x48, 0x8b, 0x00]);
+}
+
+fn emit_runtime_arg_u8_get(
+    arg_index: &I32Expr,
+    index: &I32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+    argv_global_address: u64,
+) {
+    emit_runtime_arg_ptr_to_rax(arg_index, code, program, argv_global_address);
+    code.push(0x50);
+    emit_i32_expr_to_eax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    code.push(0x58);
+    code.extend_from_slice(&[0x0f, 0xb6, 0x04, 0x08]);
 }
 
 fn stack_frame_size(program: &LoweredProgram) -> usize {

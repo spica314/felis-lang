@@ -14,6 +14,7 @@ pub(crate) enum Value {
     Constructor(ConstructorValue),
     FileDescriptor(I32Expr),
     ByteString(usize),
+    RuntimeArg(I32Expr),
     I32(I32Expr),
     I32Reference(usize),
     U8(U8Expr),
