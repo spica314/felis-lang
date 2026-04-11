@@ -16,9 +16,8 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let _ @ input_path_ref = "tests/testcases/exit-42/src/exit-42.fe";
-    #let input_path_bytes_ref = input_path_ref .> as_bytes;
-    #let input_fd <- IO::open input_path_bytes_ref 0i32 0i32;
+    #let input_path_ref <- IO::arg 1i32;
+    #let input_fd <- IO::open input_path_ref 0i32 0i32;
     #let _ @^ source_ref <- IO::array_new u8 0x100i32;
     #let source_len <- IO::read input_fd source_ref 0x100i32;
     #let _ <- IO::close input_fd;

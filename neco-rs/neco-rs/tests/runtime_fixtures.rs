@@ -227,16 +227,11 @@ fn compiles_and_runs_neco_felis_fixture() {
     let root = repo_root().join("neco-felis");
     let temp_dir = runtime_temp_dir("neco-felis");
     let binary = compile_fixture(&root, "neco-felis");
-    let input_dir = temp_dir.join("tests/testcases/exit-42/src");
-    fs::create_dir_all(&input_dir).expect("create neco-felis input dir");
-    fs::copy(
-        repo_root().join("tests/testcases/exit-42/src/exit-42.fe"),
-        input_dir.join("exit-42.fe"),
-    )
-    .expect("copy exit-42 source");
+    let input_path = repo_root().join("tests/testcases/exit-42/src/exit-42.fe");
 
     let run = runtime_test_runner(&binary)
         .current_dir(&temp_dir)
+        .arg(&input_path)
         .output()
         .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
     let emitted = temp_dir.join("a.out");
