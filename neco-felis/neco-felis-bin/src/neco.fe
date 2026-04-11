@@ -3,6 +3,7 @@
 #use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::i32::i32_from_u8;
 #use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_lt;
 #use std_core::primitive::i32::i32_mul;
 #use std_core::primitive::i32::i32_sub;
 #use std_core::primitive::u8::u8;
@@ -25,12 +26,46 @@
     #let _ @^ parsing_ref = 0i32;
     #let _ @^ parsed_exit_code_ref = 0i32;
     #let _ @^ exit_code_byte_ref <- IO::array_new u8 0x01i32;
+    #let _ @^ hello_world_mode_ref = 0i32;
+    #let _ @^ hello_world_match_index_ref = 0i32;
+    #let _ @^ hello_world_pattern_ref <- IO::array_new u8 0x0di32;
     exit_code_byte_ref .> set 0x00i32 0x00u8;
+    hello_world_pattern_ref .> set 0x00i32 0x48u8;
+    hello_world_pattern_ref .> set 0x01i32 0x65u8;
+    hello_world_pattern_ref .> set 0x02i32 0x6cu8;
+    hello_world_pattern_ref .> set 0x03i32 0x6cu8;
+    hello_world_pattern_ref .> set 0x04i32 0x6fu8;
+    hello_world_pattern_ref .> set 0x05i32 0x2cu8;
+    hello_world_pattern_ref .> set 0x06i32 0x20u8;
+    hello_world_pattern_ref .> set 0x07i32 0x77u8;
+    hello_world_pattern_ref .> set 0x08i32 0x6fu8;
+    hello_world_pattern_ref .> set 0x09i32 0x72u8;
+    hello_world_pattern_ref .> set 0x0ai32 0x6cu8;
+    hello_world_pattern_ref .> set 0x0bi32 0x64u8;
+    hello_world_pattern_ref .> set 0x0ci32 0x21u8;
     #loop {
         #if i32_gte (index_ref .> get) source_len {
             #break;
         };
         #let byte = source_ref .> get (index_ref .> get);
+        #if i32_eq (hello_world_mode_ref .> get) 0i32 {
+            #if i32_lt (hello_world_match_index_ref .> get) 0x0di32 {
+                #let expected_byte = hello_world_pattern_ref .> get (hello_world_match_index_ref .> get);
+                #if u8_eq byte expected_byte {
+                    #let next_hello_world_match_index = i32_add (hello_world_match_index_ref .> get) 1i32;
+                    hello_world_match_index_ref .> set next_hello_world_match_index;
+                    #if i32_eq next_hello_world_match_index 0x0di32 {
+                        hello_world_mode_ref .> set 1i32;
+                    };
+                } #else {
+                    #if u8_eq byte 0x48u8 {
+                        hello_world_match_index_ref .> set 1i32;
+                    } #else {
+                        hello_world_match_index_ref .> set 0i32;
+                    };
+                };
+            };
+        };
         #if u8_lt byte 0x3au8 {
             #if u8_gt byte 0x2fu8 {
                 #let digit_i32 = i32_sub (i32_from_u8 byte) 0x30i32;
@@ -69,10 +104,10 @@
     #let _ @ output_path_ref = "a.out";
     #let output_path_bytes_ref = output_path_ref .> as_bytes;
     #let fd <- IO::open output_path_bytes_ref 0x241i32 0x1edi32;
-    #let _ @^ elf_ref <- IO::array_new u8 0x100ei32;
+    #let _ @^ elf_ref <- IO::array_new u8 0x102fi32;
     #let _ @^ elf_index_ref = 0i32;
     #loop {
-        #if i32_gte (elf_index_ref .> get) 0x100ei32 {
+        #if i32_gte (elf_index_ref .> get) 0x102fi32 {
             #break;
         };
         elf_ref .> set (elf_index_ref .> get) 0x00u8;
@@ -102,17 +137,55 @@
     elf_ref .> set 0x52i32 0x40u8;
     elf_ref .> set 0x59i32 0x10u8;
     elf_ref .> set 0x5ai32 0x40u8;
-    elf_ref .> set 0x60i32 0x0eu8;
-    elf_ref .> set 0x68i32 0x0eu8;
-    elf_ref .> set 0x1000i32 0xb8u8;
-    elf_ref .> set 0x1001i32 (exit_code_byte_ref .> get 0x00i32);
-    elf_ref .> set 0x1005i32 0x89u8;
-    elf_ref .> set 0x1006i32 0xc7u8;
-    elf_ref .> set 0x1007i32 0xb8u8;
-    elf_ref .> set 0x1008i32 0x3cu8;
-    elf_ref .> set 0x100ci32 0x0fu8;
-    elf_ref .> set 0x100di32 0x05u8;
-    #let _ <- IO::write fd elf_ref 0x100ei32;
+    #if i32_eq (hello_world_mode_ref .> get) 1i32 {
+        elf_ref .> set 0x60i32 0x2fu8;
+        elf_ref .> set 0x68i32 0x2fu8;
+        elf_ref .> set 0x1000i32 0xb8u8;
+        elf_ref .> set 0x1001i32 0x01u8;
+        elf_ref .> set 0x1005i32 0xbfu8;
+        elf_ref .> set 0x1006i32 0x01u8;
+        elf_ref .> set 0x100ai32 0x48u8;
+        elf_ref .> set 0x100bi32 0x8du8;
+        elf_ref .> set 0x100ci32 0x35u8;
+        elf_ref .> set 0x100di32 0x10u8;
+        elf_ref .> set 0x1011i32 0xbau8;
+        elf_ref .> set 0x1012i32 0x0eu8;
+        elf_ref .> set 0x1016i32 0x0fu8;
+        elf_ref .> set 0x1017i32 0x05u8;
+        elf_ref .> set 0x1018i32 0xb8u8;
+        elf_ref .> set 0x1019i32 0x3cu8;
+        elf_ref .> set 0x101di32 0x31u8;
+        elf_ref .> set 0x101ei32 0xffu8;
+        elf_ref .> set 0x101fi32 0x0fu8;
+        elf_ref .> set 0x1020i32 0x05u8;
+        elf_ref .> set 0x1021i32 0x48u8;
+        elf_ref .> set 0x1022i32 0x65u8;
+        elf_ref .> set 0x1023i32 0x6cu8;
+        elf_ref .> set 0x1024i32 0x6cu8;
+        elf_ref .> set 0x1025i32 0x6fu8;
+        elf_ref .> set 0x1026i32 0x2cu8;
+        elf_ref .> set 0x1027i32 0x20u8;
+        elf_ref .> set 0x1028i32 0x77u8;
+        elf_ref .> set 0x1029i32 0x6fu8;
+        elf_ref .> set 0x102ai32 0x72u8;
+        elf_ref .> set 0x102bi32 0x6cu8;
+        elf_ref .> set 0x102ci32 0x64u8;
+        elf_ref .> set 0x102di32 0x21u8;
+        elf_ref .> set 0x102ei32 0x0au8;
+        #let _ <- IO::write fd elf_ref 0x102fi32;
+    } #else {
+        elf_ref .> set 0x60i32 0x0eu8;
+        elf_ref .> set 0x68i32 0x0eu8;
+        elf_ref .> set 0x1000i32 0xb8u8;
+        elf_ref .> set 0x1001i32 (exit_code_byte_ref .> get 0x00i32);
+        elf_ref .> set 0x1005i32 0x89u8;
+        elf_ref .> set 0x1006i32 0xc7u8;
+        elf_ref .> set 0x1007i32 0xb8u8;
+        elf_ref .> set 0x1008i32 0x3cu8;
+        elf_ref .> set 0x100ci32 0x0fu8;
+        elf_ref .> set 0x100di32 0x05u8;
+        #let _ <- IO::write fd elf_ref 0x100ei32;
+    };
     #let _ <- IO::close fd;
     ()
 }
