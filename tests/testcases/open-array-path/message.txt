@@ -1,0 +1,1 @@
+open/array/path fixture

@@ -1,0 +1,4 @@
+{
+    "name": "open-array-path",
+    "felis-bin-entrypoints": ["src/open-array-path.fe"]
+}

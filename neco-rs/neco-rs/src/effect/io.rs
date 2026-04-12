@@ -233,9 +233,13 @@ fn parse_open_arguments(
     let path = match resolve_value(path_term, &state.environment)? {
         Value::ByteString(data_index) => OpenPath::StaticData(data_index),
         Value::RuntimeArg(arg_index) => OpenPath::RuntimeArg(arg_index),
+        Value::Array {
+            slot,
+            element_type: ArrayElementType::U8,
+        } => OpenPath::Array(slot),
         other => {
             return Err(Error::Unsupported(format!(
-                "`IO::open` expects a byte string path or CLI argument as its first argument, got {other:?}"
+                "`IO::open` expects a byte string path, `u8` array, or CLI argument as its first argument, got {other:?}"
             )));
         }
     };

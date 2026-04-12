@@ -12,6 +12,7 @@ pub(crate) struct LoweredProgram {
 pub(crate) enum OpenPath {
     StaticData(usize),
     RuntimeArg(I32Expr),
+    Array(usize),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

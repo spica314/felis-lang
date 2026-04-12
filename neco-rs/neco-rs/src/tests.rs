@@ -892,6 +892,117 @@ fn lowers_cli_args_fixture_to_runtime_io_operations() {
 }
 
 #[test]
+fn lowers_open_array_path_fixture_to_runtime_io_operations() {
+    let root = repo_root().join("tests/testcases/open-array-path");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.arrays,
+        vec![
+            ArrayAllocation {
+                slot: 0,
+                len: 12,
+                element_type: ArrayElementType::U8,
+            },
+            ArrayAllocation {
+                slot: 1,
+                len: 128,
+                element_type: ArrayElementType::U8,
+            },
+        ]
+    );
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(0),
+                value: U8Expr::Literal(0x6d),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(1),
+                value: U8Expr::Literal(0x65),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(2),
+                value: U8Expr::Literal(0x73),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(3),
+                value: U8Expr::Literal(0x73),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(4),
+                value: U8Expr::Literal(0x61),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(5),
+                value: U8Expr::Literal(0x67),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(6),
+                value: U8Expr::Literal(0x65),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(7),
+                value: U8Expr::Literal(0x2e),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(8),
+                value: U8Expr::Literal(0x74),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(9),
+                value: U8Expr::Literal(0x78),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(10),
+                value: U8Expr::Literal(0x74),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I32Expr::Literal(11),
+                value: U8Expr::Literal(0x00),
+            },
+            Operation::Open {
+                path: OpenPath::Array(0),
+                flags: I32Expr::Literal(0),
+                mode: I32Expr::Literal(0),
+                result_slot: 0,
+            },
+            Operation::Read {
+                fd: I32Expr::Local(0),
+                array_slot: 1,
+                len: I32Expr::Literal(128),
+                result_slot: 1,
+            },
+            Operation::Close {
+                fd: I32Expr::Local(0),
+            },
+            Operation::WriteArray {
+                fd: I32Expr::Literal(1),
+                array_slot: 1,
+                len: I32Expr::Local(1),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
+        ]
+    );
+}
+
+#[test]
 fn lowers_fn_call_fixture_to_runtime_expression_tree() {
     let root = repo_root().join("tests/testcases/fn-call");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

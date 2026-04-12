@@ -173,6 +173,11 @@ fn emit_operations(
                         );
                         code.extend_from_slice(&[0x48, 0x89, 0xc7]);
                     }
+                    OpenPath::Array(array_slot) => {
+                        let slot_offset = array_slot_offset(program, *array_slot);
+                        code.extend_from_slice(&[0x48, 0x8b, 0xbd]);
+                        code.extend_from_slice(&slot_offset.to_le_bytes());
+                    }
                 }
                 emit_i32_expr_to_eax(flags, code, program);
                 code.extend_from_slice(&[0x89, 0xc6]);
