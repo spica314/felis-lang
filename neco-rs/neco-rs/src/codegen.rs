@@ -5,11 +5,11 @@ use crate::ir::{
     LoweredProgram, OpenPath, Operation, U8Expr,
 };
 
-const ARGV_GLOBAL_ADDRESS: u64 = 0x403000;
+const ARGV_GLOBAL_ADDRESS: u64 = 0x405000;
 
 pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) -> Elf64Executable {
     let code_virtual_address = 0x401000;
-    let data_virtual_address = 0x402000;
+    let data_virtual_address = 0x404000;
     let mut elf = Elf64Executable::new(code_virtual_address);
     elf.add_load_segment(LoadSegment::new(
         code_virtual_address,

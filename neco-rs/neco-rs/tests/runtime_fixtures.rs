@@ -236,7 +236,7 @@ fn compiles_and_runs_neco_felis_fixture() {
     let root = repo_root().join("neco-felis");
     let temp_dir = runtime_temp_dir("neco-felis");
     let binary = compile_fixture(&root, "neco-felis");
-    let input_path = repo_root().join("tests/testcases/exit-42/src/exit-42.fe");
+    let input_path = repo_root().join("tests/testcases/exit-42");
 
     let run = runtime_test_runner(&binary)
         .current_dir(&temp_dir)
@@ -266,7 +266,7 @@ fn compiles_and_runs_hello_world_with_neco_felis_fixture() {
     let root = repo_root().join("neco-felis");
     let temp_dir = runtime_temp_dir("neco-felis-hello-world");
     let binary = compile_fixture(&root, "neco-felis");
-    let input_path = repo_root().join("tests/testcases/hello-world/src/hello-world.fe");
+    let input_path = repo_root().join("tests/testcases/hello-world");
 
     let run = runtime_test_runner(&binary)
         .current_dir(&temp_dir)
