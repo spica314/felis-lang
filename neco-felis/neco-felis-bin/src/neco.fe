@@ -16,6 +16,14 @@
 
 #entrypoint main;
 
+#fn accumulate_decimal_i32 : (current : i32) -> (digit : u8) -> i32 {
+    i32_add (i32_mul current 10i32) (i32_sub (i32_from_u8 digit) 0x30i32)
+}
+
+#fn accumulate_decimal_u8 : (current : u8) -> (digit : u8) -> u8 {
+    u8_add (u8_mul current 0x0au8) (u8_sub digit 0x30u8)
+}
+
 #fn main : () #with IO {
     #let package_root_ref <- IO::arg 1i32;
     #let _ @^ manifest_path_ref <- IO::array_new u8 0x100i32;
@@ -199,12 +207,10 @@
         };
         #if u8_lt byte 0x3au8 {
             #if u8_gt byte 0x2fu8 {
-                #let digit_i32 = i32_sub (i32_from_u8 byte) 0x30i32;
-                #let next_exit_code = i32_add (i32_mul (parsed_exit_code_ref .> get) 10i32) digit_i32;
+                #let next_exit_code = accumulate_decimal_i32 (parsed_exit_code_ref .> get) byte;
                 parsed_exit_code_ref .> set next_exit_code;
-                #let digit_u8 = u8_sub byte 0x30u8;
                 #let current_exit_code_byte = exit_code_byte_ref .> get 0x00i32;
-                #let next_exit_code_byte = u8_add (u8_mul current_exit_code_byte 0x0au8) digit_u8;
+                #let next_exit_code_byte = accumulate_decimal_u8 current_exit_code_byte byte;
                 exit_code_byte_ref .> set 0x00i32 next_exit_code_byte;
                 parsing_ref .> set 1i32;
             } #else {
