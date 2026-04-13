@@ -6,6 +6,7 @@ use super::{Item, PathExpression, Pattern};
 pub enum Term {
     Unit,
     StringLiteral(String),
+    CharLiteral(char),
     IntegerLiteral(String),
     Path(PathExpression),
     Group(Box<Term>),
@@ -385,6 +386,10 @@ fn parse_primary_term(parser: &mut Parser) -> Result<Term> {
 
     if let Some(text) = parser.consume_string_literal() {
         return Ok(Term::StringLiteral(text));
+    }
+
+    if let Some(ch) = parser.consume_char_literal() {
+        return Ok(Term::CharLiteral(ch));
     }
 
     if let Some(number) = parser.consume_integer_literal() {

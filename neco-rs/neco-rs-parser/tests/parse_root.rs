@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use neco_rs_parser::{
     Item, ParsedRoot, Pattern, SourceFileRole, Statement, Term, Visibility, parse_root,
+    parse_source,
 };
 
 fn repo_root() -> PathBuf {
@@ -154,6 +155,42 @@ fn parses_comments_basic_package_root() {
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
     assert_eq!(main_fn.body.statements.len(), 4);
+}
+
+#[test]
+fn parses_ascii_char_literals() {
+    let source = r#"
+#fn first_char : u8 {
+    'A'
+}
+
+#fn newline_char : u8 {
+    '\n'
+}
+"#;
+    let (_, syntax) = parse_source(source).expect("source parses");
+    let syntax = syntax.expect("source file");
+    assert_eq!(syntax.items.len(), 2);
+
+    let Item::Function(first_char) = &syntax.items[0] else {
+        panic!("expected function");
+    };
+    let Some(Term::CharLiteral('A')) = first_char.body.tail.as_deref() else {
+        panic!("expected `A` char literal");
+    };
+
+    let Item::Function(newline_char) = &syntax.items[1] else {
+        panic!("expected function");
+    };
+    let Some(Term::CharLiteral('\n')) = newline_char.body.tail.as_deref() else {
+        panic!("expected newline char literal");
+    };
+}
+
+#[test]
+fn rejects_non_ascii_char_literals() {
+    let error = parse_source("'あ'").expect_err("source should fail");
+    assert_eq!(error.message, "char literal must be ASCII");
 }
 
 #[test]
@@ -473,13 +510,13 @@ fn parses_neco_felis_workspace_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 17);
-    let Item::Function(main_fn) = &syntax.items[16] else {
+    assert_eq!(syntax.items.len(), 19);
+    let Item::Function(main_fn) = &syntax.items[18] else {
         panic!("expected function");
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 58);
+    assert_eq!(main_fn.body.statements.len(), 121);
 }
 
 #[test]

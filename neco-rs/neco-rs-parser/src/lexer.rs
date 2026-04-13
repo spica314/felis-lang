@@ -18,6 +18,7 @@ pub enum TokenKind {
     Keyword(Keyword),
     Identifier(String),
     StringLiteral(String),
+    CharLiteral(char),
     IntegerLiteral(String),
     LeftParen,
     RightParen,
@@ -182,6 +183,7 @@ impl Lexer {
             '@' => simple_token(TokenKind::At, start, self.offset, "@"),
             '_' => simple_token(TokenKind::Underscore, start, self.offset, "_"),
             '"' => return self.string_literal(start),
+            '\'' => return self.char_literal(start),
             '#' => return self.keyword(start),
             ch if ch.is_ascii_digit() => return Ok(self.integer_literal(start, ch)),
             ch if is_identifier_start(ch) => return Ok(self.identifier(start, ch)),
@@ -233,6 +235,73 @@ impl Lexer {
             start,
             end: self.offset,
         }))
+    }
+
+    fn char_literal(&mut self, start: usize) -> Result<Token> {
+        let value = match self.bump_char() {
+            Some('\'') => {
+                return Err(Error::new("empty char literal").with_span(Span {
+                    start,
+                    end: self.offset,
+                }));
+            }
+            Some('\\') => {
+                let escaped = self.bump_char().ok_or_else(|| {
+                    Error::new("unterminated char literal").with_span(Span {
+                        start,
+                        end: self.offset,
+                    })
+                })?;
+                match escaped {
+                    '\'' => '\'',
+                    '"' => '"',
+                    '\\' => '\\',
+                    '0' => '\0',
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    other => {
+                        return Err(Error::new(format!(
+                            "unsupported char escape `\\{other}`"
+                        ))
+                        .with_span(Span {
+                            start,
+                            end: self.offset,
+                        }));
+                    }
+                }
+            }
+            Some(ch) => ch,
+            None => {
+                return Err(Error::new("unterminated char literal").with_span(Span {
+                    start,
+                    end: self.offset,
+                }));
+            }
+        };
+
+        if !value.is_ascii() {
+            return Err(Error::new("char literal must be ASCII").with_span(Span {
+                start,
+                end: self.offset,
+            }));
+        }
+
+        if !matches!(self.bump_char(), Some('\'')) {
+            return Err(Error::new("unterminated char literal").with_span(Span {
+                start,
+                end: self.offset,
+            }));
+        }
+
+        Ok(Token {
+            kind: TokenKind::CharLiteral(value),
+            span: Span {
+                start,
+                end: self.offset,
+            },
+            lexeme: self.source[start..self.offset].iter().collect(),
+        })
     }
 
     fn keyword(&mut self, start: usize) -> Result<Token> {

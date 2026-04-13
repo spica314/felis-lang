@@ -347,6 +347,14 @@ fn lower_pure_value(
             let data_index = intern_data(program, nul_terminated_bytes(literal));
             Ok(Value::ByteString(data_index))
         }
+        Term::CharLiteral(_) => {
+            if let Ok(expr) = lower_u8_expr(term, state) {
+                return Ok(Value::U8(expr));
+            }
+            Err(Error::Unsupported(format!(
+                "unsupported pure expression in entrypoint body: {term:?}"
+            )))
+        }
         Term::MethodCall { receiver, method } if method == "as_bytes" => {
             match resolve_value(receiver.as_ref(), &state.environment)? {
                 Value::ByteString(data_index) => Ok(Value::ByteString(data_index)),
@@ -919,6 +927,7 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
 pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr> {
     match term {
         Term::Group(inner) => lower_u8_expr(inner, state),
+        Term::CharLiteral(value) => Ok(U8Expr::Literal(*value as u8)),
         Term::IntegerLiteral(literal) => parse_suffixed_u8_literal(literal),
         Term::Path(_) => match resolve_value(term, &state.environment)? {
             Value::U8(expr) => Ok(expr),

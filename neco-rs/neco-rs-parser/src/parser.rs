@@ -129,6 +129,7 @@ impl Parser {
             || matches!(
                 self.peek_kind(),
                 TokenKind::StringLiteral(_)
+                    | TokenKind::CharLiteral(_)
                     | TokenKind::IntegerLiteral(_)
                     | TokenKind::Identifier(_)
                     | TokenKind::Keyword(Keyword::Package)
@@ -243,6 +244,16 @@ impl Parser {
         }
     }
 
+    pub(crate) fn consume_char_literal(&mut self) -> Option<char> {
+        match self.peek_kind() {
+            TokenKind::CharLiteral(value) => {
+                self.cursor += 1;
+                Some(value)
+            }
+            _ => None,
+        }
+    }
+
     pub(crate) fn error_here(&self, message: impl Into<String>) -> Error {
         let span = self
             .tokens
@@ -303,6 +314,7 @@ fn punctuation_name(kind: &TokenKind) -> &'static str {
         TokenKind::Keyword(_)
         | TokenKind::Identifier(_)
         | TokenKind::StringLiteral(_)
+        | TokenKind::CharLiteral(_)
         | TokenKind::IntegerLiteral(_) => "token",
     }
 }
