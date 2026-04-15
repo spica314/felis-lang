@@ -1,0 +1,26 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#entrypoint main;
+
+#proc fill_refs : (value_ref : & i32) -> (array_ref : &^ Array i32 2i32) -> () {
+    value_ref .> set 40i32;
+    array_ref .> set 0i32 1i32;
+    array_ref .> set 1i32 2i32;
+    ()
+}
+
+#fn sum_refs : (value_ref : & i32) -> (array_ref : &^ Array i32 2i32) -> i32 {
+    i32_add (value_ref .> get) (i32_add (array_ref .> get 0i32) (array_ref .> get 1i32))
+}
+
+#fn main : () #with IO {
+    #let _ @ value_ref = 39i32;
+    #let _ @^ array_ref <- IO::array_new i32 2i32;
+    fill_refs value_ref array_ref;
+    #let code = sum_refs value_ref array_ref;
+    #let _ <- IO::exit code;
+    ()
+}

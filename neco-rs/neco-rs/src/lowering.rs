@@ -18,6 +18,7 @@ pub(crate) struct LoweringState {
     pub(crate) next_array_slot: usize,
     pub(crate) next_i32_slot: usize,
     functions: HashMap<String, PureFunction>,
+    procedures: HashMap<String, Procedure>,
     constructors: HashMap<String, ConstructorSignature>,
     loop_depth: usize,
 }
@@ -31,6 +32,18 @@ struct PureFunction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PureFunctionParameter {
+    name: String,
+    ty: Term,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Procedure {
+    parameters: Vec<ProcedureParameter>,
+    body: Block,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ProcedureParameter {
     name: String,
     ty: Term,
 }
@@ -51,6 +64,7 @@ impl LoweringState {
             next_array_slot: 0,
             next_i32_slot: 0,
             functions: HashMap::new(),
+            procedures: HashMap::new(),
             constructors: HashMap::new(),
             loop_depth: 0,
         }
@@ -126,6 +140,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     };
     let mut state = LoweringState::new();
     state.functions = collect_pure_functions(package)?;
+    state.procedures = collect_procedures(package)?;
     state.constructors = collect_constructors(package)?;
     let mut terminated = false;
 
@@ -183,6 +198,7 @@ fn lower_statement(
                 next_array_slot: state.next_array_slot,
                 next_i32_slot: state.next_i32_slot,
                 functions: state.functions.clone(),
+                procedures: state.procedures.clone(),
                 constructors: state.constructors.clone(),
                 loop_depth: state.loop_depth + 1,
             };
@@ -246,6 +262,7 @@ fn lower_if_statement(
         next_array_slot: state.next_array_slot,
         next_i32_slot: state.next_i32_slot,
         functions: state.functions.clone(),
+        procedures: state.procedures.clone(),
         constructors: state.constructors.clone(),
         loop_depth: state.loop_depth,
     };
@@ -271,13 +288,14 @@ fn lower_if_statement(
 
     if let Some(else_branch) = &if_stmt.else_branch {
         let mut else_state = LoweringState {
-            environment: state.environment.clone(),
-            next_array_slot: state.next_array_slot,
-            next_i32_slot: state.next_i32_slot,
-            functions: state.functions.clone(),
-            constructors: state.constructors.clone(),
-            loop_depth: state.loop_depth,
-        };
+                environment: state.environment.clone(),
+                next_array_slot: state.next_array_slot,
+                next_i32_slot: state.next_i32_slot,
+                functions: state.functions.clone(),
+                procedures: state.procedures.clone(),
+                constructors: state.constructors.clone(),
+                loop_depth: state.loop_depth,
+            };
         let mut else_program = LoweredProgram {
             operations: Vec::new(),
             data: then_program.data,
@@ -432,6 +450,24 @@ fn collect_pure_functions(package: &ParsedPackage) -> Result<HashMap<String, Pur
     Ok(functions)
 }
 
+fn collect_procedures(package: &ParsedPackage) -> Result<HashMap<String, Procedure>> {
+    let mut procedures = HashMap::new();
+    for item in package
+        .source_files
+        .iter()
+        .flat_map(|file| file.syntax.items.iter())
+    {
+        let Item::Function(function) = item else {
+            continue;
+        };
+        if function.kind != FunctionKind::Proc {
+            continue;
+        }
+        procedures.insert(function.name.name.clone(), procedure_from_decl(function)?);
+    }
+    Ok(procedures)
+}
+
 fn collect_constructors(package: &ParsedPackage) -> Result<HashMap<String, ConstructorSignature>> {
     let mut constructors = HashMap::new();
     for item in package
@@ -514,6 +550,40 @@ fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<PureFunctio
     Ok(PureFunction {
         parameters,
         result_ty: current.clone(),
+        body: function.body.clone(),
+    })
+}
+
+fn procedure_from_decl(function: &FunctionDeclaration) -> Result<Procedure> {
+    let mut parameters = Vec::new();
+    let mut current = &function.ty;
+    while let Term::Arrow(arrow) = current {
+        let ArrowParameter::Binder(binder) = &arrow.parameter else {
+            return Err(Error::Unsupported(format!(
+                "procedure `{}` must use named parameters",
+                function.name.name
+            )));
+        };
+        parameters.push(ProcedureParameter {
+            name: binder.name.clone(),
+            ty: binder.ty.as_ref().clone(),
+        });
+        current = arrow.result.as_ref();
+    }
+    if !matches!(current, Term::Unit) {
+        return Err(Error::Unsupported(format!(
+            "procedure `{}` must return `()`",
+            function.name.name
+        )));
+    }
+    if !matches!(function.body.tail.as_deref(), Some(Term::Unit)) {
+        return Err(Error::Unsupported(format!(
+            "procedure `{}` body must end with `()`",
+            function.name.name
+        )));
+    }
+    Ok(Procedure {
+        parameters,
         body: function.body.clone(),
     })
 }
@@ -620,6 +690,7 @@ fn lower_match_value(
                 next_array_slot: state.next_array_slot,
                 next_i32_slot: state.next_i32_slot,
                 functions: state.functions.clone(),
+                procedures: state.procedures.clone(),
                 constructors: state.constructors.clone(),
                 loop_depth: state.loop_depth,
             };
@@ -841,6 +912,7 @@ fn lower_pure_function_call(
         next_array_slot: state.next_array_slot,
         next_i32_slot: state.next_i32_slot,
         functions: state.functions.clone(),
+        procedures: state.procedures.clone(),
         constructors: state.constructors.clone(),
         loop_depth: state.loop_depth,
     };
@@ -860,6 +932,7 @@ fn lower_pure_block_value(
         next_array_slot: state.next_array_slot,
         next_i32_slot: state.next_i32_slot,
         functions: state.functions.clone(),
+        procedures: state.procedures.clone(),
         constructors: state.constructors.clone(),
         loop_depth: state.loop_depth,
     };
@@ -1286,9 +1359,16 @@ fn lower_runtime_arg_get_call(
 
 fn lower_expression_statement(
     term: &Term,
-    state: &LoweringState,
+    state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<()> {
+    if let Some(terminated) = lower_procedure_call_statement(term, state, program)? {
+        if terminated {
+            return Ok(());
+        }
+        return Ok(());
+    }
+
     let Term::Application { callee, arguments } = term else {
         return Err(Error::Unsupported(format!(
             "unsupported expression statement in entrypoint body: {term:?}"
@@ -1357,6 +1437,71 @@ fn lower_expression_statement(
         }
     }
     Ok(())
+}
+
+fn lower_procedure_call_statement(
+    term: &Term,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Option<bool>> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(None);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(None);
+    };
+    if path.starts_with_package || path.segments.len() != 1 || !path.segments[0].suffixes.is_empty()
+    {
+        return Ok(None);
+    }
+
+    let name = path.segments[0].name.as_str();
+    if state.environment.contains_key(name) {
+        return Ok(None);
+    }
+    let Some(procedure) = state.procedures.get(name).cloned() else {
+        return Ok(None);
+    };
+
+    let normalized_arguments = normalize_numeric_literal_arguments(arguments);
+    if procedure.parameters.len() != normalized_arguments.len() {
+        return Err(Error::Unsupported(format!(
+            "procedure `{name}` must receive exactly {} arguments",
+            procedure.parameters.len()
+        )));
+    }
+
+    let mut scoped_environment = state.environment.clone();
+    for (parameter, argument) in procedure.parameters.iter().zip(normalized_arguments.iter()) {
+        let value = lower_pure_value(argument, state, program)?;
+        validate_value_against_type(&value, &parameter.ty, program)?;
+        scoped_environment.insert(parameter.name.clone(), value);
+    }
+
+    let mut scoped_state = LoweringState {
+        environment: scoped_environment,
+        next_array_slot: state.next_array_slot,
+        next_i32_slot: state.next_i32_slot,
+        functions: state.functions.clone(),
+        procedures: state.procedures.clone(),
+        constructors: state.constructors.clone(),
+        loop_depth: state.loop_depth,
+    };
+
+    let mut terminated = false;
+    for statement in &procedure.body.statements {
+        if terminated {
+            return Err(Error::Unsupported(
+                "statements after `IO::exit` are not supported".to_string(),
+            ));
+        }
+        terminated = lower_statement(statement, &mut scoped_state, program)?;
+    }
+
+    state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
+    state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
+
+    Ok(Some(terminated))
 }
 
 fn parse_suffixed_i32_literal(literal: &str) -> Result<I32Expr> {
