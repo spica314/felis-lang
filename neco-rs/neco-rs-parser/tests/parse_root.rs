@@ -229,9 +229,9 @@ fn parses_proc_reference_annotation_package_root() {
         exclusive,
     } = value_ref.ty.as_ref()
     else {
-        panic!("expected `& i32` reference type");
+        panic!("expected `&^ i32` reference type");
     };
-    assert!(!exclusive);
+    assert!(*exclusive);
     let Term::Path(i32_path) = referent.as_ref() else {
         panic!("expected i32 path");
     };
@@ -315,6 +315,44 @@ fn parses_proc_cli_arg_reference_package_root() {
         panic!("expected element type path");
     };
     assert_eq!(element_type_path.segments[0].name, "u8");
+    let Term::Arrow(left_arrow) = digits_arrow.result.as_ref() else {
+        panic!("expected left i32 reference parameter");
+    };
+    let neco_rs_parser::ArrowParameter::Binder(left_ref) = &left_arrow.parameter else {
+        panic!("expected named left i32 reference parameter");
+    };
+    let Term::Reference {
+        referent,
+        exclusive,
+    } = left_ref.ty.as_ref()
+    else {
+        panic!("expected `&^ i32` reference type");
+    };
+    assert!(*exclusive);
+    let Term::Path(i32_path) = referent.as_ref() else {
+        panic!("expected i32 path");
+    };
+    assert_eq!(i32_path.segments[0].name, "i32");
+
+    let Term::Arrow(right_arrow) = left_arrow.result.as_ref() else {
+        panic!("expected right i32 reference parameter");
+    };
+    let neco_rs_parser::ArrowParameter::Binder(right_ref) = &right_arrow.parameter else {
+        panic!("expected named right i32 reference parameter");
+    };
+    let Term::Reference {
+        referent,
+        exclusive,
+    } = right_ref.ty.as_ref()
+    else {
+        panic!("expected `&^ i32` reference type");
+    };
+    assert!(*exclusive);
+    let Term::Path(i32_path) = referent.as_ref() else {
+        panic!("expected i32 path");
+    };
+    assert_eq!(i32_path.segments[0].name, "i32");
+    assert!(matches!(right_arrow.result.as_ref(), Term::Unit));
 
     let Item::Function(main_fn) = &syntax.items[7] else {
         panic!("expected main function");
