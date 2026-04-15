@@ -1643,6 +1643,20 @@ fn validate_reference_value_against_type(
     referent: &Term,
     program: &LoweredProgram,
 ) -> Result<()> {
+    if let Some(element_type) = parse_unsized_array_type_annotation(referent)? {
+        return match value {
+            Value::Array {
+                element_type: actual_element_type,
+                ..
+            } if *actual_element_type == element_type => Ok(()),
+            Value::RuntimeArg(_) if element_type == ArrayElementType::U8 => Ok(()),
+            _ => Err(Error::Unsupported(format!(
+                "expected a value of type `{}` but got {value:?}",
+                render_reference_term(referent, false)
+            ))),
+        };
+    }
+
     if let Some((element_type, len)) = parse_array_type_annotation(referent)? {
         let Value::Array {
             slot,
@@ -1755,6 +1769,50 @@ fn parse_array_type_annotation(ty: &Term) -> Result<Option<(ArrayElementType, us
     })?;
 
     Ok(Some((element_type, len)))
+}
+
+fn parse_unsized_array_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
+    let Term::Application { callee, arguments } = ty else {
+        return Ok(None);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(None);
+    };
+    if path.starts_with_package
+        || path
+            .segments
+            .last()
+            .is_none_or(|segment| segment.name != "Array")
+        || path
+            .segments
+            .iter()
+            .any(|segment| !segment.suffixes.is_empty())
+    {
+        return Ok(None);
+    }
+
+    let [element_type_term] = arguments.as_slice() else {
+        return Ok(None);
+    };
+
+    match element_type_term {
+        Term::Path(path)
+            if !path.starts_with_package
+                && path.segments.len() == 1
+                && path.segments[0].suffixes.is_empty() =>
+        {
+            match path.segments[0].name.as_str() {
+                "i32" => Ok(Some(ArrayElementType::I32)),
+                "u8" => Ok(Some(ArrayElementType::U8)),
+                _ => Err(Error::Unsupported(
+                    "`Array` element type must be `i32` or `u8`".to_string(),
+                )),
+            }
+        }
+        _ => Err(Error::Unsupported(
+            "`Array` element type must be a simple path".to_string(),
+        )),
+    }
 }
 
 fn parse_array_length_term(term: &Term) -> Result<i32> {

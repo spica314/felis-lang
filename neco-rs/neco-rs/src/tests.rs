@@ -336,6 +336,47 @@ fn lowers_proc_reference_annotation_fixture_to_runtime_expression_tree() {
 }
 
 #[test]
+fn lowers_proc_cli_arg_reference_fixture_to_runtime_expression_tree() {
+    let root = repo_root().join("tests/testcases/proc-cli-arg-reference");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::StoreI32 {
+                slot: 0,
+                value: I32Expr::Literal(0),
+            },
+            Operation::StoreI32 {
+                slot: 1,
+                value: I32Expr::Literal(0),
+            },
+            Operation::StoreI32 {
+                slot: 0,
+                value: I32Expr::FromU8(Box::new(U8Expr::RuntimeArgGet {
+                    arg_index: Box::new(I32Expr::Literal(1)),
+                    index: Box::new(I32Expr::Literal(0)),
+                })),
+            },
+            Operation::StoreI32 {
+                slot: 1,
+                value: I32Expr::FromU8(Box::new(U8Expr::RuntimeArgGet {
+                    arg_index: Box::new(I32Expr::Literal(1)),
+                    index: Box::new(I32Expr::Literal(1)),
+                })),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
+                Box::new(I32Expr::Local(0)),
+                Box::new(I32Expr::Local(1)),
+            ))),
+        ]
+    );
+}
+
+#[test]
 fn lowers_u8_array_hello_world_fixture_to_runtime_array_operations() {
     let root = repo_root().join("tests/testcases/u8-array-hello-world");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

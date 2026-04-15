@@ -272,6 +272,57 @@ fn parses_proc_reference_annotation_package_root() {
 }
 
 #[test]
+fn parses_proc_cli_arg_reference_package_root() {
+    let root = repo_root().join("tests/testcases/proc-cli-arg-reference");
+    let parsed = parse_root(&root).expect("proc-cli-arg-reference package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "proc-cli-arg-reference");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 8);
+
+    let Item::Function(read_digits_proc) = &syntax.items[6] else {
+        panic!("expected helper procedure");
+    };
+    assert_eq!(read_digits_proc.kind, neco_rs_parser::FunctionKind::Proc);
+    let Term::Arrow(digits_arrow) = &read_digits_proc.ty else {
+        panic!("expected procedure arrow type");
+    };
+    let neco_rs_parser::ArrowParameter::Binder(digits_ref) = &digits_arrow.parameter else {
+        panic!("expected named byte-sequence parameter");
+    };
+    let Term::Reference { referent, exclusive } = digits_ref.ty.as_ref() else {
+        panic!("expected reference type");
+    };
+    assert!(*exclusive);
+    let Term::Application { callee, arguments } = referent.as_ref() else {
+        panic!("expected `Array u8` application");
+    };
+    let Term::Path(array_path) = callee.as_ref() else {
+        panic!("expected `Array` callee path");
+    };
+    assert_eq!(array_path.segments[0].name, "Array");
+    assert_eq!(arguments.len(), 1);
+    let Term::Path(element_type_path) = &arguments[0] else {
+        panic!("expected element type path");
+    };
+    assert_eq!(element_type_path.segments[0].name, "u8");
+
+    let Item::Function(main_fn) = &syntax.items[7] else {
+        panic!("expected main function");
+    };
+    assert_eq!(main_fn.body.statements.len(), 6);
+}
+
+#[test]
 fn parses_u8_array_hello_world_package_root() {
     let root = repo_root().join("tests/testcases/u8-array-hello-world");
     let parsed = parse_root(&root).expect("u8-array-hello-world package parses");

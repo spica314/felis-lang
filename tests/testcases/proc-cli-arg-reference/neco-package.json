@@ -1,0 +1,4 @@
+{
+    "name": "proc-cli-arg-reference",
+    "felis-bin-entrypoints": ["src/proc-cli-arg-reference.fe"]
+}

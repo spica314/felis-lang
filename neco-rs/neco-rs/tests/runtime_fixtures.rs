@@ -150,6 +150,19 @@ fn compiles_and_runs_proc_reference_annotation_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_proc_cli_arg_reference_fixture() {
+    let root = repo_root().join("tests/testcases/proc-cli-arg-reference");
+    let status = compile_fixture(&root, "proc-cli-arg-reference");
+    let run = runtime_test_runner(&status)
+        .arg("15")
+        .status()
+        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+    fs::remove_file(&status).expect("cleanup binary");
+    fs::remove_dir(status.parent().expect("build temp dir")).expect("cleanup build temp dir");
+    assert_eq!(run.code(), Some(102));
+}
+
+#[test]
 fn compiles_and_runs_u8_array_hello_world_fixture() {
     let root = repo_root().join("tests/testcases/u8-array-hello-world");
     let run = run_fixture_output(&root, "u8-array-hello-world");

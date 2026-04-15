@@ -73,18 +73,18 @@
     ()
 }
 
-#proc append_entrypoint_to_source_path : (entrypoint_ref : &^ Array u8 0x80i32) -> (source_path_ref : &^ Array u8 0x100i32) -> (source_path_index_ref : & i32) -> () {
-    #let _ @^ entrypoint_index_ref = 0i32;
+#proc append_nul_terminated_bytes : (source_ref : &^ Array u8) -> (dest_ref : &^ Array u8 0x100i32) -> (dest_index_ref : & i32) -> () {
+    #let _ @^ source_index_ref = 0i32;
     #loop {
-        #let byte = entrypoint_ref .> get (entrypoint_index_ref .> get);
+        #let byte = source_ref .> get (source_index_ref .> get);
         #if u8_eq byte '\0' {
             #break;
         };
-        source_path_ref .> set (source_path_index_ref .> get) byte;
-        #let next_source_path_index = i32_add (source_path_index_ref .> get) 1i32;
-        source_path_index_ref .> set next_source_path_index;
-        #let next_entrypoint_index = i32_add (entrypoint_index_ref .> get) 1i32;
-        entrypoint_index_ref .> set next_entrypoint_index;
+        dest_ref .> set (dest_index_ref .> get) byte;
+        #let next_dest_index = i32_add (dest_index_ref .> get) 1i32;
+        dest_index_ref .> set next_dest_index;
+        #let next_source_index = i32_add (source_index_ref .> get) 1i32;
+        source_index_ref .> set next_source_index;
     };
     ()
 }
@@ -119,19 +119,11 @@
     ()
 }
 
-#fn main : () #with IO {
+    #fn main : () #with IO {
     #let package_root_ref <- IO::arg 1i32;
     #let _ @^ manifest_path_ref <- IO::array_new u8 0x100i32;
     #let _ @^ manifest_path_index_ref = 0i32;
-    #loop {
-        #let byte = package_root_ref .> get (manifest_path_index_ref .> get);
-        #if u8_eq byte '\0' {
-            #break;
-        };
-        manifest_path_ref .> set (manifest_path_index_ref .> get) byte;
-        #let next_manifest_path_index = i32_add (manifest_path_index_ref .> get) 1i32;
-        manifest_path_index_ref .> set next_manifest_path_index;
-    };
+    append_nul_terminated_bytes package_root_ref manifest_path_ref manifest_path_index_ref;
     append_neco_package_manifest manifest_path_ref manifest_path_index_ref;
     #let manifest_fd <- IO::open manifest_path_ref 0i32 0i32;
     #let _ @^ manifest_ref <- IO::array_new u8 0x100i32;
@@ -186,18 +178,10 @@
     entrypoint_ref .> set (entrypoint_len_ref .> get) '\0';
     #let _ @^ source_path_ref <- IO::array_new u8 0x100i32;
     #let _ @^ source_path_index_ref = 0i32;
-    #loop {
-        #let byte = package_root_ref .> get (source_path_index_ref .> get);
-        #if u8_eq byte '\0' {
-            #break;
-        };
-        source_path_ref .> set (source_path_index_ref .> get) byte;
-        #let next_source_path_index = i32_add (source_path_index_ref .> get) 1i32;
-        source_path_index_ref .> set next_source_path_index;
-    };
+    append_nul_terminated_bytes package_root_ref source_path_ref source_path_index_ref;
     source_path_ref .> set (source_path_index_ref .> get) '/';
     source_path_index_ref .> set (i32_add (source_path_index_ref .> get) 1i32);
-    append_entrypoint_to_source_path entrypoint_ref source_path_ref source_path_index_ref;
+    append_nul_terminated_bytes entrypoint_ref source_path_ref source_path_index_ref;
     source_path_ref .> set (source_path_index_ref .> get) '\0';
     #let input_fd <- IO::open source_path_ref 0i32 0i32;
     #let _ @^ source_ref <- IO::array_new u8 0x100i32;
