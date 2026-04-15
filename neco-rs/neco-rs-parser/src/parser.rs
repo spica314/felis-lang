@@ -133,6 +133,8 @@ impl Parser {
                     | TokenKind::IntegerLiteral(_)
                     | TokenKind::Identifier(_)
                     | TokenKind::Keyword(Keyword::Package)
+                    | TokenKind::Ampersand
+                    | TokenKind::AmpersandCaret
             )
     }
 
@@ -302,6 +304,8 @@ fn punctuation_name(kind: &TokenKind) -> &'static str {
         TokenKind::Semicolon => ";",
         TokenKind::Comma => ",",
         TokenKind::Equals => "=",
+        TokenKind::Ampersand => "&",
+        TokenKind::AmpersandCaret => "&^",
         TokenKind::At => "@",
         TokenKind::AtCaret => "@^",
         TokenKind::Underscore => "_",

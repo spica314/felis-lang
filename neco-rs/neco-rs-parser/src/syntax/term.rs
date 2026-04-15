@@ -21,6 +21,10 @@ pub enum Term {
         receiver: Box<Term>,
         method: String,
     },
+    Reference {
+        referent: Box<Term>,
+        exclusive: bool,
+    },
     Arrow(ArrowTerm),
     Forall(ForallTerm),
 }
@@ -406,6 +410,20 @@ fn parse_primary_term(parser: &mut Parser) -> Result<Term> {
 
     if let Some(number) = parser.consume_integer_literal() {
         return Ok(Term::IntegerLiteral(number));
+    }
+
+    if parser.consume_punctuation(TokenKind::Ampersand) {
+        return Ok(Term::Reference {
+            referent: Box::new(parse_application_term(parser)?),
+            exclusive: false,
+        });
+    }
+
+    if parser.consume_punctuation(TokenKind::AmpersandCaret) {
+        return Ok(Term::Reference {
+            referent: Box::new(parse_application_term(parser)?),
+            exclusive: true,
+        });
     }
 
     if parser.is_path_start() {

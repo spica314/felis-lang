@@ -129,6 +129,20 @@ fn compiles_and_runs_array_basic_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_array_type_annotation_fixture() {
+    let root = repo_root().join("tests/testcases/array-type-annotation");
+    let status = run_fixture_status(&root, "array-type-annotation");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_i32_reference_annotation_fixture() {
+    let root = repo_root().join("tests/testcases/i32-reference-annotation");
+    let status = run_fixture_status(&root, "i32-reference-annotation");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_u8_array_hello_world_fixture() {
     let root = repo_root().join("tests/testcases/u8-array-hello-world");
     let run = run_fixture_output(&root, "u8-array-hello-world");

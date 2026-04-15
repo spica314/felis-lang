@@ -24,8 +24,15 @@ pub(crate) struct LoweringState {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PureFunction {
-    parameters: Vec<String>,
+    parameters: Vec<PureFunctionParameter>,
+    result_ty: Term,
     body: Block,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PureFunctionParameter {
+    name: String,
+    ty: Term,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -498,11 +505,15 @@ fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<PureFunctio
                 function.name.name
             )));
         };
-        parameters.push(binder.name.clone());
+        parameters.push(PureFunctionParameter {
+            name: binder.name.clone(),
+            ty: binder.ty.as_ref().clone(),
+        });
         current = arrow.result.as_ref();
     }
     Ok(PureFunction {
         parameters,
+        result_ty: current.clone(),
         body: function.body.clone(),
     })
 }
@@ -821,7 +832,8 @@ fn lower_pure_function_call(
     let mut scoped_environment = state.environment.clone();
     for (parameter, argument) in function.parameters.iter().zip(normalized_arguments.iter()) {
         let value = lower_pure_value(argument, state, program)?;
-        scoped_environment.insert(parameter.clone(), value);
+        validate_value_against_type(&value, &parameter.ty, program)?;
+        scoped_environment.insert(parameter.name.clone(), value);
     }
 
     let scoped_state = LoweringState {
@@ -833,7 +845,9 @@ fn lower_pure_function_call(
         loop_depth: state.loop_depth,
     };
 
-    lower_pure_block_value(&function.body, &scoped_state, program).map(Some)
+    let value = lower_pure_block_value(&function.body, &scoped_state, program)?;
+    validate_value_against_type(&value, &function.result_ty, program)?;
+    Ok(Some(value))
 }
 
 fn lower_pure_block_value(
@@ -1402,6 +1416,298 @@ fn parse_prefixed_u8_digits(digits: &str) -> std::result::Result<u8, std::num::P
         u8::from_str_radix(hex, 16)
     } else {
         digits.parse::<u8>()
+    }
+}
+
+fn validate_value_against_type(value: &Value, ty: &Term, program: &LoweredProgram) -> Result<()> {
+    if let Some((element_type, len)) = parse_array_type_annotation(ty)? {
+        let Value::Array {
+            slot,
+            element_type: actual_element_type,
+        } = value
+        else {
+            return Err(Error::Unsupported(format!(
+                "expected a value of type `{}` but got {value:?}",
+                render_term(ty)
+            )));
+        };
+        if *actual_element_type != element_type {
+            return Err(Error::Unsupported(format!(
+                "expected a value of type `{}` but got {value:?}",
+                render_term(ty)
+            )));
+        }
+        let actual_len = program
+            .arrays
+            .iter()
+            .find(|array| array.slot == *slot)
+            .map(|array| array.len)
+            .ok_or_else(|| {
+                Error::Unsupported(format!("unknown array slot `{slot}` while checking type"))
+            })?;
+        if actual_len != len {
+            return Err(Error::Unsupported(format!(
+                "expected a value of type `{}` but got {value:?}",
+                render_term(ty)
+            )));
+        }
+        return Ok(());
+    }
+
+    if let Term::Reference {
+        referent,
+        exclusive: _,
+    } = ty
+    {
+        return validate_reference_value_against_type(value, referent, program);
+    }
+
+    match ty {
+        Term::Unit => {
+            if matches!(value, Value::Unit) {
+                Ok(())
+            } else {
+                Err(Error::Unsupported(format!(
+                    "expected a value of type `()` but got {value:?}"
+                )))
+            }
+        }
+        Term::Path(path) if !path.starts_with_package && path.segments.len() == 1 => {
+            let segment = &path.segments[0];
+            if !segment.suffixes.is_empty() {
+                return Ok(());
+            }
+            match segment.name.as_str() {
+                "i32" if matches!(value, Value::I32(_)) => Ok(()),
+                "u8" if matches!(value, Value::U8(_)) => Ok(()),
+                type_name => match value {
+                    Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
+                    _ => Err(Error::Unsupported(format!(
+                        "expected a value of type `{}` but got {value:?}",
+                        render_term(ty)
+                    ))),
+                },
+            }
+        }
+        _ => Ok(()),
+    }
+}
+
+fn validate_reference_value_against_type(
+    value: &Value,
+    referent: &Term,
+    program: &LoweredProgram,
+) -> Result<()> {
+    if let Some((element_type, len)) = parse_array_type_annotation(referent)? {
+        let Value::Array {
+            slot,
+            element_type: actual_element_type,
+        } = value
+        else {
+            return Err(Error::Unsupported(format!(
+                "expected a value of type `{}` but got {value:?}",
+                render_reference_term(referent, false)
+            )));
+        };
+        if *actual_element_type != element_type {
+            return Err(Error::Unsupported(format!(
+                "expected a value of type `{}` but got {value:?}",
+                render_reference_term(referent, false)
+            )));
+        }
+        let actual_len = program
+            .arrays
+            .iter()
+            .find(|array| array.slot == *slot)
+            .map(|array| array.len)
+            .ok_or_else(|| {
+                Error::Unsupported(format!("unknown array slot `{slot}` while checking type"))
+            })?;
+        if actual_len != len {
+            return Err(Error::Unsupported(format!(
+                "expected a value of type `{}` but got {value:?}",
+                render_reference_term(referent, false)
+            )));
+        }
+        return Ok(());
+    }
+
+    match referent {
+        Term::Path(path)
+            if !path.starts_with_package
+                && path.segments.len() == 1
+                && path.segments[0].suffixes.is_empty() =>
+        {
+            match path.segments[0].name.as_str() {
+                "i32" if matches!(value, Value::I32Reference(_)) => Ok(()),
+                _ => Err(Error::Unsupported(format!(
+                    "expected a value of type `{}` but got {value:?}",
+                    render_reference_term(referent, false)
+                ))),
+            }
+        }
+        _ => Err(Error::Unsupported(format!(
+            "unsupported reference type `{}`",
+            render_reference_term(referent, false)
+        ))),
+    }
+}
+
+fn parse_array_type_annotation(ty: &Term) -> Result<Option<(ArrayElementType, usize)>> {
+    let Term::Application { callee, arguments } = ty else {
+        return Ok(None);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(None);
+    };
+    if path.starts_with_package
+        || path
+            .segments
+            .last()
+            .is_none_or(|segment| segment.name != "Array")
+        || path
+            .segments
+            .iter()
+            .any(|segment| !segment.suffixes.is_empty())
+    {
+        return Ok(None);
+    }
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [element_type_term, len_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`Array` type annotation must receive an element type and a constant i32 length"
+                .to_string(),
+        ));
+    };
+
+    let element_type = match element_type_term {
+        Term::Path(path)
+            if !path.starts_with_package
+                && path.segments.len() == 1
+                && path.segments[0].suffixes.is_empty() =>
+        {
+            match path.segments[0].name.as_str() {
+                "i32" => ArrayElementType::I32,
+                "u8" => ArrayElementType::U8,
+                _ => {
+                    return Err(Error::Unsupported(
+                        "`Array` element type must be `i32` or `u8`".to_string(),
+                    ));
+                }
+            }
+        }
+        _ => {
+            return Err(Error::Unsupported(
+                "`Array` element type must be a simple path".to_string(),
+            ));
+        }
+    };
+
+    let len = parse_array_length_term(len_term)?;
+    let len = usize::try_from(len).map_err(|_| {
+        Error::Unsupported("`Array` length must be non-negative".to_string())
+    })?;
+
+    Ok(Some((element_type, len)))
+}
+
+fn parse_array_length_term(term: &Term) -> Result<i32> {
+    match term {
+        Term::Application { callee, arguments } => {
+            let [suffix] = arguments.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`Array` length must be an `i32` literal".to_string(),
+                ));
+            };
+            let Term::IntegerLiteral(literal) = callee.as_ref() else {
+                return Err(Error::Unsupported(
+                    "`Array` length must be an `i32` literal".to_string(),
+                ));
+            };
+            if !is_i32_suffix_term(suffix) {
+                return Err(Error::Unsupported(
+                    "`Array` length must be an `i32` literal".to_string(),
+                ));
+            }
+            parse_bare_i32_literal(literal).map(|expr| match expr {
+                I32Expr::Literal(value) => value,
+                _ => unreachable!(),
+            })
+        }
+        _ => Err(Error::Unsupported(
+            "`Array` length must be an `i32` literal".to_string(),
+        )),
+    }
+}
+
+fn render_term(term: &Term) -> String {
+    match term {
+        Term::Unit => "()".to_string(),
+        Term::StringLiteral(value) => format!("{value:?}"),
+        Term::CharLiteral(value) => format!("{value:?}"),
+        Term::IntegerLiteral(value) => value.clone(),
+        Term::Path(path) => {
+            let mut rendered = String::new();
+            if path.starts_with_package {
+                rendered.push_str("#package");
+                if !path.segments.is_empty() {
+                    rendered.push_str("::");
+                }
+            }
+            for (index, segment) in path.segments.iter().enumerate() {
+                if index > 0 {
+                    rendered.push_str("::");
+                }
+                rendered.push_str(&segment.name);
+                for suffix in &segment.suffixes {
+                    rendered.push('[');
+                    rendered.push_str(&render_term(suffix));
+                    rendered.push(']');
+                }
+            }
+            rendered
+        }
+        Term::Group(inner) => format!("({})", render_term(inner)),
+        Term::TypedBinder(binder) => format!("({} : {})", binder.name, render_term(&binder.ty)),
+        Term::Block(_) => "{ ... }".to_string(),
+        Term::Match(_) => "#match { ... }".to_string(),
+        Term::Application { callee, arguments } => {
+            let mut rendered = render_term(callee);
+            for argument in arguments {
+                rendered.push(' ');
+                rendered.push_str(&render_term(argument));
+            }
+            rendered
+        }
+        Term::MethodCall { receiver, method } => format!("{} .> {}", render_term(receiver), method),
+        Term::Reference {
+            referent,
+            exclusive,
+        } => render_reference_term(referent, *exclusive),
+        Term::Arrow(arrow) => {
+            let lhs = match &arrow.parameter {
+                ArrowParameter::Binder(binder) => format!("({} : {})", binder.name, render_term(&binder.ty)),
+                ArrowParameter::Domain(domain) => render_term(domain),
+            };
+            format!("{lhs} -> {}", render_term(&arrow.result))
+        }
+        Term::Forall(forall) => {
+            format!(
+                "#forall {} : {}, {}",
+                forall.binder.name,
+                render_term(&forall.binder.ty),
+                render_term(&forall.body)
+            )
+        }
+    }
+}
+
+fn render_reference_term(referent: &Term, exclusive: bool) -> String {
+    if exclusive {
+        format!("&^ {}", render_term(referent))
+    } else {
+        format!("& {}", render_term(referent))
     }
 }
 

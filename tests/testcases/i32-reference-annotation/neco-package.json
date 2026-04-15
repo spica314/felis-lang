@@ -1,0 +1,4 @@
+{
+    "name": "i32-reference-annotation",
+    "felis-bin-entrypoints": ["src/i32-reference-annotation.fe"]
+}

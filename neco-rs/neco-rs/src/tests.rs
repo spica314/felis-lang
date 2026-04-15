@@ -205,6 +205,83 @@ fn lowers_array_basic_fixture_to_runtime_array_operations() {
 }
 
 #[test]
+fn lowers_array_type_annotation_fixture_to_runtime_array_operations() {
+    let root = repo_root().join("tests/testcases/array-type-annotation");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.arrays,
+        vec![ArrayAllocation {
+            slot: 0,
+            len: 4,
+            element_type: ArrayElementType::I32,
+        }]
+    );
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::ArraySetI32 {
+                array_slot: 0,
+                index: I32Expr::Literal(0),
+                value: I32Expr::Literal(7),
+            },
+            Operation::ArraySetI32 {
+                array_slot: 0,
+                index: I32Expr::Literal(1),
+                value: I32Expr::Literal(14),
+            },
+            Operation::ArraySetI32 {
+                array_slot: 0,
+                index: I32Expr::Literal(2),
+                value: I32Expr::Literal(21),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
+                Box::new(I32Expr::Add(
+                    Box::new(I32Expr::ArrayGet {
+                        array_slot: 0,
+                        index: Box::new(I32Expr::Literal(0)),
+                    }),
+                    Box::new(I32Expr::ArrayGet {
+                        array_slot: 0,
+                        index: Box::new(I32Expr::Literal(1)),
+                    }),
+                )),
+                Box::new(I32Expr::ArrayGet {
+                    array_slot: 0,
+                    index: Box::new(I32Expr::Literal(2)),
+                }),
+            ))),
+        ]
+    );
+}
+
+#[test]
+fn lowers_i32_reference_annotation_fixture_to_runtime_expression_tree() {
+    let root = repo_root().join("tests/testcases/i32-reference-annotation");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::StoreI32 {
+                slot: 0,
+                value: I32Expr::Literal(41),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
+                Box::new(I32Expr::Local(0)),
+                Box::new(I32Expr::Literal(1)),
+            ))),
+        ]
+    );
+}
+
+#[test]
 fn lowers_u8_array_hello_world_fixture_to_runtime_array_operations() {
     let root = repo_root().join("tests/testcases/u8-array-hello-world");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

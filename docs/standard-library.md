@@ -22,6 +22,11 @@ The standard library is now split into two workspace packages:
 The `primitive` branch exposes compiler-provided builtin bindings as ordinary
 source-level symbols.
 
+[`std/std_core/src/primitive/array.fe`](../std/std_core/src/primitive/array.fe)
+currently re-exports:
+
+- `Array`
+
 [`std/std_core/src/primitive/i32.fe`](../std/std_core/src/primitive/i32.fe)
 currently re-exports:
 

@@ -1,0 +1,4 @@
+{
+    "name": "array-type-annotation",
+    "felis-bin-entrypoints": ["src/array-type-annotation.fe"]
+}

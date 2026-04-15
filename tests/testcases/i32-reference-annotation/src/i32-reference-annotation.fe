@@ -1,0 +1,16 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#entrypoint main;
+
+#fn add1 : (value_ref : & i32) -> i32 {
+    i32_add (value_ref .> get) 1i32
+}
+
+#fn main : () #with IO {
+    #let _ @ value_ref = 41i32;
+    #let r = add1 value_ref;
+    #let _ <- IO::exit r;
+    ()
+}

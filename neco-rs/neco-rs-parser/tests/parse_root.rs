@@ -84,6 +84,119 @@ fn parses_array_basic_package_root() {
 }
 
 #[test]
+fn parses_array_type_annotation_package_root() {
+    let root = repo_root().join("tests/testcases/array-type-annotation");
+    let parsed = parse_root(&root).expect("array-type-annotation package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "array-type-annotation");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 7);
+
+    let Item::Function(sum3_fn) = &syntax.items[5] else {
+        panic!("expected helper function");
+    };
+    let Term::Arrow(sum3_ty) = &sum3_fn.ty else {
+        panic!("expected function arrow type");
+    };
+    let neco_rs_parser::ArrowParameter::Binder(array_ref) = &sum3_ty.parameter else {
+        panic!("expected named array parameter");
+    };
+    let Term::Reference {
+        referent,
+        exclusive,
+    } = array_ref.ty.as_ref()
+    else {
+        panic!("expected `&^ Array i32 4i32` reference type");
+    };
+    assert!(*exclusive);
+    let Term::Application {
+        callee,
+        arguments,
+    } = referent.as_ref()
+    else {
+        panic!("expected `Array i32 4i32` application");
+    };
+    let Term::Path(array_path) = callee.as_ref() else {
+        panic!("expected `Array` callee path");
+    };
+    assert_eq!(array_path.segments.len(), 1);
+    assert_eq!(array_path.segments[0].name, "Array");
+    assert_eq!(arguments.len(), 3);
+    let Term::Path(element_type_path) = &arguments[0] else {
+        panic!("expected element type path");
+    };
+    assert_eq!(element_type_path.segments[0].name, "i32");
+    let Term::IntegerLiteral(length_literal) = &arguments[1] else {
+        panic!("expected length literal");
+    };
+    assert_eq!(length_literal, "4");
+    let Term::Path(length_suffix_path) = &arguments[2] else {
+        panic!("expected length suffix path");
+    };
+    assert_eq!(length_suffix_path.segments[0].name, "i32");
+
+    let Item::Function(main_fn) = &syntax.items[6] else {
+        panic!("expected main function");
+    };
+    assert_eq!(main_fn.body.statements.len(), 6);
+}
+
+#[test]
+fn parses_i32_reference_annotation_package_root() {
+    let root = repo_root().join("tests/testcases/i32-reference-annotation");
+    let parsed = parse_root(&root).expect("i32-reference-annotation package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "i32-reference-annotation");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 6);
+
+    let Item::Function(add1_fn) = &syntax.items[4] else {
+        panic!("expected helper function");
+    };
+    let Term::Arrow(add1_ty) = &add1_fn.ty else {
+        panic!("expected function arrow type");
+    };
+    let neco_rs_parser::ArrowParameter::Binder(value_ref) = &add1_ty.parameter else {
+        panic!("expected named i32 parameter");
+    };
+    let Term::Reference {
+        referent,
+        exclusive,
+    } = value_ref.ty.as_ref()
+    else {
+        panic!("expected `& i32` reference type");
+    };
+    assert!(!exclusive);
+    let Term::Path(i32_path) = referent.as_ref() else {
+        panic!("expected i32 path");
+    };
+    assert_eq!(i32_path.segments[0].name, "i32");
+
+    let Item::Function(main_fn) = &syntax.items[5] else {
+        panic!("expected main function");
+    };
+    assert_eq!(main_fn.body.statements.len(), 3);
+}
+
+#[test]
 fn parses_u8_array_hello_world_package_root() {
     let root = repo_root().join("tests/testcases/u8-array-hello-world");
     let parsed = parse_root(&root).expect("u8-array-hello-world package parses");
