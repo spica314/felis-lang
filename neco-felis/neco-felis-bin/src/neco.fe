@@ -100,31 +100,27 @@
                 #if i32_eq next_key_match_index 0x15i32 {
                     entrypoint_parser_mode_ref .> set 1i32;
                 };
+            } #else #if u8_eq byte 'f' {
+                key_match_index_ref .> set 1i32;
             } #else {
-                #if u8_eq byte 'f' {
-                    key_match_index_ref .> set 1i32;
-                } #else {
-                    key_match_index_ref .> set 0i32;
-                };
+                key_match_index_ref .> set 0i32;
+            };
+        } #else #if i32_eq (entrypoint_parser_mode_ref .> get) 1i32 {
+            #if u8_eq byte '[' {
+                entrypoint_parser_mode_ref .> set 2i32;
             };
         } #else {
-            #if i32_eq (entrypoint_parser_mode_ref .> get) 1i32 {
-                #if u8_eq byte '[' {
-                    entrypoint_parser_mode_ref .> set 2i32;
+            #if i32_eq (entrypoint_parser_mode_ref .> get) 2i32 {
+                #if u8_eq byte '"' {
+                    entrypoint_parser_mode_ref .> set 3i32;
                 };
             } #else {
-                #if i32_eq (entrypoint_parser_mode_ref .> get) 2i32 {
-                    #if u8_eq byte '"' {
-                        entrypoint_parser_mode_ref .> set 3i32;
-                    };
-                } #else {
-                    #if u8_eq byte '"' {
-                        #break;
-                    };
-                    entrypoint_ref .> set (entrypoint_len_ref .> get) byte;
-                    #let next_entrypoint_len = i32_add (entrypoint_len_ref .> get) 1i32;
-                    entrypoint_len_ref .> set next_entrypoint_len;
+                #if u8_eq byte '"' {
+                    #break;
                 };
+                entrypoint_ref .> set (entrypoint_len_ref .> get) byte;
+                #let next_entrypoint_len = i32_add (entrypoint_len_ref .> get) 1i32;
+                entrypoint_len_ref .> set next_entrypoint_len;
             };
         };
         #let next_manifest_index = i32_add (manifest_index_ref .> get) 1i32;
@@ -196,12 +192,10 @@
                     #if i32_eq next_hello_world_match_index 0x0di32 {
                         hello_world_mode_ref .> set 1i32;
                     };
+                } #else #if u8_eq byte 'H' {
+                    hello_world_match_index_ref .> set 1i32;
                 } #else {
-                    #if u8_eq byte 'H' {
-                        hello_world_match_index_ref .> set 1i32;
-                    } #else {
-                        hello_world_match_index_ref .> set 0i32;
-                    };
+                    hello_world_match_index_ref .> set 0i32;
                 };
             };
         };
@@ -213,19 +207,7 @@
                 #let next_exit_code_byte = accumulate_decimal_u8 current_exit_code_byte byte;
                 exit_code_byte_ref .> set 0x00i32 next_exit_code_byte;
                 parsing_ref .> set 1i32;
-            } #else {
-                #if i32_eq (parsing_ref .> get) 1i32 {
-                    #if u8_eq byte 'i' {
-                        #break;
-                    } #else {
-                        parsed_exit_code_ref .> set 0i32;
-                        exit_code_byte_ref .> set 0x00i32 '\0';
-                        parsing_ref .> set 0i32;
-                    };
-                };
-            };
-        } #else {
-            #if i32_eq (parsing_ref .> get) 1i32 {
+            } #else #if i32_eq (parsing_ref .> get) 1i32 {
                 #if u8_eq byte 'i' {
                     #break;
                 } #else {
@@ -233,6 +215,14 @@
                     exit_code_byte_ref .> set 0x00i32 '\0';
                     parsing_ref .> set 0i32;
                 };
+            };
+        } #else #if i32_eq (parsing_ref .> get) 1i32 {
+            #if u8_eq byte 'i' {
+                #break;
+            } #else {
+                parsed_exit_code_ref .> set 0i32;
+                exit_code_byte_ref .> set 0x00i32 '\0';
+                parsing_ref .> set 0i32;
             };
         };
         #let next_index = i32_add (index_ref .> get) 1i32;
