@@ -13,7 +13,8 @@ use neco_rs_parser::{
 
 use crate::effect::{Value, bind_pattern, lower_effect};
 use crate::ir::{
-    ArrayAllocation, ArrayElementType, ExitCodeExpr, I32Expr, LoweredProgram, Operation,
+    ArrayAllocation, ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, LoweredProgram,
+    Operation,
 };
 use crate::{Error, Result};
 
@@ -57,6 +58,7 @@ impl LoweringState {
     pub(crate) fn allocate_array(
         &mut self,
         element_type: ArrayElementType,
+        kind: ArrayKind,
         len: usize,
         program: &mut LoweredProgram,
     ) -> usize {
@@ -66,6 +68,7 @@ impl LoweringState {
             slot,
             len,
             element_type,
+            kind,
         });
         slot
     }
@@ -445,6 +448,7 @@ fn lower_expression_statement(
         Value::Array {
             slot,
             element_type: ArrayElementType::I32,
+            ..
         } => {
             let normalized = normalize_numeric_literal_arguments(arguments);
             let [index, value] = normalized.as_slice() else {
@@ -461,6 +465,7 @@ fn lower_expression_statement(
         Value::Array {
             slot,
             element_type: ArrayElementType::U8,
+            ..
         } => {
             let normalized = normalize_numeric_literal_arguments(arguments);
             let [index, value] = normalized.as_slice() else {

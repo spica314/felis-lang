@@ -1,7 +1,7 @@
 use neco_rs_parser::Term;
 
 use crate::effect::{Value, resolve_value};
-use crate::ir::{ArrayElementType, ComparisonKind, ConditionExpr, I32Expr, U8Expr};
+use crate::ir::{ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, I32Expr, U8Expr};
 use crate::{Error, Result};
 
 use super::LoweringState;
@@ -14,14 +14,7 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
     match term {
         Term::Group(inner) => lower_i32_expr(inner, state),
         Term::IntegerLiteral(literal) => parse_suffixed_i32_literal(literal),
-        Term::MethodCall { receiver, method } if method == "get" => {
-            match resolve_value(receiver.as_ref(), &state.environment)? {
-                Value::I32Reference(slot) => Ok(I32Expr::Local(slot)),
-                other => Err(Error::Unsupported(format!(
-                    "`get` expects an `i32` reference, got {other:?}"
-                ))),
-            }
-        }
+        Term::MethodCall { .. } => lower_i32_method_call(term, state),
         Term::Path(_) => match resolve_value(term, &state.environment)? {
             Value::I32(expr) => Ok(expr),
             other => Err(Error::Unsupported(format!(
@@ -40,6 +33,33 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
             }
             lower_i32_primitive_call(callee, arguments, state)
         }
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `i32` expression in entrypoint body: {term:?}"
+        ))),
+    }
+}
+
+fn lower_i32_method_call(term: &Term, state: &LoweringState) -> Result<I32Expr> {
+    let Term::MethodCall { receiver, method } = term else {
+        unreachable!();
+    };
+    match method.as_str() {
+        "get" => match resolve_value(receiver.as_ref(), &state.environment)? {
+            Value::I32Reference(slot) => Ok(I32Expr::Local(slot)),
+            other => Err(Error::Unsupported(format!(
+                "`get` expects an `i32` reference, got {other:?}"
+            ))),
+        },
+        "len" => match resolve_value(receiver.as_ref(), &state.environment)? {
+            Value::Array {
+                slot,
+                kind: ArrayKind::Dynamic,
+                ..
+            } => Ok(I32Expr::ArrayLen { array_slot: slot }),
+            other => Err(Error::Unsupported(format!(
+                "`len` expects a `DynArray` reference, got {other:?}"
+            ))),
+        },
         _ => Err(Error::Unsupported(format!(
             "unsupported `i32` expression in entrypoint body: {term:?}"
         ))),
@@ -281,6 +301,7 @@ fn lower_array_get_call(
         Value::Array {
             slot,
             element_type: ArrayElementType::I32,
+            ..
         } => slot,
         other => {
             return Err(Error::Unsupported(format!(
@@ -336,6 +357,7 @@ fn lower_u8_array_get_call(
         Value::Array {
             slot,
             element_type: ArrayElementType::U8,
+            ..
         } => slot,
         other => {
             return Err(Error::Unsupported(format!(

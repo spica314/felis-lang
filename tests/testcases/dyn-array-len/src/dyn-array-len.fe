@@ -1,0 +1,11 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::DynArray;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let _ @^ array_ref <- IO::dyn_array_new u8 42i32;
+    #let len = array_ref .> len;
+    #let _ <- IO::exit len;
+    ()
+}

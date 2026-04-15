@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use neco_rs_parser::{BindingPattern, Term};
 
 use crate::effect::{Value, bind_pattern, resolve_value};
-use crate::ir::{ArrayElementType, ExitCodeExpr, I32Expr, LoweredProgram, OpenPath, Operation};
+use crate::ir::{
+    ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, LoweredProgram, OpenPath, Operation,
+};
 use crate::lowering::{LoweringState, lower_i32_expr, lower_u8_expr};
 use crate::{Error, Result};
 
@@ -109,12 +111,18 @@ pub(crate) fn lower_io_call(
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
-            let array_slot = state.allocate_array(element_type, length, program);
+            let kind = match path[1] {
+                "array_new" => ArrayKind::Fixed,
+                "dyn_array_new" => ArrayKind::Dynamic,
+                _ => unreachable!(),
+            };
+            let array_slot = state.allocate_array(element_type, kind, length, program);
             bind_pattern(
                 binder,
                 Value::Array {
                     slot: array_slot,
                     element_type,
+                    kind,
                 },
                 &mut state.environment,
             );
@@ -163,6 +171,7 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
         Value::Array {
             slot,
             element_type: ArrayElementType::U8,
+            ..
         } => Ok(Operation::WriteArray {
             fd,
             array_slot: slot,
@@ -199,6 +208,7 @@ fn parse_read_arguments(
         Value::Array {
             slot,
             element_type: ArrayElementType::U8,
+            ..
         } => slot,
         other => {
             return Err(Error::Unsupported(format!(
@@ -231,6 +241,7 @@ fn parse_open_arguments(
         Value::Array {
             slot,
             element_type: ArrayElementType::U8,
+            ..
         } => OpenPath::Array(slot),
         other => {
             return Err(Error::Unsupported(format!(

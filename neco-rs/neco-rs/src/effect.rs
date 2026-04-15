@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use neco_rs_parser::{BindingPattern, PathExpression, Term};
 
-use crate::ir::{ArrayElementType, ConstructorValue, I32Expr, LoweredProgram, U8Expr};
+use crate::ir::{ArrayElementType, ArrayKind, ConstructorValue, I32Expr, LoweredProgram, U8Expr};
 use crate::lowering::LoweringState;
 use crate::{Error, Result};
 
@@ -21,6 +21,7 @@ pub(crate) enum Value {
     Array {
         slot: usize,
         element_type: ArrayElementType,
+        kind: ArrayKind,
     },
 }
 

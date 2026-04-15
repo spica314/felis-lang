@@ -225,6 +225,30 @@ fn parses_dyn_array_u8_helpers_package_root() {
 }
 
 #[test]
+fn parses_dyn_array_len_package_root() {
+    let root = repo_root().join("tests/testcases/dyn-array-len");
+    let parsed = parse_root(&root).expect("dyn-array-len package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "dyn-array-len");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 4);
+
+    let Item::Function(main_fn) = &syntax.items[3] else {
+        panic!("expected main function");
+    };
+    assert_eq!(main_fn.body.statements.len(), 3);
+}
+
+#[test]
 fn parses_i32_reference_annotation_package_root() {
     let root = repo_root().join("tests/testcases/i32-reference-annotation");
     let parsed = parse_root(&root).expect("i32-reference-annotation package parses");

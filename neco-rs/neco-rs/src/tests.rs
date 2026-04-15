@@ -5,8 +5,8 @@ use neco_rs_parser::{ParsedPackage, ParsedRoot, parse_root};
 use crate::cli::{default_output_path, select_binary_from_package};
 use crate::codegen::build_linux_x86_64_program_executable;
 use crate::ir::{
-    ArrayAllocation, ArrayElementType, ComparisonKind, ConditionExpr, ExitCodeExpr, I32Expr,
-    LoweredProgram, OpenPath, Operation, U8Expr,
+    ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
+    I32Expr, LoweredProgram, OpenPath, Operation, U8Expr,
 };
 use crate::lowering::lower_package_to_program;
 
@@ -183,6 +183,7 @@ fn lowers_array_basic_fixture_to_runtime_array_operations() {
             slot: 0,
             len: 4,
             element_type: ArrayElementType::I32,
+            kind: ArrayKind::Fixed,
         }]
     );
     assert_eq!(
@@ -237,6 +238,7 @@ fn lowers_array_type_annotation_fixture_to_runtime_array_operations() {
             slot: 0,
             len: 4,
             element_type: ArrayElementType::I32,
+            kind: ArrayKind::Fixed,
         }]
     );
     assert_eq!(
@@ -291,6 +293,7 @@ fn lowers_dyn_array_type_annotation_fixture_to_runtime_array_operations() {
             slot: 0,
             len: 4,
             element_type: ArrayElementType::I32,
+            kind: ArrayKind::Dynamic,
         }]
     );
     assert_eq!(
@@ -345,9 +348,35 @@ fn lowers_dyn_array_u8_helpers_fixture_to_runtime_array_operations() {
             slot: 0,
             len: 8,
             element_type: ArrayElementType::U8,
+            kind: ArrayKind::Dynamic,
         }]
     );
     assert!(operations_contain_static_data_get(&program.operations));
+}
+
+#[test]
+fn lowers_dyn_array_len_fixture_to_runtime_array_len() {
+    let root = repo_root().join("tests/testcases/dyn-array-len");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.arrays,
+        vec![ArrayAllocation {
+            slot: 0,
+            len: 42,
+            element_type: ArrayElementType::U8,
+            kind: ArrayKind::Dynamic,
+        }]
+    );
+    assert_eq!(
+        program.operations,
+        vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::ArrayLen {
+            array_slot: 0,
+        }))]
+    );
 }
 
 #[test]
@@ -387,6 +416,7 @@ fn lowers_proc_reference_annotation_fixture_to_runtime_expression_tree() {
             slot: 0,
             len: 2,
             element_type: ArrayElementType::I32,
+            kind: ArrayKind::Fixed,
         }]
     );
     assert_eq!(
@@ -482,6 +512,7 @@ fn lowers_u8_array_hello_world_fixture_to_runtime_array_operations() {
             slot: 0,
             len: 13,
             element_type: ArrayElementType::U8,
+            kind: ArrayKind::Fixed,
         }]
     );
     assert_eq!(
@@ -578,6 +609,7 @@ fn lowers_hex_literals_fixture_to_runtime_array_operations() {
             slot: 0,
             len: 2,
             element_type: ArrayElementType::U8,
+            kind: ArrayKind::Fixed,
         }]
     );
     assert_eq!(
@@ -1042,6 +1074,7 @@ fn lowers_stdin_to_stdout_fixture_to_runtime_io_operations() {
             slot: 0,
             len: 1000,
             element_type: ArrayElementType::U8,
+            kind: ArrayKind::Fixed,
         }]
     );
     assert_eq!(
@@ -1079,6 +1112,7 @@ fn lowers_open_read_close_fixture_to_runtime_io_operations() {
             slot: 0,
             len: 128,
             element_type: ArrayElementType::U8,
+            kind: ArrayKind::Fixed,
         }]
     );
     assert_eq!(
@@ -1200,6 +1234,7 @@ fn lowers_cli_args_fixture_to_runtime_io_operations() {
             slot: 0,
             len: 64,
             element_type: ArrayElementType::U8,
+            kind: ArrayKind::Fixed,
         }]
     );
     assert_eq!(program.i32_slots, 2);
@@ -1221,11 +1256,13 @@ fn lowers_open_array_path_fixture_to_runtime_io_operations() {
                 slot: 0,
                 len: 12,
                 element_type: ArrayElementType::U8,
+                kind: ArrayKind::Fixed,
             },
             ArrayAllocation {
                 slot: 1,
                 len: 128,
                 element_type: ArrayElementType::U8,
+                kind: ArrayKind::Fixed,
             },
         ]
     );

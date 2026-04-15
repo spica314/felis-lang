@@ -163,7 +163,7 @@
     #let output_path_bytes_ref = output_path_ref .> as_bytes;
     #let fd <- IO::open output_path_bytes_ref 0x241i32 0x1edi32;
     #let _ @^ elf_ref <- IO::dyn_array_new u8 0x102fi32;
-    fill_u8 elf_ref 0x102fi32 0x00u8;
+    fill_u8 elf_ref 0x00u8;
     elf_ref .> set 0x0i32 0x7fu8;
     elf_ref .> set 0x1i32 0x45u8;
     elf_ref .> set 0x2i32 0x4cu8;

@@ -1,7 +1,7 @@
 use neco_rs_parser::{ArrowParameter, Term};
 
 use crate::effect::Value;
-use crate::ir::{ArrayElementType, I32Expr, LoweredProgram, U8Expr};
+use crate::ir::{ArrayElementType, ArrayKind, I32Expr, LoweredProgram, U8Expr};
 use crate::{Error, Result};
 
 pub(crate) fn validate_value_against_type(
@@ -14,6 +14,7 @@ pub(crate) fn validate_value_against_type(
             Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
+                kind: ArrayKind::Dynamic,
                 ..
             } if *actual_element_type == element_type => Ok(()),
             Value::RuntimeArg(_) if element_type == ArrayElementType::U8 => Ok(()),
@@ -28,6 +29,7 @@ pub(crate) fn validate_value_against_type(
         let Value::Array {
             slot,
             element_type: actual_element_type,
+            kind: ArrayKind::Fixed,
         } = value
         else {
             return Err(Error::Unsupported(format!(
@@ -122,6 +124,7 @@ fn validate_reference_value_against_type(
             Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
+                kind: ArrayKind::Dynamic,
                 ..
             } if *actual_element_type == element_type => Ok(()),
             Value::RuntimeArg(_) if element_type == ArrayElementType::U8 => Ok(()),
@@ -136,6 +139,7 @@ fn validate_reference_value_against_type(
         let Value::Array {
             slot,
             element_type: actual_element_type,
+            kind: ArrayKind::Fixed,
         } = value
         else {
             return Err(Error::Unsupported(format!(

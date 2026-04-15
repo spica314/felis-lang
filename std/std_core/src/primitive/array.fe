@@ -24,10 +24,10 @@
     ()
 }
 
-#proc fill_u8 : (dest_ref : &^ DynArray u8) -> (len : i32) -> (byte : u8) -> () {
+#proc fill_u8 : (dest_ref : &^ DynArray u8) -> (byte : u8) -> () {
     #let _ @^ index_ref = 0i32;
     #loop {
-        #if i32_gte (index_ref .> get) len {
+        #if i32_gte (index_ref .> get) (dest_ref .> len) {
             #break;
         };
         dest_ref .> set (index_ref .> get) byte;

@@ -12,7 +12,7 @@
     #let source_bytes_ref = source_ref .> as_bytes;
     #let _ @^ buffer_ref <- IO::dyn_array_new u8 8i32;
     #let _ @^ index_ref = 0i32;
-    fill_u8 buffer_ref 8i32 '.';
+    fill_u8 buffer_ref '.';
     append_nul_terminated_u8 source_bytes_ref buffer_ref index_ref;
     append_u8 buffer_ref index_ref 'c';
     #let exit_code = buffer_ref .> get 2i32;

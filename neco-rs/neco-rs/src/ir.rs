@@ -29,6 +29,9 @@ pub(crate) enum I32Expr {
         array_slot: usize,
         index: Box<I32Expr>,
     },
+    ArrayLen {
+        array_slot: usize,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,11 +91,18 @@ pub(crate) enum ArrayElementType {
     U8,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ArrayKind {
+    Fixed,
+    Dynamic,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ArrayAllocation {
     pub(crate) slot: usize,
     pub(crate) len: usize,
     pub(crate) element_type: ArrayElementType,
+    pub(crate) kind: ArrayKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
