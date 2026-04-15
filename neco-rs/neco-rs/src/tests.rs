@@ -24,6 +24,25 @@ fn selected_fixture_package(root: &Path, binary_name: &str) -> ParsedPackage {
     select_binary_from_package(package, &PathBuf::from(binary_name)).expect("select binary")
 }
 
+fn operations_contain_static_data_get(operations: &[Operation]) -> bool {
+    operations.iter().any(|operation| match operation {
+        Operation::ArraySetU8 {
+            value: U8Expr::StaticDataGet { .. },
+            ..
+        } => true,
+        Operation::If {
+            then_operations,
+            else_operations,
+            ..
+        } => {
+            operations_contain_static_data_get(then_operations)
+                || operations_contain_static_data_get(else_operations)
+        }
+        Operation::Loop { body_operations } => operations_contain_static_data_get(body_operations),
+        _ => false,
+    })
+}
+
 #[test]
 fn lowers_exit_fixture_to_program() {
     let root = repo_root().join("tests/testcases/exit-42");
@@ -310,6 +329,25 @@ fn lowers_dyn_array_type_annotation_fixture_to_runtime_array_operations() {
             ))),
         ]
     );
+}
+
+#[test]
+fn lowers_dyn_array_u8_helpers_fixture_to_runtime_array_operations() {
+    let root = repo_root().join("tests/testcases/dyn-array-u8-helpers");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.arrays,
+        vec![ArrayAllocation {
+            slot: 0,
+            len: 8,
+            element_type: ArrayElementType::U8,
+        }]
+    );
+    assert!(operations_contain_static_data_get(&program.operations));
 }
 
 #[test]

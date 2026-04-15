@@ -1,0 +1,4 @@
+{
+    "name": "dyn-array-u8-helpers",
+    "felis-bin-entrypoints": ["src/dyn-array-u8-helpers.fe"]
+}

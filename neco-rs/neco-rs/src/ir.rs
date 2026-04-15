@@ -66,6 +66,10 @@ pub(crate) enum U8Expr {
         arg_index: Box<I32Expr>,
         index: Box<I32Expr>,
     },
+    StaticDataGet {
+        data_index: usize,
+        index: Box<I32Expr>,
+    },
     ArrayGet {
         array_slot: usize,
         index: Box<I32Expr>,

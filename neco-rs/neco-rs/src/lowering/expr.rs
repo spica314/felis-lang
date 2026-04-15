@@ -374,6 +374,10 @@ fn lower_runtime_arg_get_call(
             arg_index: Box::new(arg_index),
             index: Box::new(lower_i32_expr(index, state)?),
         })),
+        Value::ByteString(data_index) => Ok(Some(U8Expr::StaticDataGet {
+            data_index,
+            index: Box::new(lower_i32_expr(index, state)?),
+        })),
         _ => Ok(None),
     }
 }

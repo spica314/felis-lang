@@ -11,6 +11,7 @@ pub(crate) fn validate_value_against_type(
 ) -> Result<()> {
     if let Some(element_type) = parse_dyn_array_type_annotation(ty)? {
         return match value {
+            Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
                 ..
@@ -103,6 +104,7 @@ fn validate_reference_value_against_type(
 ) -> Result<()> {
     if let Some(element_type) = parse_dyn_array_type_annotation(referent)? {
         return match value {
+            Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
                 ..
@@ -117,6 +119,7 @@ fn validate_reference_value_against_type(
 
     if let Some(element_type) = parse_unsized_array_type_annotation(referent)? {
         return match value {
+            Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
                 ..

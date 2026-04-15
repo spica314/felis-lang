@@ -6,10 +6,11 @@ use crate::ir::{
 };
 
 const ARGV_GLOBAL_ADDRESS: u64 = 0x405000;
+const DATA_VIRTUAL_ADDRESS: u64 = 0x404000;
 
 pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) -> Elf64Executable {
     let code_virtual_address = 0x401000;
-    let data_virtual_address = 0x404000;
+    let data_virtual_address = DATA_VIRTUAL_ADDRESS;
     let mut elf = Elf64Executable::new(code_virtual_address);
     elf.add_load_segment(LoadSegment::new(
         code_virtual_address,
@@ -483,6 +484,9 @@ fn emit_u8_expr_to_eax(expr: &U8Expr, code: &mut Vec<u8>, program: &LoweredProgr
         U8Expr::RuntimeArgGet { arg_index, index } => {
             emit_runtime_arg_u8_get(arg_index, index, code, program, ARGV_GLOBAL_ADDRESS)
         }
+        U8Expr::StaticDataGet { data_index, index } => {
+            emit_static_data_u8_get(*data_index, index, code, program)
+        }
         U8Expr::ArrayGet { array_slot, index } => {
             emit_u8_array_get(*array_slot, index, code, program)
         }
@@ -533,6 +537,19 @@ fn emit_u8_div_mod_expr(
         code.extend_from_slice(&[0x89, 0xd0]);
     }
     code.extend_from_slice(&[0x0f, 0xb6, 0xc0]);
+}
+
+fn emit_static_data_u8_get(
+    data_index: usize,
+    index: &I32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    let data_address = static_data_address(program, data_index);
+    emit_i32_expr_to_eax(index, code, program);
+    code.extend_from_slice(&[0x48, 0xbb]);
+    code.extend_from_slice(&data_address.to_le_bytes());
+    code.extend_from_slice(&[0x0f, 0xb6, 0x04, 0x03]);
 }
 
 fn emit_argv_global_init(code: &mut Vec<u8>, argv_global_address: u64) {
@@ -598,6 +615,10 @@ fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
         }
     }
     panic!("unknown array slot {slot}");
+}
+
+fn static_data_address(program: &LoweredProgram, data_index: usize) -> u64 {
+    data_addresses(program, DATA_VIRTUAL_ADDRESS)[data_index]
 }
 
 fn i32_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {

@@ -64,20 +64,22 @@ pub(super) fn collect_pure_functions(
     Ok(functions)
 }
 
-pub(super) fn collect_procedures(package: &ParsedPackage) -> Result<HashMap<String, Procedure>> {
+pub(super) fn collect_procedures(packages: &[ParsedPackage]) -> Result<HashMap<String, Procedure>> {
     let mut procedures = HashMap::new();
-    for item in package
-        .source_files
-        .iter()
-        .flat_map(|file| file.syntax.items.iter())
-    {
-        let Item::Function(function) = item else {
-            continue;
-        };
-        if function.kind != FunctionKind::Proc {
-            continue;
+    for package in packages {
+        for item in package
+            .source_files
+            .iter()
+            .flat_map(|file| file.syntax.items.iter())
+        {
+            let Item::Function(function) = item else {
+                continue;
+            };
+            if function.kind != FunctionKind::Proc {
+                continue;
+            }
+            procedures.insert(function.name.name.clone(), procedure_from_decl(function)?);
         }
-        procedures.insert(function.name.name.clone(), procedure_from_decl(function)?);
     }
     Ok(procedures)
 }

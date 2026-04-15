@@ -4,9 +4,11 @@ mod pure;
 mod typecheck;
 
 use std::collections::HashMap;
+use std::path::Path;
 
 use neco_rs_parser::{
-    BindingPattern, ElseBranch, Item, LetOperator, ParsedPackage, Statement, Term,
+    BindingPattern, ElseBranch, Item, LetOperator, ParsedPackage, ParsedRoot, ParsedWorkspace,
+    Statement, Term, parse_root,
 };
 
 use crate::effect::{Value, bind_pattern, lower_effect};
@@ -121,8 +123,9 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
         requires_argv: false,
     };
     let mut state = LoweringState::new();
+    let procedure_packages = collect_procedure_packages(package)?;
     state.functions = collect_pure_functions(package)?;
-    state.procedures = collect_procedures(package)?;
+    state.procedures = collect_procedures(&procedure_packages)?;
     state.constructors = collect_constructors(package)?;
     let mut terminated = false;
 
@@ -145,6 +148,76 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     program.i32_slots = state.next_i32_slot;
 
     Ok(program)
+}
+
+fn collect_procedure_packages(package: &ParsedPackage) -> Result<Vec<ParsedPackage>> {
+    let mut packages = resolve_workspace_dependency_packages(package)?;
+    if let Some(std_core) = find_std_core_package(package)? {
+        packages.push(std_core);
+    }
+    packages.push(package.clone());
+    Ok(packages)
+}
+
+fn resolve_workspace_dependency_packages(package: &ParsedPackage) -> Result<Vec<ParsedPackage>> {
+    if package.manifest.dependencies.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let Some(workspace) = find_workspace_for_package(package)? else {
+        return Ok(Vec::new());
+    };
+
+    let mut packages = Vec::new();
+    for dependency in &package.manifest.dependencies {
+        let dependency_package = workspace
+            .packages
+            .iter()
+            .find(|candidate| candidate.manifest.name == dependency.name)
+            .cloned()
+            .ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "workspace dependency `{}` could not be resolved for lowering",
+                    dependency.name
+                ))
+            })?;
+        packages.push(dependency_package);
+    }
+    Ok(packages)
+}
+
+fn find_workspace_for_package(package: &ParsedPackage) -> Result<Option<ParsedWorkspace>> {
+    let mut current = package.root_dir.parent();
+    while let Some(candidate) = current {
+        let manifest_path = candidate.join("neco-package.json");
+        if manifest_path.exists()
+            && let Ok(ParsedRoot::Workspace(workspace)) = parse_root(candidate)
+            && workspace
+                .packages
+                .iter()
+                .any(|member| paths_equal(&member.root_dir, &package.root_dir))
+        {
+            return Ok(Some(workspace));
+        }
+        current = candidate.parent();
+    }
+    Ok(None)
+}
+
+fn find_std_core_package(package: &ParsedPackage) -> Result<Option<ParsedPackage>> {
+    for ancestor in package.root_dir.ancestors() {
+        let candidate = ancestor.join("std/std_core");
+        if candidate.join("neco-package.json").exists()
+            && let Ok(ParsedRoot::Package(std_core)) = parse_root(&candidate)
+        {
+            return Ok(Some(std_core));
+        }
+    }
+    Ok(None)
+}
+
+fn paths_equal(lhs: &Path, rhs: &Path) -> bool {
+    lhs == rhs
 }
 
 pub(super) fn lower_statement(

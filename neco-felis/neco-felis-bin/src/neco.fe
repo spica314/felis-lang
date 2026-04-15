@@ -1,5 +1,9 @@
 #use std_core::io::IO;
 #use std_core::primitive::array::Array;
+#use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::append_nul_terminated_u8;
+#use std_core::primitive::array::append_u8;
+#use std_core::primitive::array::fill_u8;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::i32::i32_from_u8;
@@ -25,116 +29,26 @@
     u8_add (u8_mul current 10u8) (u8_sub digit '0')
 }
 
-#proc append_neco_package_manifest : (manifest_path_ref : &^ Array u8 0x100i32) -> (manifest_path_index_ref : & i32) -> () {
-    manifest_path_ref .> set (manifest_path_index_ref .> get) '/';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x01i32) 'n';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x02i32) 'e';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x03i32) 'c';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x04i32) 'o';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x05i32) '-';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x06i32) 'p';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x07i32) 'a';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x08i32) 'c';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x09i32) 'k';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x0ai32) 'a';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x0bi32) 'g';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x0ci32) 'e';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x0di32) '.';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x0ei32) 'j';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x0fi32) 's';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x10i32) 'o';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x11i32) 'n';
-    manifest_path_ref .> set (i32_add (manifest_path_index_ref .> get) 0x12i32) '\0';
-    ()
-}
-
-#proc initialize_entrypoints_key_pattern : (key_pattern_ref : &^ Array u8 0x15i32) -> () {
-    key_pattern_ref .> set 0x00i32 'f';
-    key_pattern_ref .> set 0x01i32 'e';
-    key_pattern_ref .> set 0x02i32 'l';
-    key_pattern_ref .> set 0x03i32 'i';
-    key_pattern_ref .> set 0x04i32 's';
-    key_pattern_ref .> set 0x05i32 '-';
-    key_pattern_ref .> set 0x06i32 'b';
-    key_pattern_ref .> set 0x07i32 'i';
-    key_pattern_ref .> set 0x08i32 'n';
-    key_pattern_ref .> set 0x09i32 '-';
-    key_pattern_ref .> set 0x0ai32 'e';
-    key_pattern_ref .> set 0x0bi32 'n';
-    key_pattern_ref .> set 0x0ci32 't';
-    key_pattern_ref .> set 0x0di32 'r';
-    key_pattern_ref .> set 0x0ei32 'y';
-    key_pattern_ref .> set 0x0fi32 'p';
-    key_pattern_ref .> set 0x10i32 'o';
-    key_pattern_ref .> set 0x11i32 'i';
-    key_pattern_ref .> set 0x12i32 'n';
-    key_pattern_ref .> set 0x13i32 't';
-    key_pattern_ref .> set 0x14i32 's';
-    ()
-}
-
-#proc append_nul_terminated_bytes : (source_ref : &^ Array u8) -> (dest_ref : &^ Array u8 0x100i32) -> (dest_index_ref : & i32) -> () {
-    #let _ @^ source_index_ref = 0i32;
-    #loop {
-        #let byte = source_ref .> get (source_index_ref .> get);
-        #if u8_eq byte '\0' {
-            #break;
-        };
-        dest_ref .> set (dest_index_ref .> get) byte;
-        #let next_dest_index = i32_add (dest_index_ref .> get) 1i32;
-        dest_index_ref .> set next_dest_index;
-        #let next_source_index = i32_add (source_index_ref .> get) 1i32;
-        source_index_ref .> set next_source_index;
-    };
-    ()
-}
-
-#proc initialize_hello_world_pattern : (hello_world_pattern_ref : &^ Array u8 0x0di32) -> () {
-    hello_world_pattern_ref .> set 0x00i32 'H';
-    hello_world_pattern_ref .> set 0x01i32 'e';
-    hello_world_pattern_ref .> set 0x02i32 'l';
-    hello_world_pattern_ref .> set 0x03i32 'l';
-    hello_world_pattern_ref .> set 0x04i32 'o';
-    hello_world_pattern_ref .> set 0x05i32 ',';
-    hello_world_pattern_ref .> set 0x06i32 ' ';
-    hello_world_pattern_ref .> set 0x07i32 'w';
-    hello_world_pattern_ref .> set 0x08i32 'o';
-    hello_world_pattern_ref .> set 0x09i32 'r';
-    hello_world_pattern_ref .> set 0x0ai32 'l';
-    hello_world_pattern_ref .> set 0x0bi32 'd';
-    hello_world_pattern_ref .> set 0x0ci32 '!';
-    ()
-}
-
-#proc zero_elf_buffer : (elf_ref : &^ Array u8 0x102fi32) -> () {
-    #let _ @^ elf_index_ref = 0i32;
-    #loop {
-        #if i32_gte (elf_index_ref .> get) 0x102fi32 {
-            #break;
-        };
-        elf_ref .> set (elf_index_ref .> get) 0x00u8;
-        #let next_elf_index = i32_add (elf_index_ref .> get) 1i32;
-        elf_index_ref .> set next_elf_index;
-    };
-    ()
-}
-
     #fn main : () #with IO {
     #let package_root_ref <- IO::arg 1i32;
-    #let _ @^ manifest_path_ref <- IO::array_new u8 0x100i32;
+    #let _ @^ manifest_path_ref <- IO::dyn_array_new u8 0x100i32;
     #let _ @^ manifest_path_index_ref = 0i32;
-    append_nul_terminated_bytes package_root_ref manifest_path_ref manifest_path_index_ref;
-    append_neco_package_manifest manifest_path_ref manifest_path_index_ref;
+    #let _ @ manifest_suffix_ref = "neco-package.json";
+    #let manifest_suffix_bytes_ref = manifest_suffix_ref .> as_bytes;
+    append_nul_terminated_u8 package_root_ref manifest_path_ref manifest_path_index_ref;
+    append_u8 manifest_path_ref manifest_path_index_ref '/';
+    append_nul_terminated_u8 manifest_suffix_bytes_ref manifest_path_ref manifest_path_index_ref;
+    append_u8 manifest_path_ref manifest_path_index_ref '\0';
     #let manifest_fd <- IO::open manifest_path_ref 0i32 0i32;
-    #let _ @^ manifest_ref <- IO::array_new u8 0x100i32;
+    #let _ @^ manifest_ref <- IO::dyn_array_new u8 0x100i32;
     #let manifest_len <- IO::read manifest_fd manifest_ref 0x100i32;
     #let _ <- IO::close manifest_fd;
-    #let _ @^ key_pattern_ref <- IO::array_new u8 0x15i32;
-    initialize_entrypoints_key_pattern key_pattern_ref;
+    #let _ @ key_pattern_ref = "felis-bin-entrypoints";
+    #let key_pattern_bytes_ref = key_pattern_ref .> as_bytes;
     #let _ @^ manifest_index_ref = 0i32;
     #let _ @^ key_match_index_ref = 0i32;
     #let _ @^ entrypoint_parser_mode_ref = 0i32;
-    #let _ @^ entrypoint_ref <- IO::array_new u8 0x80i32;
+    #let _ @^ entrypoint_ref <- IO::dyn_array_new u8 0x80i32;
     #let _ @^ entrypoint_len_ref = 0i32;
     #loop {
         #if i32_gte (manifest_index_ref .> get) manifest_len {
@@ -142,7 +56,7 @@
         };
         #let byte = manifest_ref .> get (manifest_index_ref .> get);
         #if i32_eq (entrypoint_parser_mode_ref .> get) 0i32 {
-            #let expected_byte = key_pattern_ref .> get (key_match_index_ref .> get);
+            #let expected_byte = key_pattern_bytes_ref .> get (key_match_index_ref .> get);
             #if u8_eq byte expected_byte {
                 #let next_key_match_index = i32_add (key_match_index_ref .> get) 1i32;
                 key_match_index_ref .> set next_key_match_index;
@@ -176,26 +90,25 @@
         manifest_index_ref .> set next_manifest_index;
     };
     entrypoint_ref .> set (entrypoint_len_ref .> get) '\0';
-    #let _ @^ source_path_ref <- IO::array_new u8 0x100i32;
+    #let _ @^ source_path_ref <- IO::dyn_array_new u8 0x100i32;
     #let _ @^ source_path_index_ref = 0i32;
-    append_nul_terminated_bytes package_root_ref source_path_ref source_path_index_ref;
-    source_path_ref .> set (source_path_index_ref .> get) '/';
-    source_path_index_ref .> set (i32_add (source_path_index_ref .> get) 1i32);
-    append_nul_terminated_bytes entrypoint_ref source_path_ref source_path_index_ref;
-    source_path_ref .> set (source_path_index_ref .> get) '\0';
+    append_nul_terminated_u8 package_root_ref source_path_ref source_path_index_ref;
+    append_u8 source_path_ref source_path_index_ref '/';
+    append_nul_terminated_u8 entrypoint_ref source_path_ref source_path_index_ref;
+    append_u8 source_path_ref source_path_index_ref '\0';
     #let input_fd <- IO::open source_path_ref 0i32 0i32;
-    #let _ @^ source_ref <- IO::array_new u8 0x100i32;
+    #let _ @^ source_ref <- IO::dyn_array_new u8 0x100i32;
     #let source_len <- IO::read input_fd source_ref 0x100i32;
     #let _ <- IO::close input_fd;
     #let _ @^ index_ref = 0i32;
     #let _ @^ parsing_ref = 0i32;
     #let _ @^ parsed_exit_code_ref = 0i32;
-    #let _ @^ exit_code_byte_ref <- IO::array_new u8 0x01i32;
+    #let _ @^ exit_code_byte_ref <- IO::dyn_array_new u8 0x01i32;
     #let _ @^ hello_world_mode_ref = 0i32;
     #let _ @^ hello_world_match_index_ref = 0i32;
-    #let _ @^ hello_world_pattern_ref <- IO::array_new u8 0x0di32;
+    #let _ @ hello_world_pattern_ref = "Hello, world!";
+    #let hello_world_pattern_bytes_ref = hello_world_pattern_ref .> as_bytes;
     exit_code_byte_ref .> set 0x00i32 '\0';
-    initialize_hello_world_pattern hello_world_pattern_ref;
     #loop {
         #if i32_gte (index_ref .> get) source_len {
             #break;
@@ -203,7 +116,7 @@
         #let byte = source_ref .> get (index_ref .> get);
         #if i32_eq (hello_world_mode_ref .> get) 0i32 {
             #if i32_lt (hello_world_match_index_ref .> get) 0x0di32 {
-                #let expected_byte = hello_world_pattern_ref .> get (hello_world_match_index_ref .> get);
+                #let expected_byte = hello_world_pattern_bytes_ref .> get (hello_world_match_index_ref .> get);
                 #if u8_eq byte expected_byte {
                     #let next_hello_world_match_index = i32_add (hello_world_match_index_ref .> get) 1i32;
                     hello_world_match_index_ref .> set next_hello_world_match_index;
@@ -249,8 +162,8 @@
     #let _ @ output_path_ref = "a.out";
     #let output_path_bytes_ref = output_path_ref .> as_bytes;
     #let fd <- IO::open output_path_bytes_ref 0x241i32 0x1edi32;
-    #let _ @^ elf_ref <- IO::array_new u8 0x102fi32;
-    zero_elf_buffer elf_ref;
+    #let _ @^ elf_ref <- IO::dyn_array_new u8 0x102fi32;
+    fill_u8 elf_ref 0x102fi32 0x00u8;
     elf_ref .> set 0x0i32 0x7fu8;
     elf_ref .> set 0x1i32 0x45u8;
     elf_ref .> set 0x2i32 0x4cu8;

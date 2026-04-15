@@ -143,6 +143,13 @@ fn compiles_and_runs_dyn_array_type_annotation_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_dyn_array_u8_helpers_fixture() {
+    let root = repo_root().join("tests/testcases/dyn-array-u8-helpers");
+    let status = run_fixture_status(&root, "dyn-array-u8-helpers");
+    assert_eq!(status.code(), Some(99));
+}
+
+#[test]
 fn compiles_and_runs_i32_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/i32-reference-annotation");
     let status = run_fixture_status(&root, "i32-reference-annotation");

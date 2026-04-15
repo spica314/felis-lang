@@ -1,5 +1,43 @@
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::u8::u8_eq;
+
 #bind_builtin "Array" #as Array;
 #bind_builtin "DynArray" #as DynArray;
 
+#proc append_u8 : (dest_ref : &^ DynArray u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () {
+    dest_ref .> set (dest_index_ref .> get) byte;
+    dest_index_ref .> set (i32_add (dest_index_ref .> get) 1i32);
+    ()
+}
+
+#proc append_nul_terminated_u8 : (source_ref : & Array u8) -> (dest_ref : &^ DynArray u8) -> (dest_index_ref : &^ i32) -> () {
+    #let _ @^ source_index_ref = 0i32;
+    #loop {
+        #let byte = source_ref .> get (source_index_ref .> get);
+        #if u8_eq byte '\0' {
+            #break;
+        };
+        append_u8 dest_ref dest_index_ref byte;
+        source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+    };
+    ()
+}
+
+#proc fill_u8 : (dest_ref : &^ DynArray u8) -> (len : i32) -> (byte : u8) -> () {
+    #let _ @^ index_ref = 0i32;
+    #loop {
+        #if i32_gte (index_ref .> get) len {
+            #break;
+        };
+        dest_ref .> set (index_ref .> get) byte;
+        index_ref .> set (i32_add (index_ref .> get) 1i32);
+    };
+    ()
+}
+
 #pub #use Array;
 #pub #use DynArray;
+#pub #use append_u8;
+#pub #use append_nul_terminated_u8;
+#pub #use fill_u8;
