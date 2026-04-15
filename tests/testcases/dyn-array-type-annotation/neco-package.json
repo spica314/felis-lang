@@ -1,0 +1,4 @@
+{
+    "name": "dyn-array-type-annotation",
+    "felis-bin-entrypoints": ["src/dyn-array-type-annotation.fe"]
+}

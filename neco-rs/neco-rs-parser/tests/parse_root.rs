@@ -151,6 +151,65 @@ fn parses_array_type_annotation_package_root() {
 }
 
 #[test]
+fn parses_dyn_array_type_annotation_package_root() {
+    let root = repo_root().join("tests/testcases/dyn-array-type-annotation");
+    let parsed = parse_root(&root).expect("dyn-array-type-annotation package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "dyn-array-type-annotation");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.source_files[0].role,
+        SourceFileRole::BinaryEntrypoint
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 7);
+
+    let Item::Function(sum3_fn) = &syntax.items[5] else {
+        panic!("expected helper function");
+    };
+    let Term::Arrow(sum3_ty) = &sum3_fn.ty else {
+        panic!("expected function arrow type");
+    };
+    let neco_rs_parser::ArrowParameter::Binder(array_ref) = &sum3_ty.parameter else {
+        panic!("expected named array parameter");
+    };
+    let Term::Reference {
+        referent,
+        exclusive,
+    } = array_ref.ty.as_ref()
+    else {
+        panic!("expected `&^ DynArray i32` reference type");
+    };
+    assert!(*exclusive);
+    let Term::Application {
+        callee,
+        arguments,
+    } = referent.as_ref()
+    else {
+        panic!("expected `DynArray i32` application");
+    };
+    let Term::Path(array_path) = callee.as_ref() else {
+        panic!("expected `DynArray` callee path");
+    };
+    assert_eq!(array_path.segments.len(), 1);
+    assert_eq!(array_path.segments[0].name, "DynArray");
+    assert_eq!(arguments.len(), 1);
+    let Term::Path(element_type_path) = &arguments[0] else {
+        panic!("expected element type path");
+    };
+    assert_eq!(element_type_path.segments[0].name, "i32");
+
+    let Item::Function(main_fn) = &syntax.items[6] else {
+        panic!("expected main function");
+    };
+    assert_eq!(main_fn.body.statements.len(), 6);
+}
+
+#[test]
 fn parses_i32_reference_annotation_package_root() {
     let root = repo_root().join("tests/testcases/i32-reference-annotation");
     let parsed = parse_root(&root).expect("i32-reference-annotation package parses");

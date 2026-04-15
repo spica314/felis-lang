@@ -105,8 +105,8 @@ pub(crate) fn lower_io_call(
             bind_pattern(binder, Value::Unit, &mut state.environment);
             Some(Ok(true))
         }
-        ["IO", "array_new"] => {
-            let (element_type, length) = match parse_array_new_arguments(arguments) {
+        ["IO", "array_new"] | ["IO", "dyn_array_new"] => {
+            let (element_type, length) = match parse_array_new_arguments(path[1], arguments) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
@@ -312,22 +312,25 @@ fn parse_exit_code_arguments(arguments: &[Term], state: &LoweringState) -> Resul
     }
 }
 
-fn parse_array_new_arguments(arguments: &[Term]) -> Result<(ArrayElementType, usize)> {
+fn parse_array_new_arguments(
+    builtin_name: &str,
+    arguments: &[Term],
+) -> Result<(ArrayElementType, usize)> {
     let normalized = normalize_i32_literal_arguments(arguments);
     let [element_type, length] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::array_new` must receive an element type and a constant i32 length".to_string(),
+            format!("`IO::{builtin_name}` must receive an element type and a constant i32 length"),
         ));
     };
 
     let Term::Path(path) = element_type else {
         return Err(Error::Unsupported(
-            "`IO::array_new` element type must be a simple path".to_string(),
+            format!("`IO::{builtin_name}` element type must be a simple path"),
         ));
     };
     let [segment] = path.segments.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::array_new` element type must be a simple path".to_string(),
+            format!("`IO::{builtin_name}` element type must be a simple path"),
         ));
     };
     let element_type = match segment.name.as_str() {
@@ -335,14 +338,14 @@ fn parse_array_new_arguments(arguments: &[Term]) -> Result<(ArrayElementType, us
         "u8" => ArrayElementType::U8,
         _ => {
             return Err(Error::Unsupported(
-                "`IO::array_new` currently supports only `i32` and `u8` arrays".to_string(),
+                format!("`IO::{builtin_name}` currently supports only `i32` and `u8` arrays"),
             ));
         }
     };
 
-    let length = parse_i32_literal_term(length)?;
+    let length = parse_i32_literal_term(length, builtin_name)?;
     let length = usize::try_from(length).map_err(|_| {
-        Error::Unsupported("`IO::array_new` length must be non-negative".to_string())
+        Error::Unsupported(format!("`IO::{builtin_name}` length must be non-negative"))
     })?;
     Ok((element_type, length))
 }
@@ -377,36 +380,38 @@ fn is_u8_suffix(term: &Term) -> bool {
     }
 }
 
-fn parse_i32_literal_term(term: &Term) -> Result<i32> {
+fn parse_i32_literal_term(term: &Term, builtin_name: &str) -> Result<i32> {
     match term {
-        Term::IntegerLiteral(literal) => parse_bare_i32_digits(literal),
+        Term::IntegerLiteral(literal) => parse_bare_i32_digits(literal, builtin_name),
         Term::Application { callee, arguments } => {
             let [suffix] = arguments.as_slice() else {
                 return Err(Error::Unsupported(
-                    "`IO::array_new` length must be an `i32` literal".to_string(),
+                    format!("`IO::{builtin_name}` length must be an `i32` literal"),
                 ));
             };
             if !is_i32_suffix(suffix) {
                 return Err(Error::Unsupported(
-                    "`IO::array_new` length must be an `i32` literal".to_string(),
+                    format!("`IO::{builtin_name}` length must be an `i32` literal"),
                 ));
             }
             let Term::IntegerLiteral(literal) = callee.as_ref() else {
                 return Err(Error::Unsupported(
-                    "`IO::array_new` length must be an `i32` literal".to_string(),
+                    format!("`IO::{builtin_name}` length must be an `i32` literal"),
                 ));
             };
-            parse_bare_i32_digits(literal)
+            parse_bare_i32_digits(literal, builtin_name)
         }
         _ => Err(Error::Unsupported(
-            "`IO::array_new` length must be an `i32` literal".to_string(),
+            format!("`IO::{builtin_name}` length must be an `i32` literal"),
         )),
     }
 }
 
-fn parse_bare_i32_digits(literal: &str) -> Result<i32> {
+fn parse_bare_i32_digits(literal: &str, builtin_name: &str) -> Result<i32> {
     parse_prefixed_i32_digits(literal).map_err(|_| {
-        Error::Unsupported("`IO::array_new` length must be a valid `i32` literal".to_string())
+        Error::Unsupported(format!(
+            "`IO::{builtin_name}` length must be a valid `i32` literal"
+        ))
     })
 }
 

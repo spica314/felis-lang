@@ -1,3 +1,5 @@
 #bind_builtin "Array" #as Array;
+#bind_builtin "DynArray" #as DynArray;
 
 #pub #use Array;
+#pub #use DynArray;
