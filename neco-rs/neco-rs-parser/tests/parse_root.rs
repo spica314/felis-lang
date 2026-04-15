@@ -1,8 +1,7 @@
 use std::path::PathBuf;
 
 use neco_rs_parser::{
-    ElseBranch, Item, ParsedRoot, Pattern, SourceFileRole, Statement, Term, Visibility,
-    parse_root,
+    ElseBranch, Item, ParsedRoot, Pattern, SourceFileRole, Statement, Term, Visibility, parse_root,
     parse_source,
 };
 
@@ -118,11 +117,7 @@ fn parses_array_type_annotation_package_root() {
         panic!("expected `&^ Array i32 4i32` reference type");
     };
     assert!(*exclusive);
-    let Term::Application {
-        callee,
-        arguments,
-    } = referent.as_ref()
-    else {
+    let Term::Application { callee, arguments } = referent.as_ref() else {
         panic!("expected `Array i32 4i32` application");
     };
     let Term::Path(array_path) = callee.as_ref() else {
@@ -185,11 +180,7 @@ fn parses_dyn_array_type_annotation_package_root() {
         panic!("expected `&^ DynArray i32` reference type");
     };
     assert!(*exclusive);
-    let Term::Application {
-        callee,
-        arguments,
-    } = referent.as_ref()
-    else {
+    let Term::Application { callee, arguments } = referent.as_ref() else {
         panic!("expected `DynArray i32` application");
     };
     let Term::Path(array_path) = callee.as_ref() else {
@@ -310,11 +301,7 @@ fn parses_proc_reference_annotation_package_root() {
         panic!("expected `&^ Array i32 2i32` reference type");
     };
     assert!(*exclusive);
-    let Term::Application {
-        callee,
-        arguments,
-    } = referent.as_ref()
-    else {
+    let Term::Application { callee, arguments } = referent.as_ref() else {
         panic!("expected `Array i32 2i32` application");
     };
     let Term::Path(array_path) = callee.as_ref() else {
@@ -358,7 +345,11 @@ fn parses_proc_cli_arg_reference_package_root() {
     let neco_rs_parser::ArrowParameter::Binder(digits_ref) = &digits_arrow.parameter else {
         panic!("expected named byte-sequence parameter");
     };
-    let Term::Reference { referent, exclusive } = digits_ref.ty.as_ref() else {
+    let Term::Reference {
+        referent,
+        exclusive,
+    } = digits_ref.ty.as_ref()
+    else {
         panic!("expected reference type");
     };
     assert!(*exclusive);
@@ -914,7 +905,10 @@ fn parses_if_package_root_with_else_branches() {
     let Some(ElseBranch::If(else_if_stmt)) = &if_stmt.else_branch else {
         panic!("expected else-if branch");
     };
-    assert!(matches!(else_if_stmt.else_branch, Some(ElseBranch::Block(_))));
+    assert!(matches!(
+        else_if_stmt.else_branch,
+        Some(ElseBranch::Block(_))
+    ));
 }
 
 #[test]

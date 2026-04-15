@@ -273,13 +273,11 @@ impl Lexer {
                     'r' => '\r',
                     't' => '\t',
                     other => {
-                        return Err(Error::new(format!(
-                            "unsupported char escape `\\{other}`"
-                        ))
-                        .with_span(Span {
-                            start,
-                            end: self.offset,
-                        }));
+                        return Err(Error::new(format!("unsupported char escape `\\{other}`"))
+                            .with_span(Span {
+                                start,
+                                end: self.offset,
+                            }));
                     }
                 }
             }

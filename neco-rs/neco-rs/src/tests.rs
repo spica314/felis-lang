@@ -866,12 +866,10 @@ fn lowers_if_else_if_fixture_to_program() {
                         lhs: I32Expr::Literal(5),
                         rhs: I32Expr::Literal(5),
                     },
-                    then_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(
-                        42,
-                    )))],
-                    else_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(
-                        2,
-                    )))],
+                    then_operations: vec![Operation::Exit(ExitCodeExpr::I32(
+                        I32Expr::Literal(42,)
+                    ))],
+                    else_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(2,)))],
                 }],
             },
             Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),

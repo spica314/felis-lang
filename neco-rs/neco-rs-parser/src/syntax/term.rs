@@ -215,7 +215,9 @@ impl Parse for IfStatement {
         let then_block = Block::parse(parser)?.unwrap();
         let else_branch = if parser.consume_keyword(Keyword::Else) {
             if parser.consume_keyword(Keyword::If) {
-                Some(ElseBranch::If(Box::new(IfStatement::parse(parser)?.unwrap())))
+                Some(ElseBranch::If(Box::new(
+                    IfStatement::parse(parser)?.unwrap(),
+                )))
             } else {
                 Some(ElseBranch::Block(Block::parse(parser)?.unwrap()))
             }

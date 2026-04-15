@@ -60,11 +60,10 @@ pub(crate) fn lower_io_call(
             Some(Ok(false))
         }
         ["IO", "open"] => {
-            let (path, flags, mode, result_slot) =
-                match parse_open_arguments(arguments, state) {
-                    Ok(value) => value,
-                    Err(err) => return Some(Err(err)),
-                };
+            let (path, flags, mode, result_slot) = match parse_open_arguments(arguments, state) {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
             program.operations.push(Operation::Open {
                 path,
                 flags,
@@ -126,11 +125,7 @@ pub(crate) fn lower_io_call(
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
-            bind_pattern(
-                binder,
-                Value::RuntimeArg(arg_index),
-                &mut state.environment,
-            );
+            bind_pattern(binder, Value::RuntimeArg(arg_index), &mut state.environment);
             Some(Ok(false))
         }
         _ => None,
@@ -318,28 +313,28 @@ fn parse_array_new_arguments(
 ) -> Result<(ArrayElementType, usize)> {
     let normalized = normalize_i32_literal_arguments(arguments);
     let [element_type, length] = normalized.as_slice() else {
-        return Err(Error::Unsupported(
-            format!("`IO::{builtin_name}` must receive an element type and a constant i32 length"),
-        ));
+        return Err(Error::Unsupported(format!(
+            "`IO::{builtin_name}` must receive an element type and a constant i32 length"
+        )));
     };
 
     let Term::Path(path) = element_type else {
-        return Err(Error::Unsupported(
-            format!("`IO::{builtin_name}` element type must be a simple path"),
-        ));
+        return Err(Error::Unsupported(format!(
+            "`IO::{builtin_name}` element type must be a simple path"
+        )));
     };
     let [segment] = path.segments.as_slice() else {
-        return Err(Error::Unsupported(
-            format!("`IO::{builtin_name}` element type must be a simple path"),
-        ));
+        return Err(Error::Unsupported(format!(
+            "`IO::{builtin_name}` element type must be a simple path"
+        )));
     };
     let element_type = match segment.name.as_str() {
         "i32" => ArrayElementType::I32,
         "u8" => ArrayElementType::U8,
         _ => {
-            return Err(Error::Unsupported(
-                format!("`IO::{builtin_name}` currently supports only `i32` and `u8` arrays"),
-            ));
+            return Err(Error::Unsupported(format!(
+                "`IO::{builtin_name}` currently supports only `i32` and `u8` arrays"
+            )));
         }
     };
 
@@ -385,25 +380,25 @@ fn parse_i32_literal_term(term: &Term, builtin_name: &str) -> Result<i32> {
         Term::IntegerLiteral(literal) => parse_bare_i32_digits(literal, builtin_name),
         Term::Application { callee, arguments } => {
             let [suffix] = arguments.as_slice() else {
-                return Err(Error::Unsupported(
-                    format!("`IO::{builtin_name}` length must be an `i32` literal"),
-                ));
+                return Err(Error::Unsupported(format!(
+                    "`IO::{builtin_name}` length must be an `i32` literal"
+                )));
             };
             if !is_i32_suffix(suffix) {
-                return Err(Error::Unsupported(
-                    format!("`IO::{builtin_name}` length must be an `i32` literal"),
-                ));
+                return Err(Error::Unsupported(format!(
+                    "`IO::{builtin_name}` length must be an `i32` literal"
+                )));
             }
             let Term::IntegerLiteral(literal) = callee.as_ref() else {
-                return Err(Error::Unsupported(
-                    format!("`IO::{builtin_name}` length must be an `i32` literal"),
-                ));
+                return Err(Error::Unsupported(format!(
+                    "`IO::{builtin_name}` length must be an `i32` literal"
+                )));
             };
             parse_bare_i32_digits(literal, builtin_name)
         }
-        _ => Err(Error::Unsupported(
-            format!("`IO::{builtin_name}` length must be an `i32` literal"),
-        )),
+        _ => Err(Error::Unsupported(format!(
+            "`IO::{builtin_name}` length must be an `i32` literal"
+        ))),
     }
 }
 
