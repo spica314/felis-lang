@@ -1,8 +1,8 @@
 use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
 
 use crate::ir::{
-    ArrayAllocation, ArrayElementType, ComparisonKind, ConditionExpr, ExitCodeExpr, I32Expr,
-    LoweredProgram, OpenPath, Operation, U8Expr,
+    ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
+    I32Expr, LoweredProgram, OpenPath, Operation, U8Expr,
 };
 
 const ARGV_GLOBAL_ADDRESS: u64 = 0x405000;
@@ -613,8 +613,16 @@ fn array_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
     panic!("unknown array slot {slot}");
 }
 
-fn array_len_offset(program: &LoweredProgram, slot: usize) -> i32 {
+fn array_capacity_offset(program: &LoweredProgram, slot: usize) -> i32 {
     array_slot_offset(program, slot) + 8
+}
+
+fn array_logical_len_offset(program: &LoweredProgram, slot: usize) -> i32 {
+    let array = array_allocation(program, slot);
+    match array.kind {
+        ArrayKind::Fixed => array_slot_offset(program, slot) + 8,
+        ArrayKind::Dynamic => array_slot_offset(program, slot) + 16,
+    }
 }
 
 fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
@@ -657,15 +665,24 @@ fn emit_array_initializers(program: &LoweredProgram, code: &mut Vec<u8>) {
         code.extend_from_slice(&data_offset.to_le_bytes());
         code.extend_from_slice(&[0x48, 0x89, 0x85]);
         code.extend_from_slice(&slot_offset.to_le_bytes());
-        let len_offset = array_len_offset(program, array.slot);
+        let capacity_offset = array_capacity_offset(program, array.slot);
         code.extend_from_slice(&[0x48, 0xc7, 0x85]);
-        code.extend_from_slice(&len_offset.to_le_bytes());
+        code.extend_from_slice(&capacity_offset.to_le_bytes());
         code.extend_from_slice(&(array.len as u32).to_le_bytes());
+        if array.kind == ArrayKind::Dynamic {
+            let logical_len_offset = array_logical_len_offset(program, array.slot);
+            code.extend_from_slice(&[0x48, 0xc7, 0x85]);
+            code.extend_from_slice(&logical_len_offset.to_le_bytes());
+            code.extend_from_slice(&(array.len as u32).to_le_bytes());
+        }
     }
 }
 
-fn array_descriptor_size(_array: &ArrayAllocation) -> usize {
-    16
+fn array_descriptor_size(array: &ArrayAllocation) -> usize {
+    match array.kind {
+        ArrayKind::Fixed => 16,
+        ArrayKind::Dynamic => 24,
+    }
 }
 
 fn array_storage_size(array: &ArrayAllocation) -> usize {
@@ -705,7 +722,7 @@ fn emit_i32_array_set(
 }
 
 fn emit_array_len(array_slot: usize, code: &mut Vec<u8>, program: &LoweredProgram) {
-    let len_offset = array_len_offset(program, array_slot);
+    let len_offset = array_logical_len_offset(program, array_slot);
     code.extend_from_slice(&[0x8b, 0x85]);
     code.extend_from_slice(&len_offset.to_le_bytes());
 }
