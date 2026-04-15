@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use neco_rs_parser::{
-    Item, ParsedRoot, Pattern, SourceFileRole, Statement, Term, Visibility, parse_root,
+    ElseBranch, Item, ParsedRoot, Pattern, SourceFileRole, Statement, Term, Visibility,
+    parse_root,
     parse_source,
 };
 
@@ -571,7 +572,7 @@ fn parses_if_package_root_with_else_branches() {
     };
 
     assert_eq!(package.manifest.name, "if");
-    assert_eq!(package.source_files.len(), 4);
+    assert_eq!(package.source_files.len(), 6);
 
     let else_true = package
         .source_files
@@ -587,7 +588,26 @@ fn parses_if_package_root_with_else_branches() {
     let Statement::If(if_stmt) = &main_fn.body.statements[0] else {
         panic!("expected if statement");
     };
-    assert!(if_stmt.else_block.is_some());
+    assert!(matches!(if_stmt.else_branch, Some(ElseBranch::Block(_))));
+
+    let else_if = package
+        .source_files
+        .iter()
+        .find(|file| {
+            file.path
+                .ends_with("tests/testcases/if/src/if-else-if-true.fe")
+        })
+        .expect("if-else-if-true file");
+    let Item::Function(main_fn) = &else_if.syntax.items[3] else {
+        panic!("expected function");
+    };
+    let Statement::If(if_stmt) = &main_fn.body.statements[0] else {
+        panic!("expected if statement");
+    };
+    let Some(ElseBranch::If(else_if_stmt)) = &if_stmt.else_branch else {
+        panic!("expected else-if branch");
+    };
+    assert!(matches!(else_if_stmt.else_branch, Some(ElseBranch::Block(_))));
 }
 
 #[test]

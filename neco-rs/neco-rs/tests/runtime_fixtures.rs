@@ -18,7 +18,9 @@ fn compile_fixture(root: &Path, name: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("system time")
         .as_nanos();
-    let output = std::env::temp_dir().join(format!("neco-rs-{name}-{unique}"));
+    let output_dir = std::env::temp_dir().join(format!("neco-rs-build-{name}-{unique}"));
+    fs::create_dir_all(&output_dir).expect("create build temp dir");
+    let output = output_dir.join(name);
 
     compile_path_to_elf(root, &output).expect("compile fixture");
 
@@ -49,6 +51,7 @@ fn run_fixture_status(root: &Path, name: &str) -> std::process::ExitStatus {
         .status()
         .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
     fs::remove_file(&output).expect("cleanup binary");
+    fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
     status
 }
 
@@ -58,6 +61,7 @@ fn run_fixture_output(root: &Path, name: &str) -> Output {
         .output()
         .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
     fs::remove_file(&output).expect("cleanup binary");
+    fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
     run
 }
 
@@ -68,6 +72,7 @@ fn run_fixture_output_with_args(root: &Path, name: &str, args: &[&str]) -> Outpu
         .output()
         .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
     fs::remove_file(&output).expect("cleanup binary");
+    fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
     run
 }
 
@@ -78,6 +83,7 @@ fn run_fixture_output_in_dir(root: &Path, name: &str, current_dir: &Path) -> Out
         .output()
         .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
     fs::remove_file(&output).expect("cleanup binary");
+    fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
     run
 }
 
@@ -97,6 +103,7 @@ fn run_fixture_with_input(root: &Path, name: &str, stdin: &[u8]) -> Output {
         .expect("write child stdin");
     let run = child.wait_with_output().expect("collect child output");
     fs::remove_file(&output).expect("cleanup binary");
+    fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
     run
 }
 
@@ -323,6 +330,20 @@ fn compiles_and_runs_if_else_true_fixture() {
 fn compiles_and_runs_if_else_false_fixture() {
     let root = repo_root().join("tests/testcases/if");
     let status = run_fixture_status(&root, "if-else-false");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_if_else_if_true_fixture() {
+    let root = repo_root().join("tests/testcases/if");
+    let status = run_fixture_status(&root, "if-else-if-true");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_if_else_if_fallback_fixture() {
+    let root = repo_root().join("tests/testcases/if");
+    let status = run_fixture_status(&root, "if-else-if-fallback");
     assert_eq!(status.code(), Some(42));
 }
 

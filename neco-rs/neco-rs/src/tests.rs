@@ -601,6 +601,59 @@ fn lowers_if_else_true_fixture_to_program() {
 }
 
 #[test]
+fn lowers_if_else_if_fixture_to_program() {
+    let root = repo_root().join("tests/testcases/if");
+    let source_path = root.join("src/if-else-if-true.fe");
+    let source = std::fs::read_to_string(&source_path).expect("read fixture source");
+    let (tokens, syntax) = neco_rs_parser::parse_source(&source).expect("parse source");
+    let package = ParsedPackage {
+        root_dir: root.clone(),
+        manifest_path: root.join("neco-package.json"),
+        manifest: neco_rs_parser::PackageManifest {
+            name: "if".to_string(),
+            dependencies: Vec::new(),
+            felis_lib_entrypoint: None,
+            felis_bin_entrypoints: vec![PathBuf::from("src/if-else-if-true.fe")],
+        },
+        source_files: vec![neco_rs_parser::ParsedSourceFile {
+            path: source_path,
+            role: neco_rs_parser::SourceFileRole::BinaryEntrypoint,
+            tokens,
+            syntax: syntax.expect("source file syntax"),
+        }],
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::If {
+                condition: ConditionExpr::I32 {
+                    kind: ComparisonKind::Eq,
+                    lhs: I32Expr::Literal(3),
+                    rhs: I32Expr::Literal(4),
+                },
+                then_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(1)))],
+                else_operations: vec![Operation::If {
+                    condition: ConditionExpr::I32 {
+                        kind: ComparisonKind::Eq,
+                        lhs: I32Expr::Literal(5),
+                        rhs: I32Expr::Literal(5),
+                    },
+                    then_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(
+                        42,
+                    )))],
+                    else_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(
+                        2,
+                    )))],
+                }],
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
+        ]
+    );
+}
+
+#[test]
 fn lowers_loop_fixture_to_runtime_operations() {
     let root = repo_root().join("tests/testcases/loop");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
@@ -1139,4 +1192,14 @@ fn defaults_output_into_package_neco_directory() {
     let root = repo_root().join("tests/testcases/exit-42");
     let output = default_output_path(&root);
     assert_eq!(output, root.join(".neco").join("exit-42"));
+}
+
+#[test]
+fn selects_longest_matching_binary_name() {
+    let root = repo_root().join("tests/testcases/if");
+    let package = selected_fixture_package(&root, "if-else-if-true");
+    assert_eq!(
+        package.manifest.felis_bin_entrypoints,
+        vec![PathBuf::from("src/if-else-if-true.fe")]
+    );
 }

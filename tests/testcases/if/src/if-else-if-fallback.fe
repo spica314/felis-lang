@@ -1,0 +1,15 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32_eq;
+
+#entrypoint main;
+
+#proc main : () #with IO {
+    #if i32_eq 3i32 4i32 {
+        #let _ <- IO::exit 1i32;
+    } #else #if i32_eq 5i32 6i32 {
+        #let _ <- IO::exit 2i32;
+    } #else {
+        #let _ <- IO::exit 42i32;
+    };
+    ()
+}

@@ -26,12 +26,15 @@ pub(crate) fn select_package_for_build(parsed: ParsedRoot, output: &Path) -> Res
                 }
                 _ => {
                     let output_name = output_selection_name(output);
-                    let mut matches = binary_packages
+                    let matches = binary_packages
                         .into_iter()
-                        .filter(|package| output_name_matches(&output_name, &package.manifest.name))
+                        .filter_map(|package| {
+                            output_name_match_score(&output_name, &package.manifest.name)
+                                .map(|score| (score, package))
+                        })
                         .collect::<Vec<_>>();
-                    if matches.len() == 1 {
-                        return select_binary_from_package(matches.remove(0), output);
+                    if let Some(package) = select_unique_best_match(matches) {
+                        return select_binary_from_package(package, output);
                     }
 
                     Err(Error::Unsupported(
@@ -51,21 +54,20 @@ pub(crate) fn select_binary_from_package(
         0 | 1 => Ok(package),
         _ => {
             let output_name = output_selection_name(output);
-            let mut matches = package
+            let matches = package
                 .manifest
                 .felis_bin_entrypoints
                 .iter()
-                .filter(|path| output_name_matches(&output_name, &binary_name(path)))
-                .cloned()
+                .filter_map(|path| {
+                    let name = binary_name(path);
+                    output_name_match_score(&output_name, &name).map(|score| (score, path.clone()))
+                })
                 .collect::<Vec<_>>();
-
-            if matches.len() != 1 {
+            let Some(selected) = select_unique_best_match(matches) else {
                 return Err(Error::Unsupported(
                     "package contains multiple binary entrypoints; choose an output path that identifies the target binary".to_string(),
                 ));
-            }
-
-            let selected = matches.remove(0);
+            };
             let selected_path = package.root_dir.join(&selected);
             let source_files = package
                 .source_files
@@ -104,8 +106,22 @@ fn output_selection_name(output: &Path) -> String {
         .to_string()
 }
 
-fn output_name_matches(output_name: &str, candidate: &str) -> bool {
-    output_name == candidate || output_name.contains(candidate)
+fn output_name_match_score(output_name: &str, candidate: &str) -> Option<usize> {
+    (output_name == candidate || output_name.contains(candidate)).then_some(candidate.len())
+}
+
+fn select_unique_best_match<T>(matches: Vec<(usize, T)>) -> Option<T> {
+    let best_score = matches.iter().map(|(score, _)| *score).max()?;
+    let mut best = matches
+        .into_iter()
+        .filter(|(score, _)| *score == best_score)
+        .map(|(_, value)| value);
+    let selected = best.next()?;
+    if best.next().is_some() {
+        None
+    } else {
+        Some(selected)
+    }
 }
 
 pub(crate) fn set_output_executable(output: &Path) -> Result<()> {

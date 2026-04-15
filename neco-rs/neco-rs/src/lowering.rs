@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use neco_rs_parser::{
-    ArrowParameter, BindingPattern, Block, ConstructorDeclaration, DeclaredName,
+    ArrowParameter, BindingPattern, Block, ConstructorDeclaration, DeclaredName, ElseBranch,
     FunctionDeclaration, FunctionKind, Item, LetOperator, MatchExpression, ParsedPackage,
     PathExpression, Pattern, Statement, Term,
 };
@@ -168,80 +168,7 @@ fn lower_statement(
             Ok(false)
         }
         Statement::If(if_stmt) => {
-            let condition = lower_condition_expr(if_stmt.condition.as_ref(), state)?;
-            let mut then_state = LoweringState {
-                environment: state.environment.clone(),
-                next_array_slot: state.next_array_slot,
-                next_i32_slot: state.next_i32_slot,
-                functions: state.functions.clone(),
-                constructors: state.constructors.clone(),
-                loop_depth: state.loop_depth,
-            };
-            let mut then_operations = Vec::new();
-            let mut then_program = LoweredProgram {
-                operations: Vec::new(),
-                data: std::mem::take(&mut program.data),
-                arrays: std::mem::take(&mut program.arrays),
-                heap_slots: program.heap_slots,
-                i32_slots: program.i32_slots,
-                requires_argv: program.requires_argv,
-            };
-            for statement in &if_stmt.then_block.statements {
-                let terminated = lower_statement(statement, &mut then_state, &mut then_program)?;
-                if terminated {
-                    break;
-                }
-            }
-            then_operations.append(&mut then_program.operations);
-            let mut else_operations = Vec::new();
-            let mut next_array_slot = then_state.next_array_slot;
-            let mut next_i32_slot = then_state.next_i32_slot;
-
-            if let Some(else_block) = &if_stmt.else_block {
-                let mut else_state = LoweringState {
-                    environment: state.environment.clone(),
-                    next_array_slot: state.next_array_slot,
-                    next_i32_slot: state.next_i32_slot,
-                    functions: state.functions.clone(),
-                    constructors: state.constructors.clone(),
-                    loop_depth: state.loop_depth,
-                };
-                let mut else_program = LoweredProgram {
-                    operations: Vec::new(),
-                    data: then_program.data,
-                    arrays: then_program.arrays,
-                    heap_slots: then_program.heap_slots,
-                    i32_slots: then_program.i32_slots,
-                    requires_argv: then_program.requires_argv,
-                };
-                for statement in &else_block.statements {
-                    let terminated =
-                        lower_statement(statement, &mut else_state, &mut else_program)?;
-                    if terminated {
-                        break;
-                    }
-                }
-                else_operations.append(&mut else_program.operations);
-                program.data = else_program.data;
-                program.arrays = else_program.arrays;
-                program.heap_slots = program.heap_slots.max(else_program.heap_slots);
-                program.requires_argv = else_program.requires_argv;
-                next_array_slot = next_array_slot.max(else_state.next_array_slot);
-                next_i32_slot = next_i32_slot.max(else_state.next_i32_slot);
-            } else {
-                program.data = then_program.data;
-                program.arrays = then_program.arrays;
-                program.heap_slots = program.heap_slots.max(then_program.heap_slots);
-                program.requires_argv = then_program.requires_argv;
-            }
-            state.next_array_slot = next_array_slot;
-            state.next_i32_slot = next_i32_slot;
-            program.operations.push(Operation::If {
-                condition,
-                then_operations,
-                else_operations,
-            });
-            Ok(false)
+            lower_if_statement(if_stmt, state, program)
         }
         Statement::Loop(loop_stmt) => {
             let mut loop_state = LoweringState {
@@ -299,6 +226,93 @@ fn lower_statement(
             "items inside entrypoint bodies are not supported".to_string(),
         )),
     }
+}
+
+fn lower_if_statement(
+    if_stmt: &neco_rs_parser::IfStatement,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<bool> {
+    let condition = lower_condition_expr(if_stmt.condition.as_ref(), state)?;
+    let mut then_state = LoweringState {
+        environment: state.environment.clone(),
+        next_array_slot: state.next_array_slot,
+        next_i32_slot: state.next_i32_slot,
+        functions: state.functions.clone(),
+        constructors: state.constructors.clone(),
+        loop_depth: state.loop_depth,
+    };
+    let mut then_operations = Vec::new();
+    let mut then_program = LoweredProgram {
+        operations: Vec::new(),
+        data: std::mem::take(&mut program.data),
+        arrays: std::mem::take(&mut program.arrays),
+        heap_slots: program.heap_slots,
+        i32_slots: program.i32_slots,
+        requires_argv: program.requires_argv,
+    };
+    for statement in &if_stmt.then_block.statements {
+        let terminated = lower_statement(statement, &mut then_state, &mut then_program)?;
+        if terminated {
+            break;
+        }
+    }
+    then_operations.append(&mut then_program.operations);
+    let mut else_operations = Vec::new();
+    let mut next_array_slot = then_state.next_array_slot;
+    let mut next_i32_slot = then_state.next_i32_slot;
+
+    if let Some(else_branch) = &if_stmt.else_branch {
+        let mut else_state = LoweringState {
+            environment: state.environment.clone(),
+            next_array_slot: state.next_array_slot,
+            next_i32_slot: state.next_i32_slot,
+            functions: state.functions.clone(),
+            constructors: state.constructors.clone(),
+            loop_depth: state.loop_depth,
+        };
+        let mut else_program = LoweredProgram {
+            operations: Vec::new(),
+            data: then_program.data,
+            arrays: then_program.arrays,
+            heap_slots: then_program.heap_slots,
+            i32_slots: then_program.i32_slots,
+            requires_argv: then_program.requires_argv,
+        };
+        match else_branch {
+            ElseBranch::Block(else_block) => {
+                for statement in &else_block.statements {
+                    let terminated = lower_statement(statement, &mut else_state, &mut else_program)?;
+                    if terminated {
+                        break;
+                    }
+                }
+            }
+            ElseBranch::If(else_if) => {
+                lower_if_statement(else_if, &mut else_state, &mut else_program)?;
+            }
+        }
+        else_operations.append(&mut else_program.operations);
+        program.data = else_program.data;
+        program.arrays = else_program.arrays;
+        program.heap_slots = program.heap_slots.max(else_program.heap_slots);
+        program.requires_argv = else_program.requires_argv;
+        next_array_slot = next_array_slot.max(else_state.next_array_slot);
+        next_i32_slot = next_i32_slot.max(else_state.next_i32_slot);
+    } else {
+        program.data = then_program.data;
+        program.arrays = then_program.arrays;
+        program.heap_slots = program.heap_slots.max(then_program.heap_slots);
+        program.requires_argv = then_program.requires_argv;
+    }
+    state.next_array_slot = next_array_slot;
+    state.next_i32_slot = next_i32_slot;
+    program.operations.push(Operation::If {
+        condition,
+        then_operations,
+        else_operations,
+    });
+    Ok(false)
 }
 
 fn lower_let_equals_statement(

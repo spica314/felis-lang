@@ -4,6 +4,8 @@
         "src/if-true.fe",
         "src/if-false.fe",
         "src/if-else-true.fe",
-        "src/if-else-false.fe"
+        "src/if-else-false.fe",
+        "src/if-else-if-true.fe",
+        "src/if-else-if-fallback.fe"
     ]
 }

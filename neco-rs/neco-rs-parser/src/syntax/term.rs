@@ -70,7 +70,13 @@ pub enum Statement {
 pub struct IfStatement {
     pub condition: Box<Term>,
     pub then_block: Block,
-    pub else_block: Option<Block>,
+    pub else_branch: Option<ElseBranch>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ElseBranch {
+    Block(Block),
+    If(Box<IfStatement>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -203,16 +209,22 @@ impl Parse for IfStatement {
     fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         let condition = parser.with_left_brace_boundary(true, Term::parse)?.unwrap();
         let then_block = Block::parse(parser)?.unwrap();
-        let else_block = if parser.consume_keyword(Keyword::Else) {
-            Some(Block::parse(parser)?.unwrap())
+        let else_branch = if parser.consume_keyword(Keyword::Else) {
+            if parser.consume_keyword(Keyword::If) {
+                Some(ElseBranch::If(Box::new(IfStatement::parse(parser)?.unwrap())))
+            } else {
+                Some(ElseBranch::Block(Block::parse(parser)?.unwrap()))
+            }
         } else {
             None
         };
-        parser.expect_punctuation(TokenKind::Semicolon)?;
+        if !matches!(else_branch, Some(ElseBranch::If(_))) {
+            parser.expect_punctuation(TokenKind::Semicolon)?;
+        }
         Ok(Some(Self {
             condition: Box::new(condition),
             then_block,
-            else_block,
+            else_branch,
         }))
     }
 }
