@@ -29,7 +29,7 @@
     u8_add (u8_mul current 10u8) (u8_sub digit '0')
 }
 
-    #fn main : () #with IO {
+#fn main : () #with IO {
     #let package_root_ref <- IO::arg 1i32;
     #let _ @^ manifest_path_ref <- IO::dyn_array_new u8 0x100i32;
     #let _ @^ manifest_path_index_ref = 0i32;
