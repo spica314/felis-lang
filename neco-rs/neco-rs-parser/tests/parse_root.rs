@@ -832,13 +832,13 @@ fn parses_open_read_close_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 4);
-    let Item::Function(main_fn) = &syntax.items[3] else {
+    assert_eq!(syntax.items.len(), 5);
+    let Item::Function(main_fn) = &syntax.items[4] else {
         panic!("expected function");
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 8);
+    assert_eq!(main_fn.body.statements.len(), 9);
 }
 
 #[test]

@@ -1112,7 +1112,7 @@ fn lowers_open_read_close_fixture_to_runtime_io_operations() {
             slot: 0,
             len: 128,
             element_type: ArrayElementType::U8,
-            kind: ArrayKind::Fixed,
+            kind: ArrayKind::Dynamic,
         }]
     );
     assert_eq!(

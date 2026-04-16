@@ -100,6 +100,8 @@
 #pub #use Array;
 #pub #use RawArray;
 #pub #use DynArray;
+#pub #use dyn_array_raw_u8;
+#pub #use dyn_array_raw_i32;
 #pub #use dyn_array_len_u8;
 #pub #use dyn_array_len_i32;
 #pub #use dyn_array_get_u8;

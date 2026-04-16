@@ -4,6 +4,7 @@
 #use std_core::primitive::array::append_nul_terminated_u8;
 #use std_core::primitive::array::append_dyn_nul_terminated_u8;
 #use std_core::primitive::array::append_u8;
+#use std_core::primitive::array::dyn_array_raw_u8;
 #use std_core::primitive::array::dyn_array_get_u8;
 #use std_core::primitive::array::dyn_array_set_u8;
 #use std_core::primitive::array::fill_u8;
@@ -42,9 +43,11 @@
     append_u8 manifest_path_ref manifest_path_index_ref '/';
     append_nul_terminated_u8 manifest_suffix_bytes_ref manifest_path_ref manifest_path_index_ref;
     append_u8 manifest_path_ref manifest_path_index_ref '\0';
-    #let manifest_fd <- IO::open manifest_path_ref 0i32 0i32;
+    #let manifest_path_bytes_ref = dyn_array_raw_u8 manifest_path_ref;
+    #let manifest_fd <- IO::open manifest_path_bytes_ref 0i32 0i32;
     #let _ @^ manifest_ref <- dyn_array_new u8 0x100i32;
-    #let manifest_len <- IO::read manifest_fd manifest_ref 0x100i32;
+    #let manifest_bytes_ref = dyn_array_raw_u8 manifest_ref;
+    #let manifest_len <- IO::read manifest_fd manifest_bytes_ref 0x100i32;
     #let _ <- IO::close manifest_fd;
     #let _ @ key_pattern_ref = "felis-bin-entrypoints";
     #let key_pattern_bytes_ref = key_pattern_ref .> as_bytes;
@@ -99,9 +102,11 @@
     append_u8 source_path_ref source_path_index_ref '/';
     append_dyn_nul_terminated_u8 entrypoint_ref source_path_ref source_path_index_ref;
     append_u8 source_path_ref source_path_index_ref '\0';
-    #let input_fd <- IO::open source_path_ref 0i32 0i32;
+    #let source_path_bytes_ref = dyn_array_raw_u8 source_path_ref;
+    #let input_fd <- IO::open source_path_bytes_ref 0i32 0i32;
     #let _ @^ source_ref <- dyn_array_new u8 0x100i32;
-    #let source_len <- IO::read input_fd source_ref 0x100i32;
+    #let source_bytes_ref = dyn_array_raw_u8 source_ref;
+    #let source_len <- IO::read input_fd source_bytes_ref 0x100i32;
     #let _ <- IO::close input_fd;
     #let _ @^ index_ref = 0i32;
     #let _ @^ parsing_ref = 0i32;
@@ -166,6 +171,7 @@
     #let output_path_bytes_ref = output_path_ref .> as_bytes;
     #let fd <- IO::open output_path_bytes_ref 0x241i32 0x1edi32;
     #let _ @^ elf_ref <- dyn_array_new u8 0x102fi32;
+    #let elf_bytes_ref = dyn_array_raw_u8 elf_ref;
     fill_u8 elf_ref 0x00u8;
     dyn_array_set_u8 elf_ref 0x0i32 0x7fu8;
     dyn_array_set_u8 elf_ref 0x1i32 0x45u8;
@@ -225,7 +231,7 @@
         dyn_array_set_u8 elf_ref 0x102ci32 'd';
         dyn_array_set_u8 elf_ref 0x102di32 '!';
         dyn_array_set_u8 elf_ref 0x102ei32 '\n';
-        #let _ <- IO::write fd elf_ref 0x102fi32;
+        #let _ <- IO::write fd elf_bytes_ref 0x102fi32;
     } #else {
         dyn_array_set_u8 elf_ref 0x60i32 0x0eu8;
         dyn_array_set_u8 elf_ref 0x68i32 0x0eu8;
@@ -237,7 +243,7 @@
         dyn_array_set_u8 elf_ref 0x1008i32 0x3cu8;
         dyn_array_set_u8 elf_ref 0x100ci32 0x0fu8;
         dyn_array_set_u8 elf_ref 0x100di32 0x05u8;
-        #let _ <- IO::write fd elf_ref 0x100ei32;
+        #let _ <- IO::write fd elf_bytes_ref 0x100ei32;
     };
     #let _ <- IO::close fd;
     ()
