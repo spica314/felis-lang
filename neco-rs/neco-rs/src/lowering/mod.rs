@@ -127,9 +127,9 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     };
     let mut state = LoweringState::new();
     let procedure_packages = collect_procedure_packages(package)?;
-    state.functions = collect_pure_functions(package)?;
+    state.functions = collect_pure_functions(&procedure_packages)?;
     state.procedures = collect_procedures(&procedure_packages)?;
-    state.constructors = collect_constructors(package)?;
+    state.constructors = collect_constructors(&procedure_packages)?;
     let mut terminated = false;
 
     for statement in &main_fn.body.statements {

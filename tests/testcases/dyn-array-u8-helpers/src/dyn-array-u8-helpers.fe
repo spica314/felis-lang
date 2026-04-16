@@ -2,6 +2,7 @@
 #use std_core::primitive::array::DynArray;
 #use std_core::primitive::array::append_nul_terminated_u8;
 #use std_core::primitive::array::append_u8;
+#use std_core::primitive::array::dyn_array_get_u8;
 #use std_core::primitive::array::fill_u8;
 #use std_core::primitive::i32::i32_from_u8;
 
@@ -10,12 +11,12 @@
 #fn main : () #with IO {
     #let _ @ source_ref = "ab";
     #let source_bytes_ref = source_ref .> as_bytes;
-    #let _ @^ buffer_ref <- IO::dyn_array_new u8 8i32;
+    #let _ @^ buffer_ref <- dyn_array_new u8 8i32;
     #let _ @^ index_ref = 0i32;
     fill_u8 buffer_ref '.';
     append_nul_terminated_u8 source_bytes_ref buffer_ref index_ref;
     append_u8 buffer_ref index_ref 'c';
-    #let exit_code = buffer_ref .> get 2i32;
+    #let exit_code = dyn_array_get_u8 buffer_ref 2i32;
     #let _ <- IO::exit (i32_from_u8 exit_code);
     ()
 }

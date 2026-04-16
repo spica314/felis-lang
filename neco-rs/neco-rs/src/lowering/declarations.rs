@@ -42,24 +42,26 @@ pub(super) struct ConstructorSignature {
 }
 
 pub(super) fn collect_pure_functions(
-    package: &ParsedPackage,
+    packages: &[ParsedPackage],
 ) -> Result<HashMap<String, PureFunction>> {
     let mut functions = HashMap::new();
-    for item in package
-        .source_files
-        .iter()
-        .flat_map(|file| file.syntax.items.iter())
-    {
-        let Item::Function(function) = item else {
-            continue;
-        };
-        if function.kind != FunctionKind::Fn || function.effect.is_some() {
-            continue;
+    for package in packages {
+        for item in package
+            .source_files
+            .iter()
+            .flat_map(|file| file.syntax.items.iter())
+        {
+            let Item::Function(function) = item else {
+                continue;
+            };
+            if function.kind != FunctionKind::Fn || function.effect.is_some() {
+                continue;
+            }
+            functions.insert(
+                function.name.name.clone(),
+                pure_function_from_decl(function)?,
+            );
         }
-        functions.insert(
-            function.name.name.clone(),
-            pure_function_from_decl(function)?,
-        );
     }
     Ok(functions)
 }
@@ -85,35 +87,37 @@ pub(super) fn collect_procedures(packages: &[ParsedPackage]) -> Result<HashMap<S
 }
 
 pub(super) fn collect_constructors(
-    package: &ParsedPackage,
+    packages: &[ParsedPackage],
 ) -> Result<HashMap<String, ConstructorSignature>> {
     let mut constructors = HashMap::new();
-    for item in package
-        .source_files
-        .iter()
-        .flat_map(|file| file.syntax.items.iter())
-    {
-        let Item::Type(type_decl) = item else {
-            continue;
-        };
-
-        for constructor in &type_decl.constructors {
-            let Some(arity) = constructor_arity(constructor, &type_decl.name) else {
+    for package in packages {
+        for item in package
+            .source_files
+            .iter()
+            .flat_map(|file| file.syntax.items.iter())
+        {
+            let Item::Type(type_decl) = item else {
                 continue;
             };
 
-            let key = constructor_key(&type_decl.name.name, &constructor.name.name);
-            let value = ConstructorSignature {
-                type_name: type_decl.name.name.clone(),
-                constructor_name: constructor.name.name.clone(),
-                arity,
-                is_rc: type_decl.modifier.as_deref() == Some("rc"),
-                tag: constructors.len() as i32,
-            };
-            if constructors.insert(key.clone(), value).is_some() {
-                return Err(Error::Unsupported(format!(
-                    "duplicate constructor `{key}` is not supported"
-                )));
+            for (tag, constructor) in type_decl.constructors.iter().enumerate() {
+                let Some(arity) = constructor_arity(constructor, &type_decl.name) else {
+                    continue;
+                };
+
+                let key = constructor_key(&type_decl.name.name, &constructor.name.name);
+                let value = ConstructorSignature {
+                    type_name: type_decl.name.name.clone(),
+                    constructor_name: constructor.name.name.clone(),
+                    arity,
+                    is_rc: type_decl.modifier.as_deref() == Some("rc"),
+                    tag: tag as i32,
+                };
+                if constructors.insert(key.clone(), value).is_some() {
+                    return Err(Error::Unsupported(format!(
+                        "duplicate constructor `{key}` is not supported"
+                    )));
+                }
             }
         }
     }
@@ -131,13 +135,19 @@ fn constructor_arity(
         current = arrow.result.as_ref();
     }
 
-    let Term::Path(path) = current else {
-        return None;
+    let path = match current {
+        Term::Path(path) => path,
+        Term::Application { callee, .. } => {
+            let Term::Path(path) = callee.as_ref() else {
+                return None;
+            };
+            path
+        }
+        _ => return None,
     };
     if !path.starts_with_package
         && path.segments.len() == 1
         && path.segments[0].name == type_name.name
-        && path.segments[0].suffixes == type_name.suffixes
     {
         Some(arity)
     } else {

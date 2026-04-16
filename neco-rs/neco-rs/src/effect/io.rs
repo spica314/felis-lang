@@ -106,14 +106,14 @@ pub(crate) fn lower_io_call(
             bind_pattern(binder, Value::Unit, &mut state.environment);
             Some(Ok(true))
         }
-        ["IO", "array_new"] | ["IO", "dyn_array_new"] => {
+        ["IO", "array_new"] | ["IO", "raw_array_new"] => {
             let (element_type, length) = match parse_array_new_arguments(path[1], arguments) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
             let kind = match path[1] {
                 "array_new" => ArrayKind::Fixed,
-                "dyn_array_new" => ArrayKind::Dynamic,
+                "raw_array_new" => ArrayKind::Dynamic,
                 _ => unreachable!(),
             };
             let array_slot = state.allocate_array(element_type, kind, length, program);
@@ -177,6 +177,14 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
             array_slot: slot,
             len,
         }),
+        Value::Constructor(constructor) if constructor.type_name == "DynArray" => {
+            let array_slot = dyn_array_u8_slot(&constructor)?;
+            Ok(Operation::WriteArray {
+                fd,
+                array_slot,
+                len,
+            })
+        }
         other => Err(Error::Unsupported(format!(
             "`IO::write` expects a byte string reference or `u8` array as its second argument, got {other:?}"
         ))),
@@ -210,6 +218,9 @@ fn parse_read_arguments(
             element_type: ArrayElementType::U8,
             ..
         } => slot,
+        Value::Constructor(constructor) if constructor.type_name == "DynArray" => {
+            dyn_array_u8_slot(&constructor)?
+        }
         other => {
             return Err(Error::Unsupported(format!(
                 "`IO::read` expects a `u8` array reference as its second argument, got {other:?}"
@@ -243,6 +254,9 @@ fn parse_open_arguments(
             element_type: ArrayElementType::U8,
             ..
         } => OpenPath::Array(slot),
+        Value::Constructor(constructor) if constructor.type_name == "DynArray" => {
+            OpenPath::Array(dyn_array_u8_slot(&constructor)?)
+        }
         other => {
             return Err(Error::Unsupported(format!(
                 "`IO::open` expects a byte string path, `u8` array, or CLI argument as its first argument, got {other:?}"
@@ -386,7 +400,7 @@ fn is_u8_suffix(term: &Term) -> bool {
     }
 }
 
-fn parse_i32_literal_term(term: &Term, builtin_name: &str) -> Result<i32> {
+pub(crate) fn parse_i32_literal_term(term: &Term, builtin_name: &str) -> Result<i32> {
     match term {
         Term::IntegerLiteral(literal) => parse_bare_i32_digits(literal, builtin_name),
         Term::Application { callee, arguments } => {
@@ -432,7 +446,7 @@ fn parse_prefixed_i32_digits(literal: &str) -> std::result::Result<i32, std::num
     }
 }
 
-fn normalize_i32_literal_arguments(arguments: &[Term]) -> Vec<Term> {
+pub(crate) fn normalize_i32_literal_arguments(arguments: &[Term]) -> Vec<Term> {
     let mut normalized = Vec::with_capacity(arguments.len());
     let mut index = 0;
     while index < arguments.len() {
@@ -451,4 +465,18 @@ fn normalize_i32_literal_arguments(arguments: &[Term]) -> Vec<Term> {
         index += 1;
     }
     normalized
+}
+
+fn dyn_array_u8_slot(constructor: &crate::ir::ConstructorValue) -> Result<usize> {
+    let [Value::Array {
+        slot,
+        element_type: ArrayElementType::U8,
+        ..
+    }, Value::I32(_), Value::I32(_)] = constructor.fields.as_slice()
+    else {
+        return Err(Error::Unsupported(
+            "`DynArray` value must contain a `u8` raw array and two `i32` lengths".to_string(),
+        ));
+    };
+    Ok(*slot)
 }

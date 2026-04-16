@@ -161,9 +161,9 @@ fn parses_dyn_array_type_annotation_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 7);
+    assert_eq!(syntax.items.len(), 9);
 
-    let Item::Function(sum3_fn) = &syntax.items[5] else {
+    let Item::Function(sum3_fn) = &syntax.items[7] else {
         panic!("expected helper function");
     };
     let Term::Arrow(sum3_ty) = &sum3_fn.ty else {
@@ -194,7 +194,7 @@ fn parses_dyn_array_type_annotation_package_root() {
     };
     assert_eq!(element_type_path.segments[0].name, "i32");
 
-    let Item::Function(main_fn) = &syntax.items[6] else {
+    let Item::Function(main_fn) = &syntax.items[8] else {
         panic!("expected main function");
     };
     assert_eq!(main_fn.body.statements.len(), 6);
@@ -216,9 +216,9 @@ fn parses_dyn_array_u8_helpers_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 8);
+    assert_eq!(syntax.items.len(), 9);
 
-    let Item::Function(main_fn) = &syntax.items[7] else {
+    let Item::Function(main_fn) = &syntax.items[8] else {
         panic!("expected main function");
     };
     assert_eq!(main_fn.body.statements.len(), 9);
@@ -240,9 +240,9 @@ fn parses_dyn_array_len_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 4);
+    assert_eq!(syntax.items.len(), 5);
 
-    let Item::Function(main_fn) = &syntax.items[3] else {
+    let Item::Function(main_fn) = &syntax.items[4] else {
         panic!("expected main function");
     };
     assert_eq!(main_fn.body.statements.len(), 3);

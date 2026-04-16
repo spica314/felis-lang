@@ -3,10 +3,58 @@
 #use std_core::primitive::u8::u8_eq;
 
 #bind_builtin "Array" #as Array;
-#bind_builtin "DynArray" #as DynArray;
+#bind_builtin "RawArray" #as RawArray;
+
+#type DynArray : (t : Type[0]) -> Type[0] {
+    dyn_array : RawArray t -> i32 -> i32 -> DynArray t,
+}
+
+#fn dyn_array_raw_u8 : (array : DynArray u8) -> RawArray u8 {
+    #match array {
+        DynArray::dyn_array raw_array _ _ => raw_array,
+    }
+}
+
+#fn dyn_array_raw_i32 : (array : DynArray i32) -> RawArray i32 {
+    #match array {
+        DynArray::dyn_array raw_array _ _ => raw_array,
+    }
+}
+
+#fn dyn_array_len_u8 : (array : DynArray u8) -> i32 {
+    #let raw_array = dyn_array_raw_u8 array;
+    raw_array .> len
+}
+
+#fn dyn_array_len_i32 : (array : DynArray i32) -> i32 {
+    #let raw_array = dyn_array_raw_i32 array;
+    raw_array .> len
+}
+
+#fn dyn_array_get_u8 : (array : DynArray u8) -> (index : i32) -> u8 {
+    #let raw_array = dyn_array_raw_u8 array;
+    raw_array .> get index
+}
+
+#fn dyn_array_get_i32 : (array : DynArray i32) -> (index : i32) -> i32 {
+    #let raw_array = dyn_array_raw_i32 array;
+    raw_array .> get index
+}
+
+#proc dyn_array_set_u8 : (array : DynArray u8) -> (index : i32) -> (byte : u8) -> () {
+    #let raw_array = dyn_array_raw_u8 array;
+    raw_array .> set index byte;
+    ()
+}
+
+#proc dyn_array_set_i32 : (array : DynArray i32) -> (index : i32) -> (value : i32) -> () {
+    #let raw_array = dyn_array_raw_i32 array;
+    raw_array .> set index value;
+    ()
+}
 
 #proc append_u8 : (dest_ref : &^ DynArray u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () {
-    dest_ref .> set (dest_index_ref .> get) byte;
+    dyn_array_set_u8 dest_ref (dest_index_ref .> get) byte;
     dest_index_ref .> set (i32_add (dest_index_ref .> get) 1i32);
     ()
 }
@@ -24,20 +72,41 @@
     ()
 }
 
+#proc append_dyn_nul_terminated_u8 : (source_ref : & DynArray u8) -> (dest_ref : &^ DynArray u8) -> (dest_index_ref : &^ i32) -> () {
+    #let _ @^ source_index_ref = 0i32;
+    #loop {
+        #let byte = dyn_array_get_u8 source_ref (source_index_ref .> get);
+        #if u8_eq byte '\0' {
+            #break;
+        };
+        append_u8 dest_ref dest_index_ref byte;
+        source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+    };
+    ()
+}
+
 #proc fill_u8 : (dest_ref : &^ DynArray u8) -> (byte : u8) -> () {
     #let _ @^ index_ref = 0i32;
     #loop {
-        #if i32_gte (index_ref .> get) (dest_ref .> len) {
+        #if i32_gte (index_ref .> get) (dyn_array_len_u8 dest_ref) {
             #break;
         };
-        dest_ref .> set (index_ref .> get) byte;
+        dyn_array_set_u8 dest_ref (index_ref .> get) byte;
         index_ref .> set (i32_add (index_ref .> get) 1i32);
     };
     ()
 }
 
 #pub #use Array;
+#pub #use RawArray;
 #pub #use DynArray;
+#pub #use dyn_array_len_u8;
+#pub #use dyn_array_len_i32;
+#pub #use dyn_array_get_u8;
+#pub #use dyn_array_get_i32;
+#pub #use dyn_array_set_u8;
+#pub #use dyn_array_set_i32;
 #pub #use append_u8;
 #pub #use append_nul_terminated_u8;
+#pub #use append_dyn_nul_terminated_u8;
 #pub #use fill_u8;
