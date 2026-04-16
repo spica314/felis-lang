@@ -215,7 +215,7 @@ fn pattern_match_bindings_with_mode(
                 subpatterns.iter().zip(actual.fields.iter()).enumerate()
             {
                 let _ = (index, actual.heap_slot);
-                let field_value = field.clone();
+                let field_value: Value = field.clone();
                 let Some(sub_bindings) = pattern_match_bindings_with_mode(
                     subpattern,
                     &field_value,

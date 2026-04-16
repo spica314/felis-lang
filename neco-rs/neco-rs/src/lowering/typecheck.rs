@@ -9,24 +9,14 @@ pub(crate) fn validate_value_against_type(
     ty: &Term,
     program: &LoweredProgram,
 ) -> Result<()> {
-    if let Some((element_type, require_dynamic_kind)) = parse_dynamic_array_type_annotation(ty)? {
+    if let Some(element_type) = parse_raw_array_type_annotation(ty)? {
         return match value {
             Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
-                kind,
+                kind: ArrayKind::Dynamic,
                 ..
-            } if *actual_element_type == element_type
-                && (!require_dynamic_kind || *kind == ArrayKind::Dynamic) =>
-            {
-                Ok(())
-            }
-            Value::Constructor(constructor)
-                if require_dynamic_kind
-                    && dyn_array_constructor_matches(constructor, element_type) =>
-            {
-                Ok(())
-            }
+            } if *actual_element_type == element_type => Ok(()),
             Value::RuntimeArg(_) if element_type == ArrayElementType::U8 => Ok(()),
             _ => Err(Error::Unsupported(format!(
                 "expected a value of type `{}` but got {value:?}",
@@ -114,26 +104,14 @@ fn validate_reference_value_against_type(
     referent: &Term,
     program: &LoweredProgram,
 ) -> Result<()> {
-    if let Some((element_type, require_dynamic_kind)) =
-        parse_dynamic_array_type_annotation(referent)?
-    {
+    if let Some(element_type) = parse_raw_array_type_annotation(referent)? {
         return match value {
             Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
-                kind,
+                kind: ArrayKind::Dynamic,
                 ..
-            } if *actual_element_type == element_type
-                && (!require_dynamic_kind || *kind == ArrayKind::Dynamic) =>
-            {
-                Ok(())
-            }
-            Value::Constructor(constructor)
-                if require_dynamic_kind
-                    && dyn_array_constructor_matches(constructor, element_type) =>
-            {
-                Ok(())
-            }
+            } if *actual_element_type == element_type => Ok(()),
             Value::RuntimeArg(_) if element_type == ArrayElementType::U8 => Ok(()),
             _ => Err(Error::Unsupported(format!(
                 "expected a value of type `{}` but got {value:?}",
@@ -277,9 +255,7 @@ fn parse_unsized_array_type_annotation(ty: &Term) -> Result<Option<ArrayElementT
     parse_array_element_type(element_type_term, "Array").map(Some)
 }
 
-fn parse_dynamic_array_type_annotation(
-    ty: &Term,
-) -> Result<Option<(ArrayElementType, bool)>> {
+fn parse_raw_array_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
     let Term::Application { callee, arguments } = ty else {
         return Ok(None);
     };
@@ -289,11 +265,9 @@ fn parse_dynamic_array_type_annotation(
     let Some(type_name) = path.segments.last().map(|segment| segment.name.as_str()) else {
         return Ok(None);
     };
-    let require_dynamic_kind = match type_name {
-        "RawArray" => false,
-        "DynArray" => true,
-        _ => return Ok(None),
-    };
+    if type_name != "RawArray" {
+        return Ok(None);
+    }
     if path.starts_with_package
         || path
             .segments
@@ -309,8 +283,7 @@ fn parse_dynamic_array_type_annotation(
         ));
     };
 
-    parse_array_element_type(element_type_term, type_name)
-        .map(|element_type| Some((element_type, require_dynamic_kind)))
+    parse_array_element_type(element_type_term, type_name).map(Some)
 }
 
 fn parse_array_element_type(term: &Term, type_name: &str) -> Result<ArrayElementType> {
@@ -361,27 +334,6 @@ fn parse_array_length_term(term: &Term) -> Result<i32> {
             "`Array` length must be an `i32` literal".to_string(),
         )),
     }
-}
-
-fn dyn_array_constructor_matches(
-    constructor: &crate::ir::ConstructorValue,
-    element_type: ArrayElementType,
-) -> bool {
-    if constructor.type_name != "DynArray" || constructor.constructor_name != "dyn_array" {
-        return false;
-    }
-    matches!(
-        constructor.fields.as_slice(),
-        [
-            Value::Array {
-                element_type: actual_element_type,
-                kind: ArrayKind::Dynamic,
-                ..
-            },
-            Value::I32(_),
-            Value::I32(_)
-        ] if *actual_element_type == element_type
-    )
 }
 
 pub(super) fn parse_suffixed_i32_literal(literal: &str) -> Result<I32Expr> {

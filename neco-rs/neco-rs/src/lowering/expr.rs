@@ -25,12 +25,6 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
             if let Some(expr) = lower_i32_literal_application(callee, arguments)? {
                 return Ok(expr);
             }
-            if let Some(expr) = lower_dyn_array_len_call(callee, arguments, state)? {
-                return Ok(expr);
-            }
-            if let Some(expr) = lower_dyn_array_i32_get_call(callee, arguments, state)? {
-                return Ok(expr);
-            }
             if let Some(expr) = lower_i32_reference_get_call(callee, arguments, state)? {
                 return Ok(expr);
             }
@@ -85,9 +79,6 @@ pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr
         },
         Term::Application { callee, arguments } => {
             if let Some(expr) = lower_u8_literal_application(callee, arguments)? {
-                return Ok(expr);
-            }
-            if let Some(expr) = lower_dyn_array_u8_get_call(callee, arguments, state)? {
                 return Ok(expr);
             }
             if let Some(expr) = lower_runtime_arg_get_call(callee, arguments, state)? {
@@ -162,44 +153,6 @@ fn lower_i32_literal_application(callee: &Term, arguments: &[Term]) -> Result<Op
     Ok(Some(parse_bare_i32_literal(literal)?))
 }
 
-fn lower_dyn_array_len_call(
-    callee: &Term,
-    arguments: &[Term],
-    state: &LoweringState,
-) -> Result<Option<I32Expr>> {
-    let Term::Path(path) = callee else {
-        return Ok(None);
-    };
-    if path.starts_with_package || path.segments.len() != 1 || !path.segments[0].suffixes.is_empty()
-    {
-        return Ok(None);
-    }
-    match path.segments[0].name.as_str() {
-        "dyn_array_len_u8" | "dyn_array_len_i32" => {}
-        _ => return Ok(None),
-    }
-    let normalized = normalize_numeric_literal_arguments(arguments);
-    let [array] = normalized.as_slice() else {
-        return Err(Error::Unsupported(format!(
-            "`{}` must receive exactly one array argument",
-            path.segments[0].name
-        )));
-    };
-    let Value::Constructor(constructor) = resolve_value(array, &state.environment)? else {
-        return Err(Error::Unsupported(format!(
-            "`{}` expects a `DynArray` value",
-            path.segments[0].name
-        )));
-    };
-    let [Value::Array { slot, .. }, Value::I32(_), Value::I32(_)] = constructor.fields.as_slice()
-    else {
-        return Err(Error::Unsupported(
-            "`DynArray` value must contain raw array, capacity, and logical length".to_string(),
-        ));
-    };
-    Ok(Some(I32Expr::ArrayLen { array_slot: *slot }))
-}
-
 fn lower_u8_literal_application(callee: &Term, arguments: &[Term]) -> Result<Option<U8Expr>> {
     let [suffix] = arguments else {
         return Ok(None);
@@ -211,48 +164,6 @@ fn lower_u8_literal_application(callee: &Term, arguments: &[Term]) -> Result<Opt
         return Ok(None);
     }
     Ok(Some(parse_bare_u8_literal(literal)?))
-}
-
-fn lower_dyn_array_u8_get_call(
-    callee: &Term,
-    arguments: &[Term],
-    state: &LoweringState,
-) -> Result<Option<U8Expr>> {
-    let Term::Path(path) = callee else {
-        return Ok(None);
-    };
-    if path.starts_with_package || path.segments.len() != 1 || !path.segments[0].suffixes.is_empty()
-    {
-        return Ok(None);
-    }
-    if path.segments[0].name != "dyn_array_get_u8" {
-        return Ok(None);
-    }
-    let normalized = normalize_numeric_literal_arguments(arguments);
-    let [array, index] = normalized.as_slice() else {
-        return Err(Error::Unsupported(
-            "`dyn_array_get_u8` must receive an array and an index".to_string(),
-        ));
-    };
-    let Value::Constructor(constructor) = resolve_value(array, &state.environment)? else {
-        return Err(Error::Unsupported(
-            "`dyn_array_get_u8` expects a `DynArray` value".to_string(),
-        ));
-    };
-    let [Value::Array {
-        slot,
-        element_type: ArrayElementType::U8,
-        ..
-    }, Value::I32(_), Value::I32(_)] = constructor.fields.as_slice()
-    else {
-        return Err(Error::Unsupported(
-            "`DynArray` value must contain a `u8` raw array and two `i32` lengths".to_string(),
-        ));
-    };
-    Ok(Some(U8Expr::ArrayGet {
-        array_slot: *slot,
-        index: Box::new(lower_i32_expr(index, state)?),
-    }))
 }
 
 fn i32_comparison_kind(name: &str) -> Option<ComparisonKind> {
@@ -401,48 +312,6 @@ fn lower_array_get_call(
 
     Ok(Some(I32Expr::ArrayGet {
         array_slot,
-        index: Box::new(lower_i32_expr(index, state)?),
-    }))
-}
-
-fn lower_dyn_array_i32_get_call(
-    callee: &Term,
-    arguments: &[Term],
-    state: &LoweringState,
-) -> Result<Option<I32Expr>> {
-    let Term::Path(path) = callee else {
-        return Ok(None);
-    };
-    if path.starts_with_package || path.segments.len() != 1 || !path.segments[0].suffixes.is_empty()
-    {
-        return Ok(None);
-    }
-    if path.segments[0].name != "dyn_array_get_i32" {
-        return Ok(None);
-    }
-    let normalized = normalize_numeric_literal_arguments(arguments);
-    let [array, index] = normalized.as_slice() else {
-        return Err(Error::Unsupported(
-            "`dyn_array_get_i32` must receive an array and an index".to_string(),
-        ));
-    };
-    let Value::Constructor(constructor) = resolve_value(array, &state.environment)? else {
-        return Err(Error::Unsupported(
-            "`dyn_array_get_i32` expects a `DynArray` value".to_string(),
-        ));
-    };
-    let [Value::Array {
-        slot,
-        element_type: ArrayElementType::I32,
-        ..
-    }, Value::I32(_), Value::I32(_)] = constructor.fields.as_slice()
-    else {
-        return Err(Error::Unsupported(
-            "`DynArray` value must contain an `i32` raw array and two `i32` lengths".to_string(),
-        ));
-    };
-    Ok(Some(I32Expr::ArrayGet {
-        array_slot: *slot,
         index: Box::new(lower_i32_expr(index, state)?),
     }))
 }

@@ -35,17 +35,19 @@
 
 #fn main : () #with IO {
     #let package_root_ref <- IO::arg 1i32;
-    #let _ @^ manifest_path_ref <- dyn_array_new u8 0x100i32;
+    #let manifest_path_raw_ref <- IO::raw_array_new u8 0x100i32;
+    #let _ @^ manifest_path_ref = DynArray::dyn_array manifest_path_raw_ref 0x100i32 0i32;
+    #let manifest_path_bytes_ref = dyn_array_raw_u8 manifest_path_ref;
     #let _ @^ manifest_path_index_ref = 0i32;
     #let _ @ manifest_suffix_ref = "neco-package.json";
     #let manifest_suffix_bytes_ref = manifest_suffix_ref .> as_bytes;
-    append_nul_terminated_u8 package_root_ref manifest_path_ref manifest_path_index_ref;
-    append_u8 manifest_path_ref manifest_path_index_ref '/';
-    append_nul_terminated_u8 manifest_suffix_bytes_ref manifest_path_ref manifest_path_index_ref;
-    append_u8 manifest_path_ref manifest_path_index_ref '\0';
-    #let manifest_path_bytes_ref = dyn_array_raw_u8 manifest_path_ref;
+    append_nul_terminated_u8 package_root_ref manifest_path_bytes_ref manifest_path_index_ref;
+    append_u8 manifest_path_bytes_ref manifest_path_index_ref '/';
+    append_nul_terminated_u8 manifest_suffix_bytes_ref manifest_path_bytes_ref manifest_path_index_ref;
+    append_u8 manifest_path_bytes_ref manifest_path_index_ref '\0';
     #let manifest_fd <- IO::open manifest_path_bytes_ref 0i32 0i32;
-    #let _ @^ manifest_ref <- dyn_array_new u8 0x100i32;
+    #let manifest_raw_ref <- IO::raw_array_new u8 0x100i32;
+    #let _ @^ manifest_ref = DynArray::dyn_array manifest_raw_ref 0x100i32 0i32;
     #let manifest_bytes_ref = dyn_array_raw_u8 manifest_ref;
     #let manifest_len <- IO::read manifest_fd manifest_bytes_ref 0x100i32;
     #let _ <- IO::close manifest_fd;
@@ -54,7 +56,9 @@
     #let _ @^ manifest_index_ref = 0i32;
     #let _ @^ key_match_index_ref = 0i32;
     #let _ @^ entrypoint_parser_mode_ref = 0i32;
-    #let _ @^ entrypoint_ref <- dyn_array_new u8 0x80i32;
+    #let entrypoint_raw_ref <- IO::raw_array_new u8 0x80i32;
+    #let _ @^ entrypoint_ref = DynArray::dyn_array entrypoint_raw_ref 0x80i32 0i32;
+    #let entrypoint_bytes_ref = dyn_array_raw_u8 entrypoint_ref;
     #let _ @^ entrypoint_len_ref = 0i32;
     #loop {
         #if i32_gte (manifest_index_ref .> get) manifest_len {
@@ -96,22 +100,25 @@
         manifest_index_ref .> set next_manifest_index;
     };
     dyn_array_set_u8 entrypoint_ref (entrypoint_len_ref .> get) '\0';
-    #let _ @^ source_path_ref <- dyn_array_new u8 0x100i32;
-    #let _ @^ source_path_index_ref = 0i32;
-    append_nul_terminated_u8 package_root_ref source_path_ref source_path_index_ref;
-    append_u8 source_path_ref source_path_index_ref '/';
-    append_dyn_nul_terminated_u8 entrypoint_ref source_path_ref source_path_index_ref;
-    append_u8 source_path_ref source_path_index_ref '\0';
+    #let source_path_raw_ref <- IO::raw_array_new u8 0x100i32;
+    #let _ @^ source_path_ref = DynArray::dyn_array source_path_raw_ref 0x100i32 0i32;
     #let source_path_bytes_ref = dyn_array_raw_u8 source_path_ref;
+    #let _ @^ source_path_index_ref = 0i32;
+    append_nul_terminated_u8 package_root_ref source_path_bytes_ref source_path_index_ref;
+    append_u8 source_path_bytes_ref source_path_index_ref '/';
+    append_dyn_nul_terminated_u8 entrypoint_bytes_ref source_path_bytes_ref source_path_index_ref;
+    append_u8 source_path_bytes_ref source_path_index_ref '\0';
     #let input_fd <- IO::open source_path_bytes_ref 0i32 0i32;
-    #let _ @^ source_ref <- dyn_array_new u8 0x100i32;
+    #let source_raw_ref <- IO::raw_array_new u8 0x100i32;
+    #let _ @^ source_ref = DynArray::dyn_array source_raw_ref 0x100i32 0i32;
     #let source_bytes_ref = dyn_array_raw_u8 source_ref;
     #let source_len <- IO::read input_fd source_bytes_ref 0x100i32;
     #let _ <- IO::close input_fd;
     #let _ @^ index_ref = 0i32;
     #let _ @^ parsing_ref = 0i32;
     #let _ @^ parsed_exit_code_ref = 0i32;
-    #let _ @^ exit_code_byte_ref <- dyn_array_new u8 0x01i32;
+    #let exit_code_byte_raw_ref <- IO::raw_array_new u8 0x01i32;
+    #let _ @^ exit_code_byte_ref = DynArray::dyn_array exit_code_byte_raw_ref 0x01i32 0i32;
     #let _ @^ hello_world_mode_ref = 0i32;
     #let _ @^ hello_world_match_index_ref = 0i32;
     #let _ @ hello_world_pattern_ref = "Hello, world!";
@@ -170,9 +177,10 @@
     #let _ @ output_path_ref = "a.out";
     #let output_path_bytes_ref = output_path_ref .> as_bytes;
     #let fd <- IO::open output_path_bytes_ref 0x241i32 0x1edi32;
-    #let _ @^ elf_ref <- dyn_array_new u8 0x102fi32;
+    #let elf_raw_ref <- IO::raw_array_new u8 0x102fi32;
+    #let _ @^ elf_ref = DynArray::dyn_array elf_raw_ref 0x102fi32 0i32;
     #let elf_bytes_ref = dyn_array_raw_u8 elf_ref;
-    fill_u8 elf_ref 0x00u8;
+    fill_u8 elf_bytes_ref 0x00u8;
     dyn_array_set_u8 elf_ref 0x0i32 0x7fu8;
     dyn_array_set_u8 elf_ref 0x1i32 0x45u8;
     dyn_array_set_u8 elf_ref 0x2i32 0x4cu8;

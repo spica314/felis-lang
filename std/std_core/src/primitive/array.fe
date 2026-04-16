@@ -53,13 +53,13 @@
     ()
 }
 
-#proc append_u8 : (dest_ref : &^ DynArray u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () {
-    dyn_array_set_u8 dest_ref (dest_index_ref .> get) byte;
+#proc append_u8 : (dest_ref : &^ RawArray u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () {
+    dest_ref .> set (dest_index_ref .> get) byte;
     dest_index_ref .> set (i32_add (dest_index_ref .> get) 1i32);
     ()
 }
 
-#proc append_nul_terminated_u8 : (source_ref : & Array u8) -> (dest_ref : &^ DynArray u8) -> (dest_index_ref : &^ i32) -> () {
+#proc append_nul_terminated_u8 : (source_ref : & Array u8) -> (dest_ref : &^ RawArray u8) -> (dest_index_ref : &^ i32) -> () {
     #let _ @^ source_index_ref = 0i32;
     #loop {
         #let byte = source_ref .> get (source_index_ref .> get);
@@ -72,10 +72,10 @@
     ()
 }
 
-#proc append_dyn_nul_terminated_u8 : (source_ref : & DynArray u8) -> (dest_ref : &^ DynArray u8) -> (dest_index_ref : &^ i32) -> () {
+#proc append_dyn_nul_terminated_u8 : (source_ref : & RawArray u8) -> (dest_ref : &^ RawArray u8) -> (dest_index_ref : &^ i32) -> () {
     #let _ @^ source_index_ref = 0i32;
     #loop {
-        #let byte = dyn_array_get_u8 source_ref (source_index_ref .> get);
+        #let byte = source_ref .> get (source_index_ref .> get);
         #if u8_eq byte '\0' {
             #break;
         };
@@ -85,13 +85,13 @@
     ()
 }
 
-#proc fill_u8 : (dest_ref : &^ DynArray u8) -> (byte : u8) -> () {
+#proc fill_u8 : (dest_ref : &^ RawArray u8) -> (byte : u8) -> () {
     #let _ @^ index_ref = 0i32;
     #loop {
-        #if i32_gte (index_ref .> get) (dyn_array_len_u8 dest_ref) {
+        #if i32_gte (index_ref .> get) (dest_ref .> len) {
             #break;
         };
-        dyn_array_set_u8 dest_ref (index_ref .> get) byte;
+        dest_ref .> set (index_ref .> get) byte;
         index_ref .> set (i32_add (index_ref .> get) 1i32);
     };
     ()

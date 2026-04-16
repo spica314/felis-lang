@@ -1,7 +1,4 @@
 #use std_core::io::IO;
-#use std_core::primitive::array::DynArray;
-#use std_core::primitive::array::dyn_array_raw_u8;
-
 #entrypoint main;
 
 #fn main : () #with IO {
@@ -9,10 +6,9 @@
     #let _ @ path_ref = "message.txt";
     #let path_bytes_ref = path_ref .> as_bytes;
     #let fd <- IO::open path_bytes_ref 0i32 0i32;
-    #let _ @^ bytes_ref <- dyn_array_new u8 128i32;
-    #let bytes_raw_ref = dyn_array_raw_u8 bytes_ref;
-    #let len <- IO::read fd bytes_raw_ref 128i32;
+    #let _ @^ bytes_ref <- IO::raw_array_new u8 128i32;
+    #let len <- IO::read fd bytes_ref 128i32;
     #let _ <- IO::close fd;
-    #let _ <- IO::write stdout bytes_raw_ref len;
+    #let _ <- IO::write stdout bytes_ref len;
     ()
 }

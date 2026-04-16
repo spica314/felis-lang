@@ -1,12 +1,9 @@
 #use std_core::io::IO;
-#use std_core::primitive::array::DynArray;
-#use std_core::primitive::array::dyn_array_len_u8;
-
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let _ @^ array_ref <- dyn_array_new u8 42i32;
-    #let len = dyn_array_len_u8 array_ref;
+    #let _ @^ array_ref <- IO::raw_array_new u8 42i32;
+    #let len = array_ref .> len;
     #let _ <- IO::exit len;
     ()
 }

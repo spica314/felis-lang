@@ -161,9 +161,9 @@ fn parses_dyn_array_type_annotation_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 9);
+    assert_eq!(syntax.items.len(), 7);
 
-    let Item::Function(sum3_fn) = &syntax.items[7] else {
+    let Item::Function(sum3_fn) = &syntax.items[5] else {
         panic!("expected helper function");
     };
     let Term::Arrow(sum3_ty) = &sum3_fn.ty else {
@@ -177,24 +177,24 @@ fn parses_dyn_array_type_annotation_package_root() {
         exclusive,
     } = array_ref.ty.as_ref()
     else {
-        panic!("expected `&^ DynArray i32` reference type");
+        panic!("expected `&^ RawArray i32` reference type");
     };
     assert!(*exclusive);
     let Term::Application { callee, arguments } = referent.as_ref() else {
-        panic!("expected `DynArray i32` application");
+        panic!("expected `RawArray i32` application");
     };
     let Term::Path(array_path) = callee.as_ref() else {
-        panic!("expected `DynArray` callee path");
+        panic!("expected `RawArray` callee path");
     };
     assert_eq!(array_path.segments.len(), 1);
-    assert_eq!(array_path.segments[0].name, "DynArray");
+    assert_eq!(array_path.segments[0].name, "RawArray");
     assert_eq!(arguments.len(), 1);
     let Term::Path(element_type_path) = &arguments[0] else {
         panic!("expected element type path");
     };
     assert_eq!(element_type_path.segments[0].name, "i32");
 
-    let Item::Function(main_fn) = &syntax.items[8] else {
+    let Item::Function(main_fn) = &syntax.items[6] else {
         panic!("expected main function");
     };
     assert_eq!(main_fn.body.statements.len(), 6);
@@ -216,9 +216,9 @@ fn parses_dyn_array_u8_helpers_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 9);
+    assert_eq!(syntax.items.len(), 7);
 
-    let Item::Function(main_fn) = &syntax.items[8] else {
+    let Item::Function(main_fn) = &syntax.items[6] else {
         panic!("expected main function");
     };
     assert_eq!(main_fn.body.statements.len(), 9);
@@ -240,9 +240,9 @@ fn parses_dyn_array_len_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 5);
+    assert_eq!(syntax.items.len(), 3);
 
-    let Item::Function(main_fn) = &syntax.items[4] else {
+    let Item::Function(main_fn) = &syntax.items[2] else {
         panic!("expected main function");
     };
     assert_eq!(main_fn.body.statements.len(), 3);
@@ -832,13 +832,13 @@ fn parses_open_read_close_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 5);
-    let Item::Function(main_fn) = &syntax.items[4] else {
+    assert_eq!(syntax.items.len(), 3);
+    let Item::Function(main_fn) = &syntax.items[2] else {
         panic!("expected function");
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 9);
+    assert_eq!(main_fn.body.statements.len(), 8);
 }
 
 #[test]
