@@ -24,14 +24,140 @@
 #use std_core::primitive::u8::u8_sub;
 #use neco-felis-json::parse_felis_bin_entrypoint;
 
+#type(rc) FelisToken : Type[0] {
+    byte : i32 -> i32 -> i32 -> FelisToken,
+    string : i32 -> i32 -> i32 -> FelisToken,
+    int_literal : i32 -> i32 -> i32 -> FelisToken,
+}
+
 #entrypoint main;
 
-#fn accumulate_decimal_i32 : (current : i32) -> (digit : u8) -> i32 {
-    i32_add (i32_mul current 10i32) (i32_sub (i32_from_u8 digit) (i32_from_u8 '0'))
+#fn accumulate_decimal_i32 : (current : i32) -> (digit : i32) -> i32 {
+    i32_add (i32_mul current 10i32) (i32_sub digit (i32_from_u8 '0'))
 }
 
 #fn accumulate_decimal_u8 : (current : u8) -> (digit : u8) -> u8 {
     u8_add (u8_mul current 10u8) (u8_sub digit '0')
+}
+
+#proc parse_felis_string_token : (source_ref : DynArray u8) -> (string_start : i32) -> (hello_world_mode_ref : &^ i32) -> () {
+    #if i32_eq (hello_world_mode_ref .> get) 0i32 {
+        #let _ @ hello_world_pattern_ref = "Hello, world!";
+        #let hello_world_pattern_bytes_ref = hello_world_pattern_ref .> as_bytes;
+        #let _ @^ hello_world_match_index_ref = 0i32;
+        #loop {
+            #if i32_gte (hello_world_match_index_ref .> get) 0x0di32 {
+                #break;
+            };
+            #let source_byte = dyn_array_get_u8 source_ref (i32_add string_start (hello_world_match_index_ref .> get));
+            #let pattern_byte = hello_world_pattern_bytes_ref .> get (hello_world_match_index_ref .> get);
+            #if u8_eq source_byte pattern_byte {
+                hello_world_match_index_ref .> set (i32_add (hello_world_match_index_ref .> get) 1i32);
+            } #else {
+                #break;
+            };
+        };
+        #if i32_eq (hello_world_match_index_ref .> get) 0x0di32 {
+            hello_world_mode_ref .> set 1i32;
+        };
+    };
+    ()
+}
+
+#proc parse_felis_int_token : (source_ref : DynArray u8) -> (exit_code : i32) -> (number_start : i32) -> (number_end : i32) -> (parsed_exit_code_ref : &^ i32) -> (exit_code_byte_ref : DynArray u8) -> () {
+    parsed_exit_code_ref .> set exit_code;
+    #let _ @^ number_index_ref = number_start;
+    dyn_array_set_u8 exit_code_byte_ref 0x00i32 0x00u8;
+    #loop {
+        #if i32_gte (number_index_ref .> get) number_end {
+            #break;
+        };
+        #let number_byte = dyn_array_get_u8 source_ref (number_index_ref .> get);
+        #let current_number_byte = dyn_array_get_u8 exit_code_byte_ref 0x00i32;
+        #let next_number_byte = accumulate_decimal_u8 current_number_byte number_byte;
+        dyn_array_set_u8 exit_code_byte_ref 0x00i32 next_number_byte;
+        number_index_ref .> set (i32_add (number_index_ref .> get) 1i32);
+    };
+    ()
+}
+
+#proc parse_felis_token : (token : FelisToken) -> (source_ref : DynArray u8) -> (hello_world_mode_ref : &^ i32) -> (parsed_exit_code_ref : &^ i32) -> (exit_code_byte_ref : DynArray u8) -> () {
+    #match token {
+        FelisToken::byte _ _ _ => (),
+        FelisToken::string string_start _ _ => parse_felis_string_token source_ref string_start hello_world_mode_ref,
+        FelisToken::int_literal exit_code number_start number_end => parse_felis_int_token source_ref exit_code number_start number_end parsed_exit_code_ref exit_code_byte_ref,
+    };
+    ()
+}
+
+#proc lex_felis_source : (source_ref : DynArray u8) -> (source_len : i32) -> (hello_world_mode_ref : &^ i32) -> (parsed_exit_code_ref : &^ i32) -> (exit_code_byte_ref : DynArray u8) -> () {
+    #let _ @^ source_index_ref = 0i32;
+    #loop {
+        #if i32_gte (source_index_ref .> get) source_len {
+            #break;
+        };
+        #let byte = dyn_array_get_u8 source_ref (source_index_ref .> get);
+        #if u8_eq byte '"' {
+            #let string_start = i32_add (source_index_ref .> get) 1i32;
+            #let _ @^ string_end_ref = string_start;
+            #loop {
+                #if i32_gte (string_end_ref .> get) source_len {
+                    #break;
+                };
+                #let string_byte = dyn_array_get_u8 source_ref (string_end_ref .> get);
+                #if u8_eq string_byte '"' {
+                    #break;
+                };
+                string_end_ref .> set (i32_add (string_end_ref .> get) 1i32);
+            };
+            #let next_source_index = i32_add (string_end_ref .> get) 1i32;
+            #let token = FelisToken::string string_start (i32_sub (string_end_ref .> get) string_start) next_source_index;
+            parse_felis_token token source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+            source_index_ref .> set next_source_index;
+        } #else #if u8_lt byte ':' {
+            #if u8_gt byte '/' {
+                #let number_start = source_index_ref .> get;
+                #let _ @^ number_end_ref = number_start;
+                #let _ @^ parsed_number_ref = 0i32;
+                #loop {
+                    #if i32_gte (number_end_ref .> get) source_len {
+                        #break;
+                    };
+                    #let number_byte = dyn_array_get_u8 source_ref (number_end_ref .> get);
+                    #if u8_lt number_byte ':' {
+                        #if u8_gt number_byte '/' {
+                            #let next_number = accumulate_decimal_i32 (parsed_number_ref .> get) (i32_from_u8 number_byte);
+                            parsed_number_ref .> set next_number;
+                            number_end_ref .> set (i32_add (number_end_ref .> get) 1i32);
+                        } #else {
+                            #break;
+                        };
+                    } #else {
+                        #break;
+                    };
+                };
+                #let suffix_byte = dyn_array_get_u8 source_ref (number_end_ref .> get);
+                #if u8_eq suffix_byte 'i' {
+                    #let token = FelisToken::int_literal (parsed_number_ref .> get) number_start (number_end_ref .> get);
+                    parse_felis_token token source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+                    source_index_ref .> set (number_end_ref .> get);
+                } #else {
+                    #let token = FelisToken::byte (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32);
+                    parse_felis_token token source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+                    source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+                };
+            } #else {
+                #let token = FelisToken::byte (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32);
+                parse_felis_token token source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+                source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+            };
+        } #else {
+            #let token = FelisToken::byte (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32);
+            parse_felis_token token source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+            source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+        };
+    };
+    ()
 }
 
 #fn main : () #with IO {
@@ -70,66 +196,12 @@
     #let source_bytes_ref = dyn_array_raw_u8 source_ref;
     #let source_len <- IO::read input_fd source_bytes_ref 0x100i32;
     #let _ <- IO::close input_fd;
-    #let _ @^ index_ref = 0i32;
-    #let _ @^ parsing_ref = 0i32;
     #let _ @^ parsed_exit_code_ref = 0i32;
     #let exit_code_byte_raw_ref <- IO::raw_array_new u8 0x01i32;
     #let _ @^ exit_code_byte_ref = DynArray::dyn_array exit_code_byte_raw_ref 0x01i32 0i32;
     #let _ @^ hello_world_mode_ref = 0i32;
-    #let _ @^ hello_world_match_index_ref = 0i32;
-    #let _ @ hello_world_pattern_ref = "Hello, world!";
-    #let hello_world_pattern_bytes_ref = hello_world_pattern_ref .> as_bytes;
     dyn_array_set_u8 exit_code_byte_ref 0x00i32 '\0';
-    #loop {
-        #if i32_gte (index_ref .> get) source_len {
-            #break;
-        };
-        #let byte = dyn_array_get_u8 source_ref (index_ref .> get);
-        #if i32_eq (hello_world_mode_ref .> get) 0i32 {
-            #if i32_lt (hello_world_match_index_ref .> get) 0x0di32 {
-                #let expected_byte = hello_world_pattern_bytes_ref .> get (hello_world_match_index_ref .> get);
-                #if u8_eq byte expected_byte {
-                    #let next_hello_world_match_index = i32_add (hello_world_match_index_ref .> get) 1i32;
-                    hello_world_match_index_ref .> set next_hello_world_match_index;
-                    #if i32_eq next_hello_world_match_index 0x0di32 {
-                        hello_world_mode_ref .> set 1i32;
-                    };
-                } #else #if u8_eq byte 'H' {
-                    hello_world_match_index_ref .> set 1i32;
-                } #else {
-                    hello_world_match_index_ref .> set 0i32;
-                };
-            };
-        };
-        #if u8_lt byte ':' {
-            #if u8_gt byte '/' {
-                #let next_exit_code = accumulate_decimal_i32 (parsed_exit_code_ref .> get) byte;
-                parsed_exit_code_ref .> set next_exit_code;
-                #let current_exit_code_byte = dyn_array_get_u8 exit_code_byte_ref 0x00i32;
-                #let next_exit_code_byte = accumulate_decimal_u8 current_exit_code_byte byte;
-                dyn_array_set_u8 exit_code_byte_ref 0x00i32 next_exit_code_byte;
-                parsing_ref .> set 1i32;
-            } #else #if i32_eq (parsing_ref .> get) 1i32 {
-                #if u8_eq byte 'i' {
-                    #break;
-                } #else {
-                    parsed_exit_code_ref .> set 0i32;
-                    dyn_array_set_u8 exit_code_byte_ref 0x00i32 '\0';
-                    parsing_ref .> set 0i32;
-                };
-            };
-        } #else #if i32_eq (parsing_ref .> get) 1i32 {
-            #if u8_eq byte 'i' {
-                #break;
-            } #else {
-                parsed_exit_code_ref .> set 0i32;
-                dyn_array_set_u8 exit_code_byte_ref 0x00i32 '\0';
-                parsing_ref .> set 0i32;
-            };
-        };
-        #let next_index = i32_add (index_ref .> get) 1i32;
-        index_ref .> set next_index;
-    };
+    lex_felis_source source_ref source_len hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
     #let _ @ output_path_ref = "a.out";
     #let output_path_bytes_ref = output_path_ref .> as_bytes;
     #let fd <- IO::open output_path_bytes_ref 0x241i32 0x1edi32;
