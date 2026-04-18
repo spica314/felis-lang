@@ -1,0 +1,86 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#type(rc) Token : Type[0] {
+    int : i32 -> Token,
+    plus : Token,
+    eof : Token,
+}
+
+#type(rc) Tokens : Type[0] {
+    nil : Tokens,
+    cons : Token -> Tokens -> Tokens,
+}
+
+#type(rc) Expr : Type[0] {
+    literal : i32 -> Expr,
+    add : Expr -> Expr -> Expr,
+}
+
+#fn parse_atom : (token : Token) -> Expr {
+    #match token {
+        Token::int value => Expr::literal value,
+        Token::plus => Expr::literal 0i32,
+        Token::eof => Expr::literal 0i32,
+    }
+}
+
+#fn parse_tail : (left : Expr) -> (tokens : Tokens) -> Expr {
+    #match tokens {
+        Tokens::nil => left,
+        Tokens::cons token rest => {
+            #match token {
+                Token::plus => {
+                    #match rest {
+                        Tokens::nil => left,
+                        Tokens::cons rhs_token rhs_rest => {
+                            #let rhs = parse_atom rhs_token;
+                            #let combined = Expr::add left rhs;
+                            parse_tail combined rhs_rest
+                        }
+                    }
+                }
+                Token::int _ => left,
+                Token::eof => left,
+            }
+        }
+    }
+}
+
+#fn parse_expr : (tokens : Tokens) -> Expr {
+    #match tokens {
+        Tokens::nil => Expr::literal 0i32,
+        Tokens::cons token rest => {
+            #let left = parse_atom token;
+            parse_tail left rest
+        }
+    }
+}
+
+#fn eval_expr : (expr : Expr) -> i32 {
+    #match expr {
+        Expr::literal value => value,
+        Expr::add lhs rhs => {
+            #let lhs_value = eval_expr lhs;
+            #let rhs_value = eval_expr rhs;
+            i32_add lhs_value rhs_value
+        }
+    }
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let tokens =
+        Tokens::cons (Token::int 1i32)
+            (Tokens::cons Token::plus
+                (Tokens::cons (Token::int 2i32)
+                    (Tokens::cons Token::plus
+                        (Tokens::cons (Token::int 39i32)
+                            (Tokens::cons Token::eof Tokens::nil)))));
+    #let expr = parse_expr tokens;
+    #let code = eval_expr expr;
+    #let _ <- IO::exit code;
+    ()
+}

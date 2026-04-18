@@ -818,6 +818,61 @@ fn parses_type_rc_match_package_root() {
 }
 
 #[test]
+fn parses_type_rc_parser_basic_package_root() {
+    let root = repo_root().join("tests/testcases/type-rc-parser-basic");
+    let parsed = parse_root(&root).expect("type-rc-parser-basic package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "type-rc-parser-basic");
+    assert_eq!(package.source_files.len(), 1);
+    assert_eq!(
+        package.manifest.felis_bin_entrypoints,
+        vec![PathBuf::from("src/type-rc-parser-basic.fe")]
+    );
+
+    let syntax = &package.source_files[0].syntax;
+    assert_eq!(syntax.items.len(), 12);
+
+    let type_names: Vec<_> = syntax
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Type(type_decl) => Some(type_decl.name.name.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(type_names, vec!["Token", "Tokens", "Expr"]);
+
+    let parse_tail = syntax
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::Function(function) if function.name.name == "parse_tail" => Some(function),
+            _ => None,
+        })
+        .expect("parse_tail function");
+    let Some(Term::Match(match_expr)) = parse_tail.body.tail.as_deref() else {
+        panic!("expected parse_tail to return match expression");
+    };
+    assert_eq!(match_expr.arms.len(), 2);
+
+    let eval_expr = syntax
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::Function(function) if function.name.name == "eval_expr" => Some(function),
+            _ => None,
+        })
+        .expect("eval_expr function");
+    let Some(Term::Match(match_expr)) = eval_expr.body.tail.as_deref() else {
+        panic!("expected eval_expr to return match expression");
+    };
+    assert_eq!(match_expr.arms.len(), 2);
+}
+
+#[test]
 fn parses_stdin_to_stdout_package_root() {
     let root = repo_root().join("tests/testcases/stdin-to-stdout");
     let parsed = parse_root(&root).expect("stdin-to-stdout package parses");

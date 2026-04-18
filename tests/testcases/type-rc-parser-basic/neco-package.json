@@ -1,0 +1,6 @@
+{
+    "name": "type-rc-parser-basic",
+    "felis-bin-entrypoints": [
+        "src/type-rc-parser-basic.fe"
+    ]
+}

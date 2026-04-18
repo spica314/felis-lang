@@ -260,6 +260,13 @@ fn compiles_and_runs_type_rc_match_proc_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_type_rc_parser_basic_fixture() {
+    let root = repo_root().join("tests/testcases/type-rc-parser-basic");
+    let status = run_fixture_status(&root, "type-rc-parser-basic");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_stdin_to_stdout_fixture() {
     let root = repo_root().join("tests/testcases/stdin-to-stdout");
     let run = run_fixture_with_input(&root, "stdin-to-stdout", b"echo through stdin\n");
