@@ -570,6 +570,36 @@ fn rejects_non_ascii_char_literals() {
 }
 
 #[test]
+fn parses_match_block_arms_with_trailing_commas() {
+    let source = r#"
+#fn value_code : (value : Color) -> i32 {
+    #match value {
+        Color::red => {
+            1i32
+        },
+        Color::green => {
+            2i32
+        },
+        Color::blue => 3i32,
+    }
+}
+"#;
+    let (_, syntax) = parse_source(source).expect("source parses");
+    let syntax = syntax.expect("source file");
+    assert_eq!(syntax.items.len(), 1);
+
+    let Item::Function(function) = &syntax.items[0] else {
+        panic!("expected function");
+    };
+    let Some(Term::Match(match_expr)) = function.body.tail.as_deref() else {
+        panic!("expected match expression");
+    };
+    assert_eq!(match_expr.arms.len(), 3);
+    assert!(matches!(match_expr.arms[0].result.as_ref(), Term::Block(_)));
+    assert!(matches!(match_expr.arms[1].result.as_ref(), Term::Block(_)));
+}
+
+#[test]
 fn parses_enum_match_basic_package_root() {
     let root = repo_root().join("tests/testcases/enum-match-basic");
     let parsed = parse_root(&root).expect("enum-match-basic package parses");

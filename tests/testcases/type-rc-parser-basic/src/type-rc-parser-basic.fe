@@ -38,13 +38,13 @@
                             #let rhs = parse_atom rhs_token;
                             #let combined = Expr::add left rhs;
                             parse_tail combined rhs_rest
-                        }
+                        },
                     }
-                }
+                },
                 Token::int _ => left,
                 Token::eof => left,
             }
-        }
+        },
     }
 }
 
@@ -54,7 +54,7 @@
         Tokens::cons token rest => {
             #let left = parse_atom token;
             parse_tail left rest
-        }
+        },
     }
 }
 
@@ -65,7 +65,7 @@
             #let lhs_value = eval_expr lhs;
             #let rhs_value = eval_expr rhs;
             i32_add lhs_value rhs_value
-        }
+        },
     }
 }
 
