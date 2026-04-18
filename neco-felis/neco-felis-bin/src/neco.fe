@@ -26,8 +26,34 @@
 
 #type(rc) FelisToken : Type[0] {
     byte : i32 -> i32 -> i32 -> FelisToken,
+    ident : i32 -> i32 -> i32 -> FelisToken,
     string : i32 -> i32 -> i32 -> FelisToken,
     int_literal : i32 -> i32 -> i32 -> FelisToken,
+}
+
+#type(rc) FelisTokens : Type[0] {
+    nil : FelisTokens,
+    cons : FelisToken -> FelisTokens -> FelisTokens,
+}
+
+#type(rc) FelisExpr : Type[0] {
+    unknown_expr : FelisExpr,
+    int_literal_expr : i32 -> i32 -> i32 -> FelisExpr,
+    string_literal_expr : i32 -> i32 -> i32 -> FelisExpr,
+}
+
+#type(rc) FelisStmt : Type[0] {
+    exit_stmt : FelisExpr -> FelisStmt,
+    write_stmt : FelisExpr -> FelisStmt,
+}
+
+#type(rc) FelisStmts : Type[0] {
+    no_stmts : FelisStmts,
+    cons_stmt : FelisStmt -> FelisStmts -> FelisStmts,
+}
+
+#type(rc) FelisProgram : Type[0] {
+    program : FelisStmts -> FelisProgram,
 }
 
 #entrypoint main;
@@ -81,16 +107,145 @@
     ()
 }
 
-#proc parse_felis_token : (token : FelisToken) -> (source_ref : DynArray u8) -> (hello_world_mode_ref : &^ i32) -> (parsed_exit_code_ref : &^ i32) -> (exit_code_byte_ref : DynArray u8) -> () {
-    #match token {
-        FelisToken::byte _ _ _ => (),
-        FelisToken::string string_start _ _ => parse_felis_string_token source_ref string_start hello_world_mode_ref,
-        FelisToken::int_literal exit_code number_start number_end => parse_felis_int_token source_ref exit_code number_start number_end parsed_exit_code_ref exit_code_byte_ref,
+#proc lower_felis_stmt : (stmt : FelisStmt) -> (source_ref : DynArray u8) -> (hello_world_mode_ref : &^ i32) -> (parsed_exit_code_ref : &^ i32) -> (exit_code_byte_ref : DynArray u8) -> () {
+    #match stmt {
+        FelisStmt::exit_stmt expr => {
+            #match expr {
+                FelisExpr::int_literal_expr exit_code number_start number_end => parse_felis_int_token source_ref exit_code number_start number_end parsed_exit_code_ref exit_code_byte_ref,
+                FelisExpr::string_literal_expr _ _ _ => (),
+                FelisExpr::unknown_expr => (),
+            }
+        },
+        FelisStmt::write_stmt expr => {
+            #match expr {
+                FelisExpr::string_literal_expr string_start _ _ => parse_felis_string_token source_ref string_start hello_world_mode_ref,
+                FelisExpr::int_literal_expr _ _ _ => (),
+                FelisExpr::unknown_expr => (),
+            }
+        },
     };
     ()
 }
 
-#proc lex_felis_source : (source_ref : DynArray u8) -> (source_len : i32) -> (hello_world_mode_ref : &^ i32) -> (parsed_exit_code_ref : &^ i32) -> (exit_code_byte_ref : DynArray u8) -> () {
+#proc lower_felis_stmts : (stmts : FelisStmts) -> (source_ref : DynArray u8) -> (hello_world_mode_ref : &^ i32) -> (parsed_exit_code_ref : &^ i32) -> (exit_code_byte_ref : DynArray u8) -> () {
+    #match stmts {
+        FelisStmts::no_stmts => (),
+        FelisStmts::cons_stmt stmt rest => {
+            lower_felis_stmt stmt source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+            lower_felis_stmts rest source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref
+        },
+    };
+    ()
+}
+
+#proc lower_felis_program : (program : FelisProgram) -> (source_ref : DynArray u8) -> (hello_world_mode_ref : &^ i32) -> (parsed_exit_code_ref : &^ i32) -> (exit_code_byte_ref : DynArray u8) -> () {
+    #match program {
+        FelisProgram::program stmts => lower_felis_stmts stmts source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref,
+    };
+    ()
+}
+
+#proc parse_felis_ident_token : (source_ref : DynArray u8) -> (ident_start : i32) -> (ident_len : i32) -> (parse_state_ref : &^ i32) -> () {
+    #if i32_eq ident_len 4i32 {
+        #let byte0 = dyn_array_get_u8 source_ref ident_start;
+        #let byte1 = dyn_array_get_u8 source_ref (i32_add ident_start 1i32);
+        #let byte2 = dyn_array_get_u8 source_ref (i32_add ident_start 2i32);
+        #let byte3 = dyn_array_get_u8 source_ref (i32_add ident_start 3i32);
+        #if u8_eq byte0 'e' {
+            #if u8_eq byte1 'x' {
+                #if u8_eq byte2 'i' {
+                    #if u8_eq byte3 't' {
+                        parse_state_ref .> set 1i32;
+                    };
+                };
+            };
+        };
+    } #else #if i32_eq ident_len 5i32 {
+        #let byte0 = dyn_array_get_u8 source_ref ident_start;
+        #let byte1 = dyn_array_get_u8 source_ref (i32_add ident_start 1i32);
+        #let byte2 = dyn_array_get_u8 source_ref (i32_add ident_start 2i32);
+        #let byte3 = dyn_array_get_u8 source_ref (i32_add ident_start 3i32);
+        #let byte4 = dyn_array_get_u8 source_ref (i32_add ident_start 4i32);
+        #if u8_eq byte0 'w' {
+            #if u8_eq byte1 'r' {
+                #if u8_eq byte2 'i' {
+                    #if u8_eq byte3 't' {
+                        #if u8_eq byte4 'e' {
+                            parse_state_ref .> set 2i32;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ()
+}
+
+#proc parse_felis_token : (token : FelisToken) -> (source_ref : DynArray u8) -> (parse_state_ref : &^ i32) -> (hello_world_mode_ref : &^ i32) -> (parsed_exit_code_ref : &^ i32) -> (exit_code_byte_ref : DynArray u8) -> () {
+    #match token {
+        FelisToken::byte _ _ _ => (),
+        FelisToken::ident ident_start ident_len _ => parse_felis_ident_token source_ref ident_start ident_len parse_state_ref,
+        FelisToken::string string_start string_len string_end => {
+            #if i32_eq (parse_state_ref .> get) 2i32 {
+                #let stmt = FelisStmt::write_stmt (FelisExpr::string_literal_expr string_start string_len string_end);
+                lower_felis_stmt stmt source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+                parse_state_ref .> set 0i32;
+            } #else {
+                #let stmt = FelisStmt::write_stmt (FelisExpr::string_literal_expr string_start string_len string_end);
+                lower_felis_stmt stmt source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+            };
+        },
+        FelisToken::int_literal exit_code number_start number_end => {
+            #if i32_eq (parse_state_ref .> get) 1i32 {
+                #let stmt = FelisStmt::exit_stmt (FelisExpr::int_literal_expr exit_code number_start number_end);
+                lower_felis_stmt stmt source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+                parse_state_ref .> set 0i32;
+            };
+        },
+    };
+    ()
+}
+
+#proc mark_ident_part : (byte : u8) -> (is_ident_ref : &^ i32) -> () {
+    #if u8_gt byte '`' {
+        #if u8_lt byte '{' {
+            is_ident_ref .> set 1i32;
+        };
+    };
+    #if u8_gt byte '@' {
+        #if u8_lt byte '[' {
+            is_ident_ref .> set 1i32;
+        };
+    };
+    #if u8_gt byte '/' {
+        #if u8_lt byte ':' {
+            is_ident_ref .> set 1i32;
+        };
+    };
+    #if u8_eq byte '_' {
+        is_ident_ref .> set 1i32;
+    };
+    ()
+}
+
+#proc mark_ident_start : (byte : u8) -> (is_ident_ref : &^ i32) -> () {
+    #if u8_gt byte '`' {
+        #if u8_lt byte '{' {
+            is_ident_ref .> set 1i32;
+        };
+    };
+    #if u8_gt byte '@' {
+        #if u8_lt byte '[' {
+            is_ident_ref .> set 1i32;
+        };
+    };
+    #if u8_eq byte '_' {
+        is_ident_ref .> set 1i32;
+    };
+    ()
+}
+
+#proc lex_felis_source : (source_ref : DynArray u8) -> (source_len : i32) -> (parse_state_ref : &^ i32) -> (hello_world_mode_ref : &^ i32) -> (parsed_exit_code_ref : &^ i32) -> (exit_code_byte_ref : DynArray u8) -> () {
     #let _ @^ source_index_ref = 0i32;
     #loop {
         #if i32_gte (source_index_ref .> get) source_len {
@@ -112,7 +267,7 @@
             };
             #let next_source_index = i32_add (string_end_ref .> get) 1i32;
             #let token = FelisToken::string string_start (i32_sub (string_end_ref .> get) string_start) next_source_index;
-            parse_felis_token token source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+            parse_felis_token token source_ref parse_state_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
             source_index_ref .> set next_source_index;
         } #else #if u8_lt byte ':' {
             #if u8_gt byte '/' {
@@ -136,25 +291,64 @@
                         #break;
                     };
                 };
-                #let suffix_byte = dyn_array_get_u8 source_ref (number_end_ref .> get);
-                #if u8_eq suffix_byte 'i' {
-                    #let token = FelisToken::int_literal (parsed_number_ref .> get) number_start (number_end_ref .> get);
-                    parse_felis_token token source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
-                    source_index_ref .> set (number_end_ref .> get);
+                #let token = FelisToken::int_literal (parsed_number_ref .> get) number_start (number_end_ref .> get);
+                parse_felis_token token source_ref parse_state_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+                source_index_ref .> set (number_end_ref .> get);
+            } #else {
+                #let _ @^ is_ident_start_ref = 0i32;
+                mark_ident_start byte is_ident_start_ref;
+                #if i32_eq (is_ident_start_ref .> get) 1i32 {
+                    #let ident_start = source_index_ref .> get;
+                    #let _ @^ ident_end_ref = ident_start;
+                    #loop {
+                        #if i32_gte (ident_end_ref .> get) source_len {
+                            #break;
+                        };
+                        #let ident_byte = dyn_array_get_u8 source_ref (ident_end_ref .> get);
+                        #let _ @^ is_ident_part_ref = 0i32;
+                        mark_ident_part ident_byte is_ident_part_ref;
+                        #if i32_eq (is_ident_part_ref .> get) 1i32 {
+                            ident_end_ref .> set (i32_add (ident_end_ref .> get) 1i32);
+                        } #else {
+                            #break;
+                        };
+                    };
+                    #let token = FelisToken::ident ident_start (i32_sub (ident_end_ref .> get) ident_start) (ident_end_ref .> get);
+                    parse_felis_token token source_ref parse_state_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+                    source_index_ref .> set (ident_end_ref .> get);
                 } #else {
                     #let token = FelisToken::byte (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32);
-                    parse_felis_token token source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+                    parse_felis_token token source_ref parse_state_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
                     source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
                 };
-            } #else {
-                #let token = FelisToken::byte (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32);
-                parse_felis_token token source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
-                source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
             };
         } #else {
-            #let token = FelisToken::byte (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32);
-            parse_felis_token token source_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
-            source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+            #let _ @^ is_ident_start_ref = 0i32;
+            mark_ident_start byte is_ident_start_ref;
+            #if i32_eq (is_ident_start_ref .> get) 1i32 {
+                #let ident_start = source_index_ref .> get;
+                #let _ @^ ident_end_ref = ident_start;
+                #loop {
+                    #if i32_gte (ident_end_ref .> get) source_len {
+                        #break;
+                    };
+                    #let ident_byte = dyn_array_get_u8 source_ref (ident_end_ref .> get);
+                    #let _ @^ is_ident_part_ref = 0i32;
+                    mark_ident_part ident_byte is_ident_part_ref;
+                    #if i32_eq (is_ident_part_ref .> get) 1i32 {
+                        ident_end_ref .> set (i32_add (ident_end_ref .> get) 1i32);
+                    } #else {
+                        #break;
+                    };
+                };
+                #let token = FelisToken::ident ident_start (i32_sub (ident_end_ref .> get) ident_start) (ident_end_ref .> get);
+                parse_felis_token token source_ref parse_state_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+                source_index_ref .> set (ident_end_ref .> get);
+            } #else {
+                #let token = FelisToken::byte (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32);
+                parse_felis_token token source_ref parse_state_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+                source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+            };
         };
     };
     ()
@@ -200,8 +394,9 @@
     #let exit_code_byte_raw_ref <- IO::raw_array_new u8 0x01i32;
     #let _ @^ exit_code_byte_ref = DynArray::dyn_array exit_code_byte_raw_ref 0x01i32 0i32;
     #let _ @^ hello_world_mode_ref = 0i32;
+    #let _ @^ parse_state_ref = 0i32;
     dyn_array_set_u8 exit_code_byte_ref 0x00i32 '\0';
-    lex_felis_source source_ref source_len hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+    lex_felis_source source_ref source_len parse_state_ref hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
     #let _ @ output_path_ref = "a.out";
     #let output_path_bytes_ref = output_path_ref .> as_bytes;
     #let fd <- IO::open output_path_bytes_ref 0x241i32 0x1edi32;

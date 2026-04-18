@@ -411,6 +411,10 @@ fn lower_expression_statement(
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<()> {
+    if let Term::Block(block) = term {
+        lower_effectful_block(block, state, program)?;
+        return Ok(());
+    }
     if matches!(term, Term::Unit) {
         return Ok(());
     }
@@ -492,6 +496,28 @@ fn lower_expression_statement(
         }
     }
     Ok(())
+}
+
+fn lower_effectful_block(
+    block: &neco_rs_parser::Block,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<bool> {
+    let mut scoped_state = state.child_scope();
+    for statement in &block.statements {
+        let terminated = lower_statement(statement, &mut scoped_state, program)?;
+        if terminated {
+            state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
+            state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
+            return Ok(true);
+        }
+    }
+    if let Some(tail) = block.tail.as_deref() {
+        lower_expression_statement(tail, &mut scoped_state, program)?;
+    }
+    state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
+    state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
+    Ok(false)
 }
 
 fn lower_match_expression_statement(
