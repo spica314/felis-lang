@@ -1,0 +1,57 @@
+#use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::dyn_array_get_u8;
+#use std_core::primitive::array::dyn_array_set_u8;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::u8::u8_eq;
+
+#pub #proc parse_felis_bin_entrypoint : (manifest_ref : DynArray u8) -> (manifest_len : i32) -> (entrypoint_ref : DynArray u8) -> () {
+    #let _ @ key_pattern_ref = "felis-bin-entrypoints";
+    #let key_pattern_bytes_ref = key_pattern_ref .> as_bytes;
+    #let _ @^ manifest_index_ref = 0i32;
+    #let _ @^ key_match_index_ref = 0i32;
+    #let _ @^ entrypoint_parser_mode_ref = 0i32;
+    #let _ @^ entrypoint_len_ref = 0i32;
+    #loop {
+        #if i32_gte (manifest_index_ref .> get) manifest_len {
+            #break;
+        };
+        #let byte = dyn_array_get_u8 manifest_ref (manifest_index_ref .> get);
+        #if i32_eq (entrypoint_parser_mode_ref .> get) 0i32 {
+            #let expected_byte = key_pattern_bytes_ref .> get (key_match_index_ref .> get);
+            #if u8_eq byte expected_byte {
+                #let next_key_match_index = i32_add (key_match_index_ref .> get) 1i32;
+                key_match_index_ref .> set next_key_match_index;
+                #if i32_eq next_key_match_index 0x15i32 {
+                    entrypoint_parser_mode_ref .> set 1i32;
+                };
+            } #else #if u8_eq byte 'f' {
+                key_match_index_ref .> set 1i32;
+            } #else {
+                key_match_index_ref .> set 0i32;
+            };
+        } #else #if i32_eq (entrypoint_parser_mode_ref .> get) 1i32 {
+            #if u8_eq byte '[' {
+                entrypoint_parser_mode_ref .> set 2i32;
+            };
+        } #else {
+            #if i32_eq (entrypoint_parser_mode_ref .> get) 2i32 {
+                #if u8_eq byte '"' {
+                    entrypoint_parser_mode_ref .> set 3i32;
+                };
+            } #else {
+                #if u8_eq byte '"' {
+                    #break;
+                };
+                dyn_array_set_u8 entrypoint_ref (entrypoint_len_ref .> get) byte;
+                #let next_entrypoint_len = i32_add (entrypoint_len_ref .> get) 1i32;
+                entrypoint_len_ref .> set next_entrypoint_len;
+            };
+        };
+        #let next_manifest_index = i32_add (manifest_index_ref .> get) 1i32;
+        manifest_index_ref .> set next_manifest_index;
+    };
+    dyn_array_set_u8 entrypoint_ref (entrypoint_len_ref .> get) '\0';
+    ()
+}

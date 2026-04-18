@@ -1,6 +1,7 @@
 {
     "workspace": {
         "members": [
+            "neco-felis-json",
             "neco-felis-bin"
         ]
     }

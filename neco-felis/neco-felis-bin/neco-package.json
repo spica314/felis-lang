@@ -1,4 +1,9 @@
 {
     "name": "neco-felis",
+    "dependencies": {
+        "neco-felis-json": {
+            "workspace": true
+        }
+    },
     "felis-bin-entrypoints": ["src/neco.fe"]
 }

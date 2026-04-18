@@ -1,0 +1,4 @@
+{
+    "name": "neco-felis-json",
+    "felis-lib-entrypoint": "src/lib.fe"
+}
