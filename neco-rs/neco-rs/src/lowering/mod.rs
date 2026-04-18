@@ -7,14 +7,13 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use neco_rs_parser::{
-    BindingPattern, ElseBranch, Item, LetOperator, ParsedPackage, ParsedRoot, ParsedWorkspace,
-    Statement, Term, parse_root,
+    BindingPattern, ElseBranch, Item, LetOperator, MatchExpression, ParsedPackage, ParsedRoot,
+    ParsedWorkspace, Statement, Term, parse_root,
 };
 
 use crate::effect::{Value, bind_pattern, lower_effect};
 use crate::ir::{
-    ArrayAllocation, ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, LoweredProgram,
-    Operation,
+    ArrayAllocation, ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, LoweredProgram, Operation,
 };
 use crate::{Error, Result};
 
@@ -23,7 +22,7 @@ use declarations::{
     collect_pure_functions,
 };
 use expr::lower_condition_expr;
-use pure::{lower_procedure_call_statement, lower_pure_value};
+use pure::{lower_procedure_call_statement, lower_pure_value, pattern_match_bindings};
 
 pub(crate) use expr::{lower_i32_expr, lower_u8_expr, normalize_numeric_literal_arguments};
 
@@ -412,6 +411,13 @@ fn lower_expression_statement(
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<()> {
+    if matches!(term, Term::Unit) {
+        return Ok(());
+    }
+    if let Term::Match(match_expr) = term {
+        lower_match_expression_statement(match_expr, state, program)?;
+        return Ok(());
+    }
     if lower_procedure_call_statement(term, state, program)?.is_some() {
         return Ok(());
     }
@@ -486,4 +492,28 @@ fn lower_expression_statement(
         }
     }
     Ok(())
+}
+
+fn lower_match_expression_statement(
+    match_expr: &MatchExpression,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<()> {
+    let scrutinee = lower_pure_value(match_expr.scrutinee.as_ref(), state, program)?;
+    for arm in &match_expr.arms {
+        if let Some(bindings) =
+            pattern_match_bindings(&arm.pattern, &scrutinee, &state.constructors)?
+        {
+            let mut scoped_state = state.child_scope();
+            scoped_state.environment.extend(bindings);
+            lower_expression_statement(arm.result.as_ref(), &mut scoped_state, program)?;
+            state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
+            state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
+            return Ok(());
+        }
+    }
+
+    Err(Error::Unsupported(
+        "`#match` did not match any constructor arm".to_string(),
+    ))
 }

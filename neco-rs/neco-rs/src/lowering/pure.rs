@@ -173,7 +173,7 @@ fn lower_match_value(
     ))
 }
 
-fn pattern_match_bindings(
+pub(super) fn pattern_match_bindings(
     pattern: &Pattern,
     value: &Value,
     constructors: &HashMap<String, ConstructorSignature>,

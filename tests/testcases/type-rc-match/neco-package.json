@@ -3,6 +3,7 @@
     "felis-bin-entrypoints": [
         "src/type-rc-match-single.fe",
         "src/type-rc-match-pair.fe",
-        "src/type-rc-match-list.fe"
+        "src/type-rc-match-list.fe",
+        "src/type-rc-match-proc.fe"
     ]
 }

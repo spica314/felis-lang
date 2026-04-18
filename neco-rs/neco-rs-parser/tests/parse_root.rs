@@ -686,19 +686,45 @@ fn parses_type_rc_match_package_root() {
     };
 
     assert_eq!(package.manifest.name, "type-rc-match");
-    assert_eq!(package.source_files.len(), 3);
+    assert_eq!(package.source_files.len(), 4);
     assert_eq!(
         package.manifest.felis_bin_entrypoints,
         vec![
             PathBuf::from("src/type-rc-match-single.fe"),
             PathBuf::from("src/type-rc-match-pair.fe"),
             PathBuf::from("src/type-rc-match-list.fe"),
+            PathBuf::from("src/type-rc-match-proc.fe"),
         ]
     );
 
     for source_file in &package.source_files {
         assert_eq!(source_file.role, SourceFileRole::BinaryEntrypoint);
         let syntax = &source_file.syntax;
+
+        if source_file.path.ends_with("src/type-rc-match-proc.fe") {
+            assert_eq!(syntax.items.len(), 6);
+
+            let function = syntax
+                .items
+                .iter()
+                .find_map(|item| match item {
+                    Item::Function(function) if function.name.name == "apply_token" => {
+                        Some(function)
+                    }
+                    _ => None,
+                })
+                .expect("procedure");
+            assert_eq!(function.body.statements.len(), 1);
+            let Statement::Expression(term) = &function.body.statements[0] else {
+                panic!("expected match expression statement");
+            };
+            let Term::Match(match_expr) = term.as_ref() else {
+                panic!("expected match expression");
+            };
+            assert_eq!(match_expr.arms.len(), 2);
+            continue;
+        }
+
         assert_eq!(syntax.items.len(), 7);
 
         let type_decl = syntax

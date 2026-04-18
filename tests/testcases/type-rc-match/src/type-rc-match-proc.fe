@@ -1,0 +1,25 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+
+#type(rc) Token : Type[0] {
+    empty : Token,
+    number : i32 -> Token,
+}
+
+#proc apply_token : (token : Token) -> (code_ref : &^ i32) -> () {
+    #match token {
+        Token::empty => code_ref .> set 1i32,
+        Token::number value => code_ref .> set value,
+    };
+    ()
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let _ @^ code_ref = 0i32;
+    #let token = Token::number 42i32;
+    apply_token token code_ref;
+    #let _ <- IO::exit (code_ref .> get);
+    ()
+}
