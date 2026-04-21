@@ -20,6 +20,7 @@ argument, loads `neco-package.json`, opens the first
 source through `neco-felis-parser`, and writes `./a.out` in the current
 directory.
 
-The emitted `a.out` is a minimal Linux x86_64 ELF executable whose only
-behavior is currently `exit(...)` or `write "Hello, world!"` for the supported
-bootstrap fixtures.
+The emitted `a.out` is a minimal Linux x86_64 ELF executable. The current
+bootstrap path recognizes a single parsed statement shape at a time and emits
+the corresponding Linux x86_64 syscall sequence for `exit(<small integer>)` or
+`write(<string literal>)`.

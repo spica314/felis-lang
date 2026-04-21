@@ -8,12 +8,174 @@
 #use std_core::primitive::array::dyn_array_get_u8;
 #use std_core::primitive::array::dyn_array_set_u8;
 #use std_core::primitive::array::fill_u8;
+#use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::i32::i32_gte;
 #use std_core::primitive::u8::u8;
+#use std_core::primitive::u8::u8_add;
+#use std_core::primitive::u8::u8_eq;
 #use neco-felis-json::parse_felis_bin_entrypoint;
 #use neco-felis-parser::parse_felis_source;
 
 #entrypoint main;
+
+#type(rc) EmitFelisExpr : Type[0] {
+    emit_unknown_expr : EmitFelisExpr,
+    emit_int_literal_expr : i32 -> i32 -> i32 -> EmitFelisExpr,
+    emit_string_literal_expr : i32 -> i32 -> i32 -> EmitFelisExpr,
+}
+
+#type(rc) EmitFelisStmt : Type[0] {
+    emit_exit_stmt : EmitFelisExpr -> EmitFelisStmt,
+    emit_write_stmt : EmitFelisExpr -> EmitFelisStmt,
+}
+
+#proc emit_elf_u8 : (elf_ref : DynArray u8) -> (code_index_ref : &^ i32) -> (byte : u8) -> () {
+    dyn_array_set_u8 elf_ref (code_index_ref .> get) byte;
+    code_index_ref .> set (i32_add (code_index_ref .> get) 1i32);
+    ()
+}
+
+#proc emit_zero3 : (elf_ref : DynArray u8) -> (code_index_ref : &^ i32) -> () {
+    emit_elf_u8 elf_ref code_index_ref 0x00u8;
+    emit_elf_u8 elf_ref code_index_ref 0x00u8;
+    emit_elf_u8 elf_ref code_index_ref 0x00u8;
+    ()
+}
+
+#proc emit_exit_assembly : (elf_ref : DynArray u8) -> (code_index_ref : &^ i32) -> (exit_code : u8) -> () {
+    emit_elf_u8 elf_ref code_index_ref 0xb8u8;
+    emit_elf_u8 elf_ref code_index_ref 0x3cu8;
+    emit_zero3 elf_ref code_index_ref;
+    emit_elf_u8 elf_ref code_index_ref 0xbfu8;
+    emit_elf_u8 elf_ref code_index_ref exit_code;
+    emit_zero3 elf_ref code_index_ref;
+    emit_elf_u8 elf_ref code_index_ref 0x0fu8;
+    emit_elf_u8 elf_ref code_index_ref 0x05u8;
+    ()
+}
+
+#proc increment_write_len : (emit_u8_state_ref : DynArray u8) -> () {
+    #let write_len = dyn_array_get_u8 emit_u8_state_ref 0x01i32;
+    dyn_array_set_u8 emit_u8_state_ref 0x01i32 (u8_add write_len 1u8);
+    ()
+}
+
+#proc copy_felis_string_data : (source_ref : DynArray u8) -> (string_start : i32) -> (string_end : i32) -> (elf_ref : DynArray u8) -> (data_index_ref : &^ i32) -> (emit_u8_state_ref : DynArray u8) -> () {
+    #let _ @^ source_index_ref = string_start;
+    dyn_array_set_u8 emit_u8_state_ref 0x01i32 0x00u8;
+    #loop {
+        #if i32_gte (source_index_ref .> get) string_end {
+            #break;
+        };
+        #let byte = dyn_array_get_u8 source_ref (source_index_ref .> get);
+        #if u8_eq byte '\\' {
+            #let next_source_index = i32_add (source_index_ref .> get) 1i32;
+            #if i32_gte next_source_index string_end {
+                dyn_array_set_u8 elf_ref (data_index_ref .> get) byte;
+                data_index_ref .> set (i32_add (data_index_ref .> get) 1i32);
+                increment_write_len emit_u8_state_ref;
+                source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+            } #else {
+                #let escape_byte = dyn_array_get_u8 source_ref next_source_index;
+                #if u8_eq escape_byte 'n' {
+                    dyn_array_set_u8 elf_ref (data_index_ref .> get) '\n';
+                    data_index_ref .> set (i32_add (data_index_ref .> get) 1i32);
+                    increment_write_len emit_u8_state_ref;
+                    source_index_ref .> set (i32_add (source_index_ref .> get) 2i32);
+                } #else {
+                    dyn_array_set_u8 elf_ref (data_index_ref .> get) byte;
+                    data_index_ref .> set (i32_add (data_index_ref .> get) 1i32);
+                    increment_write_len emit_u8_state_ref;
+                    source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+                };
+            };
+        } #else {
+            dyn_array_set_u8 elf_ref (data_index_ref .> get) byte;
+            data_index_ref .> set (i32_add (data_index_ref .> get) 1i32);
+            increment_write_len emit_u8_state_ref;
+            source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+        };
+    };
+    ()
+}
+
+#proc emit_write_string_assembly : (source_ref : DynArray u8) -> (elf_ref : DynArray u8) -> (code_index_ref : &^ i32) -> (data_index_ref : &^ i32) -> (emit_u8_state_ref : DynArray u8) -> (string_start : i32) -> (string_end : i32) -> () {
+    #let data_addr_low = dyn_array_get_u8 emit_u8_state_ref 0x00i32;
+    copy_felis_string_data source_ref string_start string_end elf_ref data_index_ref emit_u8_state_ref;
+    #let write_len = dyn_array_get_u8 emit_u8_state_ref 0x01i32;
+
+    emit_elf_u8 elf_ref code_index_ref 0xb8u8;
+    emit_elf_u8 elf_ref code_index_ref 0x01u8;
+    emit_zero3 elf_ref code_index_ref;
+    emit_elf_u8 elf_ref code_index_ref 0xbfu8;
+    emit_elf_u8 elf_ref code_index_ref 0x01u8;
+    emit_zero3 elf_ref code_index_ref;
+    emit_elf_u8 elf_ref code_index_ref 0x48u8;
+    emit_elf_u8 elf_ref code_index_ref 0xbeu8;
+    emit_elf_u8 elf_ref code_index_ref data_addr_low;
+    emit_elf_u8 elf_ref code_index_ref 0x10u8;
+    emit_elf_u8 elf_ref code_index_ref 0x40u8;
+    emit_elf_u8 elf_ref code_index_ref 0x00u8;
+    emit_elf_u8 elf_ref code_index_ref 0x00u8;
+    emit_elf_u8 elf_ref code_index_ref 0x00u8;
+    emit_elf_u8 elf_ref code_index_ref 0x00u8;
+    emit_elf_u8 elf_ref code_index_ref 0x00u8;
+    emit_elf_u8 elf_ref code_index_ref 0xbau8;
+    emit_elf_u8 elf_ref code_index_ref write_len;
+    emit_zero3 elf_ref code_index_ref;
+    emit_elf_u8 elf_ref code_index_ref 0x0fu8;
+    emit_elf_u8 elf_ref code_index_ref 0x05u8;
+    dyn_array_set_u8 emit_u8_state_ref 0x00i32 (u8_add data_addr_low write_len);
+    ()
+}
+
+#proc emit_felis_stmt : (stmt : EmitFelisStmt) -> (stmt_value : u8) -> (source_ref : DynArray u8) -> (elf_ref : DynArray u8) -> (code_index_ref : &^ i32) -> (data_index_ref : &^ i32) -> (emit_u8_state_ref : DynArray u8) -> (terminated_ref : &^ i32) -> () {
+    #if i32_eq (terminated_ref .> get) 0i32 {
+        #match stmt {
+            EmitFelisStmt::emit_exit_stmt expr => {
+                #match expr {
+                    EmitFelisExpr::emit_int_literal_expr _ _ _ => {
+                        emit_exit_assembly elf_ref code_index_ref stmt_value;
+                        terminated_ref .> set 1i32;
+                    },
+                    EmitFelisExpr::emit_string_literal_expr _ _ _ => (),
+                    EmitFelisExpr::emit_unknown_expr => (),
+                }
+            },
+            EmitFelisStmt::emit_write_stmt expr => {
+                #match expr {
+                    EmitFelisExpr::emit_string_literal_expr string_start _ string_end => {
+                        emit_write_string_assembly source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref string_start string_end;
+                    },
+                    EmitFelisExpr::emit_int_literal_expr _ _ _ => (),
+                    EmitFelisExpr::emit_unknown_expr => (),
+                }
+            },
+        };
+    };
+    ()
+}
+
+#proc emit_parsed_felis_stmt : (stmt_tag : i32) -> (stmt_value : u8) -> (stmt_start : i32) -> (stmt_end : i32) -> (stmt_count : i32) -> (source_ref : DynArray u8) -> (elf_ref : DynArray u8) -> (emit_u8_state_ref : DynArray u8) -> () {
+    #let _ @^ code_index_ref = 0x1000i32;
+    #let _ @^ data_index_ref = 0x1028i32;
+    dyn_array_set_u8 emit_u8_state_ref 0x00i32 0x28u8;
+    #let _ @^ terminated_ref = 0i32;
+    #if i32_gte stmt_count 1i32 {
+        #if i32_eq stmt_tag 0x01i32 {
+            #let stmt = EmitFelisStmt::emit_exit_stmt (EmitFelisExpr::emit_int_literal_expr 0i32 stmt_start stmt_end);
+            emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
+        } #else #if i32_eq stmt_tag 0x02i32 {
+            #let stmt = EmitFelisStmt::emit_write_stmt (EmitFelisExpr::emit_string_literal_expr stmt_start 0i32 stmt_end);
+            emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
+        };
+    };
+    #if i32_eq (terminated_ref .> get) 0i32 {
+        emit_exit_assembly elf_ref code_index_ref 0x00u8;
+    };
+    ()
+}
 
 #fn main : () #with IO {
     #let package_root_ref <- IO::arg 1i32;
@@ -51,17 +213,22 @@
     #let source_bytes_ref = dyn_array_raw_u8 source_ref;
     #let source_len <- IO::read input_fd source_bytes_ref 0x100i32;
     #let _ <- IO::close input_fd;
-    #let _ @^ parsed_exit_code_ref = 0i32;
-    #let exit_code_byte_raw_ref <- IO::raw_array_new u8 0x01i32;
-    #let _ @^ exit_code_byte_ref = DynArray::dyn_array exit_code_byte_raw_ref 0x01i32 0i32;
-    #let _ @^ hello_world_mode_ref = 0i32;
-    dyn_array_set_u8 exit_code_byte_ref 0x00i32 '\0';
-    parse_felis_source source_ref source_len hello_world_mode_ref parsed_exit_code_ref exit_code_byte_ref;
+    #let _ @^ stmt_tag_ref = 0i32;
+    #let stmt_value_raw_ref <- IO::raw_array_new u8 0x01i32;
+    #let _ @^ stmt_value_ref = DynArray::dyn_array stmt_value_raw_ref 0x01i32 0i32;
+    #let _ @^ stmt_start_ref = 0i32;
+    #let _ @^ stmt_end_ref = 0i32;
+    #let number_byte_raw_ref <- IO::raw_array_new u8 0x01i32;
+    #let _ @^ number_byte_ref = DynArray::dyn_array number_byte_raw_ref 0x01i32 0i32;
+    #let emit_u8_state_raw_ref <- IO::raw_array_new u8 0x02i32;
+    #let _ @^ emit_u8_state_ref = DynArray::dyn_array emit_u8_state_raw_ref 0x02i32 0i32;
+    #let _ @^ stmt_count_ref = 0i32;
+    parse_felis_source source_ref source_len stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref number_byte_ref stmt_count_ref;
     #let _ @ output_path_ref = "a.out";
     #let output_path_bytes_ref = output_path_ref .> as_bytes;
     #let fd <- IO::open output_path_bytes_ref 0x241i32 0x1edi32;
-    #let elf_raw_ref <- IO::raw_array_new u8 0x102fi32;
-    #let _ @^ elf_ref = DynArray::dyn_array elf_raw_ref 0x102fi32 0i32;
+    #let elf_raw_ref <- IO::raw_array_new u8 0x1040i32;
+    #let _ @^ elf_ref = DynArray::dyn_array elf_raw_ref 0x1040i32 0i32;
     #let elf_bytes_ref = dyn_array_raw_u8 elf_ref;
     fill_u8 elf_bytes_ref 0x00u8;
     dyn_array_set_u8 elf_ref 0x0i32 0x7fu8;
@@ -87,55 +254,10 @@
     dyn_array_set_u8 elf_ref 0x52i32 0x40u8;
     dyn_array_set_u8 elf_ref 0x59i32 0x10u8;
     dyn_array_set_u8 elf_ref 0x5ai32 0x40u8;
-    #if i32_eq (hello_world_mode_ref .> get) 1i32 {
-        dyn_array_set_u8 elf_ref 0x60i32 '/';
-        dyn_array_set_u8 elf_ref 0x68i32 '/';
-        dyn_array_set_u8 elf_ref 0x1000i32 0xb8u8;
-        dyn_array_set_u8 elf_ref 0x1001i32 0x01u8;
-        dyn_array_set_u8 elf_ref 0x1005i32 0xbfu8;
-        dyn_array_set_u8 elf_ref 0x1006i32 0x01u8;
-        dyn_array_set_u8 elf_ref 0x100ai32 0x48u8;
-        dyn_array_set_u8 elf_ref 0x100bi32 0x8du8;
-        dyn_array_set_u8 elf_ref 0x100ci32 0x35u8;
-        dyn_array_set_u8 elf_ref 0x100di32 0x10u8;
-        dyn_array_set_u8 elf_ref 0x1011i32 0xbau8;
-        dyn_array_set_u8 elf_ref 0x1012i32 0x0eu8;
-        dyn_array_set_u8 elf_ref 0x1016i32 0x0fu8;
-        dyn_array_set_u8 elf_ref 0x1017i32 0x05u8;
-        dyn_array_set_u8 elf_ref 0x1018i32 0xb8u8;
-        dyn_array_set_u8 elf_ref 0x1019i32 0x3cu8;
-        dyn_array_set_u8 elf_ref 0x101di32 0x31u8;
-        dyn_array_set_u8 elf_ref 0x101ei32 0xffu8;
-        dyn_array_set_u8 elf_ref 0x101fi32 0x0fu8;
-        dyn_array_set_u8 elf_ref 0x1020i32 0x05u8;
-        dyn_array_set_u8 elf_ref 0x1021i32 'H';
-        dyn_array_set_u8 elf_ref 0x1022i32 'e';
-        dyn_array_set_u8 elf_ref 0x1023i32 'l';
-        dyn_array_set_u8 elf_ref 0x1024i32 'l';
-        dyn_array_set_u8 elf_ref 0x1025i32 'o';
-        dyn_array_set_u8 elf_ref 0x1026i32 ',';
-        dyn_array_set_u8 elf_ref 0x1027i32 ' ';
-        dyn_array_set_u8 elf_ref 0x1028i32 'w';
-        dyn_array_set_u8 elf_ref 0x1029i32 'o';
-        dyn_array_set_u8 elf_ref 0x102ai32 'r';
-        dyn_array_set_u8 elf_ref 0x102bi32 'l';
-        dyn_array_set_u8 elf_ref 0x102ci32 'd';
-        dyn_array_set_u8 elf_ref 0x102di32 '!';
-        dyn_array_set_u8 elf_ref 0x102ei32 '\n';
-        #let _ <- IO::write fd elf_bytes_ref 0x102fi32;
-    } #else {
-        dyn_array_set_u8 elf_ref 0x60i32 0x0eu8;
-        dyn_array_set_u8 elf_ref 0x68i32 0x0eu8;
-        dyn_array_set_u8 elf_ref 0x1000i32 0xb8u8;
-        dyn_array_set_u8 elf_ref 0x1001i32 (dyn_array_get_u8 exit_code_byte_ref 0x00i32);
-        dyn_array_set_u8 elf_ref 0x1005i32 0x89u8;
-        dyn_array_set_u8 elf_ref 0x1006i32 0xc7u8;
-        dyn_array_set_u8 elf_ref 0x1007i32 0xb8u8;
-        dyn_array_set_u8 elf_ref 0x1008i32 0x3cu8;
-        dyn_array_set_u8 elf_ref 0x100ci32 0x0fu8;
-        dyn_array_set_u8 elf_ref 0x100di32 0x05u8;
-        #let _ <- IO::write fd elf_bytes_ref 0x100ei32;
-    };
+    dyn_array_set_u8 elf_ref 0x60i32 0x40u8;
+    dyn_array_set_u8 elf_ref 0x68i32 0x40u8;
+    emit_parsed_felis_stmt (stmt_tag_ref .> get) (dyn_array_get_u8 stmt_value_ref 0x00i32) (stmt_start_ref .> get) (stmt_end_ref .> get) (stmt_count_ref .> get) source_ref elf_ref emit_u8_state_ref;
+    #let _ <- IO::write fd elf_bytes_ref 0x1040i32;
     #let _ <- IO::close fd;
     ()
 }
