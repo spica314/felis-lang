@@ -2,6 +2,7 @@
     "workspace": {
         "members": [
             "neco-felis-json",
+            "neco-felis-parser",
             "neco-felis-bin"
         ]
     }

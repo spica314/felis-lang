@@ -3,6 +3,9 @@
     "dependencies": {
         "neco-felis-json": {
             "workspace": true
+        },
+        "neco-felis-parser": {
+            "workspace": true
         }
     },
     "felis-bin-entrypoints": ["src/neco.fe"]

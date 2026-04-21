@@ -11,11 +11,15 @@ This directory is a workspace root.
 `neco-felis-json/` contains the current JSON-oriented manifest parsing helpers
 used by the bootstrap binary.
 
+`neco-felis-parser/` contains the current Felis source parsing helpers used by
+the bootstrap binary.
+
 The current bootstrap binary reads a package root from its first command-line
 argument, loads `neco-package.json`, opens the first
-`felis-bin-entrypoints` source file through `neco-felis-json`, extracts the
-`IO::exit ...i32` literal in a minimal way, and writes `./a.out` in the current
+`felis-bin-entrypoints` source file through `neco-felis-json`, parses the Felis
+source through `neco-felis-parser`, and writes `./a.out` in the current
 directory.
 
 The emitted `a.out` is a minimal Linux x86_64 ELF executable whose only
-behavior is `exit(42)` for that fixture.
+behavior is currently `exit(...)` or `write "Hello, world!"` for the supported
+bootstrap fixtures.
