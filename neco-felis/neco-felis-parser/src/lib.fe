@@ -93,12 +93,13 @@
     ()
 }
 
-#proc append_parsed_felis_stmt : (stmt_tag : i32) -> (stmt_value : u8) -> (stmt_start : i32) -> (stmt_end : i32) -> (stmt_tag_ref : &^ i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : &^ i32) -> (stmt_end_ref : &^ i32) -> (stmt_count_ref : &^ i32) -> () {
-    stmt_tag_ref .> set stmt_tag;
-    dyn_array_set_u8 stmt_value_ref 0x00i32 stmt_value;
-    stmt_start_ref .> set stmt_start;
-    stmt_end_ref .> set stmt_end;
-    stmt_count_ref .> set (i32_add (stmt_count_ref .> get) 1i32);
+#proc append_parsed_felis_stmt : (stmt_tag : i32) -> (stmt_value : u8) -> (stmt_start : i32) -> (stmt_end : i32) -> (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_count_ref : &^ i32) -> () {
+    #let stmt_index = stmt_count_ref .> get;
+    dyn_array_set_i32 stmt_tag_ref stmt_index stmt_tag;
+    dyn_array_set_u8 stmt_value_ref stmt_index stmt_value;
+    dyn_array_set_i32 stmt_start_ref stmt_index stmt_start;
+    dyn_array_set_i32 stmt_end_ref stmt_index stmt_end;
+    stmt_count_ref .> set (i32_add stmt_index 1i32);
     ()
 }
 
@@ -112,7 +113,7 @@
     ()
 }
 
-#proc parse_felis_token : (token : FelisToken) -> (source_ref : DynArray u8) -> (parse_state_ref : &^ i32) -> (stmt_tag_ref : &^ i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : &^ i32) -> (stmt_end_ref : &^ i32) -> (number_byte_ref : DynArray u8) -> (stmt_count_ref : &^ i32) -> () {
+#proc parse_felis_token : (token : FelisToken) -> (source_ref : DynArray u8) -> (parse_state_ref : &^ i32) -> (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (number_byte_ref : DynArray u8) -> (stmt_count_ref : &^ i32) -> () {
     #match token {
         FelisToken::byte _ _ _ => (),
         FelisToken::ident ident_start ident_len _ => {
@@ -175,7 +176,7 @@
     ()
 }
 
-#pub #proc parse_felis_source : (source_ref : DynArray u8) -> (source_len : i32) -> (stmt_tag_ref : &^ i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : &^ i32) -> (stmt_end_ref : &^ i32) -> (number_byte_ref : DynArray u8) -> (stmt_count_ref : &^ i32) -> () {
+#pub #proc parse_felis_source : (source_ref : DynArray u8) -> (source_len : i32) -> (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (number_byte_ref : DynArray u8) -> (stmt_count_ref : &^ i32) -> () {
     #let _ @^ parse_state_ref = 0i32;
     #let _ @^ source_index_ref = 0i32;
     stmt_count_ref .> set 0i32;
