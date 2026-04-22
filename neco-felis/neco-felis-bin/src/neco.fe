@@ -16,6 +16,7 @@
 #use std_core::primitive::u8::u8_eq;
 #use neco-felis-json::parse_felis_bin_entrypoint;
 #use neco-felis-parser::parse_felis_source;
+#use neco-felis-parser::parse_felis_source_tokens;
 
 #entrypoint main;
 
@@ -223,6 +224,16 @@
     #let emit_u8_state_raw_ref <- IO::raw_array_new u8 0x02i32;
     #let _ @^ emit_u8_state_ref = DynArray::dyn_array emit_u8_state_raw_ref 0x02i32 0i32;
     #let _ @^ stmt_count_ref = 0i32;
+    #let token_tag_raw_ref <- IO::raw_array_new i32 0x80i32;
+    #let _ @^ token_tag_ref = DynArray::dyn_array token_tag_raw_ref 0x80i32 0i32;
+    #let token_value_raw_ref <- IO::raw_array_new i32 0x80i32;
+    #let _ @^ token_value_ref = DynArray::dyn_array token_value_raw_ref 0x80i32 0i32;
+    #let token_start_raw_ref <- IO::raw_array_new i32 0x80i32;
+    #let _ @^ token_start_ref = DynArray::dyn_array token_start_raw_ref 0x80i32 0i32;
+    #let token_end_raw_ref <- IO::raw_array_new i32 0x80i32;
+    #let _ @^ token_end_ref = DynArray::dyn_array token_end_raw_ref 0x80i32 0i32;
+    #let _ @^ token_count_ref = 0i32;
+    parse_felis_source_tokens source_ref source_len token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
     parse_felis_source source_ref source_len stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref number_byte_ref stmt_count_ref;
     #let _ @ output_path_ref = "a.out";
     #let output_path_bytes_ref = output_path_ref .> as_bytes;

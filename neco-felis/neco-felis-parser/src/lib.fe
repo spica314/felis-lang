@@ -1,5 +1,6 @@
 #use std_core::primitive::array::DynArray;
 #use std_core::primitive::array::dyn_array_get_u8;
+#use std_core::primitive::array::dyn_array_set_i32;
 #use std_core::primitive::array::dyn_array_set_u8;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_eq;
@@ -98,6 +99,16 @@
     stmt_start_ref .> set stmt_start;
     stmt_end_ref .> set stmt_end;
     stmt_count_ref .> set (i32_add (stmt_count_ref .> get) 1i32);
+    ()
+}
+
+#proc append_parsed_felis_token : (tag : i32) -> (value : i32) -> (start : i32) -> (end : i32) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> () {
+    #let token_index = token_count_ref .> get;
+    dyn_array_set_i32 token_tag_ref token_index tag;
+    dyn_array_set_i32 token_value_ref token_index value;
+    dyn_array_set_i32 token_start_ref token_index start;
+    dyn_array_set_i32 token_end_ref token_index end;
+    token_count_ref .> set (i32_add token_index 1i32);
     ()
 }
 
@@ -272,6 +283,110 @@
             } #else {
                 #let token = FelisToken::byte (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32);
                 parse_felis_token token source_ref parse_state_ref stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref number_byte_ref stmt_count_ref;
+                source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+            };
+        };
+    };
+    ()
+}
+
+#pub #proc parse_felis_source_tokens : (source_ref : DynArray u8) -> (source_len : i32) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> () {
+    #let _ @^ source_index_ref = 0i32;
+    token_count_ref .> set 0i32;
+    #loop {
+        #if i32_gte (source_index_ref .> get) source_len {
+            #break;
+        };
+        #let byte = dyn_array_get_u8 source_ref (source_index_ref .> get);
+        #if u8_eq byte '"' {
+            #let string_start = i32_add (source_index_ref .> get) 1i32;
+            #let _ @^ string_end_ref = string_start;
+            #loop {
+                #if i32_gte (string_end_ref .> get) source_len {
+                    #break;
+                };
+                #let string_byte = dyn_array_get_u8 source_ref (string_end_ref .> get);
+                #if u8_eq string_byte '"' {
+                    #break;
+                };
+                string_end_ref .> set (i32_add (string_end_ref .> get) 1i32);
+            };
+            #let next_source_index = i32_add (string_end_ref .> get) 1i32;
+            append_parsed_felis_token 2i32 (i32_sub (string_end_ref .> get) string_start) string_start next_source_index token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+            source_index_ref .> set next_source_index;
+        } #else #if u8_lt byte ':' {
+            #if u8_gt byte '/' {
+                #let number_start = source_index_ref .> get;
+                #let _ @^ number_end_ref = number_start;
+                #let _ @^ parsed_number_ref = 0i32;
+                #loop {
+                    #if i32_gte (number_end_ref .> get) source_len {
+                        #break;
+                    };
+                    #let number_byte = dyn_array_get_u8 source_ref (number_end_ref .> get);
+                    #if u8_lt number_byte ':' {
+                        #if u8_gt number_byte '/' {
+                            #let next_number = accumulate_decimal_i32 (parsed_number_ref .> get) (i32_from_u8 number_byte);
+                            parsed_number_ref .> set next_number;
+                            number_end_ref .> set (i32_add (number_end_ref .> get) 1i32);
+                        } #else {
+                            #break;
+                        };
+                    } #else {
+                        #break;
+                    };
+                };
+                append_parsed_felis_token 3i32 (parsed_number_ref .> get) number_start (number_end_ref .> get) token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                source_index_ref .> set (number_end_ref .> get);
+            } #else {
+                #let _ @^ is_ident_start_ref = 0i32;
+                mark_ident_start byte is_ident_start_ref;
+                #if i32_eq (is_ident_start_ref .> get) 1i32 {
+                    #let ident_start = source_index_ref .> get;
+                    #let _ @^ ident_end_ref = ident_start;
+                    #loop {
+                        #if i32_gte (ident_end_ref .> get) source_len {
+                            #break;
+                        };
+                        #let ident_byte = dyn_array_get_u8 source_ref (ident_end_ref .> get);
+                        #let _ @^ is_ident_part_ref = 0i32;
+                        mark_ident_part ident_byte is_ident_part_ref;
+                        #if i32_eq (is_ident_part_ref .> get) 1i32 {
+                            ident_end_ref .> set (i32_add (ident_end_ref .> get) 1i32);
+                        } #else {
+                            #break;
+                        };
+                    };
+                    append_parsed_felis_token 1i32 (i32_sub (ident_end_ref .> get) ident_start) ident_start (ident_end_ref .> get) token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                    source_index_ref .> set (ident_end_ref .> get);
+                } #else {
+                    append_parsed_felis_token 0i32 (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32) token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                    source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+                };
+            };
+        } #else {
+            #let _ @^ is_ident_start_ref = 0i32;
+            mark_ident_start byte is_ident_start_ref;
+            #if i32_eq (is_ident_start_ref .> get) 1i32 {
+                #let ident_start = source_index_ref .> get;
+                #let _ @^ ident_end_ref = ident_start;
+                #loop {
+                    #if i32_gte (ident_end_ref .> get) source_len {
+                        #break;
+                    };
+                    #let ident_byte = dyn_array_get_u8 source_ref (ident_end_ref .> get);
+                    #let _ @^ is_ident_part_ref = 0i32;
+                    mark_ident_part ident_byte is_ident_part_ref;
+                    #if i32_eq (is_ident_part_ref .> get) 1i32 {
+                        ident_end_ref .> set (i32_add (ident_end_ref .> get) 1i32);
+                    } #else {
+                        #break;
+                    };
+                };
+                append_parsed_felis_token 1i32 (i32_sub (ident_end_ref .> get) ident_start) ident_start (ident_end_ref .> get) token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                source_index_ref .> set (ident_end_ref .> get);
+            } #else {
+                append_parsed_felis_token 0i32 (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32) token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
                 source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
             };
         };

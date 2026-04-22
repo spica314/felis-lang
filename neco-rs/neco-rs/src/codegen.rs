@@ -5,8 +5,8 @@ use crate::ir::{
     I32Expr, LoweredProgram, OpenPath, Operation, U8Expr,
 };
 
-const ARGV_GLOBAL_ADDRESS: u64 = 0x405000;
-const DATA_VIRTUAL_ADDRESS: u64 = 0x404000;
+const DATA_VIRTUAL_ADDRESS: u64 = 0x410000;
+const ARGV_GLOBAL_ADDRESS: u64 = 0x420000;
 
 pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) -> Elf64Executable {
     let code_virtual_address = 0x401000;
