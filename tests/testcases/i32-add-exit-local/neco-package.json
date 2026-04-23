@@ -1,0 +1,4 @@
+{
+    "name": "i32-add-exit-local",
+    "felis-bin-entrypoints": ["src/i32-add-exit-local.fe"]
+}

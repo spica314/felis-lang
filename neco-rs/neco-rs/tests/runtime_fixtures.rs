@@ -107,6 +107,28 @@ fn run_fixture_with_input(root: &Path, name: &str, stdin: &[u8]) -> Output {
     run
 }
 
+fn run_neco_felis_fixture(input_root: &Path, temp_name: &str) -> (Output, Vec<u8>, Output) {
+    let root = repo_root().join("neco-felis");
+    let temp_dir = runtime_temp_dir(temp_name);
+    let binary = compile_fixture(&root, "neco-felis");
+
+    let run = runtime_test_runner(&binary)
+        .current_dir(&temp_dir)
+        .arg(input_root)
+        .output()
+        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+    let emitted = temp_dir.join("a.out");
+    let emitted_bytes = fs::read(&emitted).expect("read emitted a.out");
+    let emitted_run = runtime_test_runner(&emitted)
+        .output()
+        .unwrap_or_else(|error| panic!("run emitted a.out with qemu-x86_64: {error}"));
+
+    fs::remove_file(&binary).expect("cleanup binary");
+    fs::remove_dir_all(&temp_dir).expect("cleanup runtime temp dir");
+
+    (run, emitted_bytes, emitted_run)
+}
+
 #[test]
 fn compiles_and_runs_i32_ops_fixture() {
     let root = repo_root().join("tests/testcases/i32-ops");
@@ -309,24 +331,8 @@ fn compiles_and_runs_open_write_close_fixture() {
 
 #[test]
 fn compiles_and_runs_neco_felis_fixture() {
-    let root = repo_root().join("neco-felis");
-    let temp_dir = runtime_temp_dir("neco-felis");
-    let binary = compile_fixture(&root, "neco-felis");
     let input_path = repo_root().join("tests/testcases/exit-42");
-
-    let run = runtime_test_runner(&binary)
-        .current_dir(&temp_dir)
-        .arg(&input_path)
-        .output()
-        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
-    let emitted = temp_dir.join("a.out");
-    let emitted_bytes = fs::read(&emitted).expect("read emitted a.out");
-    let emitted_run = runtime_test_runner(&emitted)
-        .output()
-        .unwrap_or_else(|error| panic!("run emitted a.out with qemu-x86_64: {error}"));
-
-    fs::remove_file(&binary).expect("cleanup binary");
-    fs::remove_dir_all(&temp_dir).expect("cleanup runtime temp dir");
+    let (run, emitted_bytes, emitted_run) = run_neco_felis_fixture(&input_path, "neco-felis");
 
     assert_eq!(run.status.code(), Some(0));
     assert!(run.stdout.is_empty());
@@ -339,24 +345,9 @@ fn compiles_and_runs_neco_felis_fixture() {
 
 #[test]
 fn compiles_and_runs_hello_world_with_neco_felis_fixture() {
-    let root = repo_root().join("neco-felis");
-    let temp_dir = runtime_temp_dir("neco-felis-hello-world");
-    let binary = compile_fixture(&root, "neco-felis");
     let input_path = repo_root().join("tests/testcases/hello-world");
-
-    let run = runtime_test_runner(&binary)
-        .current_dir(&temp_dir)
-        .arg(&input_path)
-        .output()
-        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
-    let emitted = temp_dir.join("a.out");
-    let emitted_bytes = fs::read(&emitted).expect("read emitted a.out");
-    let emitted_run = runtime_test_runner(&emitted)
-        .output()
-        .unwrap_or_else(|error| panic!("run emitted a.out with qemu-x86_64: {error}"));
-
-    fs::remove_file(&binary).expect("cleanup binary");
-    fs::remove_dir_all(&temp_dir).expect("cleanup runtime temp dir");
+    let (run, emitted_bytes, emitted_run) =
+        run_neco_felis_fixture(&input_path, "neco-felis-hello-world");
 
     assert_eq!(run.status.code(), Some(0));
     assert!(run.stdout.is_empty());
@@ -369,30 +360,63 @@ fn compiles_and_runs_hello_world_with_neco_felis_fixture() {
 
 #[test]
 fn compiles_i32_ops_with_neco_felis_fixture() {
-    let root = repo_root().join("neco-felis");
-    let temp_dir = runtime_temp_dir("neco-felis-i32-ops");
-    let binary = compile_fixture(&root, "neco-felis");
     let input_path = repo_root().join("tests/testcases/i32-ops");
-
-    let run = runtime_test_runner(&binary)
-        .current_dir(&temp_dir)
-        .arg(&input_path)
-        .output()
-        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
-    let emitted = temp_dir.join("a.out");
-    let emitted_bytes = fs::read(&emitted).expect("read emitted a.out");
-    let emitted_run = runtime_test_runner(&emitted)
-        .output()
-        .unwrap_or_else(|error| panic!("run emitted a.out with qemu-x86_64: {error}"));
-
-    fs::remove_file(&binary).expect("cleanup binary");
-    fs::remove_dir_all(&temp_dir).expect("cleanup runtime temp dir");
+    let (run, emitted_bytes, emitted_run) =
+        run_neco_felis_fixture(&input_path, "neco-felis-i32-ops");
 
     assert_eq!(run.status.code(), Some(0));
     assert!(run.stdout.is_empty());
     assert!(run.stderr.is_empty());
     assert_eq!(&emitted_bytes[0..4], b"\x7FELF");
     assert_eq!(emitted_run.status.code(), Some(0));
+    assert!(emitted_run.stdout.is_empty());
+    assert!(emitted_run.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "bug-0002: neco-felis still emits exit code 0 for i32-ops"]
+fn compiles_i32_ops_with_neco_felis_fixture_returns_42() {
+    let input_path = repo_root().join("tests/testcases/i32-ops");
+    let (run, emitted_bytes, emitted_run) =
+        run_neco_felis_fixture(&input_path, "neco-felis-i32-ops-expected-42");
+
+    assert_eq!(run.status.code(), Some(0));
+    assert!(run.stdout.is_empty());
+    assert!(run.stderr.is_empty());
+    assert_eq!(&emitted_bytes[0..4], b"\x7FELF");
+    assert_eq!(emitted_run.status.code(), Some(42));
+    assert!(emitted_run.stdout.is_empty());
+    assert!(emitted_run.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "bug-0002: neco-felis does not reliably preserve i32 locals into IO::exit"]
+fn compiles_i32_exit_local_with_neco_felis_fixture() {
+    let input_path = repo_root().join("tests/testcases/i32-exit-local");
+    let (run, emitted_bytes, emitted_run) =
+        run_neco_felis_fixture(&input_path, "neco-felis-i32-exit-local");
+
+    assert_eq!(run.status.code(), Some(0));
+    assert!(run.stdout.is_empty());
+    assert!(run.stderr.is_empty());
+    assert_eq!(&emitted_bytes[0..4], b"\x7FELF");
+    assert_eq!(emitted_run.status.code(), Some(3));
+    assert!(emitted_run.stdout.is_empty());
+    assert!(emitted_run.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "bug-0002: neco-felis does not yet evaluate i32_add into a local exit code"]
+fn compiles_i32_add_exit_local_with_neco_felis_fixture() {
+    let input_path = repo_root().join("tests/testcases/i32-add-exit-local");
+    let (run, emitted_bytes, emitted_run) =
+        run_neco_felis_fixture(&input_path, "neco-felis-i32-add-exit-local");
+
+    assert_eq!(run.status.code(), Some(0));
+    assert!(run.stdout.is_empty());
+    assert!(run.stderr.is_empty());
+    assert_eq!(&emitted_bytes[0..4], b"\x7FELF");
+    assert_eq!(emitted_run.status.code(), Some(10));
     assert!(emitted_run.stdout.is_empty());
     assert!(emitted_run.stderr.is_empty());
 }

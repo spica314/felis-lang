@@ -1,0 +1,11 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let x = i32_add 3i32 7i32;
+    #let _ <- IO::exit x;
+    ()
+}
