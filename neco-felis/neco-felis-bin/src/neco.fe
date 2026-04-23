@@ -21,6 +21,8 @@
 #use std_core::primitive::u8::u8_eq;
 #use std_core::primitive::u8::u8_gt;
 #use std_core::primitive::u8::u8_lt;
+#use std_core::primitive::u8::u8_mul;
+#use std_core::primitive::u8::u8_sub;
 #use neco-felis-json::parse_felis_bin_entrypoint;
 #use neco-felis-parser::parse_felis_source;
 #use neco-felis-parser::parse_felis_source_tokens;
@@ -499,8 +501,32 @@
                 build_emit_simple_expr_node source_ref stmt_expr_start stmt_expr_end local_name_start_ref local_name_end_ref (local_count_ref .> get) expr_tag_ref expr_value_ref expr_lhs_ref expr_rhs_ref expr_count_ref expr_node_ref;
             };
             dyn_array_set_i32 stmt_expr_node_ref (stmt_index_ref .> get) (expr_node_ref .> get);
-            #let stmt = EmitFelisStmt::emit_exit_stmt (EmitFelisExpr::emit_int_literal_expr 0i32 stmt_expr_start stmt_expr_end);
-            emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
+            #let _ @^ local_index_ref = 0i32;
+            find_i32_local_slot source_ref stmt_expr_start stmt_expr_end local_name_start_ref local_name_end_ref (local_count_ref .> get) local_index_ref;
+            #if i32_eq (local_index_ref .> get) (i32_sub 0i32 1i32) {
+                #let stmt = EmitFelisStmt::emit_exit_stmt (EmitFelisExpr::emit_int_literal_expr 0i32 stmt_expr_start stmt_expr_end);
+                emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
+            } #else {
+                #if i32_eq (terminated_ref .> get) 0i32 {
+                    #let local_index = local_index_ref .> get;
+                    #let defining_stmt_index = dyn_array_get_i32 local_slot_ref local_index;
+                    #let defining_expr_start = dyn_array_get_i32 stmt_expr_start_ref defining_stmt_index;
+                    #let exit_digit = dyn_array_get_u8 source_ref defining_expr_start;
+                    #if u8_lt exit_digit ':' {
+                        #if u8_gt exit_digit '/' {
+                            #let exit_code = u8_sub exit_digit '0';
+                            emit_exit_assembly elf_ref code_index_ref exit_code;
+                            terminated_ref .> set 1i32;
+                        } #else {
+                            #let stmt = EmitFelisStmt::emit_exit_stmt (EmitFelisExpr::emit_int_literal_expr 0i32 stmt_expr_start stmt_expr_end);
+                            emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
+                        };
+                    } #else {
+                        #let stmt = EmitFelisStmt::emit_exit_stmt (EmitFelisExpr::emit_int_literal_expr 0i32 stmt_expr_start stmt_expr_end);
+                        emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
+                    };
+                };
+            };
         } #else #if i32_eq stmt_tag 0x02i32 {
             #let _ @^ expr_node_ref = 0i32;
             append_emit_expr_node 2i32 stmt_expr_start 0i32 stmt_expr_end expr_tag_ref expr_value_ref expr_lhs_ref expr_rhs_ref expr_count_ref expr_node_ref;
@@ -509,6 +535,8 @@
             emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
         } #else #if i32_eq stmt_tag 0x03i32 {
             record_i32_local stmt_name_start stmt_name_end local_name_start_ref local_name_end_ref local_slot_ref local_count_ref;
+            #let local_index = i32_sub (local_count_ref .> get) 1i32;
+            dyn_array_set_i32 local_slot_ref local_index (stmt_index_ref .> get);
             #let _ @^ expr_node_ref = 0i32;
             build_emit_expr_node source_ref stmt_expr_start stmt_expr_end local_name_start_ref local_name_end_ref (local_count_ref .> get) expr_tag_ref expr_value_ref expr_lhs_ref expr_rhs_ref expr_count_ref expr_node_ref;
             dyn_array_set_i32 stmt_expr_node_ref (stmt_index_ref .> get) (expr_node_ref .> get);

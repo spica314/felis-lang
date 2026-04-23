@@ -162,7 +162,8 @@
                 };
             } #else #if i32_eq byte_value (i32_from_u8 ';') {
                 #if i32_eq (parse_state_ref .> get) 6i32 {
-                    append_parsed_felis_stmt 0x03i32 0x00u8 (let_name_start_ref .> get) (expr_end_ref .> get) (let_name_start_ref .> get) (let_name_end_ref .> get) (expr_start_ref .> get) (expr_end_ref .> get) stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
+                    #let number_byte = dyn_array_get_u8 number_byte_ref 0x00i32;
+                    append_parsed_felis_stmt 0x03i32 number_byte (let_name_start_ref .> get) (expr_end_ref .> get) (let_name_start_ref .> get) (let_name_end_ref .> get) (expr_start_ref .> get) (expr_end_ref .> get) stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
                     parse_state_ref .> set 0i32;
                 } #else #if i32_eq (parse_state_ref .> get) 8i32 {
                     append_parsed_felis_stmt 0x01i32 0x00u8 (expr_start_ref .> get) (expr_end_ref .> get) 0i32 0i32 (expr_start_ref .> get) (expr_end_ref .> get) stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
