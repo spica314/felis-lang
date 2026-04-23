@@ -1,0 +1,8 @@
+{
+    "workspace": {
+        "members": [
+            "workspace-app",
+            "workspace-lib"
+        ]
+    }
+}

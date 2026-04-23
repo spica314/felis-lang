@@ -1,0 +1,32 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::u8::u8_eq;
+
+#proc find_byte_offset : (bytes_ref : & Array u8) -> (target : u8) -> (len : i32) -> (offset_ref : &^ i32) -> () {
+    offset_ref .> set 0i32;
+    #loop {
+        #if i32_gte (offset_ref .> get) len {
+            #break;
+        };
+        #if u8_eq (bytes_ref .> get (offset_ref .> get)) target {
+            #break;
+        };
+        offset_ref .> set (i32_add (offset_ref .> get) 1i32);
+    };
+    ()
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let _ @ source_ref = "abc:42";
+    #let bytes_ref = source_ref .> as_bytes;
+    #let _ @^ offset_ref = 0i32;
+    find_byte_offset bytes_ref ':' 6i32 offset_ref;
+    #let code = i32_add (offset_ref .> get) 39i32;
+    #let _ <- IO::exit code;
+    ()
+}

@@ -1,0 +1,4 @@
+{
+    "name": "array-byte-scan",
+    "felis-bin-entrypoints": ["src/array-byte-scan.fe"]
+}

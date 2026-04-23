@@ -179,6 +179,21 @@ fn compiles_and_runs_dyn_array_len_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_array_byte_scan_fixture() {
+    let root = repo_root().join("tests/testcases/array-byte-scan");
+    let status = run_fixture_status(&root, "array-byte-scan");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+#[ignore = "workspace import lowering still rejects imported entrypoint values: unknown entrypoint local `f`"]
+fn compiles_and_runs_workspace_runtime_dependency_fixture() {
+    let root = repo_root().join("tests/testcases/workspace-runtime-dependency/workspace-app");
+    let status = run_fixture_status(&root, "workspace-runtime-dependency");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_i32_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/i32-reference-annotation");
     let status = run_fixture_status(&root, "i32-reference-annotation");

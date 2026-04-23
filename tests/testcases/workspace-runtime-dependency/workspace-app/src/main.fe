@@ -1,0 +1,9 @@
+#use std_core::io::IO;
+#use workspace-lib::f;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let _ <- IO::exit f;
+    ()
+}
