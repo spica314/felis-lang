@@ -262,10 +262,10 @@
     append_dyn_nul_terminated_u8 entrypoint_bytes_ref source_path_bytes_ref source_path_index_ref;
     append_u8 source_path_bytes_ref source_path_index_ref '\0';
     #let input_fd <- IO::open source_path_bytes_ref 0i32 0i32;
-    #let source_raw_ref <- IO::raw_array_new u8 0x100i32;
-    #let _ @^ source_ref = DynArray::dyn_array source_raw_ref 0x100i32 0i32;
+    #let source_raw_ref <- IO::raw_array_new u8 0x100000i32;
+    #let _ @^ source_ref = DynArray::dyn_array source_raw_ref 0x100000i32 0i32;
     #let source_bytes_ref = dyn_array_raw_u8 source_ref;
-    #let source_len <- IO::read input_fd source_bytes_ref 0x100i32;
+    #let source_len <- IO::read input_fd source_bytes_ref 0x100000i32;
     #let _ <- IO::close input_fd;
     #let stmt_tag_raw_ref <- IO::raw_array_new i32 0x20i32;
     #let _ @^ stmt_tag_ref = DynArray::dyn_array stmt_tag_raw_ref 0x20i32 0i32;
