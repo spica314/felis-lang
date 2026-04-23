@@ -159,7 +159,7 @@ pub(super) fn constructor_key(type_name: &str, constructor_name: &str) -> String
     format!("{type_name}::{constructor_name}")
 }
 
-fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<PureFunction> {
+pub(super) fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<PureFunction> {
     let mut parameters = Vec::new();
     let mut current = &function.ty;
     while let Term::Arrow(arrow) = current {

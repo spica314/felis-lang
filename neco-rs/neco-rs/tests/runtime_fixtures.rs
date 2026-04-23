@@ -186,7 +186,6 @@ fn compiles_and_runs_array_byte_scan_fixture() {
 }
 
 #[test]
-#[ignore = "workspace import lowering still rejects imported entrypoint values: unknown entrypoint local `f`"]
 fn compiles_and_runs_workspace_runtime_dependency_fixture() {
     let root = repo_root().join("tests/testcases/workspace-runtime-dependency/workspace-app");
     let status = run_fixture_status(&root, "workspace-runtime-dependency");

@@ -383,7 +383,7 @@ fn lower_pure_function_call(
     Ok(Some(value))
 }
 
-fn lower_pure_block_value(
+pub(super) fn lower_pure_block_value(
     block: &Block,
     state: &LoweringState,
     program: &mut LoweredProgram,

@@ -19,10 +19,14 @@ use crate::{Error, Result};
 
 use declarations::{
     ConstructorSignature, Procedure, PureFunction, collect_constructors, collect_procedures,
-    collect_pure_functions,
+    collect_pure_functions, pure_function_from_decl,
 };
 use expr::lower_condition_expr;
-use pure::{lower_procedure_call_statement, lower_pure_value, pattern_match_bindings};
+use pure::{
+    lower_procedure_call_statement, lower_pure_block_value, lower_pure_value,
+    pattern_match_bindings,
+};
+use typecheck::validate_value_against_type;
 
 pub(crate) use expr::{lower_i32_expr, lower_u8_expr, normalize_numeric_literal_arguments};
 
@@ -129,6 +133,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     state.functions = collect_pure_functions(&procedure_packages)?;
     state.procedures = collect_procedures(&procedure_packages)?;
     state.constructors = collect_constructors(&procedure_packages)?;
+    initialize_zero_arg_use_bindings(package, &procedure_packages, &mut state, &mut program)?;
     let mut terminated = false;
 
     for statement in &main_fn.body.statements {
@@ -150,6 +155,89 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     program.i32_slots = state.next_i32_slot;
 
     Ok(program)
+}
+
+fn initialize_zero_arg_use_bindings(
+    package: &ParsedPackage,
+    available_packages: &[ParsedPackage],
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<()> {
+    for item in package
+        .source_files
+        .iter()
+        .flat_map(|file| file.syntax.items.iter())
+    {
+        let Item::Use(use_decl) = item else {
+            continue;
+        };
+
+        let Some(function) =
+            resolve_zero_arg_imported_pure_function(package, available_packages, &use_decl.path)?
+        else {
+            continue;
+        };
+
+        let imported_name = use_decl
+            .path
+            .segments
+            .last()
+            .expect("use path always has at least one segment")
+            .name
+            .clone();
+        let value = lower_pure_block_value(&function.body, state, program)?;
+        validate_value_against_type(&value, &function.result_ty, program)?;
+        state.environment.insert(imported_name, value);
+    }
+
+    Ok(())
+}
+
+fn resolve_zero_arg_imported_pure_function(
+    package: &ParsedPackage,
+    available_packages: &[ParsedPackage],
+    path: &neco_rs_parser::PathExpression,
+) -> Result<Option<PureFunction>> {
+    let Some(last_segment) = path.segments.last() else {
+        return Ok(None);
+    };
+    if !last_segment.suffixes.is_empty() {
+        return Ok(None);
+    }
+
+    let target_package = if path.starts_with_package || path.segments.len() == 1 {
+        package
+    } else {
+        let package_name = &path.segments[0].name;
+        available_packages
+            .iter()
+            .find(|candidate| candidate.manifest.name == *package_name)
+            .unwrap_or(package)
+    };
+
+    for item in target_package
+        .source_files
+        .iter()
+        .flat_map(|file| file.syntax.items.iter())
+    {
+        let Item::Function(function) = item else {
+            continue;
+        };
+        if function.kind != neco_rs_parser::FunctionKind::Fn || function.effect.is_some() {
+            continue;
+        }
+        if function.name.name != last_segment.name {
+            continue;
+        }
+
+        let function = pure_function_from_decl(function)?;
+        if function.parameters.is_empty() {
+            return Ok(Some(function));
+        }
+        return Ok(None);
+    }
+
+    Ok(None)
 }
 
 fn collect_procedure_packages(package: &ParsedPackage) -> Result<Vec<ParsedPackage>> {
