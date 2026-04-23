@@ -260,6 +260,14 @@
     #let _ @^ stmt_start_ref = DynArray::dyn_array stmt_start_raw_ref 0x20i32 0i32;
     #let stmt_end_raw_ref <- IO::raw_array_new i32 0x20i32;
     #let _ @^ stmt_end_ref = DynArray::dyn_array stmt_end_raw_ref 0x20i32 0i32;
+    #let stmt_name_start_raw_ref <- IO::raw_array_new i32 0x20i32;
+    #let _ @^ stmt_name_start_ref = DynArray::dyn_array stmt_name_start_raw_ref 0x20i32 0i32;
+    #let stmt_name_end_raw_ref <- IO::raw_array_new i32 0x20i32;
+    #let _ @^ stmt_name_end_ref = DynArray::dyn_array stmt_name_end_raw_ref 0x20i32 0i32;
+    #let stmt_expr_start_raw_ref <- IO::raw_array_new i32 0x20i32;
+    #let _ @^ stmt_expr_start_ref = DynArray::dyn_array stmt_expr_start_raw_ref 0x20i32 0i32;
+    #let stmt_expr_end_raw_ref <- IO::raw_array_new i32 0x20i32;
+    #let _ @^ stmt_expr_end_ref = DynArray::dyn_array stmt_expr_end_raw_ref 0x20i32 0i32;
     #let number_byte_raw_ref <- IO::raw_array_new u8 0x01i32;
     #let _ @^ number_byte_ref = DynArray::dyn_array number_byte_raw_ref 0x01i32 0i32;
     #let emit_u8_state_raw_ref <- IO::raw_array_new u8 0x02i32;
@@ -275,7 +283,7 @@
     #let _ @^ token_end_ref = DynArray::dyn_array token_end_raw_ref 0x80i32 0i32;
     #let _ @^ token_count_ref = 0i32;
     parse_felis_source_tokens source_ref source_len token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
-    parse_felis_source source_ref source_len stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref number_byte_ref stmt_count_ref;
+    parse_felis_source source_ref source_len stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref stmt_count_ref;
     #let _ @ output_path_ref = "a.out";
     #let output_path_bytes_ref = output_path_ref .> as_bytes;
     #let fd <- IO::open output_path_bytes_ref 0x241i32 0x1edi32;
