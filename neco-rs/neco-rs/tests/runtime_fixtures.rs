@@ -368,6 +368,36 @@ fn compiles_and_runs_hello_world_with_neco_felis_fixture() {
 }
 
 #[test]
+fn compiles_i32_ops_with_neco_felis_fixture() {
+    let root = repo_root().join("neco-felis");
+    let temp_dir = runtime_temp_dir("neco-felis-i32-ops");
+    let binary = compile_fixture(&root, "neco-felis");
+    let input_path = repo_root().join("tests/testcases/i32-ops");
+
+    let run = runtime_test_runner(&binary)
+        .current_dir(&temp_dir)
+        .arg(&input_path)
+        .output()
+        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+    let emitted = temp_dir.join("a.out");
+    let emitted_bytes = fs::read(&emitted).expect("read emitted a.out");
+    let emitted_run = runtime_test_runner(&emitted)
+        .output()
+        .unwrap_or_else(|error| panic!("run emitted a.out with qemu-x86_64: {error}"));
+
+    fs::remove_file(&binary).expect("cleanup binary");
+    fs::remove_dir_all(&temp_dir).expect("cleanup runtime temp dir");
+
+    assert_eq!(run.status.code(), Some(0));
+    assert!(run.stdout.is_empty());
+    assert!(run.stderr.is_empty());
+    assert_eq!(&emitted_bytes[0..4], b"\x7FELF");
+    assert_eq!(emitted_run.status.code(), Some(0));
+    assert!(emitted_run.stdout.is_empty());
+    assert!(emitted_run.stderr.is_empty());
+}
+
+#[test]
 fn compiles_and_runs_fn_call_fixture() {
     let root = repo_root().join("tests/testcases/fn-call");
     let status = run_fixture_status(&root, "fn-call");
