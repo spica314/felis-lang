@@ -7,6 +7,7 @@
 #use std_core::primitive::array::dyn_array_raw_u8;
 #use std_core::primitive::array::dyn_array_get_i32;
 #use std_core::primitive::array::dyn_array_get_u8;
+#use std_core::primitive::array::dyn_array_set_i32;
 #use std_core::primitive::array::dyn_array_set_u8;
 #use std_core::primitive::array::fill_u8;
 #use std_core::primitive::i32::i32_add;
@@ -140,6 +141,15 @@
     ()
 }
 
+#proc record_i32_local : (name_start : i32) -> (name_end : i32) -> (local_name_start_ref : DynArray i32) -> (local_name_end_ref : DynArray i32) -> (local_slot_ref : DynArray i32) -> (local_count_ref : &^ i32) -> () {
+    #let local_index = local_count_ref .> get;
+    dyn_array_set_i32 local_name_start_ref local_index name_start;
+    dyn_array_set_i32 local_name_end_ref local_index name_end;
+    dyn_array_set_i32 local_slot_ref local_index local_index;
+    local_count_ref .> set (i32_add local_index 1i32);
+    ()
+}
+
 #proc emit_felis_stmt : (stmt : EmitFelisStmt) -> (stmt_value : u8) -> (source_ref : DynArray u8) -> (elf_ref : DynArray u8) -> (code_index_ref : &^ i32) -> (data_index_ref : &^ i32) -> (emit_u8_state_ref : DynArray u8) -> (terminated_ref : &^ i32) -> () {
     #if i32_eq (terminated_ref .> get) 0i32 {
         #match stmt {
@@ -181,7 +191,7 @@
     ()
 }
 
-#proc emit_parsed_felis_stmts : (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (stmt_count : i32) -> (source_ref : DynArray u8) -> (elf_ref : DynArray u8) -> (emit_u8_state_ref : DynArray u8) -> () {
+#proc emit_parsed_felis_stmts : (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (stmt_count : i32) -> (source_ref : DynArray u8) -> (elf_ref : DynArray u8) -> (emit_u8_state_ref : DynArray u8) -> (local_name_start_ref : DynArray i32) -> (local_name_end_ref : DynArray i32) -> (local_slot_ref : DynArray i32) -> (local_count_ref : &^ i32) -> () {
     #let _ @^ code_index_ref = 0x1000i32;
     #let _ @^ data_index_ref = 0x1028i32;
     dyn_array_set_u8 emit_u8_state_ref 0x00i32 0x28u8;
@@ -206,6 +216,7 @@
             #let stmt = EmitFelisStmt::emit_write_stmt (EmitFelisExpr::emit_string_literal_expr stmt_expr_start 0i32 stmt_expr_end);
             emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
         } #else #if i32_eq stmt_tag 0x03i32 {
+            record_i32_local stmt_name_start stmt_name_end local_name_start_ref local_name_end_ref local_slot_ref local_count_ref;
             #let stmt = EmitFelisStmt::emit_let_stmt stmt_name_start EmitFelisExpr::emit_unknown_expr;
             emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
         } #else #if i32_eq stmt_tag 0x04i32 {
@@ -286,6 +297,13 @@
     #let token_end_raw_ref <- IO::raw_array_new i32 0x80i32;
     #let _ @^ token_end_ref = DynArray::dyn_array token_end_raw_ref 0x80i32 0i32;
     #let _ @^ token_count_ref = 0i32;
+    #let local_name_start_raw_ref <- IO::raw_array_new i32 0x20i32;
+    #let _ @^ local_name_start_ref = DynArray::dyn_array local_name_start_raw_ref 0x20i32 0i32;
+    #let local_name_end_raw_ref <- IO::raw_array_new i32 0x20i32;
+    #let _ @^ local_name_end_ref = DynArray::dyn_array local_name_end_raw_ref 0x20i32 0i32;
+    #let local_slot_raw_ref <- IO::raw_array_new i32 0x20i32;
+    #let _ @^ local_slot_ref = DynArray::dyn_array local_slot_raw_ref 0x20i32 0i32;
+    #let _ @^ local_count_ref = 0i32;
     parse_felis_source_tokens source_ref source_len token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
     parse_felis_source source_ref source_len stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref stmt_count_ref;
     #let _ @ output_path_ref = "a.out";
@@ -320,7 +338,7 @@
     dyn_array_set_u8 elf_ref 0x5ai32 0x40u8;
     dyn_array_set_u8 elf_ref 0x60i32 0x40u8;
     dyn_array_set_u8 elf_ref 0x68i32 0x40u8;
-    emit_parsed_felis_stmts stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref (stmt_count_ref .> get) source_ref elf_ref emit_u8_state_ref;
+    emit_parsed_felis_stmts stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref (stmt_count_ref .> get) source_ref elf_ref emit_u8_state_ref local_name_start_ref local_name_end_ref local_slot_ref local_count_ref;
     #let _ <- IO::write fd elf_bytes_ref 0x1040i32;
     #let _ <- IO::close fd;
     ()
