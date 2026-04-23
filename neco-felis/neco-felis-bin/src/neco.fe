@@ -25,6 +25,12 @@
     emit_unknown_expr : EmitFelisExpr,
     emit_int_literal_expr : i32 -> i32 -> i32 -> EmitFelisExpr,
     emit_string_literal_expr : i32 -> i32 -> i32 -> EmitFelisExpr,
+    emit_i32_local_expr : i32 -> EmitFelisExpr,
+    emit_i32_add_expr : EmitFelisExpr -> EmitFelisExpr -> EmitFelisExpr,
+    emit_i32_sub_expr : EmitFelisExpr -> EmitFelisExpr -> EmitFelisExpr,
+    emit_i32_mul_expr : EmitFelisExpr -> EmitFelisExpr -> EmitFelisExpr,
+    emit_i32_div_expr : EmitFelisExpr -> EmitFelisExpr -> EmitFelisExpr,
+    emit_i32_mod_expr : EmitFelisExpr -> EmitFelisExpr -> EmitFelisExpr,
 }
 
 #type(rc) EmitFelisStmt : Type[0] {
@@ -144,6 +150,12 @@
                         terminated_ref .> set 1i32;
                     },
                     EmitFelisExpr::emit_string_literal_expr _ _ _ => (),
+                    EmitFelisExpr::emit_i32_local_expr _ => (),
+                    EmitFelisExpr::emit_i32_add_expr _ _ => (),
+                    EmitFelisExpr::emit_i32_sub_expr _ _ => (),
+                    EmitFelisExpr::emit_i32_mul_expr _ _ => (),
+                    EmitFelisExpr::emit_i32_div_expr _ _ => (),
+                    EmitFelisExpr::emit_i32_mod_expr _ _ => (),
                     EmitFelisExpr::emit_unknown_expr => (),
                 }
             },
@@ -153,6 +165,12 @@
                         emit_write_string_assembly source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref string_start string_end;
                     },
                     EmitFelisExpr::emit_int_literal_expr _ _ _ => (),
+                    EmitFelisExpr::emit_i32_local_expr _ => (),
+                    EmitFelisExpr::emit_i32_add_expr _ _ => (),
+                    EmitFelisExpr::emit_i32_sub_expr _ _ => (),
+                    EmitFelisExpr::emit_i32_mul_expr _ _ => (),
+                    EmitFelisExpr::emit_i32_div_expr _ _ => (),
+                    EmitFelisExpr::emit_i32_mod_expr _ _ => (),
                     EmitFelisExpr::emit_unknown_expr => (),
                 }
             },

@@ -33,11 +33,19 @@
     unknown_expr : FelisExpr,
     int_literal_expr : i32 -> i32 -> i32 -> FelisExpr,
     string_literal_expr : i32 -> i32 -> i32 -> FelisExpr,
+    local_expr : i32 -> i32 -> FelisExpr,
+    i32_add_expr : FelisExpr -> FelisExpr -> FelisExpr,
+    i32_sub_expr : FelisExpr -> FelisExpr -> FelisExpr,
+    i32_mul_expr : FelisExpr -> FelisExpr -> FelisExpr,
+    i32_div_expr : FelisExpr -> FelisExpr -> FelisExpr,
+    i32_mod_expr : FelisExpr -> FelisExpr -> FelisExpr,
 }
 
 #pub #type(rc) FelisStmt : Type[0] {
     exit_stmt : FelisExpr -> FelisStmt,
     write_stmt : FelisExpr -> FelisStmt,
+    let_i32_stmt : i32 -> i32 -> FelisExpr -> FelisStmt,
+    expr_stmt : FelisExpr -> FelisStmt,
 }
 
 #pub #type(rc) FelisStmts : Type[0] {
