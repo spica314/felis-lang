@@ -181,7 +181,7 @@
     ()
 }
 
-#proc emit_parsed_felis_stmts : (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_count : i32) -> (source_ref : DynArray u8) -> (elf_ref : DynArray u8) -> (emit_u8_state_ref : DynArray u8) -> () {
+#proc emit_parsed_felis_stmts : (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (stmt_count : i32) -> (source_ref : DynArray u8) -> (elf_ref : DynArray u8) -> (emit_u8_state_ref : DynArray u8) -> () {
     #let _ @^ code_index_ref = 0x1000i32;
     #let _ @^ data_index_ref = 0x1028i32;
     dyn_array_set_u8 emit_u8_state_ref 0x00i32 0x28u8;
@@ -195,14 +195,18 @@
         #let stmt_value = dyn_array_get_u8 stmt_value_ref (stmt_index_ref .> get);
         #let stmt_start = dyn_array_get_i32 stmt_start_ref (stmt_index_ref .> get);
         #let stmt_end = dyn_array_get_i32 stmt_end_ref (stmt_index_ref .> get);
+        #let stmt_name_start = dyn_array_get_i32 stmt_name_start_ref (stmt_index_ref .> get);
+        #let stmt_name_end = dyn_array_get_i32 stmt_name_end_ref (stmt_index_ref .> get);
+        #let stmt_expr_start = dyn_array_get_i32 stmt_expr_start_ref (stmt_index_ref .> get);
+        #let stmt_expr_end = dyn_array_get_i32 stmt_expr_end_ref (stmt_index_ref .> get);
         #if i32_eq stmt_tag 0x01i32 {
-            #let stmt = EmitFelisStmt::emit_exit_stmt (EmitFelisExpr::emit_int_literal_expr 0i32 stmt_start stmt_end);
+            #let stmt = EmitFelisStmt::emit_exit_stmt (EmitFelisExpr::emit_int_literal_expr 0i32 stmt_expr_start stmt_expr_end);
             emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
         } #else #if i32_eq stmt_tag 0x02i32 {
-            #let stmt = EmitFelisStmt::emit_write_stmt (EmitFelisExpr::emit_string_literal_expr stmt_start 0i32 stmt_end);
+            #let stmt = EmitFelisStmt::emit_write_stmt (EmitFelisExpr::emit_string_literal_expr stmt_expr_start 0i32 stmt_expr_end);
             emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
         } #else #if i32_eq stmt_tag 0x03i32 {
-            #let stmt = EmitFelisStmt::emit_let_stmt stmt_start EmitFelisExpr::emit_unknown_expr;
+            #let stmt = EmitFelisStmt::emit_let_stmt stmt_name_start EmitFelisExpr::emit_unknown_expr;
             emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
         } #else #if i32_eq stmt_tag 0x04i32 {
             #let stmt = EmitFelisStmt::emit_expr_stmt EmitFelisExpr::emit_unknown_expr;
@@ -316,7 +320,7 @@
     dyn_array_set_u8 elf_ref 0x5ai32 0x40u8;
     dyn_array_set_u8 elf_ref 0x60i32 0x40u8;
     dyn_array_set_u8 elf_ref 0x68i32 0x40u8;
-    emit_parsed_felis_stmts stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref (stmt_count_ref .> get) source_ref elf_ref emit_u8_state_ref;
+    emit_parsed_felis_stmts stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref (stmt_count_ref .> get) source_ref elf_ref emit_u8_state_ref;
     #let _ <- IO::write fd elf_bytes_ref 0x1040i32;
     #let _ <- IO::close fd;
     ()
