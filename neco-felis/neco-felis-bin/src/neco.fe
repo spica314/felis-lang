@@ -30,6 +30,8 @@
 #type(rc) EmitFelisStmt : Type[0] {
     emit_exit_stmt : EmitFelisExpr -> EmitFelisStmt,
     emit_write_stmt : EmitFelisExpr -> EmitFelisStmt,
+    emit_let_stmt : i32 -> EmitFelisExpr -> EmitFelisStmt,
+    emit_expr_stmt : EmitFelisExpr -> EmitFelisStmt,
 }
 
 #proc emit_elf_u8 : (elf_ref : DynArray u8) -> (code_index_ref : &^ i32) -> (byte : u8) -> () {
@@ -154,6 +156,8 @@
                     EmitFelisExpr::emit_unknown_expr => (),
                 }
             },
+            EmitFelisStmt::emit_let_stmt _ _ => (),
+            EmitFelisStmt::emit_expr_stmt _ => (),
         };
     };
     ()
@@ -178,6 +182,12 @@
             emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
         } #else #if i32_eq stmt_tag 0x02i32 {
             #let stmt = EmitFelisStmt::emit_write_stmt (EmitFelisExpr::emit_string_literal_expr stmt_start 0i32 stmt_end);
+            emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
+        } #else #if i32_eq stmt_tag 0x03i32 {
+            #let stmt = EmitFelisStmt::emit_let_stmt stmt_start EmitFelisExpr::emit_unknown_expr;
+            emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
+        } #else #if i32_eq stmt_tag 0x04i32 {
+            #let stmt = EmitFelisStmt::emit_expr_stmt EmitFelisExpr::emit_unknown_expr;
             emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
         };
         stmt_index_ref .> set (i32_add (stmt_index_ref .> get) 1i32);
