@@ -23,6 +23,7 @@ pub(super) struct PureFunctionParameter {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Procedure {
     pub(super) parameters: Vec<ProcedureParameter>,
+    pub(super) result_ty: Term,
     pub(super) body: Block,
 }
 
@@ -254,20 +255,15 @@ fn procedure_from_decl(function: &FunctionDeclaration) -> Result<Procedure> {
         });
         current = arrow.result.as_ref();
     }
-    if !matches!(current, Term::Unit) {
+    if function.body.tail.is_none() {
         return Err(Error::Unsupported(format!(
-            "procedure `{}` must return `()`",
-            function.name.name
-        )));
-    }
-    if !matches!(function.body.tail.as_deref(), Some(Term::Unit)) {
-        return Err(Error::Unsupported(format!(
-            "procedure `{}` body must end with `()`",
+            "procedure `{}` body must end with a value expression",
             function.name.name
         )));
     }
     Ok(Procedure {
         parameters,
+        result_ty: current.clone(),
         body: function.body.clone(),
     })
 }

@@ -23,8 +23,8 @@ use declarations::{
 };
 use expr::lower_condition_expr;
 use pure::{
-    lower_procedure_call_statement, lower_pure_block_value, lower_pure_value,
-    pattern_match_bindings,
+    lower_procedure_call_statement, lower_procedure_call_value, lower_pure_block_value,
+    lower_pure_value, pattern_match_bindings,
 };
 pub(crate) use typecheck::validate_value_against_type;
 
@@ -487,7 +487,10 @@ fn lower_let_equals_statement(
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<()> {
-    let value = lower_pure_value(value_term, state, program)?;
+    let value = match lower_procedure_call_value(value_term, state, program)? {
+        Some(value) => value,
+        None => lower_pure_value(value_term, state, program)?,
+    };
     validate_value_against_type(&value, ty, program)?;
     bind_pattern(binder, value, &mut state.environment);
     Ok(())

@@ -1,0 +1,18 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#entrypoint main;
+
+#proc add_into_ref : (value_ref : &^ i32) -> (delta : i32) -> i32 {
+    value_ref .> set (i32_add (value_ref .> get) delta);
+    i32_add (value_ref .> get) delta
+}
+
+#fn main : () #with IO {
+    #let value : i32 = 38i32;
+    #letref #excl value_ref : &^ i32 #borrow value;
+    #let code : i32 = add_into_ref value_ref 2i32;
+    #let _ : () <- IO::exit code;
+    ()
+}

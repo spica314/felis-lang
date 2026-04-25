@@ -9,7 +9,7 @@ use crate::ir::{
 };
 use crate::{Error, Result};
 
-use super::declarations::{ConstructorSignature, constructor_key};
+use super::declarations::{ConstructorSignature, Procedure, ProcedureParameter, constructor_key};
 use super::typecheck::{nul_terminated_bytes, validate_value_against_type};
 use super::{
     LoweringState, allocate_heap_slot, lower_statement, normalize_numeric_literal_arguments,
@@ -612,6 +612,59 @@ pub(super) fn lower_procedure_call_statement(
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<Option<bool>> {
+    let Some((procedure, normalized_arguments, _name)) = resolve_procedure_call(term, state)?
+    else {
+        return Ok(None);
+    };
+
+    let mut scoped_state =
+        bind_procedure_arguments(&procedure.parameters, &normalized_arguments, state, program)?;
+
+    let terminated = lower_procedure_body_statements(&procedure.body, &mut scoped_state, program)?;
+
+    state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
+    state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
+
+    Ok(Some(terminated))
+}
+
+pub(super) fn lower_procedure_call_value(
+    term: &Term,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Option<Value>> {
+    let Some((procedure, normalized_arguments, name)) = resolve_procedure_call(term, state)? else {
+        return Ok(None);
+    };
+
+    let mut scoped_state =
+        bind_procedure_arguments(&procedure.parameters, &normalized_arguments, state, program)?;
+
+    let terminated = lower_procedure_body_statements(&procedure.body, &mut scoped_state, program)?;
+    if terminated {
+        return Err(Error::Unsupported(format!(
+            "procedure `{name}` used as a value cannot terminate before returning"
+        )));
+    }
+
+    let Some(tail) = procedure.body.tail.as_deref() else {
+        return Err(Error::Unsupported(format!(
+            "procedure `{name}` body must end with a value expression"
+        )));
+    };
+    let value = lower_pure_value(tail, &scoped_state, program)?;
+    validate_value_against_type(&value, &procedure.result_ty, program)?;
+
+    state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
+    state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
+
+    Ok(Some(value))
+}
+
+fn resolve_procedure_call<'a>(
+    term: &'a Term,
+    state: &LoweringState,
+) -> Result<Option<(Procedure, Vec<Term>, &'a str)>> {
     let Term::Application { callee, arguments } = term else {
         return Ok(None);
     };
@@ -639,27 +692,39 @@ pub(super) fn lower_procedure_call_statement(
         )));
     }
 
+    Ok(Some((procedure, normalized_arguments, name)))
+}
+
+fn bind_procedure_arguments(
+    parameters: &[ProcedureParameter],
+    normalized_arguments: &[Term],
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<LoweringState> {
     let mut scoped_state = state.child_scope();
-    for (parameter, argument) in procedure.parameters.iter().zip(normalized_arguments.iter()) {
+    for (parameter, argument) in parameters.iter().zip(normalized_arguments.iter()) {
         let value = lower_pure_value(argument, state, program)?;
         validate_value_against_type(&value, &parameter.ty, program)?;
         scoped_state
             .environment
             .insert(parameter.name.clone(), value);
     }
+    Ok(scoped_state)
+}
 
+fn lower_procedure_body_statements(
+    body: &Block,
+    scoped_state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<bool> {
     let mut terminated = false;
-    for statement in &procedure.body.statements {
+    for statement in &body.statements {
         if terminated {
             return Err(Error::Unsupported(
                 "statements after `IO::exit` are not supported".to_string(),
             ));
         }
-        terminated = lower_statement(statement, &mut scoped_state, program)?;
+        terminated = lower_statement(statement, scoped_state, program)?;
     }
-
-    state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
-    state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
-
-    Ok(Some(terminated))
+    Ok(terminated)
 }
