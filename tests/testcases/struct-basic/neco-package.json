@@ -1,0 +1,8 @@
+{
+    "name": "struct-basic",
+    "felis-bin-entrypoints": [
+        "src/struct-declaration.fe",
+        "src/struct-field-access.fe",
+        "src/struct-rc-field-access.fe"
+    ]
+}
