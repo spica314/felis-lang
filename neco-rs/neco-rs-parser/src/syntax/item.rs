@@ -11,6 +11,7 @@ pub enum Item {
     Mod(ModuleDeclaration),
     BindBuiltin(BindBuiltinDeclaration),
     Function(FunctionDeclaration),
+    Struct(StructDeclaration),
     Type(TypeDeclaration),
     Prop(PropDeclaration),
     Theorem(TheoremDeclaration),
@@ -49,6 +50,15 @@ pub struct FunctionDeclaration {
     pub body: Block,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StructDeclaration {
+    pub visibility: Visibility,
+    pub name: DeclaredName,
+    pub modifier: Option<String>,
+    pub ty: Term,
+    pub fields: Vec<StructFieldDeclaration>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FunctionKind {
     Fn,
@@ -83,6 +93,12 @@ pub struct TheoremDeclaration {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConstructorDeclaration {
     pub name: DeclaredName,
+    pub ty: Term,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StructFieldDeclaration {
+    pub name: String,
     pub ty: Term,
 }
 
@@ -137,9 +153,9 @@ impl Parse for Item {
         if let Some(kind) = kind {
             let name = DeclaredName::parse(parser)?.unwrap();
             parser.expect_punctuation(TokenKind::Colon)?;
-            let ty = Term::parse(parser)?.unwrap();
+            let ty = parser.with_left_brace_boundary(true, Term::parse)?.unwrap();
             let effect = if parser.consume_keyword(Keyword::With) {
-                Some(Term::parse(parser)?.unwrap())
+                Some(parser.with_left_brace_boundary(true, Term::parse)?.unwrap())
             } else {
                 None
             };
@@ -153,6 +169,26 @@ impl Parse for Item {
                 body,
             })));
         }
+        if parser.consume_keyword(Keyword::Struct) {
+            let modifier = if parser.consume_punctuation(TokenKind::LeftParen) {
+                let modifier = parser.expect_identifier()?;
+                parser.expect_punctuation(TokenKind::RightParen)?;
+                Some(modifier)
+            } else {
+                None
+            };
+            let name = DeclaredName::parse(parser)?.unwrap();
+            parser.expect_punctuation(TokenKind::Colon)?;
+            let ty = parser.with_left_brace_boundary(true, Term::parse)?.unwrap();
+            let fields = parse_struct_field_block(parser)?.unwrap();
+            return Ok(Some(Self::Struct(StructDeclaration {
+                visibility,
+                name,
+                modifier,
+                ty,
+                fields,
+            })));
+        }
         if parser.consume_keyword(Keyword::Type) {
             let modifier = if parser.consume_punctuation(TokenKind::LeftParen) {
                 let modifier = parser.expect_identifier()?;
@@ -163,7 +199,7 @@ impl Parse for Item {
             };
             let name = DeclaredName::parse(parser)?.unwrap();
             parser.expect_punctuation(TokenKind::Colon)?;
-            let ty = Term::parse(parser)?.unwrap();
+            let ty = parser.with_left_brace_boundary(true, Term::parse)?.unwrap();
             let constructors = parse_constructor_block(parser)?.unwrap();
             return Ok(Some(Self::Type(TypeDeclaration {
                 visibility,
@@ -176,7 +212,7 @@ impl Parse for Item {
         if parser.consume_keyword(Keyword::Prop) {
             let name = DeclaredName::parse(parser)?.unwrap();
             parser.expect_punctuation(TokenKind::Colon)?;
-            let ty = Term::parse(parser)?.unwrap();
+            let ty = parser.with_left_brace_boundary(true, Term::parse)?.unwrap();
             let constructors = parse_constructor_block(parser)?.unwrap();
             return Ok(Some(Self::Prop(PropDeclaration {
                 visibility,
@@ -188,7 +224,7 @@ impl Parse for Item {
         if parser.consume_keyword(Keyword::Theorem) {
             let name = DeclaredName::parse(parser)?.unwrap();
             parser.expect_punctuation(TokenKind::Colon)?;
-            let statement = Term::parse(parser)?.unwrap();
+            let statement = parser.with_left_brace_boundary(true, Term::parse)?.unwrap();
             let body = Block::parse(parser)?.unwrap();
             return Ok(Some(Self::Theorem(TheoremDeclaration {
                 visibility,
@@ -219,6 +255,15 @@ impl Parse for ConstructorDeclaration {
     }
 }
 
+impl Parse for StructFieldDeclaration {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
+        let name = parser.expect_identifier()?;
+        parser.expect_punctuation(TokenKind::Colon)?;
+        let ty = Term::parse(parser)?.unwrap();
+        Ok(Some(Self { name, ty }))
+    }
+}
+
 fn parse_constructor_block(parser: &mut Parser) -> Result<Option<Vec<ConstructorDeclaration>>> {
     parser.expect_punctuation(TokenKind::LeftBrace)?;
     let mut constructors = Vec::new();
@@ -228,4 +273,15 @@ fn parse_constructor_block(parser: &mut Parser) -> Result<Option<Vec<Constructor
         constructors.push(constructor);
     }
     Ok(Some(constructors))
+}
+
+fn parse_struct_field_block(parser: &mut Parser) -> Result<Option<Vec<StructFieldDeclaration>>> {
+    parser.expect_punctuation(TokenKind::LeftBrace)?;
+    let mut fields = Vec::new();
+    while !parser.consume_punctuation(TokenKind::RightBrace) {
+        let field = StructFieldDeclaration::parse(parser)?.unwrap();
+        parser.expect_punctuation(TokenKind::Comma)?;
+        fields.push(field);
+    }
+    Ok(Some(fields))
 }

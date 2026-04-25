@@ -7,8 +7,8 @@ mod term;
 
 pub use item::{
     BindBuiltinDeclaration, ConstructorDeclaration, DeclaredName, EntryPointDeclaration,
-    FunctionDeclaration, FunctionKind, Item, ModuleDeclaration, PropDeclaration,
-    TheoremDeclaration, TypeDeclaration, UseDeclaration, Visibility,
+    FunctionDeclaration, FunctionKind, Item, ModuleDeclaration, PropDeclaration, StructDeclaration,
+    StructFieldDeclaration, TheoremDeclaration, TypeDeclaration, UseDeclaration, Visibility,
 };
 pub use path::{PathExpression, PathSegment};
 pub use pattern::Pattern;
@@ -16,5 +16,5 @@ pub use source_file::SourceFile;
 pub use term::{
     ArrowParameter, ArrowTerm, BindingPattern, Block, ElseBranch, ForallTerm, IfStatement,
     LetOperator, LetRefStatement, LetStatement, LoopStatement, MatchArm, MatchExpression,
-    Statement, Term, TypedBinder,
+    Statement, StructLiteralField, Term, TypedBinder,
 };

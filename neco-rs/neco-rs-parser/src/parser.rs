@@ -116,6 +116,7 @@ impl Parser {
                         | Keyword::BindBuiltin
                         | Keyword::Fn
                         | Keyword::Proc
+                        | Keyword::Struct
                         | Keyword::Type
                         | Keyword::Prop
                         | Keyword::Theorem
@@ -276,6 +277,7 @@ fn keyword_name(keyword: Keyword) -> &'static str {
         Keyword::Else => "else",
         Keyword::Fn => "fn",
         Keyword::Proc => "proc",
+        Keyword::Struct => "struct",
         Keyword::Pub => "pub",
         Keyword::Type => "type",
         Keyword::Theorem => "theorem",
@@ -316,6 +318,7 @@ fn punctuation_name(kind: &TokenKind) -> &'static str {
         TokenKind::Arrow => "->",
         TokenKind::FatArrow => "=>",
         TokenKind::LeftArrow => "<-",
+        TokenKind::Dot => ".",
         TokenKind::DotArrow => ".>",
         TokenKind::EndOfFile => "end of file",
         TokenKind::Keyword(_)

@@ -21,6 +21,14 @@ pub enum Term {
         receiver: Box<Term>,
         method: String,
     },
+    FieldAccess {
+        receiver: Box<Term>,
+        field: String,
+    },
+    StructLiteral {
+        path: PathExpression,
+        fields: Vec<StructLiteralField>,
+    },
     Reference {
         referent: Box<Term>,
         exclusive: bool,
@@ -128,6 +136,12 @@ pub struct MatchExpression {
 pub struct MatchArm {
     pub pattern: Pattern,
     pub result: Box<Term>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StructLiteralField {
+    pub name: String,
+    pub value: Term,
 }
 
 impl Parse for Term {
@@ -293,7 +307,7 @@ impl Parse for BindingPattern {
 
 impl Parse for MatchExpression {
     fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let scrutinee = Term::parse(parser)?.unwrap();
+        let scrutinee = parser.with_left_brace_boundary(true, Term::parse)?.unwrap();
         parser.expect_punctuation(TokenKind::LeftBrace)?;
         let mut arms = Vec::new();
         while !parser.consume_punctuation(TokenKind::RightBrace) {
@@ -353,16 +367,8 @@ fn parse_forall_term(parser: &mut Parser) -> Result<Term> {
 }
 
 fn parse_application_term(parser: &mut Parser) -> Result<Term> {
-    let mut term = parse_primary_term(parser)?;
+    let mut term = parse_postfix_term(parser)?;
     loop {
-        if parser.consume_punctuation(TokenKind::DotArrow) {
-            let method = parser.expect_identifier()?;
-            term = Term::MethodCall {
-                receiver: Box::new(term),
-                method,
-            };
-            continue;
-        }
         if parser.stop_at_left_brace() && parser.check_punctuation(TokenKind::LeftBrace) {
             break;
         }
@@ -373,7 +379,7 @@ fn parse_application_term(parser: &mut Parser) -> Result<Term> {
             break;
         }
         if parser.is_term_start() {
-            let argument = parse_primary_term(parser)?;
+            let argument = parse_postfix_term(parser)?;
             term = match term {
                 Term::Application {
                     callee,
@@ -388,6 +394,44 @@ fn parse_application_term(parser: &mut Parser) -> Result<Term> {
                 },
             };
             continue;
+        }
+        break;
+    }
+    Ok(term)
+}
+
+fn parse_postfix_term(parser: &mut Parser) -> Result<Term> {
+    let mut term = parse_primary_term(parser)?;
+    loop {
+        if parser.consume_punctuation(TokenKind::DotArrow) {
+            let method = parser.expect_identifier()?;
+            term = Term::MethodCall {
+                receiver: Box::new(term),
+                method,
+            };
+            continue;
+        }
+        if parser.consume_punctuation(TokenKind::Dot) {
+            let field = parser.expect_identifier()?;
+            term = Term::FieldAccess {
+                receiver: Box::new(term),
+                field,
+            };
+            continue;
+        }
+        if !parser.stop_at_left_brace() && parser.check_punctuation(TokenKind::LeftBrace) {
+            match term {
+                Term::Path(path) if path_has_no_suffixes(&path) => {
+                    term = Term::StructLiteral {
+                        path,
+                        fields: parse_struct_literal_fields(parser)?,
+                    };
+                    continue;
+                }
+                other => {
+                    term = other;
+                }
+            }
         }
         break;
     }
@@ -458,4 +502,27 @@ fn parse_primary_term(parser: &mut Parser) -> Result<Term> {
     }
 
     Err(parser.error_here("expected term"))
+}
+
+fn parse_struct_literal_fields(parser: &mut Parser) -> Result<Vec<StructLiteralField>> {
+    parser.expect_punctuation(TokenKind::LeftBrace)?;
+    let mut fields = Vec::new();
+    while !parser.consume_punctuation(TokenKind::RightBrace) {
+        let name = parser.expect_identifier()?;
+        parser.expect_punctuation(TokenKind::Equals)?;
+        let value = Term::parse(parser)?.unwrap();
+        fields.push(StructLiteralField { name, value });
+        if parser.consume_punctuation(TokenKind::Comma) {
+            continue;
+        }
+        parser.expect_punctuation(TokenKind::RightBrace)?;
+        break;
+    }
+    Ok(fields)
+}
+
+fn path_has_no_suffixes(path: &PathExpression) -> bool {
+    path.segments
+        .iter()
+        .all(|segment| segment.suffixes.is_empty())
 }

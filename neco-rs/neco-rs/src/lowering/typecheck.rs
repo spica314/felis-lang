@@ -440,6 +440,16 @@ fn render_term(term: &Term) -> String {
             rendered
         }
         Term::MethodCall { receiver, method } => format!("{} .> {}", render_term(receiver), method),
+        Term::FieldAccess { receiver, field } => format!("{}.{}", render_term(receiver), field),
+        Term::StructLiteral { path, fields } => {
+            let rendered_path = render_term(&Term::Path(path.clone()));
+            let rendered_fields = fields
+                .iter()
+                .map(|field| format!("{} = {}", field.name, render_term(&field.value)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{rendered_path} {{ {rendered_fields} }}")
+        }
         Term::Reference {
             referent,
             exclusive,

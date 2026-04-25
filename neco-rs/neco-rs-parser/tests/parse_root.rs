@@ -646,6 +646,61 @@ fn parses_enum_match_basic_package_root() {
 }
 
 #[test]
+fn parses_struct_declaration_package_root() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let parsed = parse_root(&root).expect("struct-basic package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "struct-basic");
+    assert_eq!(package.source_files.len(), 3);
+    assert_eq!(
+        package.manifest.felis_bin_entrypoints,
+        vec![
+            PathBuf::from("src/struct-declaration.fe"),
+            PathBuf::from("src/struct-field-access.fe"),
+            PathBuf::from("src/struct-rc-field-access.fe"),
+        ]
+    );
+
+    let source_file = package
+        .source_files
+        .iter()
+        .find(|file| file.path.ends_with("src/struct-declaration.fe"))
+        .expect("struct-declaration source file");
+    assert_eq!(source_file.role, SourceFileRole::BinaryEntrypoint);
+
+    let syntax = &source_file.syntax;
+    assert_eq!(syntax.items.len(), 6);
+
+    let Item::Struct(span_decl) = &syntax.items[2] else {
+        panic!("expected Span struct declaration");
+    };
+    assert_eq!(span_decl.name.name, "Span");
+    assert_eq!(span_decl.modifier, None);
+    assert_eq!(span_decl.fields.len(), 2);
+    assert_eq!(span_decl.fields[0].name, "start");
+    assert_eq!(span_decl.fields[1].name, "end");
+
+    let Item::Struct(point_decl) = &syntax.items[3] else {
+        panic!("expected Point struct declaration");
+    };
+    assert_eq!(point_decl.name.name, "Point");
+    assert_eq!(point_decl.modifier.as_deref(), Some("rc"));
+    assert_eq!(point_decl.fields.len(), 2);
+    assert_eq!(point_decl.fields[0].name, "x");
+    assert_eq!(point_decl.fields[1].name, "y");
+
+    let Item::Function(main_fn) = &syntax.items[5] else {
+        panic!("expected main function");
+    };
+    assert_eq!(main_fn.visibility, Visibility::Private);
+    assert!(main_fn.effect.is_some());
+    assert_eq!(main_fn.body.statements.len(), 1);
+}
+
+#[test]
 fn parses_enum_match_payload_package_root() {
     let root = repo_root().join("tests/testcases/enum-match-payload");
     let parsed = parse_root(&root).expect("enum-match-payload package parses");
