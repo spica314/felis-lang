@@ -1,0 +1,811 @@
+#use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::dyn_array_get_u8;
+#use std_core::primitive::array::dyn_array_set_i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::i32::i32_from_u8;
+#use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_lt;
+#use std_core::primitive::i32::i32_mul;
+#use std_core::primitive::i32::i32_sub;
+#use std_core::primitive::u8::u8;
+#use std_core::primitive::u8::u8_add;
+#use std_core::primitive::u8::u8_eq;
+#use std_core::primitive::u8::u8_gt;
+#use std_core::primitive::u8::u8_lt;
+#use std_core::primitive::u8::u8_mul;
+#use std_core::primitive::u8::u8_sub;
+#use std_core::string::String;
+#use std_core::string::string_as_dyn_array;
+#use std_core::string::string_len;
+#use #package::syntax::FelisTokenPayload;
+
+#pub #fn accumulate_decimal_i32 : (current : i32) -> (digit : i32) -> i32 {
+    i32_add (i32_mul current 10i32) (i32_sub digit (i32_from_u8 '0'))
+}
+
+#pub #fn accumulate_decimal_u8 : (current : u8) -> (digit : u8) -> u8 {
+    u8_add (u8_mul current 10u8) (u8_sub digit '0')
+}
+
+#proc append_parsed_felis_token : (tag : i32) -> (payload : FelisTokenPayload) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> () {
+    #let token_index : i32 = token_count_ref .> get;
+    dyn_array_set_i32 token_tag_ref token_index tag;
+    dyn_array_set_i32 token_value_ref token_index payload.value;
+    dyn_array_set_i32 token_start_ref token_index payload.start;
+    dyn_array_set_i32 token_end_ref token_index payload.end;
+    token_count_ref .> set (i32_add token_index 1i32);
+    ()
+}
+#pub #proc mark_ident_part : (byte : u8) -> (is_ident_ref : &^ i32) -> () {
+    #if u8_gt byte '`' {
+        #if u8_lt byte '{' {
+            is_ident_ref .> set 1i32;
+        };
+    };
+    #if u8_gt byte '@' {
+        #if u8_lt byte '[' {
+            is_ident_ref .> set 1i32;
+        };
+    };
+    #if u8_gt byte '/' {
+        #if u8_lt byte ':' {
+            is_ident_ref .> set 1i32;
+        };
+    };
+    #if u8_eq byte '_' {
+        is_ident_ref .> set 1i32;
+    };
+    ()
+}
+
+#pub #proc mark_ident_start : (byte : u8) -> (is_ident_ref : &^ i32) -> () {
+    #if u8_gt byte '`' {
+        #if u8_lt byte '{' {
+            is_ident_ref .> set 1i32;
+        };
+    };
+    #if u8_gt byte '@' {
+        #if u8_lt byte '[' {
+            is_ident_ref .> set 1i32;
+        };
+    };
+    #if u8_eq byte '_' {
+        is_ident_ref .> set 1i32;
+    };
+    ()
+}
+
+#proc mark_whitespace : (byte : u8) -> (is_whitespace_ref : &^ i32) -> () {
+    #if u8_eq byte ' ' {
+        is_whitespace_ref .> set 1i32;
+    };
+    #if u8_eq byte '\n' {
+        is_whitespace_ref .> set 1i32;
+    };
+    #if u8_eq byte '\r' {
+        is_whitespace_ref .> set 1i32;
+    };
+    #if u8_eq byte '\t' {
+        is_whitespace_ref .> set 1i32;
+    };
+    ()
+}
+
+#proc set_felis_keyword_code : (source_ref : DynArray u8) -> (keyword_start : i32) -> (keyword_len : i32) -> (keyword_code_ref : &^ i32) -> () {
+    #if i32_eq keyword_len 2i32 {
+        #let byte0 : u8 = dyn_array_get_u8 source_ref keyword_start;
+        #let byte1 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 1i32);
+        #if u8_eq byte0 'a' {
+            #if u8_eq byte1 's' {
+                keyword_code_ref .> set 21i32;
+            };
+        };
+        #if u8_eq byte0 'f' {
+            #if u8_eq byte1 'n' {
+                keyword_code_ref .> set 3i32;
+            };
+        };
+        #if u8_eq byte0 'i' {
+            #if u8_eq byte1 'f' {
+                keyword_code_ref .> set 7i32;
+            };
+        };
+    } #else #if i32_eq keyword_len 3i32 {
+        #let byte0 : u8 = dyn_array_get_u8 source_ref keyword_start;
+        #let byte1 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 1i32);
+        #let byte2 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 2i32);
+        #if u8_eq byte0 'm' {
+            #if u8_eq byte1 'o' {
+                #if u8_eq byte2 'd' {
+                    keyword_code_ref .> set 23i32;
+                };
+            };
+        };
+        #if u8_eq byte0 'l' {
+            #if u8_eq byte1 'e' {
+                #if u8_eq byte2 't' {
+                    keyword_code_ref .> set 5i32;
+                };
+            };
+        };
+        #if u8_eq byte0 'p' {
+            #if u8_eq byte1 'u' {
+                #if u8_eq byte2 'b' {
+                    keyword_code_ref .> set 15i32;
+                };
+            };
+        };
+        #if u8_eq byte0 'u' {
+            #if u8_eq byte1 's' {
+                #if u8_eq byte2 'e' {
+                    keyword_code_ref .> set 2i32;
+                };
+            };
+        };
+    } #else #if i32_eq keyword_len 4i32 {
+        #let byte0 : u8 = dyn_array_get_u8 source_ref keyword_start;
+        #let byte1 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 1i32);
+        #let byte2 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 2i32);
+        #let byte3 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 3i32);
+        #if u8_eq byte0 'e' {
+            #if u8_eq byte1 'l' {
+                #if u8_eq byte2 's' {
+                    #if u8_eq byte3 'e' {
+                        keyword_code_ref .> set 8i32;
+                    };
+                };
+            };
+        };
+        #if u8_eq byte0 'e' {
+            #if u8_eq byte1 'x' {
+                #if u8_eq byte2 'c' {
+                    #if u8_eq byte3 'l' {
+                        keyword_code_ref .> set 18i32;
+                    };
+                };
+            };
+        };
+        #if u8_eq byte0 'l' {
+            #if u8_eq byte1 'o' {
+                #if u8_eq byte2 'o' {
+                    #if u8_eq byte3 'p' {
+                        keyword_code_ref .> set 9i32;
+                    };
+                };
+            };
+        };
+        #if u8_eq byte0 'p' {
+            #if u8_eq byte1 'r' {
+                #if u8_eq byte2 'o' {
+                    #if u8_eq byte3 'c' {
+                        keyword_code_ref .> set 4i32;
+                    };
+                };
+            };
+            #if u8_eq byte1 'r' {
+                #if u8_eq byte2 'o' {
+                    #if u8_eq byte3 'p' {
+                        keyword_code_ref .> set 25i32;
+                    };
+                };
+            };
+        };
+        #if u8_eq byte0 't' {
+            #if u8_eq byte1 'y' {
+                #if u8_eq byte2 'p' {
+                    #if u8_eq byte3 'e' {
+                        keyword_code_ref .> set 13i32;
+                    };
+                };
+            };
+        };
+        #if u8_eq byte0 'w' {
+            #if u8_eq byte1 'i' {
+                #if u8_eq byte2 't' {
+                    #if u8_eq byte3 'h' {
+                        keyword_code_ref .> set 16i32;
+                    };
+                };
+            };
+        };
+    } #else #if i32_eq keyword_len 5i32 {
+        #let byte0 : u8 = dyn_array_get_u8 source_ref keyword_start;
+        #let byte1 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 1i32);
+        #let byte2 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 2i32);
+        #let byte3 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 3i32);
+        #let byte4 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 4i32);
+        #if u8_eq byte0 'b' {
+            #if u8_eq byte1 'r' {
+                #if u8_eq byte2 'e' {
+                    #if u8_eq byte3 'a' {
+                        #if u8_eq byte4 'k' {
+                            keyword_code_ref .> set 10i32;
+                        };
+                    };
+                };
+            };
+        };
+        #if u8_eq byte0 'm' {
+            #if u8_eq byte1 'a' {
+                #if u8_eq byte2 't' {
+                    #if u8_eq byte3 'c' {
+                        #if u8_eq byte4 'h' {
+                            keyword_code_ref .> set 12i32;
+                        };
+                    };
+                };
+            };
+        };
+    } #else #if i32_eq keyword_len 6i32 {
+        #let byte0 : u8 = dyn_array_get_u8 source_ref keyword_start;
+        #let byte1 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 1i32);
+        #let byte2 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 2i32);
+        #let byte3 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 3i32);
+        #let byte4 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 4i32);
+        #let byte5 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 5i32);
+        #if u8_eq byte0 'b' {
+            #if u8_eq byte1 'o' {
+                #if u8_eq byte2 'r' {
+                    #if u8_eq byte3 'r' {
+                        #if u8_eq byte4 'o' {
+                            #if u8_eq byte5 'w' {
+                                keyword_code_ref .> set 17i32;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        #if u8_eq byte0 'l' {
+            #if u8_eq byte1 'e' {
+                #if u8_eq byte2 't' {
+                    #if u8_eq byte3 'r' {
+                        #if u8_eq byte4 'e' {
+                            #if u8_eq byte5 'f' {
+                                keyword_code_ref .> set 6i32;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        #if u8_eq byte0 'f' {
+            #if u8_eq byte1 'o' {
+                #if u8_eq byte2 'r' {
+                    #if u8_eq byte3 'a' {
+                        #if u8_eq byte4 'l' {
+                            #if u8_eq byte5 'l' {
+                                keyword_code_ref .> set 19i32;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        #if u8_eq byte0 's' {
+            #if u8_eq byte1 't' {
+                #if u8_eq byte2 'r' {
+                    #if u8_eq byte3 'u' {
+                        #if u8_eq byte4 'c' {
+                            #if u8_eq byte5 't' {
+                                keyword_code_ref .> set 14i32;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    } #else #if i32_eq keyword_len 7i32 {
+        #let byte0 : u8 = dyn_array_get_u8 source_ref keyword_start;
+        #let byte1 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 1i32);
+        #let byte2 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 2i32);
+        #let byte3 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 3i32);
+        #let byte4 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 4i32);
+        #let byte5 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 5i32);
+        #let byte6 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 6i32);
+        #if u8_eq byte0 'p' {
+            #if u8_eq byte1 'a' {
+                #if u8_eq byte2 'c' {
+                    #if u8_eq byte3 'k' {
+                        #if u8_eq byte4 'a' {
+                            #if u8_eq byte5 'g' {
+                                #if u8_eq byte6 'e' {
+                                    keyword_code_ref .> set 20i32;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        #if u8_eq byte0 't' {
+            #if u8_eq byte1 'h' {
+                #if u8_eq byte2 'e' {
+                    #if u8_eq byte3 'o' {
+                        #if u8_eq byte4 'r' {
+                            #if u8_eq byte5 'e' {
+                                #if u8_eq byte6 'm' {
+                                    keyword_code_ref .> set 24i32;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    } #else #if i32_eq keyword_len 8i32 {
+        #let byte0 : u8 = dyn_array_get_u8 source_ref keyword_start;
+        #let byte1 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 1i32);
+        #let byte2 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 2i32);
+        #let byte3 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 3i32);
+        #let byte4 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 4i32);
+        #let byte5 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 5i32);
+        #let byte6 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 6i32);
+        #let byte7 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 7i32);
+        #if u8_eq byte0 'c' {
+            #if u8_eq byte1 'o' {
+                #if u8_eq byte2 'n' {
+                    #if u8_eq byte3 't' {
+                        #if u8_eq byte4 'i' {
+                            #if u8_eq byte5 'n' {
+                                #if u8_eq byte6 'u' {
+                                    #if u8_eq byte7 'e' {
+                                        keyword_code_ref .> set 11i32;
+                                    };
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    } #else #if i32_eq keyword_len 10i32 {
+        #let byte0 : u8 = dyn_array_get_u8 source_ref keyword_start;
+        #let byte1 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 1i32);
+        #let byte2 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 2i32);
+        #let byte3 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 3i32);
+        #let byte4 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 4i32);
+        #let byte5 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 5i32);
+        #let byte6 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 6i32);
+        #let byte7 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 7i32);
+        #let byte8 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 8i32);
+        #let byte9 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 9i32);
+        #if u8_eq byte0 'e' {
+            #if u8_eq byte1 'n' {
+                #if u8_eq byte2 't' {
+                    #if u8_eq byte3 'r' {
+                        #if u8_eq byte4 'y' {
+                            #if u8_eq byte5 'p' {
+                                #if u8_eq byte6 'o' {
+                                    #if u8_eq byte7 'i' {
+                                        #if u8_eq byte8 'n' {
+                                            #if u8_eq byte9 't' {
+                                                keyword_code_ref .> set 1i32;
+                                            };
+                                        };
+                                    };
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    } #else #if i32_eq keyword_len 12i32 {
+        #let byte0 : u8 = dyn_array_get_u8 source_ref keyword_start;
+        #let byte1 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 1i32);
+        #let byte2 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 2i32);
+        #let byte3 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 3i32);
+        #let byte4 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 4i32);
+        #let byte5 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 5i32);
+        #let byte6 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 6i32);
+        #let byte7 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 7i32);
+        #let byte8 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 8i32);
+        #let byte9 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 9i32);
+        #let byte10 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 10i32);
+        #let byte11 : u8 = dyn_array_get_u8 source_ref (i32_add keyword_start 11i32);
+        #if u8_eq byte0 'b' {
+            #if u8_eq byte1 'i' {
+                #if u8_eq byte2 'n' {
+                    #if u8_eq byte3 'd' {
+                        #if u8_eq byte4 '_' {
+                            #if u8_eq byte5 'b' {
+                                #if u8_eq byte6 'u' {
+                                    #if u8_eq byte7 'i' {
+                                        #if u8_eq byte8 'l' {
+                                            #if u8_eq byte9 't' {
+                                                #if u8_eq byte10 'i' {
+                                                    #if u8_eq byte11 'n' {
+                                                        keyword_code_ref .> set 22i32;
+                                                    };
+                                                };
+                                            };
+                                        };
+                                    };
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ()
+}
+
+#pub #proc parse_felis_source_tokens : (source : String) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> () {
+    #let source_ref : DynArray u8 = string_as_dyn_array source;
+    #let source_len : i32 = string_len source;
+    #let source_index_ref : i32 = 0i32;
+    #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
+    token_count_ref .> set 0i32;
+    #loop {
+        #if i32_gte (source_index_ref .> get) source_len {
+            #break;
+        };
+        #let byte : u8 = dyn_array_get_u8 source_ref (source_index_ref .> get);
+        #let is_whitespace_ref : i32 = 0i32;
+        #letref #excl is_whitespace_ref : &^ i32 #borrow is_whitespace_ref;
+        mark_whitespace byte is_whitespace_ref;
+        #if i32_eq (is_whitespace_ref .> get) 1i32 {
+            source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+        } #else #if u8_eq byte '/' {
+            #let next_index : i32 = i32_add (source_index_ref .> get) 1i32;
+            #if i32_lt next_index source_len {
+                #let next_byte : u8 = dyn_array_get_u8 source_ref next_index;
+                #if u8_eq next_byte '/' {
+                    source_index_ref .> set (i32_add next_index 1i32);
+                    #loop {
+                        #if i32_gte (source_index_ref .> get) source_len {
+                            #break;
+                        };
+                        #let comment_byte : u8 = dyn_array_get_u8 source_ref (source_index_ref .> get);
+                        #if u8_eq comment_byte '\n' {
+                            #break;
+                        };
+                        source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+                    };
+                } #else #if u8_eq next_byte '*' {
+                    source_index_ref .> set (i32_add next_index 1i32);
+                    #loop {
+                        #if i32_gte (source_index_ref .> get) source_len {
+                            #break;
+                        };
+                        #let comment_byte : u8 = dyn_array_get_u8 source_ref (source_index_ref .> get);
+                        #let comment_next_index : i32 = i32_add (source_index_ref .> get) 1i32;
+                        #if u8_eq comment_byte '*' {
+                            #if i32_lt comment_next_index source_len {
+                                #let comment_next_byte : u8 = dyn_array_get_u8 source_ref comment_next_index;
+                                #if u8_eq comment_next_byte '/' {
+                                    source_index_ref .> set (i32_add comment_next_index 1i32);
+                                    #break;
+                                };
+                            };
+                        };
+                        source_index_ref .> set comment_next_index;
+                    };
+                } #else {
+                    #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                        value = i32_from_u8 byte,
+                        start = source_index_ref .> get,
+                        end = i32_add (source_index_ref .> get) 1i32
+                    };
+                    append_parsed_felis_token 0i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                    source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+                };
+            } #else {
+                #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                    value = i32_from_u8 byte,
+                    start = source_index_ref .> get,
+                    end = i32_add (source_index_ref .> get) 1i32
+                };
+                append_parsed_felis_token 0i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+            };
+        } #else #if u8_eq byte '#' {
+            #let keyword_start : i32 = i32_add (source_index_ref .> get) 1i32;
+            #let keyword_code_ref : i32 = 0i32;
+            #letref #excl keyword_code_ref : &^ i32 #borrow keyword_code_ref;
+            #if i32_lt keyword_start source_len {
+                #let keyword_start_byte : u8 = dyn_array_get_u8 source_ref keyword_start;
+                #let is_keyword_start_ref : i32 = 0i32;
+                #letref #excl is_keyword_start_ref : &^ i32 #borrow is_keyword_start_ref;
+                mark_ident_start keyword_start_byte is_keyword_start_ref;
+                #if i32_eq (is_keyword_start_ref .> get) 1i32 {
+                    #let keyword_end_ref : i32 = keyword_start;
+                    #letref #excl keyword_end_ref : &^ i32 #borrow keyword_end_ref;
+                    #loop {
+                        #if i32_gte (keyword_end_ref .> get) source_len {
+                            #break;
+                        };
+                        #let keyword_byte : u8 = dyn_array_get_u8 source_ref (keyword_end_ref .> get);
+                        #let is_keyword_part_ref : i32 = 0i32;
+                        #letref #excl is_keyword_part_ref : &^ i32 #borrow is_keyword_part_ref;
+                        mark_ident_part keyword_byte is_keyword_part_ref;
+                        #if i32_eq (is_keyword_part_ref .> get) 1i32 {
+                            keyword_end_ref .> set (i32_add (keyword_end_ref .> get) 1i32);
+                        } #else {
+                            #break;
+                        };
+                    };
+                    set_felis_keyword_code source_ref keyword_start (i32_sub (keyword_end_ref .> get) keyword_start) keyword_code_ref;
+                    #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                        value = keyword_code_ref .> get,
+                        start = source_index_ref .> get,
+                        end = keyword_end_ref .> get
+                    };
+                    append_parsed_felis_token 4i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                    source_index_ref .> set (keyword_end_ref .> get);
+                } #else {
+                    #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                        value = i32_from_u8 byte,
+                        start = source_index_ref .> get,
+                        end = keyword_start
+                    };
+                    append_parsed_felis_token 0i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                    source_index_ref .> set keyword_start;
+                };
+            } #else {
+                #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                    value = i32_from_u8 byte,
+                    start = source_index_ref .> get,
+                    end = keyword_start
+                };
+                append_parsed_felis_token 0i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                source_index_ref .> set keyword_start;
+            };
+        } #else #if u8_eq byte '"' {
+            #let string_start : i32 = source_index_ref .> get;
+            #let string_value_start : i32 = i32_add string_start 1i32;
+            #let string_end_ref : i32 = string_value_start;
+            #letref #excl string_end_ref : &^ i32 #borrow string_end_ref;
+            #loop {
+                #if i32_gte (string_end_ref .> get) source_len {
+                    #break;
+                };
+                #let string_byte : u8 = dyn_array_get_u8 source_ref (string_end_ref .> get);
+                #if u8_eq string_byte '"' {
+                    #break;
+                };
+                string_end_ref .> set (i32_add (string_end_ref .> get) 1i32);
+            };
+            #let next_source_index : i32 = i32_add (string_end_ref .> get) 1i32;
+            #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                value = i32_sub (string_end_ref .> get) string_value_start,
+                start = string_start,
+                end = next_source_index
+            };
+            append_parsed_felis_token 2i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+            source_index_ref .> set next_source_index;
+        } #else #if u8_eq byte '\'' {
+            #let char_start : i32 = source_index_ref .> get;
+            #let char_value_index : i32 = i32_add char_start 1i32;
+            #let char_value_ref : i32 = 0i32;
+            #letref #excl char_value_ref : &^ i32 #borrow char_value_ref;
+            #if i32_lt char_value_index source_len {
+                #let char_byte : u8 = dyn_array_get_u8 source_ref char_value_index;
+                char_value_ref .> set (i32_from_u8 char_byte);
+            };
+            #let char_end_ref : i32 = i32_add char_value_index 1i32;
+            #letref #excl char_end_ref : &^ i32 #borrow char_end_ref;
+            #loop {
+                #if i32_gte (char_end_ref .> get) source_len {
+                    #break;
+                };
+                #let char_end_byte : u8 = dyn_array_get_u8 source_ref (char_end_ref .> get);
+                char_end_ref .> set (i32_add (char_end_ref .> get) 1i32);
+                #if u8_eq char_end_byte '\'' {
+                    #break;
+                };
+            };
+            #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                value = char_value_ref .> get,
+                start = char_start,
+                end = char_end_ref .> get
+            };
+            append_parsed_felis_token 6i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+            source_index_ref .> set (char_end_ref .> get);
+        } #else {
+            #let next_index : i32 = i32_add (source_index_ref .> get) 1i32;
+            #let punct_code_ref : i32 = 0i32;
+            #letref #excl punct_code_ref : &^ i32 #borrow punct_code_ref;
+            #let punct_end_ref : i32 = next_index;
+            #letref #excl punct_end_ref : &^ i32 #borrow punct_end_ref;
+            #if i32_lt next_index source_len {
+                #let next_byte : u8 = dyn_array_get_u8 source_ref next_index;
+                #if u8_eq byte ':' {
+                    #if u8_eq next_byte ':' {
+                        punct_code_ref .> set 14i32;
+                        punct_end_ref .> set (i32_add next_index 1i32);
+                    };
+                };
+                #if u8_eq byte '-' {
+                    #if u8_eq next_byte '>' {
+                        punct_code_ref .> set 15i32;
+                        punct_end_ref .> set (i32_add next_index 1i32);
+                    };
+                };
+                #if u8_eq byte '=' {
+                    #if u8_eq next_byte '>' {
+                        punct_code_ref .> set 16i32;
+                        punct_end_ref .> set (i32_add next_index 1i32);
+                    };
+                };
+                #if u8_eq byte '<' {
+                    #if u8_eq next_byte '-' {
+                        punct_code_ref .> set 17i32;
+                        punct_end_ref .> set (i32_add next_index 1i32);
+                    };
+                };
+                #if u8_eq byte '.' {
+                    #if u8_eq next_byte '>' {
+                        punct_code_ref .> set 18i32;
+                        punct_end_ref .> set (i32_add next_index 1i32);
+                    };
+                };
+                #if u8_eq byte '&' {
+                    #if u8_eq next_byte '^' {
+                        punct_code_ref .> set 19i32;
+                        punct_end_ref .> set (i32_add next_index 1i32);
+                    };
+                };
+            };
+            #if i32_eq (punct_code_ref .> get) 0i32 {
+                #if u8_eq byte '(' {
+                    punct_code_ref .> set 1i32;
+                } #else #if u8_eq byte ')' {
+                    punct_code_ref .> set 2i32;
+                } #else #if u8_eq byte '{' {
+                    punct_code_ref .> set 3i32;
+                } #else #if u8_eq byte '}' {
+                    punct_code_ref .> set 4i32;
+                } #else #if u8_eq byte '[' {
+                    punct_code_ref .> set 5i32;
+                } #else #if u8_eq byte ']' {
+                    punct_code_ref .> set 6i32;
+                } #else #if u8_eq byte ':' {
+                    punct_code_ref .> set 7i32;
+                } #else #if u8_eq byte ';' {
+                    punct_code_ref .> set 8i32;
+                } #else #if u8_eq byte ',' {
+                    punct_code_ref .> set 9i32;
+                } #else #if u8_eq byte '=' {
+                    punct_code_ref .> set 10i32;
+                } #else #if u8_eq byte '.' {
+                    punct_code_ref .> set 11i32;
+                } #else #if u8_eq byte '&' {
+                    punct_code_ref .> set 12i32;
+                } #else #if u8_eq byte '_' {
+                    punct_code_ref .> set 13i32;
+                };
+            };
+            #if i32_eq (punct_code_ref .> get) 0i32 {
+                #if u8_lt byte ':' {
+                    #if u8_gt byte '/' {
+                        #let number_start : i32 = source_index_ref .> get;
+                        #let number_end_ref : i32 = number_start;
+                        #letref #excl number_end_ref : &^ i32 #borrow number_end_ref;
+                        #let parsed_number_ref : i32 = 0i32;
+                        #letref #excl parsed_number_ref : &^ i32 #borrow parsed_number_ref;
+                        #loop {
+                            #if i32_gte (number_end_ref .> get) source_len {
+                                #break;
+                            };
+                            #let number_byte : u8 = dyn_array_get_u8 source_ref (number_end_ref .> get);
+                            #if u8_lt number_byte ':' {
+                                #if u8_gt number_byte '/' {
+                                    #let next_number : i32 = accumulate_decimal_i32 (parsed_number_ref .> get) (i32_from_u8 number_byte);
+                                    parsed_number_ref .> set next_number;
+                                    number_end_ref .> set (i32_add (number_end_ref .> get) 1i32);
+                                } #else {
+                                    #break;
+                                };
+                            } #else {
+                                #break;
+                            };
+                        };
+                        #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                            value = parsed_number_ref .> get,
+                            start = number_start,
+                            end = number_end_ref .> get
+                        };
+                        append_parsed_felis_token 3i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                        source_index_ref .> set (number_end_ref .> get);
+                    } #else {
+                        #let is_ident_start_ref : i32 = 0i32;
+                        #letref #excl is_ident_start_ref : &^ i32 #borrow is_ident_start_ref;
+                        mark_ident_start byte is_ident_start_ref;
+                        #if i32_eq (is_ident_start_ref .> get) 1i32 {
+                            #let ident_start : i32 = source_index_ref .> get;
+                            #let ident_end_ref : i32 = ident_start;
+                            #letref #excl ident_end_ref : &^ i32 #borrow ident_end_ref;
+                            #loop {
+                                #if i32_gte (ident_end_ref .> get) source_len {
+                                    #break;
+                                };
+                                #let ident_byte : u8 = dyn_array_get_u8 source_ref (ident_end_ref .> get);
+                                #let is_ident_part_ref : i32 = 0i32;
+                                #letref #excl is_ident_part_ref : &^ i32 #borrow is_ident_part_ref;
+                                mark_ident_part ident_byte is_ident_part_ref;
+                                #if i32_eq (is_ident_part_ref .> get) 1i32 {
+                                    ident_end_ref .> set (i32_add (ident_end_ref .> get) 1i32);
+                                } #else {
+                                    #break;
+                                };
+                            };
+                            #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                                value = i32_sub (ident_end_ref .> get) ident_start,
+                                start = ident_start,
+                                end = ident_end_ref .> get
+                            };
+                            append_parsed_felis_token 1i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                            source_index_ref .> set (ident_end_ref .> get);
+                        } #else {
+                            #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                                value = i32_from_u8 byte,
+                                start = source_index_ref .> get,
+                                end = next_index
+                            };
+                            append_parsed_felis_token 0i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                            source_index_ref .> set next_index;
+                        };
+                    };
+                } #else {
+                    #let is_ident_start_ref : i32 = 0i32;
+                    #letref #excl is_ident_start_ref : &^ i32 #borrow is_ident_start_ref;
+                    mark_ident_start byte is_ident_start_ref;
+                    #if i32_eq (is_ident_start_ref .> get) 1i32 {
+                        #let ident_start : i32 = source_index_ref .> get;
+                        #let ident_end_ref : i32 = ident_start;
+                        #letref #excl ident_end_ref : &^ i32 #borrow ident_end_ref;
+                        #loop {
+                            #if i32_gte (ident_end_ref .> get) source_len {
+                                #break;
+                            };
+                            #let ident_byte : u8 = dyn_array_get_u8 source_ref (ident_end_ref .> get);
+                            #let is_ident_part_ref : i32 = 0i32;
+                            #letref #excl is_ident_part_ref : &^ i32 #borrow is_ident_part_ref;
+                            mark_ident_part ident_byte is_ident_part_ref;
+                            #if i32_eq (is_ident_part_ref .> get) 1i32 {
+                                ident_end_ref .> set (i32_add (ident_end_ref .> get) 1i32);
+                            } #else {
+                                #break;
+                            };
+                        };
+                        #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                            value = i32_sub (ident_end_ref .> get) ident_start,
+                            start = ident_start,
+                            end = ident_end_ref .> get
+                        };
+                        append_parsed_felis_token 1i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                        source_index_ref .> set (ident_end_ref .> get);
+                    } #else {
+                        #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                            value = i32_from_u8 byte,
+                            start = source_index_ref .> get,
+                            end = next_index
+                        };
+                        append_parsed_felis_token 0i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                        source_index_ref .> set next_index;
+                    };
+                };
+            } #else {
+                #let token_payload : FelisTokenPayload = FelisTokenPayload {
+                    value = punct_code_ref .> get,
+                    start = source_index_ref .> get,
+                    end = punct_end_ref .> get
+                };
+                append_parsed_felis_token 5i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                source_index_ref .> set (punct_end_ref .> get);
+            };
+        };
+    };
+    #let eof_payload : FelisTokenPayload = FelisTokenPayload {
+        value = 0i32,
+        start = source_len,
+        end = source_len
+    };
+    append_parsed_felis_token 7i32 eof_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+    ()
+}

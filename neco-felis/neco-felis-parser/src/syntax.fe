@@ -1,0 +1,64 @@
+#use std_core::primitive::u8::u8;
+#use std_core::string::String;
+
+#pub #struct FelisTokenPayload : Type[0] {
+    value : i32,
+    start : i32,
+    end : i32,
+}
+
+#pub #type FelisToken : Type[0] {
+    byte : FelisTokenPayload -> FelisToken,
+    keyword : FelisTokenPayload -> FelisToken,
+    punct : FelisTokenPayload -> FelisToken,
+    ident : FelisTokenPayload -> FelisToken,
+    string : FelisTokenPayload -> FelisToken,
+    char_literal : FelisTokenPayload -> FelisToken,
+    int_literal : FelisTokenPayload -> FelisToken,
+    eof : FelisTokenPayload -> FelisToken,
+}
+
+#pub #type(rc) FelisTokens : Type[0] {
+    nil : FelisTokens,
+    cons : FelisToken -> FelisTokens -> FelisTokens,
+}
+
+#pub #type(rc) FelisExpr : Type[0] {
+    unknown_expr : FelisExpr,
+    int_literal_expr : i32 -> i32 -> i32 -> FelisExpr,
+    string_literal_expr : String -> FelisExpr,
+    local_expr : i32 -> i32 -> FelisExpr,
+    i32_add_expr : FelisExpr -> FelisExpr -> FelisExpr,
+    i32_sub_expr : FelisExpr -> FelisExpr -> FelisExpr,
+    i32_mul_expr : FelisExpr -> FelisExpr -> FelisExpr,
+    i32_div_expr : FelisExpr -> FelisExpr -> FelisExpr,
+    i32_mod_expr : FelisExpr -> FelisExpr -> FelisExpr,
+}
+
+#pub #type(rc) FelisStmt : Type[0] {
+    exit_stmt : FelisExpr -> FelisStmt,
+    write_stmt : FelisExpr -> FelisStmt,
+    let_i32_stmt : i32 -> i32 -> FelisExpr -> FelisStmt,
+    expr_stmt : FelisExpr -> FelisStmt,
+}
+
+#pub #type(rc) FelisStmts : Type[0] {
+    no_stmts : FelisStmts,
+    cons_stmt : FelisStmt -> FelisStmts -> FelisStmts,
+}
+
+#pub #type(rc) FelisProgram : Type[0] {
+    program : FelisStmts -> FelisProgram,
+}
+
+#pub #struct ParsedFelisStmtPayload : Type[0] {
+    tag : i32,
+    value : u8,
+    start : i32,
+    end : i32,
+    name_start : i32,
+    name_end : i32,
+    expr_start : i32,
+    expr_end : i32,
+}
+
