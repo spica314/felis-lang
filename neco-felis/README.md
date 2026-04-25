@@ -14,11 +14,14 @@ used by the bootstrap binary.
 `neco-felis-parser/` contains the current Felis source parsing helpers used by
 the bootstrap binary.
 
+`neco-felis-emit/` contains the current parsed-statement-to-ELF emission
+helpers used by the bootstrap binary.
+
 The current bootstrap binary reads a package root from its first command-line
 argument, loads `neco-package.json`, opens the first
 `felis-bin-entrypoints` source file through `neco-felis-json`, parses the Felis
-source through `neco-felis-parser`, and writes `./a.out` in the current
-directory.
+source through `neco-felis-parser`, emits through `neco-felis-emit`, and writes
+`./a.out` in the current directory.
 
 The emitted `a.out` is a minimal Linux x86_64 ELF executable. The current
 bootstrap path recognizes a single parsed statement shape at a time and emits

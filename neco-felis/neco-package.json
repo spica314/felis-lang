@@ -3,6 +3,7 @@
         "members": [
             "neco-felis-json",
             "neco-felis-parser",
+            "neco-felis-emit",
             "neco-felis-bin"
         ]
     }

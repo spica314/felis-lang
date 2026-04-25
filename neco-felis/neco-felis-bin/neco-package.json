@@ -6,6 +6,9 @@
         },
         "neco-felis-parser": {
             "workspace": true
+        },
+        "neco-felis-emit": {
+            "workspace": true
         }
     },
     "felis-bin-entrypoints": ["src/neco.fe"]
