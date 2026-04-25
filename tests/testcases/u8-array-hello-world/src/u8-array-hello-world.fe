@@ -6,7 +6,7 @@
 
 #fn main : () #with IO {
     #let stdout : FileDescriptor <- IO::stdout;
-    #let _ @^ bytes_ref : &^ Array u8 13i32 <- IO::array_new u8 13i32;
+    #letref #excl bytes_ref : &^ Array u8 13i32 <- IO::array_new u8 13i32;
     bytes_ref .> set 0i32 'h';
     bytes_ref .> set 1i32 'e';
     bytes_ref .> set 2i32 'l';

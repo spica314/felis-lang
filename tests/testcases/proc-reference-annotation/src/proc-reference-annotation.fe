@@ -17,8 +17,8 @@
 }
 
 #fn main : () #with IO {
-    #let _ @^ value_ref : i32 = 39i32;
-    #let _ @^ array_ref : &^ Array i32 2i32 <- IO::array_new i32 2i32;
+    #letref #excl value_ref : &^ i32 := 39i32;
+    #letref #excl array_ref : &^ Array i32 2i32 <- IO::array_new i32 2i32;
     fill_refs value_ref array_ref;
     #let code : i32 = sum_refs value_ref array_ref;
     #let _ : () <- IO::exit code;

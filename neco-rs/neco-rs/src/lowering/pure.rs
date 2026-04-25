@@ -403,6 +403,11 @@ pub(super) fn lower_pure_block_value(
                     "effectful statements are not supported in pure function bodies".to_string(),
                 ));
             }
+            Statement::LetRef(_) => {
+                return Err(Error::Unsupported(
+                    "`#letref` is not supported in pure function bodies".to_string(),
+                ));
+            }
             Statement::Expression(_) => {
                 return Err(Error::Unsupported(
                     "expression statements are not supported in pure function bodies".to_string(),

@@ -180,10 +180,13 @@ fn validate_reference_value_against_type(
         {
             match path.segments[0].name.as_str() {
                 "i32" if matches!(value, Value::I32Reference(_)) => Ok(()),
-                _ => Err(Error::Unsupported(format!(
-                    "expected a value of type `{}` but got {value:?}",
-                    render_reference_term(referent, false)
-                ))),
+                type_name => match value {
+                    Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
+                    _ => Err(Error::Unsupported(format!(
+                        "expected a value of type `{}` but got {value:?}",
+                        render_reference_term(referent, false)
+                    ))),
+                },
             }
         }
         _ => Err(Error::Unsupported(format!(

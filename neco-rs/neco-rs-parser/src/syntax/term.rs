@@ -62,6 +62,7 @@ pub struct Block {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement {
     Let(LetStatement),
+    LetRef(LetRefStatement),
     If(IfStatement),
     Loop(LoopStatement),
     Break,
@@ -97,14 +98,18 @@ pub struct LetStatement {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LetRefStatement {
+    pub reference: String,
+    pub exclusive: bool,
+    pub ty: Box<Term>,
+    pub operator: LetOperator,
+    pub value: Box<Term>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BindingPattern {
     Name(String),
     Wildcard,
-    ValueAndReference {
-        value: Box<BindingPattern>,
-        reference: String,
-        exclusive: bool,
-    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -156,6 +161,10 @@ impl Parse for Block {
             }
             if parser.consume_keyword(Keyword::Let) {
                 statements.push(Statement::Let(LetStatement::parse(parser)?.unwrap()));
+                continue;
+            }
+            if parser.consume_keyword(Keyword::LetRef) {
+                statements.push(Statement::LetRef(LetRefStatement::parse(parser)?.unwrap()));
                 continue;
             }
             if parser.consume_keyword(Keyword::If) {
@@ -213,6 +222,30 @@ impl Parse for LetStatement {
     }
 }
 
+impl Parse for LetRefStatement {
+    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
+        let exclusive = parser.consume_keyword(Keyword::Excl);
+        let reference = parser.expect_identifier()?;
+        parser.expect_punctuation(TokenKind::Colon)?;
+        let ty = Term::parse(parser)?.unwrap();
+        let operator = if parser.consume_punctuation(TokenKind::ColonEquals) {
+            LetOperator::Equals
+        } else {
+            parser.expect_punctuation(TokenKind::LeftArrow)?;
+            LetOperator::LeftArrow
+        };
+        let value = Term::parse(parser)?.unwrap();
+        parser.expect_punctuation(TokenKind::Semicolon)?;
+        Ok(Some(Self {
+            reference,
+            exclusive,
+            ty: Box::new(ty),
+            operator,
+            value: Box::new(value),
+        }))
+    }
+}
+
 impl Parse for IfStatement {
     fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         let condition = parser.with_left_brace_boundary(true, Term::parse)?.unwrap();
@@ -249,26 +282,12 @@ impl Parse for LoopStatement {
 
 impl Parse for BindingPattern {
     fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let left = if parser.consume_punctuation(TokenKind::Underscore) {
+        let pattern = if parser.consume_punctuation(TokenKind::Underscore) {
             Self::Wildcard
         } else {
             Self::Name(parser.expect_identifier()?)
         };
-        let exclusive = if parser.consume_punctuation(TokenKind::At) {
-            false
-        } else if parser.consume_punctuation(TokenKind::AtCaret) {
-            true
-        } else {
-            return Ok(Some(left));
-        };
-        {
-            let reference = parser.expect_identifier()?;
-            Ok(Some(Self::ValueAndReference {
-                value: Box::new(left),
-                reference,
-                exclusive,
-            }))
-        }
+        Ok(Some(pattern))
     }
 }
 

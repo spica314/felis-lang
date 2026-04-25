@@ -27,6 +27,7 @@ pub enum TokenKind {
     LeftBracket,
     RightBracket,
     Colon,
+    ColonEquals,
     Semicolon,
     Comma,
     Equals,
@@ -60,10 +61,12 @@ pub enum Keyword {
     If,
     Match,
     Let,
+    LetRef,
     Loop,
     Use,
     Mod,
     With,
+    Excl,
     Forall,
     Package,
 }
@@ -145,6 +148,15 @@ impl Lexer {
                 start,
                 self.offset,
                 "::",
+            ));
+        }
+        if self.starts_with(":=") {
+            self.offset += 2;
+            return Ok(simple_token(
+                TokenKind::ColonEquals,
+                start,
+                self.offset,
+                ":=",
             ));
         }
         if self.starts_with("->") {
@@ -340,10 +352,12 @@ impl Lexer {
             "#if" => Keyword::If,
             "#match" => Keyword::Match,
             "#let" => Keyword::Let,
+            "#letref" => Keyword::LetRef,
             "#loop" => Keyword::Loop,
             "#use" => Keyword::Use,
             "#mod" => Keyword::Mod,
             "#with" => Keyword::With,
+            "#excl" => Keyword::Excl,
             "#forall" => Keyword::Forall,
             "#package" => Keyword::Package,
             _ => {

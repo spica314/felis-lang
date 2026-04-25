@@ -60,7 +60,7 @@
 }
 
 #proc append_nul_terminated_u8 : (source_ref : & Array u8) -> (dest_ref : &^ RawArray u8) -> (dest_index_ref : &^ i32) -> () {
-    #let _ @^ source_index_ref : i32 = 0i32;
+    #letref #excl source_index_ref : &^ i32 := 0i32;
     #loop {
         #let byte : u8 = source_ref .> get (source_index_ref .> get);
         #if u8_eq byte '\0' {
@@ -73,7 +73,7 @@
 }
 
 #proc append_dyn_nul_terminated_u8 : (source_ref : & RawArray u8) -> (dest_ref : &^ RawArray u8) -> (dest_index_ref : &^ i32) -> () {
-    #let _ @^ source_index_ref : i32 = 0i32;
+    #letref #excl source_index_ref : &^ i32 := 0i32;
     #loop {
         #let byte : u8 = source_ref .> get (source_index_ref .> get);
         #if u8_eq byte '\0' {
@@ -86,7 +86,7 @@
 }
 
 #proc fill_u8 : (dest_ref : &^ RawArray u8) -> (byte : u8) -> () {
-    #let _ @^ index_ref : i32 = 0i32;
+    #letref #excl index_ref : &^ i32 := 0i32;
     #loop {
         #if i32_gte (index_ref .> get) (dest_ref .> len) {
             #break;

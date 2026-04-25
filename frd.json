@@ -461,14 +461,17 @@
         },
         {
           "id": "FR-006-012",
-          "title": "Let Reference-Binding Targets",
-          "description": "Local let bindings can introduce a value and a reference to that value at the same time.",
+          "title": "Let Reference Bindings",
+          "description": "Local reference let bindings can introduce named immutable or exclusive references.",
           "acceptanceCriteria": [
             {
-              "description": "A `#let` form can use `<value-binder> @ <reference-binder> : <type>` as its binding target."
+              "description": "A `#letref` form can use `<name> : & <type> := <value>` to introduce an immutable reference."
+            },
+            {
+              "description": "A `#letref #excl` form can use `<name> : &^ <type> := <value>` or `<name> : &^ <type> <- <effectful-expression>` to introduce an exclusive reference."
             }
           ],
-          "notes": "In this form, the left side binds the value itself and the right side binds a reference introduced together with that value.",
+          "notes": "The `#excl` marker and the `&^` type annotation must agree.",
           "docs": [
             "docs/declaration-forms.md"
           ]

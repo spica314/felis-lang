@@ -79,14 +79,6 @@ pub(crate) fn bind_pattern(
             environment.insert(name.clone(), value);
         }
         BindingPattern::Wildcard => {}
-        BindingPattern::ValueAndReference {
-            value: inner,
-            reference,
-            exclusive: _,
-        } => {
-            bind_pattern(inner, value.clone(), environment);
-            environment.insert(reference.clone(), value);
-        }
     }
 }
 

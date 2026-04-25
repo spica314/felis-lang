@@ -5,8 +5,8 @@
 #entrypoint main;
 
 #proc main : () #with IO {
-    #let _ @^ counter : i32 = 1i32;
-    #let _ @^ sum : i32 = 0i32;
+    #letref #excl counter : &^ i32 := 1i32;
+    #letref #excl sum : &^ i32 := 0i32;
     #loop {
         #let new_sum : i32 = i32_add (sum .> get) (counter .> get);
         sum .> set new_sum;

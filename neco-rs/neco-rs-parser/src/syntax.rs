@@ -15,6 +15,6 @@ pub use pattern::Pattern;
 pub use source_file::SourceFile;
 pub use term::{
     ArrowParameter, ArrowTerm, BindingPattern, Block, ElseBranch, ForallTerm, IfStatement,
-    LetOperator, LetStatement, LoopStatement, MatchArm, MatchExpression, Statement, Term,
-    TypedBinder,
+    LetOperator, LetRefStatement, LetStatement, LoopStatement, MatchArm, MatchExpression,
+    Statement, Term, TypedBinder,
 };

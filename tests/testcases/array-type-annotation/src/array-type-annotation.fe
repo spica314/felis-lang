@@ -14,7 +14,7 @@
 }
 
 #fn main : () #with IO {
-    #let _ @^ array_ref : &^ Array i32 4i32 <- IO::array_new i32 4i32;
+    #letref #excl array_ref : &^ Array i32 4i32 <- IO::array_new i32 4i32;
     array_ref .> set 0i32 7i32;
     array_ref .> set 1i32 14i32;
     array_ref .> set 2i32 21i32;

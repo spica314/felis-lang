@@ -11,7 +11,7 @@
     #let path_ref : & Array u8 <- IO::arg 1i32;
     #let digits_ref : & Array u8 <- IO::arg 2i32;
     #let fd : FileDescriptor <- IO::open path_ref 0i32 0i32;
-    #let _ @^ bytes_ref : &^ Array u8 64i32 <- IO::array_new u8 64i32;
+    #letref #excl bytes_ref : &^ Array u8 64i32 <- IO::array_new u8 64i32;
     #let len : i32 <- IO::read fd bytes_ref 64i32;
     #let _ : () <- IO::close fd;
     #let _ : () <- IO::write stdout bytes_ref len;

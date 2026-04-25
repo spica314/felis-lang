@@ -9,7 +9,7 @@
 }
 
 #fn main : () #with IO {
-    #let _ @ value_ref : i32 = 41i32;
+    #letref value_ref : & i32 := 41i32;
     #let r : i32 = add1 value_ref;
     #let _ : () <- IO::exit r;
     ()

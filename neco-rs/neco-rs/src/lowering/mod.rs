@@ -335,6 +335,27 @@ pub(super) fn lower_statement(
                 program,
             ),
         },
+        Statement::LetRef(letref_stmt) => match letref_stmt.operator {
+            LetOperator::Equals => {
+                lower_letref_equals_statement(
+                    &letref_stmt.reference,
+                    letref_stmt.exclusive,
+                    letref_stmt.ty.as_ref(),
+                    letref_stmt.value.as_ref(),
+                    state,
+                    program,
+                )?;
+                Ok(false)
+            }
+            LetOperator::LeftArrow => lower_letref_effect_statement(
+                &letref_stmt.reference,
+                letref_stmt.exclusive,
+                letref_stmt.ty.as_ref(),
+                letref_stmt.value.as_ref(),
+                state,
+                program,
+            ),
+        },
         Statement::Expression(term) => {
             lower_expression_statement(term.as_ref(), state, program)?;
             Ok(false)
@@ -475,29 +496,65 @@ fn lower_let_equals_statement(
 ) -> Result<()> {
     let value = lower_pure_value(value_term, state, program)?;
     validate_value_against_type(&value, ty, program)?;
-    if let BindingPattern::ValueAndReference {
-        value: inner,
-        reference,
-        ..
-    } = binder
-        && let Value::I32(expr) = value
-    {
-        let slot = state.allocate_i32_slot();
-        program
-            .operations
-            .push(Operation::StoreI32 { slot, value: expr });
-        bind_pattern(
-            inner.as_ref(),
-            Value::I32(I32Expr::Local(slot)),
-            &mut state.environment,
-        );
-        state
-            .environment
-            .insert(reference.clone(), Value::I32Reference(slot));
-        return Ok(());
-    }
-
     bind_pattern(binder, value, &mut state.environment);
+    Ok(())
+}
+
+fn lower_letref_equals_statement(
+    reference: &str,
+    exclusive: bool,
+    ty: &Term,
+    value_term: &Term,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<()> {
+    validate_letref_annotation(exclusive, ty)?;
+    let value = lower_pure_value(value_term, state, program)?;
+    let reference_value = match value {
+        Value::I32(expr) => {
+            let slot = state.allocate_i32_slot();
+            program
+                .operations
+                .push(Operation::StoreI32 { slot, value: expr });
+            Value::I32Reference(slot)
+        }
+        other => other,
+    };
+    validate_value_against_type(&reference_value, ty, program)?;
+    state
+        .environment
+        .insert(reference.to_string(), reference_value);
+    Ok(())
+}
+
+fn lower_letref_effect_statement(
+    reference: &str,
+    exclusive: bool,
+    ty: &Term,
+    value_term: &Term,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<bool> {
+    validate_letref_annotation(exclusive, ty)?;
+    let binder = BindingPattern::Name(reference.to_string());
+    lower_effect(&binder, ty, value_term, state, program)
+}
+
+fn validate_letref_annotation(exclusive: bool, ty: &Term) -> Result<()> {
+    let Term::Reference {
+        exclusive: annotated_exclusive,
+        ..
+    } = ty
+    else {
+        return Err(Error::Unsupported(
+            "`#letref` requires a reference type annotation".to_string(),
+        ));
+    };
+    if *annotated_exclusive != exclusive {
+        return Err(Error::Unsupported(
+            "`#letref #excl` requires `&^`, and `#letref` requires `&`".to_string(),
+        ));
+    }
     Ok(())
 }
 

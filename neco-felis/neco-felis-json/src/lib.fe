@@ -16,9 +16,9 @@
 #proc set_string_eq_key_pattern : (manifest_ref : DynArray u8) -> (string_start : i32) -> (string_len : i32) -> (result_ref : &^ i32) -> () {
     result_ref .> set 0i32;
     #if i32_eq string_len 0x15i32 {
-        #let _ @ key_pattern_ref : & Array u8 = "felis-bin-entrypoints";
+        #letref key_pattern_ref : & Array u8 := "felis-bin-entrypoints";
         #let key_pattern_bytes_ref : & Array u8 = key_pattern_ref .> as_bytes;
-        #let _ @^ index_ref : i32 = 0i32;
+        #letref #excl index_ref : &^ i32 := 0i32;
         result_ref .> set 1i32;
         #loop {
             #if i32_gte (index_ref .> get) string_len {
@@ -39,7 +39,7 @@
 }
 
 #proc copy_string_token : (manifest_ref : DynArray u8) -> (string_start : i32) -> (string_len : i32) -> (entrypoint_ref : DynArray u8) -> (entrypoint_len_ref : &^ i32) -> () {
-    #let _ @^ copy_index_ref : i32 = 0i32;
+    #letref #excl copy_index_ref : &^ i32 := 0i32;
     #loop {
         #if i32_gte (copy_index_ref .> get) string_len {
             #break;
@@ -63,7 +63,7 @@
 
 #proc parse_json_string_token : (manifest_ref : DynArray u8) -> (string_start : i32) -> (string_len : i32) -> (entrypoint_ref : DynArray u8) -> (entrypoint_parser_mode_ref : &^ i32) -> (entrypoint_len_ref : &^ i32) -> (done_ref : &^ i32) -> () {
     #if i32_eq (entrypoint_parser_mode_ref .> get) 0i32 {
-        #let _ @^ key_matches_ref : i32 = 0i32;
+        #letref #excl key_matches_ref : &^ i32 := 0i32;
         set_string_eq_key_pattern manifest_ref string_start string_len key_matches_ref;
         #if i32_eq (key_matches_ref .> get) 1i32 {
             entrypoint_parser_mode_ref .> set 1i32;
@@ -86,10 +86,10 @@
 }
 
 #pub #proc parse_felis_bin_entrypoint : (manifest_ref : DynArray u8) -> (manifest_len : i32) -> (entrypoint_ref : DynArray u8) -> () {
-    #let _ @^ manifest_index_ref : i32 = 0i32;
-    #let _ @^ entrypoint_parser_mode_ref : i32 = 0i32;
-    #let _ @^ entrypoint_len_ref : i32 = 0i32;
-    #let _ @^ done_ref : i32 = 0i32;
+    #letref #excl manifest_index_ref : &^ i32 := 0i32;
+    #letref #excl entrypoint_parser_mode_ref : &^ i32 := 0i32;
+    #letref #excl entrypoint_len_ref : &^ i32 := 0i32;
+    #letref #excl done_ref : &^ i32 := 0i32;
     #loop {
         #if i32_gte (manifest_index_ref .> get) manifest_len {
             #break;
@@ -100,7 +100,7 @@
         #let byte : u8 = dyn_array_get_u8 manifest_ref (manifest_index_ref .> get);
         #if u8_eq byte '"' {
             #let string_start : i32 = i32_add (manifest_index_ref .> get) 1i32;
-            #let _ @^ string_end_ref : i32 = string_start;
+            #letref #excl string_end_ref : &^ i32 := string_start;
             #loop {
                 #if i32_gte (string_end_ref .> get) manifest_len {
                     #break;

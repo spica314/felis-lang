@@ -225,7 +225,7 @@ Example:
 ```felis
 #let s : Eq[0] Nat (nat_add p Nat::zero) p = proof p;
 #let stdout : FileDescriptor <- IO::stdout;
-#let _ @ hello_world_ref : & Array u8 = "Hello, world!";
+#letref hello_world_ref : & Array u8 := "Hello, world!";
 ```
 
 The documented shape is:
@@ -237,13 +237,12 @@ The documented shape is:
 The currently observed variations are:
 
 - `#let <name> : <type> <- <value>;` for binding the result of an effectful expression.
-- `#let <value-binder> @ <reference-binder> : <type> = <value>;` for introducing the
-  value itself on the left and a reference to that value on the right as part
-  of the same `#let`.
+- `#letref <name> : & <type> := <value>;` for introducing an immutable reference.
+- `#letref #excl <name> : &^ <type> := <value>;` for introducing an exclusive reference.
+- `#letref #excl <name> : &^ <type> <- <value>;` for binding the reference result
+  of an effectful expression.
 
-In this form, `@` is not documented as a general-purpose expression operator.
-It is the `#let`-binding form used when source code needs both the value and a
-reference bound from the same definition site.
+In this form, `#excl` and `&^` must agree; the non-`#excl` form uses `&`.
 
 ## String Literals And Method Calls
 
