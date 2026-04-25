@@ -1,0 +1,4 @@
+{
+    "name": "workspace-lib",
+    "felis-lib-entrypoint": "src/lib.fe"
+}

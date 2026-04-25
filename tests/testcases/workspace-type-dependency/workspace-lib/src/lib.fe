@@ -1,0 +1,37 @@
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#pub #type Choice : Type[0] {
+    small : i32 -> Choice,
+    pair : i32 -> i32 -> Choice,
+}
+
+#pub #type(rc) List : Type[0] {
+    nil : List,
+    cons : i32 -> List -> List,
+}
+
+#pub #fn default_choice : Choice {
+    Choice::small 17i32
+}
+
+#pub #fn choice_code : (choice : Choice) -> i32 {
+    #match choice {
+        Choice::small value => value,
+        Choice::pair left right => i32_add left right,
+    }
+}
+
+#pub #fn default_list : List {
+    List::cons 20i32 (List::cons 22i32 List::nil)
+}
+
+#pub #fn list_sum : (list : List) -> i32 {
+    #match list {
+        List::nil => 0i32,
+        List::cons head tail => {
+            #let tail_sum = list_sum tail;
+            i32_add head tail_sum
+        }
+    }
+}

@@ -193,6 +193,13 @@ fn compiles_and_runs_workspace_runtime_dependency_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_workspace_type_dependency_fixture() {
+    let root = repo_root().join("tests/testcases/workspace-type-dependency/workspace-app");
+    let status = run_fixture_status(&root, "workspace-type-dependency");
+    assert_eq!(status.code(), Some(101));
+}
+
+#[test]
 fn compiles_and_runs_i32_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/i32-reference-annotation");
     let status = run_fixture_status(&root, "i32-reference-annotation");

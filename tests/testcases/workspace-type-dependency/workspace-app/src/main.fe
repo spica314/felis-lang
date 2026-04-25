@@ -1,0 +1,22 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#use workspace-lib::Choice;
+#use workspace-lib::List;
+#use workspace-lib::choice_code;
+#use workspace-lib::default_choice;
+#use workspace-lib::default_list;
+#use workspace-lib::list_sum;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let explicit_choice = Choice::pair 20i32 22i32;
+    #let explicit_code = choice_code explicit_choice;
+    #let imported_code = choice_code default_choice;
+    #let imported_list_sum = list_sum default_list;
+    #let first_sum = i32_add explicit_code imported_code;
+    #let code = i32_add first_sum imported_list_sum;
+    #let _ <- IO::exit code;
+    ()
+}

@@ -1,0 +1,9 @@
+{
+    "name": "workspace-app",
+    "dependencies": {
+        "workspace-lib": {
+            "workspace": true
+        }
+    },
+    "felis-bin-entrypoints": ["src/main.fe"]
+}
