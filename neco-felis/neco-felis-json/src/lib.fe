@@ -119,12 +119,14 @@
             };
             #let string_len : i32 = i32_sub (string_end_ref .> get) string_start;
             #let next_manifest_index : i32 = i32_add (string_end_ref .> get) 1i32;
-            #let token : JsonToken = JsonToken::string JsonTokenPayload { value = string_len, start = string_start, end = next_manifest_index };
+            #let token_payload : JsonTokenPayload = JsonTokenPayload { value = string_len, start = string_start, end = next_manifest_index };
+            #let token : JsonToken = JsonToken::string token_payload;
             parse_json_token token manifest_ref entrypoint_ref entrypoint_parser_mode_ref entrypoint_len_ref done_ref;
             manifest_index_ref .> set next_manifest_index;
         } #else {
             #let next_manifest_index : i32 = i32_add (manifest_index_ref .> get) 1i32;
-            #let token : JsonToken = JsonToken::byte JsonTokenPayload { value = i32_from_u8 byte, start = manifest_index_ref .> get, end = next_manifest_index };
+            #let token_payload : JsonTokenPayload = JsonTokenPayload { value = i32_from_u8 byte, start = manifest_index_ref .> get, end = next_manifest_index };
+            #let token : JsonToken = JsonToken::byte token_payload;
             parse_json_token token manifest_ref entrypoint_ref entrypoint_parser_mode_ref entrypoint_len_ref done_ref;
             manifest_index_ref .> set next_manifest_index;
         };
