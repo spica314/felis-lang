@@ -1,4 +1,6 @@
+#use std_core::io::IO;
 #use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::RawArray;
 #use std_core::primitive::array::dyn_array_get_u8;
 #use std_core::primitive::array::dyn_array_set_i32;
 #use std_core::primitive::array::dyn_array_set_u8;
@@ -18,6 +20,8 @@
 #use std_core::primitive::u8::u8_sub;
 #use std_core::string::String;
 #use std_core::string::string_as_dyn_array;
+#use std_core::string::string_copy_from_string_range_into;
+#use std_core::string::string_from_raw_parts;
 #use std_core::string::string_len;
 
 #pub #struct FelisTokenPayload : Type[0] {
@@ -41,7 +45,7 @@
 #pub #type(rc) FelisExpr : Type[0] {
     unknown_expr : FelisExpr,
     int_literal_expr : i32 -> i32 -> i32 -> FelisExpr,
-    string_literal_expr : i32 -> i32 -> i32 -> FelisExpr,
+    string_literal_expr : String -> FelisExpr,
     local_expr : i32 -> i32 -> FelisExpr,
     i32_add_expr : FelisExpr -> FelisExpr -> FelisExpr,
     i32_sub_expr : FelisExpr -> FelisExpr -> FelisExpr,
@@ -311,6 +315,49 @@
         is_ident_ref .> set 1i32;
     };
     ()
+}
+
+#pub #proc parse_felis_first_string_literal_expr : (source : String) -> FelisExpr #with IO {
+    #let source_ref : DynArray u8 = string_as_dyn_array source;
+    #let source_len : i32 = string_len source;
+    #let source_index_ref : i32 = 0i32;
+    #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
+    #let found_ref : i32 = 0i32;
+    #letref #excl found_ref : &^ i32 #borrow found_ref;
+    #let string_start_ref : i32 = 0i32;
+    #letref #excl string_start_ref : &^ i32 #borrow string_start_ref;
+    #let string_end_ref : i32 = 0i32;
+    #letref #excl string_end_ref : &^ i32 #borrow string_end_ref;
+    found_ref .> set 0i32;
+    #loop {
+        #if i32_gte (source_index_ref .> get) source_len {
+            #break;
+        };
+        #let byte : u8 = dyn_array_get_u8 source_ref (source_index_ref .> get);
+        #if u8_eq byte '"' {
+            string_start_ref .> set (i32_add (source_index_ref .> get) 1i32);
+            string_end_ref .> set (string_start_ref .> get);
+            #loop {
+                #if i32_gte (string_end_ref .> get) source_len {
+                    #break;
+                };
+                #let string_byte : u8 = dyn_array_get_u8 source_ref (string_end_ref .> get);
+                #if u8_eq string_byte '"' {
+                    #break;
+                };
+                string_end_ref .> set (i32_add (string_end_ref .> get) 1i32);
+            };
+            found_ref .> set 1i32;
+            #break;
+        } #else {
+            source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+        };
+    };
+    #let value_len : i32 = i32_sub (string_end_ref .> get) (string_start_ref .> get);
+    #let raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 0x100000i32;
+    #let value : String = string_from_raw_parts raw_ref 0x100000i32 value_len;
+    string_copy_from_string_range_into source (string_start_ref .> get) (string_end_ref .> get) value;
+    FelisExpr::string_literal_expr value
 }
 
 #pub #proc parse_felis_source : (source : String) -> (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (number_byte_ref : DynArray u8) -> (stmt_count_ref : &^ i32) -> () {

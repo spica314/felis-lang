@@ -382,6 +382,13 @@ fn compiles_and_runs_type_rc_parser_basic_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_neco_felis_parser_string_expr_fixture() {
+    let root = repo_root().join("neco-felis/neco-felis-parser");
+    let status = run_fixture_status(&root, "felis-parser-string-expr");
+    assert_eq!(status.code(), Some(5));
+}
+
+#[test]
 fn compiles_and_runs_stdin_to_stdout_fixture() {
     let root = repo_root().join("tests/testcases/stdin-to-stdout");
     let run = run_fixture_with_input(&root, "stdin-to-stdout", b"echo through stdin\n");

@@ -45,6 +45,16 @@
     ()
 }
 
+#proc string_copy_from_string_range_into : (source : String) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
+    string_copy_from_dyn_array_range_into (string_as_dyn_array source) start end dest;
+    ()
+}
+
+#fn string_copy_from_string_range : (source : String) -> (start : i32) -> (end : i32) -> (dest : String) -> String {
+    string_copy_from_string_range_into source start end dest;
+    string_with_len dest (i32_sub end start)
+}
+
 #fn string_as_dyn_array : (string : String) -> DynArray u8 {
     #match string {
         String::string array => array,
@@ -134,6 +144,8 @@
 #pub #use string_from_raw_parts;
 #pub #use string_with_len;
 #pub #use string_copy_from_dyn_array_range_into;
+#pub #use string_copy_from_string_range_into;
+#pub #use string_copy_from_string_range;
 #pub #use string_as_dyn_array;
 #pub #use string_as_raw_array;
 #pub #use string_len;

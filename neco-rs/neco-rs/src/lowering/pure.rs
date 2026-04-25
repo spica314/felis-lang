@@ -427,8 +427,11 @@ fn lower_constructor_application(
                 Value::Constructor(ConstructorValue {
                     heap_slot: Some(_), ..
                 }) => Ok(8),
+                Value::Constructor(ConstructorValue {
+                    heap_slot: None, ..
+                }) => Ok(0),
                 _ => Err(Error::Unsupported(
-                    "`type(rc)` currently supports only `i32` and nested `type(rc)` payload fields"
+                    "`type(rc)` currently supports only `i32`, nested `type(rc)`, and compile-time constructor payload fields"
                         .to_string(),
                 )),
             })
@@ -471,9 +474,12 @@ fn lower_constructor_application(
                     });
                     byte_offset += 8;
                 }
+                Value::Constructor(ConstructorValue {
+                    heap_slot: None, ..
+                }) => {}
                 _ => {
                     return Err(Error::Unsupported(
-                        "`type(rc)` currently supports only `i32` and nested `type(rc)` payload fields"
+                        "`type(rc)` currently supports only `i32`, nested `type(rc)`, and compile-time constructor payload fields"
                             .to_string(),
                     ));
                 }

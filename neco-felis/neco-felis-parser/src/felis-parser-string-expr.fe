@@ -1,0 +1,49 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::RawArray;
+#use std_core::primitive::i32::i32;
+#use std_core::string::String;
+#use std_core::string::string_from_raw_parts;
+#use std_core::string::string_len;
+#use std_core::string::string_set_u8;
+#use neco-felis-parser::FelisExpr;
+#use neco-felis-parser::parse_felis_first_string_literal_expr;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let source_raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 0x0ei32;
+    #let source : String = string_from_raw_parts source_raw_ref 0x0ei32 0x0ei32;
+    string_set_u8 source 0i32 'w';
+    string_set_u8 source 1i32 'r';
+    string_set_u8 source 2i32 'i';
+    string_set_u8 source 3i32 't';
+    string_set_u8 source 4i32 'e';
+    string_set_u8 source 5i32 ' ';
+    string_set_u8 source 6i32 '"';
+    string_set_u8 source 7i32 'h';
+    string_set_u8 source 8i32 'e';
+    string_set_u8 source 9i32 'l';
+    string_set_u8 source 10i32 'l';
+    string_set_u8 source 11i32 'o';
+    string_set_u8 source 12i32 '"';
+    string_set_u8 source 13i32 ';';
+    #let expr : FelisExpr = parse_felis_first_string_literal_expr source;
+    #let code_ref : i32 = 1i32;
+    #letref #excl code_ref : &^ i32 #borrow code_ref;
+    #match expr {
+        FelisExpr::string_literal_expr value => {
+            #let len : i32 = string_len value;
+            code_ref .> set len;
+        },
+        FelisExpr::unknown_expr => code_ref .> set 2i32,
+        FelisExpr::int_literal_expr _ _ _ => code_ref .> set 3i32,
+        FelisExpr::local_expr _ _ => code_ref .> set 4i32,
+        FelisExpr::i32_add_expr _ _ => code_ref .> set 5i32,
+        FelisExpr::i32_sub_expr _ _ => code_ref .> set 6i32,
+        FelisExpr::i32_mul_expr _ _ => code_ref .> set 7i32,
+        FelisExpr::i32_div_expr _ _ => code_ref .> set 8i32,
+        FelisExpr::i32_mod_expr _ _ => code_ref .> set 9i32,
+    };
+    #let _ : () <- IO::exit (code_ref .> get);
+    ()
+}
