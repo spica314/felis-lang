@@ -181,6 +181,18 @@ pub(crate) struct ConstructorValue {
     pub(crate) fields: Vec<crate::effect::Value>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StructValue {
+    pub(crate) type_name: String,
+    pub(crate) fields: Vec<StructFieldValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StructFieldValue {
+    pub(crate) name: String,
+    pub(crate) value: crate::effect::Value,
+}
+
 pub(crate) fn intern_data(program: &mut LoweredProgram, bytes: Vec<u8>) -> usize {
     program.data.push(bytes);
     program.data.len() - 1

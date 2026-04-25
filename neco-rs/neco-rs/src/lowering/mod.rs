@@ -18,8 +18,8 @@ use crate::ir::{
 use crate::{Error, Result};
 
 use declarations::{
-    ConstructorSignature, Procedure, PureFunction, collect_constructors, collect_procedures,
-    collect_pure_functions, pure_function_from_decl,
+    ConstructorSignature, Procedure, PureFunction, StructSignature, collect_constructors,
+    collect_procedures, collect_pure_functions, collect_structs, pure_function_from_decl,
 };
 use expr::lower_condition_expr;
 use pure::{
@@ -38,6 +38,7 @@ pub(crate) struct LoweringState {
     functions: HashMap<String, PureFunction>,
     procedures: HashMap<String, Procedure>,
     constructors: HashMap<String, ConstructorSignature>,
+    structs: HashMap<String, StructSignature>,
     loop_depth: usize,
 }
 
@@ -50,6 +51,7 @@ impl LoweringState {
             functions: HashMap::new(),
             procedures: HashMap::new(),
             constructors: HashMap::new(),
+            structs: HashMap::new(),
             loop_depth: 0,
         }
     }
@@ -133,6 +135,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     state.functions = collect_pure_functions(&procedure_packages)?;
     state.procedures = collect_procedures(&procedure_packages)?;
     state.constructors = collect_constructors(&procedure_packages)?;
+    state.structs = collect_structs(&procedure_packages)?;
     initialize_zero_arg_use_bindings(package, &procedure_packages, &mut state, &mut program)?;
     let mut terminated = false;
 

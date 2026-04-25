@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use neco_rs_parser::{
     ArrowParameter, Block, ConstructorDeclaration, DeclaredName, FunctionDeclaration, FunctionKind,
-    Item, ParsedPackage, Term,
+    Item, ParsedPackage, StructDeclaration, Term,
 };
 
 use crate::{Error, Result};
@@ -39,6 +39,19 @@ pub(super) struct ConstructorSignature {
     pub(super) arity: usize,
     pub(super) is_rc: bool,
     pub(super) tag: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct StructSignature {
+    pub(super) type_name: String,
+    pub(super) is_rc: bool,
+    pub(super) fields: Vec<StructFieldSignature>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct StructFieldSignature {
+    pub(super) name: String,
+    pub(super) ty: Term,
 }
 
 pub(super) fn collect_pure_functions(
@@ -122,6 +135,49 @@ pub(super) fn collect_constructors(
         }
     }
     Ok(constructors)
+}
+
+pub(super) fn collect_structs(
+    packages: &[ParsedPackage],
+) -> Result<HashMap<String, StructSignature>> {
+    let mut structs = HashMap::new();
+    for package in packages {
+        for item in package
+            .source_files
+            .iter()
+            .flat_map(|file| file.syntax.items.iter())
+        {
+            let Item::Struct(struct_decl) = item else {
+                continue;
+            };
+            let signature = struct_signature_from_decl(struct_decl);
+            if structs
+                .insert(signature.type_name.clone(), signature)
+                .is_some()
+            {
+                return Err(Error::Unsupported(format!(
+                    "duplicate struct `{}` is not supported",
+                    struct_decl.name.name
+                )));
+            }
+        }
+    }
+    Ok(structs)
+}
+
+fn struct_signature_from_decl(struct_decl: &StructDeclaration) -> StructSignature {
+    StructSignature {
+        type_name: struct_decl.name.name.clone(),
+        is_rc: struct_decl.modifier.as_deref() == Some("rc"),
+        fields: struct_decl
+            .fields
+            .iter()
+            .map(|field| StructFieldSignature {
+                name: field.name.clone(),
+                ty: field.ty.clone(),
+            })
+            .collect(),
+    }
 }
 
 fn constructor_arity(

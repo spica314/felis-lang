@@ -701,6 +701,63 @@ fn parses_struct_declaration_package_root() {
 }
 
 #[test]
+fn parses_struct_field_access_package_root() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let parsed = parse_root(&root).expect("struct-basic package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    let source_file = package
+        .source_files
+        .iter()
+        .find(|file| file.path.ends_with("src/struct-field-access.fe"))
+        .expect("struct-field-access source file");
+    assert_eq!(source_file.role, SourceFileRole::BinaryEntrypoint);
+
+    let syntax = &source_file.syntax;
+    assert_eq!(syntax.items.len(), 7);
+
+    let Item::Struct(span_decl) = &syntax.items[3] else {
+        panic!("expected Span struct declaration");
+    };
+    assert_eq!(span_decl.name.name, "Span");
+    assert_eq!(span_decl.fields.len(), 2);
+
+    let Item::Function(span_len) = &syntax.items[4] else {
+        panic!("expected span_len function");
+    };
+    let Some(Term::Application { arguments, .. }) = span_len.body.tail.as_deref() else {
+        panic!("expected i32_add application");
+    };
+    assert_eq!(arguments.len(), 2);
+    for (argument, expected_field) in arguments.iter().zip(["start", "end"]) {
+        let Term::FieldAccess { receiver, field } = argument else {
+            panic!("expected field access argument");
+        };
+        assert_eq!(field, expected_field);
+        let Term::Path(path) = receiver.as_ref() else {
+            panic!("expected field access receiver path");
+        };
+        assert_eq!(path.segments[0].name, "span");
+    }
+
+    let Item::Function(main_fn) = &syntax.items[6] else {
+        panic!("expected main function");
+    };
+    let Statement::Let(span_let) = &main_fn.body.statements[0] else {
+        panic!("expected span let statement");
+    };
+    let Term::StructLiteral { path, fields } = span_let.value.as_ref() else {
+        panic!("expected Span struct literal");
+    };
+    assert_eq!(path.segments[0].name, "Span");
+    assert_eq!(fields.len(), 2);
+    assert_eq!(fields[0].name, "start");
+    assert_eq!(fields[1].name, "end");
+}
+
+#[test]
 fn parses_enum_match_payload_package_root() {
     let root = repo_root().join("tests/testcases/enum-match-payload");
     let parsed = parse_root(&root).expect("enum-match-payload package parses");

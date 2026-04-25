@@ -89,6 +89,7 @@ pub(crate) fn validate_value_against_type(
                 "FileDescriptor" if matches!(value, Value::FileDescriptor(_)) => Ok(()),
                 type_name => match value {
                     Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
+                    Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
                     _ => Err(Error::Unsupported(format!(
                         "expected a value of type `{}` but got {value:?}",
                         render_term(ty)
@@ -182,6 +183,7 @@ fn validate_reference_value_against_type(
                 "i32" if matches!(value, Value::I32Reference(_)) => Ok(()),
                 type_name => match value {
                     Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
+                    Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
                     _ => Err(Error::Unsupported(format!(
                         "expected a value of type `{}` but got {value:?}",
                         render_reference_term(referent, false)

@@ -4,7 +4,9 @@ use std::collections::HashMap;
 
 use neco_rs_parser::{BindingPattern, PathExpression, Term};
 
-use crate::ir::{ArrayElementType, ArrayKind, ConstructorValue, I32Expr, LoweredProgram, U8Expr};
+use crate::ir::{
+    ArrayElementType, ArrayKind, ConstructorValue, I32Expr, LoweredProgram, StructValue, U8Expr,
+};
 use crate::lowering::LoweringState;
 use crate::{Error, Result};
 
@@ -12,6 +14,7 @@ use crate::{Error, Result};
 pub(crate) enum Value {
     Unit,
     Constructor(ConstructorValue),
+    Struct(StructValue),
     FileDescriptor(I32Expr),
     ByteString(usize),
     RuntimeArg(I32Expr),
@@ -83,23 +86,46 @@ pub(crate) fn bind_pattern(
 }
 
 pub(crate) fn resolve_value(term: &Term, environment: &HashMap<String, Value>) -> Result<Value> {
-    let Term::Path(path) = term else {
-        return Err(Error::Unsupported(format!(
-            "expected a variable reference, got {term:?}"
-        )));
-    };
+    match term {
+        Term::Group(inner) => return resolve_value(inner, environment),
+        Term::FieldAccess { receiver, field } => {
+            let value = resolve_value(receiver, environment)?;
+            let Value::Struct(struct_value) = value else {
+                return Err(Error::Unsupported(format!(
+                    "`.{field}` expects a struct value, got {value:?}"
+                )));
+            };
+            return struct_value
+                .fields
+                .into_iter()
+                .find(|candidate| candidate.name == *field)
+                .map(|candidate| candidate.value)
+                .ok_or_else(|| {
+                    Error::Unsupported(format!(
+                        "struct `{}` has no field `{field}`",
+                        struct_value.type_name
+                    ))
+                });
+        }
+        Term::Path(path) => {
+            let segments = path_segments(path)?;
+            let [name] = segments.as_slice() else {
+                return Err(Error::Unsupported(
+                    "only simple local variable references are supported here".to_string(),
+                ));
+            };
 
-    let segments = path_segments(path)?;
-    let [name] = segments.as_slice() else {
-        return Err(Error::Unsupported(
-            "only simple local variable references are supported here".to_string(),
-        ));
-    };
+            return environment
+                .get(*name)
+                .cloned()
+                .ok_or_else(|| Error::Unsupported(format!("unknown entrypoint local `{name}`")));
+        }
+        _ => {}
+    }
 
-    environment
-        .get(*name)
-        .cloned()
-        .ok_or_else(|| Error::Unsupported(format!("unknown entrypoint local `{name}`")))
+    Err(Error::Unsupported(format!(
+        "expected a variable reference, got {term:?}"
+    )))
 }
 
 fn path_segments(path: &PathExpression) -> Result<Vec<&str>> {

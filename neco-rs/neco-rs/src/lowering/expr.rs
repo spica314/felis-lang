@@ -15,12 +15,14 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
         Term::Group(inner) => lower_i32_expr(inner, state),
         Term::IntegerLiteral(literal) => parse_suffixed_i32_literal(literal),
         Term::MethodCall { .. } => lower_i32_method_call(term, state),
-        Term::Path(_) => match resolve_value(term, &state.environment)? {
-            Value::I32(expr) => Ok(expr),
-            other => Err(Error::Unsupported(format!(
-                "expected an `i32` value, got {other:?}"
-            ))),
-        },
+        Term::Path(_) | Term::FieldAccess { .. } => {
+            match resolve_value(term, &state.environment)? {
+                Value::I32(expr) => Ok(expr),
+                other => Err(Error::Unsupported(format!(
+                    "expected an `i32` value, got {other:?}"
+                ))),
+            }
+        }
         Term::Application { callee, arguments } => {
             if let Some(expr) = lower_i32_literal_application(callee, arguments)? {
                 return Ok(expr);
@@ -71,12 +73,14 @@ pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr
         Term::Group(inner) => lower_u8_expr(inner, state),
         Term::CharLiteral(value) => Ok(U8Expr::Literal(*value as u8)),
         Term::IntegerLiteral(literal) => parse_suffixed_u8_literal(literal),
-        Term::Path(_) => match resolve_value(term, &state.environment)? {
-            Value::U8(expr) => Ok(expr),
-            other => Err(Error::Unsupported(format!(
-                "expected a `u8` value, got {other:?}"
-            ))),
-        },
+        Term::Path(_) | Term::FieldAccess { .. } => {
+            match resolve_value(term, &state.environment)? {
+                Value::U8(expr) => Ok(expr),
+                other => Err(Error::Unsupported(format!(
+                    "expected a `u8` value, got {other:?}"
+                ))),
+            }
+        }
         Term::Application { callee, arguments } => {
             if let Some(expr) = lower_u8_literal_application(callee, arguments)? {
                 return Ok(expr);

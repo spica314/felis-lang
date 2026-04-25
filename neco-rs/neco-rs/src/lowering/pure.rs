@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use neco_rs_parser::{Block, MatchExpression, PathExpression, Pattern, Statement, Term};
 
 use crate::effect::{Value, bind_pattern, resolve_value};
-use crate::ir::{ConstructorValue, I32Expr, LoweredProgram, Operation, intern_data};
+use crate::ir::{
+    ConstructorValue, I32Expr, LoweredProgram, Operation, StructFieldValue, StructValue,
+    intern_data,
+};
 use crate::{Error, Result};
 
 use super::declarations::{ConstructorSignature, constructor_key};
@@ -21,6 +24,9 @@ pub(super) fn lower_pure_value(
         Term::Group(inner) => lower_pure_value(inner, state, program),
         Term::Block(block) => lower_pure_block_value(block, state, program),
         Term::Match(match_expr) => lower_match_value(match_expr, state, program),
+        Term::StructLiteral { path, fields } => {
+            lower_struct_literal_value(path, fields, state, program)
+        }
         Term::StringLiteral(literal) => {
             let data_index = intern_data(program, nul_terminated_bytes(literal));
             Ok(Value::ByteString(data_index))
@@ -61,6 +67,7 @@ pub(super) fn lower_pure_value(
                 "unsupported pure expression in entrypoint body: {term:?}"
             )))
         }
+        Term::FieldAccess { .. } => resolve_value(term, &state.environment),
         Term::Path(path) => lower_path_value(path, state, program),
         _ => Err(Error::Unsupported(format!(
             "unsupported pure expression in entrypoint body: {term:?}"
@@ -120,6 +127,69 @@ fn lower_path_value(
         constructor_name: signature.constructor_name,
         heap_slot: None,
         fields: Vec::new(),
+    }))
+}
+
+fn lower_struct_literal_value(
+    path: &PathExpression,
+    fields: &[neco_rs_parser::StructLiteralField],
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Value> {
+    if path.starts_with_package || path.segments.len() != 1 || !path.segments[0].suffixes.is_empty()
+    {
+        return Err(Error::Unsupported(
+            "only simple struct literal paths are supported in entrypoint lowering".to_string(),
+        ));
+    }
+
+    let type_name = path.segments[0].name.as_str();
+    let Some(signature) = state.structs.get(type_name) else {
+        return Err(Error::Unsupported(format!("unknown struct `{type_name}`")));
+    };
+    if signature.is_rc {
+        return Err(Error::Unsupported(
+            "`struct(rc)` literals are not supported in entrypoint lowering yet".to_string(),
+        ));
+    }
+
+    let mut values = HashMap::new();
+    for field in fields {
+        if values.contains_key(&field.name) {
+            return Err(Error::Unsupported(format!(
+                "duplicate field `{}` in struct literal `{type_name}`",
+                field.name
+            )));
+        }
+        values.insert(
+            field.name.clone(),
+            lower_pure_value(&field.value, state, program)?,
+        );
+    }
+
+    let mut struct_fields = Vec::with_capacity(signature.fields.len());
+    for field in &signature.fields {
+        let Some(value) = values.remove(&field.name) else {
+            return Err(Error::Unsupported(format!(
+                "missing field `{}` in struct literal `{type_name}`",
+                field.name
+            )));
+        };
+        validate_value_against_type(&value, &field.ty, program)?;
+        struct_fields.push(StructFieldValue {
+            name: field.name.clone(),
+            value,
+        });
+    }
+    if let Some(extra) = values.keys().next() {
+        return Err(Error::Unsupported(format!(
+            "unknown field `{extra}` in struct literal `{type_name}`"
+        )));
+    }
+
+    Ok(Value::Struct(StructValue {
+        type_name: signature.type_name.clone(),
+        fields: struct_fields,
     }))
 }
 

@@ -305,6 +305,13 @@ fn compiles_and_runs_struct_declaration_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_struct_field_access_fixture() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let status = run_fixture_status(&root, "struct-field-access");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_enum_match_payload_single_fixture() {
     let root = repo_root().join("tests/testcases/enum-match-payload");
     let status = run_fixture_status(&root, "enum-match-payload-single");
