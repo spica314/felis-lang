@@ -484,7 +484,6 @@ fn compiles_i32_exit_local_with_neco_felis_fixture() {
 }
 
 #[test]
-#[ignore = "bug-0002: neco-felis does not yet evaluate i32_add into a local exit code"]
 fn compiles_i32_add_exit_local_with_neco_felis_fixture() {
     let input_path = repo_root().join("tests/testcases/i32-add-exit-local");
     let (run, emitted_bytes, emitted_run) =

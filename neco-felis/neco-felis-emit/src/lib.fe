@@ -567,20 +567,54 @@
                 emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
             } #else {
                 #if i32_eq (terminated_ref .> get) 0i32 {
+                    #letref #excl exit_success_ref : &^ i32 := 0i32;
                     #let local_index : i32 = local_index_ref .> get;
                     #let defining_stmt_index : i32 = dyn_array_get_i32 local_slot_ref local_index;
-                    #let defining_expr_start : i32 = dyn_array_get_i32 stmt_expr_start_ref defining_stmt_index;
+                    #let raw_defining_expr_start : i32 = dyn_array_get_i32 stmt_expr_start_ref defining_stmt_index;
+                    #let defining_expr_end : i32 = dyn_array_get_i32 stmt_expr_end_ref defining_stmt_index;
+                    #letref #excl defining_expr_start_ref : &^ i32 := raw_defining_expr_start;
+                    skip_felis_spaces source_ref raw_defining_expr_start defining_expr_end defining_expr_start_ref;
+                    #let defining_expr_start : i32 = defining_expr_start_ref .> get;
                     #let exit_digit : u8 = dyn_array_get_u8 source_ref defining_expr_start;
                     #if u8_lt exit_digit ':' {
                         #if u8_gt exit_digit '/' {
                             #let exit_code : u8 = u8_sub exit_digit '0';
                             emit_exit_assembly elf_ref code_index_ref exit_code;
                             terminated_ref .> set 1i32;
-                        } #else {
-                            #let stmt : EmitFelisStmt = EmitFelisStmt::emit_exit_stmt (EmitFelisExpr::emit_int_literal_expr 0i32 stmt_expr_start stmt_expr_end);
-                            emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
+                            exit_success_ref .> set 1i32;
                         };
-                    } #else {
+                    };
+                    #if i32_eq (exit_success_ref .> get) 0i32 {
+                        #letref #excl operator_end_ref : &^ i32 := defining_expr_start;
+                        scan_felis_ident_end source_ref defining_expr_start defining_expr_end operator_end_ref;
+                        #if i32_gte defining_expr_end (i32_add defining_expr_start 5i32) {
+                            #let operator_byte4 : u8 = dyn_array_get_u8 source_ref (i32_add defining_expr_start 4i32);
+                            #if u8_eq operator_byte4 'a' {
+                                operator_end_ref .> set (i32_add defining_expr_start 7i32);
+                                #letref #excl lhs_start_ref : &^ i32 := operator_end_ref .> get;
+                                skip_felis_spaces source_ref (operator_end_ref .> get) defining_expr_end lhs_start_ref;
+                                #letref #excl lhs_end_ref : &^ i32 := lhs_start_ref .> get;
+                                scan_felis_simple_expr_end source_ref (lhs_start_ref .> get) defining_expr_end lhs_end_ref;
+                                #letref #excl rhs_start_ref : &^ i32 := lhs_end_ref .> get;
+                                skip_felis_spaces source_ref (lhs_end_ref .> get) defining_expr_end rhs_start_ref;
+                                #let lhs_digit : u8 = dyn_array_get_u8 source_ref (lhs_start_ref .> get);
+                                #let rhs_digit : u8 = dyn_array_get_u8 source_ref (rhs_start_ref .> get);
+                                #if u8_lt lhs_digit ':' {
+                                    #if u8_gt lhs_digit '/' {
+                                        #if u8_lt rhs_digit ':' {
+                                            #if u8_gt rhs_digit '/' {
+                                                #let exit_code : u8 = u8_add (u8_sub lhs_digit '0') (u8_sub rhs_digit '0');
+                                                emit_exit_assembly elf_ref code_index_ref exit_code;
+                                                terminated_ref .> set 1i32;
+                                                exit_success_ref .> set 1i32;
+                                            };
+                                        };
+                                    };
+                                };
+                            };
+                        };
+                    };
+                    #if i32_eq (exit_success_ref .> get) 0i32 {
                         #let stmt : EmitFelisStmt = EmitFelisStmt::emit_exit_stmt (EmitFelisExpr::emit_int_literal_expr 0i32 stmt_expr_start stmt_expr_end);
                         emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
                     };
