@@ -16,6 +16,9 @@
 #use std_core::primitive::u8::u8_lt;
 #use std_core::primitive::u8::u8_mul;
 #use std_core::primitive::u8::u8_sub;
+#use std_core::string::String;
+#use std_core::string::string_as_dyn_array;
+#use std_core::string::string_len;
 
 #pub #struct FelisTokenPayload : Type[0] {
     value : i32,
@@ -310,7 +313,9 @@
     ()
 }
 
-#pub #proc parse_felis_source : (source_ref : DynArray u8) -> (source_len : i32) -> (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (number_byte_ref : DynArray u8) -> (stmt_count_ref : &^ i32) -> () {
+#pub #proc parse_felis_source : (source : String) -> (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (number_byte_ref : DynArray u8) -> (stmt_count_ref : &^ i32) -> () {
+    #let source_ref : DynArray u8 = string_as_dyn_array source;
+    #let source_len : i32 = string_len source;
     #let parse_state_ref : i32 = 0i32;
     #letref #excl parse_state_ref : &^ i32 #borrow parse_state_ref;
     #let source_index_ref : i32 = 0i32;
@@ -474,7 +479,9 @@
     ()
 }
 
-#pub #proc parse_felis_source_tokens : (source_ref : DynArray u8) -> (source_len : i32) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> () {
+#pub #proc parse_felis_source_tokens : (source : String) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> () {
+    #let source_ref : DynArray u8 = string_as_dyn_array source;
+    #let source_len : i32 = string_len source;
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     token_count_ref .> set 0i32;

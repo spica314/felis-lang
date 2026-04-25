@@ -15,6 +15,8 @@
 #use std_core::primitive::u8::u8_gt;
 #use std_core::primitive::u8::u8_lt;
 #use std_core::primitive::u8::u8_sub;
+#use std_core::string::String;
+#use std_core::string::string_as_dyn_array;
 
 #type(rc) EmitFelisExpr : Type[0] {
     emit_unknown_expr : EmitFelisExpr,
@@ -543,7 +545,8 @@
     ()
 }
 
-#pub #proc emit_parsed_felis_stmts : (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (stmt_expr_node_ref : DynArray i32) -> (stmt_count : i32) -> (source_ref : DynArray u8) -> (elf_ref : DynArray u8) -> (emit_u8_state_ref : DynArray u8) -> (local_name_start_ref : DynArray i32) -> (local_name_end_ref : DynArray i32) -> (local_slot_ref : DynArray i32) -> (local_count_ref : &^ i32) -> (expr_tag_ref : DynArray i32) -> (expr_value_ref : DynArray i32) -> (expr_lhs_ref : DynArray i32) -> (expr_rhs_ref : DynArray i32) -> (expr_count_ref : &^ i32) -> () {
+#pub #proc emit_parsed_felis_stmts : (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (stmt_expr_node_ref : DynArray i32) -> (stmt_count : i32) -> (source : String) -> (elf_ref : DynArray u8) -> (emit_u8_state_ref : DynArray u8) -> (local_name_start_ref : DynArray i32) -> (local_name_end_ref : DynArray i32) -> (local_slot_ref : DynArray i32) -> (local_count_ref : &^ i32) -> (expr_tag_ref : DynArray i32) -> (expr_value_ref : DynArray i32) -> (expr_lhs_ref : DynArray i32) -> (expr_rhs_ref : DynArray i32) -> (expr_count_ref : &^ i32) -> () {
+    #let source_ref : DynArray u8 = string_as_dyn_array source;
     #let code_index_ref : i32 = 0x1000i32;
     #letref #excl code_index_ref : &^ i32 #borrow code_index_ref;
     #let data_index_ref : i32 = 0x1028i32;
