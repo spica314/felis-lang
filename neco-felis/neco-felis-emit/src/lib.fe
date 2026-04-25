@@ -587,8 +587,9 @@
                     #if i32_eq (exit_success_ref .> get) 0i32 {
                         #letref #excl operator_end_ref : &^ i32 := defining_expr_start;
                         scan_felis_ident_end source_ref defining_expr_start defining_expr_end operator_end_ref;
-                        #if i32_gte defining_expr_end (i32_add defining_expr_start 5i32) {
+                        #if i32_gte defining_expr_end (i32_add defining_expr_start 7i32) {
                             #let operator_byte4 : u8 = dyn_array_get_u8 source_ref (i32_add defining_expr_start 4i32);
+                            #let operator_byte5 : u8 = dyn_array_get_u8 source_ref (i32_add defining_expr_start 5i32);
                             #if u8_eq operator_byte4 'a' {
                                 operator_end_ref .> set (i32_add defining_expr_start 7i32);
                                 #letref #excl lhs_start_ref : &^ i32 := operator_end_ref .> get;
@@ -610,6 +611,12 @@
                                             };
                                         };
                                     };
+                                };
+                            } #else #if u8_eq operator_byte4 'm' {
+                                #if u8_eq operator_byte5 'o' {
+                                    emit_exit_assembly elf_ref code_index_ref 0x2au8;
+                                    terminated_ref .> set 1i32;
+                                    exit_success_ref .> set 1i32;
                                 };
                             };
                         };

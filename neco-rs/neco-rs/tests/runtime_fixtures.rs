@@ -447,13 +447,12 @@ fn compiles_i32_ops_with_neco_felis_fixture() {
     assert!(run.stdout.is_empty());
     assert!(run.stderr.is_empty());
     assert_eq!(&emitted_bytes[0..4], b"\x7FELF");
-    assert_eq!(emitted_run.status.code(), Some(0));
+    assert_eq!(emitted_run.status.code(), Some(42));
     assert!(emitted_run.stdout.is_empty());
     assert!(emitted_run.stderr.is_empty());
 }
 
 #[test]
-#[ignore = "bug-0002: neco-felis still emits exit code 0 for i32-ops"]
 fn compiles_i32_ops_with_neco_felis_fixture_returns_42() {
     let input_path = repo_root().join("tests/testcases/i32-ops");
     let (run, emitted_bytes, emitted_run) =
