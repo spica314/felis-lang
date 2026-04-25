@@ -1,11 +1,12 @@
 #use std_core::io::IO;
+#use std_core::io::FileDescriptor;
 
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let stdout <- IO::stdout;
-    #let _ @ hello_world_ref = "Hello, world!\n";
-    #let hello_world_bytes_ref = hello_world_ref .> as_bytes;
-    #let _ <- IO::write stdout hello_world_bytes_ref 14i32;
+    #let stdout : FileDescriptor <- IO::stdout;
+    #let _ @ hello_world_ref : & Array u8 = "Hello, world!\n";
+    #let hello_world_bytes_ref : & Array u8 = hello_world_ref .> as_bytes;
+    #let _ : () <- IO::write stdout hello_world_bytes_ref 14i32;
     ()
 }

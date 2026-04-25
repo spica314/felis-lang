@@ -26,7 +26,7 @@ use pure::{
     lower_procedure_call_statement, lower_pure_block_value, lower_pure_value,
     pattern_match_bindings,
 };
-use typecheck::validate_value_against_type;
+pub(crate) use typecheck::validate_value_against_type;
 
 pub(crate) use expr::{lower_i32_expr, lower_u8_expr, normalize_numeric_literal_arguments};
 
@@ -320,15 +320,20 @@ pub(super) fn lower_statement(
             LetOperator::Equals => {
                 lower_let_equals_statement(
                     &let_stmt.binder,
+                    let_stmt.ty.as_ref(),
                     let_stmt.value.as_ref(),
                     state,
                     program,
                 )?;
                 Ok(false)
             }
-            LetOperator::LeftArrow => {
-                lower_effect(&let_stmt.binder, let_stmt.value.as_ref(), state, program)
-            }
+            LetOperator::LeftArrow => lower_effect(
+                &let_stmt.binder,
+                let_stmt.ty.as_ref(),
+                let_stmt.value.as_ref(),
+                state,
+                program,
+            ),
         },
         Statement::Expression(term) => {
             lower_expression_statement(term.as_ref(), state, program)?;
@@ -463,11 +468,13 @@ fn lower_if_statement(
 
 fn lower_let_equals_statement(
     binder: &BindingPattern,
+    ty: &Term,
     value_term: &Term,
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<()> {
     let value = lower_pure_value(value_term, state, program)?;
+    validate_value_against_type(&value, ty, program)?;
     if let BindingPattern::ValueAndReference {
         value: inner,
         reference,

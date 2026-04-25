@@ -28,8 +28,8 @@ fn parses_single_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 3);
-    let Item::Function(main_fn) = &syntax.items[2] else {
+    assert_eq!(syntax.items.len(), 4);
+    let Item::Function(main_fn) = &syntax.items[3] else {
         panic!("expected function");
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
@@ -474,8 +474,8 @@ fn parses_u8_array_hello_world_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 4);
-    let Item::Function(main_fn) = &syntax.items[3] else {
+    assert_eq!(syntax.items.len(), 5);
+    let Item::Function(main_fn) = &syntax.items[4] else {
         panic!("expected function");
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
@@ -499,8 +499,8 @@ fn parses_hex_literals_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 4);
-    let Item::Function(main_fn) = &syntax.items[3] else {
+    assert_eq!(syntax.items.len(), 5);
+    let Item::Function(main_fn) = &syntax.items[4] else {
         panic!("expected function");
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
@@ -524,8 +524,8 @@ fn parses_comments_basic_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 3);
-    let Item::Function(main_fn) = &syntax.items[2] else {
+    assert_eq!(syntax.items.len(), 4);
+    let Item::Function(main_fn) = &syntax.items[3] else {
         panic!("expected function");
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
@@ -918,8 +918,8 @@ fn parses_stdin_to_stdout_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 4);
-    let Item::Function(main_fn) = &syntax.items[3] else {
+    assert_eq!(syntax.items.len(), 5);
+    let Item::Function(main_fn) = &syntax.items[4] else {
         panic!("expected function");
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
@@ -943,8 +943,8 @@ fn parses_open_read_close_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 3);
-    let Item::Function(main_fn) = &syntax.items[2] else {
+    assert_eq!(syntax.items.len(), 4);
+    let Item::Function(main_fn) = &syntax.items[3] else {
         panic!("expected function");
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
@@ -968,8 +968,8 @@ fn parses_open_write_close_package_root() {
     );
 
     let syntax = &package.source_files[0].syntax;
-    assert_eq!(syntax.items.len(), 3);
-    let Item::Function(main_fn) = &syntax.items[2] else {
+    assert_eq!(syntax.items.len(), 4);
+    let Item::Function(main_fn) = &syntax.items[3] else {
         panic!("expected function");
     };
     assert_eq!(main_fn.visibility, Visibility::Private);

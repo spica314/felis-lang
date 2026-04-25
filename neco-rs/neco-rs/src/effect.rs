@@ -27,6 +27,7 @@ pub(crate) enum Value {
 
 pub(crate) fn lower_effect(
     binder: &BindingPattern,
+    ty: &Term,
     term: &Term,
     state: &mut LoweringState,
     program: &mut LoweredProgram,
@@ -34,8 +35,7 @@ pub(crate) fn lower_effect(
     match term {
         Term::Path(path) => {
             let segments = path_segments(path)?;
-            if let Some(result) = io::lower_io_reference(binder, &segments, &mut state.environment)
-            {
+            if let Some(result) = io::lower_io_reference(binder, ty, &segments, state, program) {
                 return result;
             }
 
@@ -52,7 +52,9 @@ pub(crate) fn lower_effect(
             };
 
             let segments = path_segments(path)?;
-            if let Some(result) = io::lower_io_call(binder, &segments, arguments, state, program) {
+            if let Some(result) =
+                io::lower_io_call(binder, ty, &segments, arguments, state, program)
+            {
                 return result;
             }
 

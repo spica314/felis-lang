@@ -1,14 +1,15 @@
 #use std_core::io::IO;
+#use std_core::io::FileDescriptor;
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let stdout <- IO::stdout;
-    #let _ @ path_ref = "message.txt";
-    #let path_bytes_ref = path_ref .> as_bytes;
-    #let fd <- IO::open path_bytes_ref 0i32 0i32;
-    #let _ @^ bytes_ref <- IO::raw_array_new u8 128i32;
-    #let len <- IO::read fd bytes_ref 128i32;
-    #let _ <- IO::close fd;
-    #let _ <- IO::write stdout bytes_ref len;
+    #let stdout : FileDescriptor <- IO::stdout;
+    #let _ @ path_ref : & Array u8 = "message.txt";
+    #let path_bytes_ref : & Array u8 = path_ref .> as_bytes;
+    #let fd : FileDescriptor <- IO::open path_bytes_ref 0i32 0i32;
+    #let _ @^ bytes_ref : &^ RawArray u8 <- IO::raw_array_new u8 128i32;
+    #let len : i32 <- IO::read fd bytes_ref 128i32;
+    #let _ : () <- IO::close fd;
+    #let _ : () <- IO::write stdout bytes_ref len;
     ()
 }

@@ -86,6 +86,7 @@ pub(crate) fn validate_value_against_type(
             match segment.name.as_str() {
                 "i32" if matches!(value, Value::I32(_)) => Ok(()),
                 "u8" if matches!(value, Value::U8(_)) => Ok(()),
+                "FileDescriptor" if matches!(value, Value::FileDescriptor(_)) => Ok(()),
                 type_name => match value {
                     Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
                     _ => Err(Error::Unsupported(format!(

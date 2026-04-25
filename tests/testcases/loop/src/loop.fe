@@ -5,17 +5,17 @@
 #entrypoint main;
 
 #proc main : () #with IO {
-    #let _ @^ counter = 1i32;
-    #let _ @^ sum = 0i32;
+    #let _ @^ counter : i32 = 1i32;
+    #let _ @^ sum : i32 = 0i32;
     #loop {
-        #let new_sum = i32_add (sum .> get) (counter .> get);
+        #let new_sum : i32 = i32_add (sum .> get) (counter .> get);
         sum .> set new_sum;
         #if i32_eq (counter .> get) 10i32 {
             #break;
         };
-        #let new_counter = i32_add (counter .> get) 1i32;
+        #let new_counter : i32 = i32_add (counter .> get) 1i32;
         counter .> set new_counter;
     };
-    #let _ <- IO::exit (sum .> get);
+    #let _ : () <- IO::exit (sum .> get);
     ()
 }

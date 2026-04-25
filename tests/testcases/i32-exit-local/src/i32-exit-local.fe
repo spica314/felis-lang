@@ -4,7 +4,7 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let code = 3i32;
-    #let _ <- IO::exit code;
+    #let code : i32 = 3i32;
+    #let _ : () <- IO::exit code;
     ()
 }

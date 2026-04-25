@@ -22,33 +22,33 @@
 }
 
 #fn dyn_array_len_u8 : (array : DynArray u8) -> i32 {
-    #let raw_array = dyn_array_raw_u8 array;
+    #let raw_array : RawArray u8 = dyn_array_raw_u8 array;
     raw_array .> len
 }
 
 #fn dyn_array_len_i32 : (array : DynArray i32) -> i32 {
-    #let raw_array = dyn_array_raw_i32 array;
+    #let raw_array : RawArray i32 = dyn_array_raw_i32 array;
     raw_array .> len
 }
 
 #fn dyn_array_get_u8 : (array : DynArray u8) -> (index : i32) -> u8 {
-    #let raw_array = dyn_array_raw_u8 array;
+    #let raw_array : RawArray u8 = dyn_array_raw_u8 array;
     raw_array .> get index
 }
 
 #fn dyn_array_get_i32 : (array : DynArray i32) -> (index : i32) -> i32 {
-    #let raw_array = dyn_array_raw_i32 array;
+    #let raw_array : RawArray i32 = dyn_array_raw_i32 array;
     raw_array .> get index
 }
 
 #proc dyn_array_set_u8 : (array : DynArray u8) -> (index : i32) -> (byte : u8) -> () {
-    #let raw_array = dyn_array_raw_u8 array;
+    #let raw_array : RawArray u8 = dyn_array_raw_u8 array;
     raw_array .> set index byte;
     ()
 }
 
 #proc dyn_array_set_i32 : (array : DynArray i32) -> (index : i32) -> (value : i32) -> () {
-    #let raw_array = dyn_array_raw_i32 array;
+    #let raw_array : RawArray i32 = dyn_array_raw_i32 array;
     raw_array .> set index value;
     ()
 }
@@ -60,9 +60,9 @@
 }
 
 #proc append_nul_terminated_u8 : (source_ref : & Array u8) -> (dest_ref : &^ RawArray u8) -> (dest_index_ref : &^ i32) -> () {
-    #let _ @^ source_index_ref = 0i32;
+    #let _ @^ source_index_ref : i32 = 0i32;
     #loop {
-        #let byte = source_ref .> get (source_index_ref .> get);
+        #let byte : u8 = source_ref .> get (source_index_ref .> get);
         #if u8_eq byte '\0' {
             #break;
         };
@@ -73,9 +73,9 @@
 }
 
 #proc append_dyn_nul_terminated_u8 : (source_ref : & RawArray u8) -> (dest_ref : &^ RawArray u8) -> (dest_index_ref : &^ i32) -> () {
-    #let _ @^ source_index_ref = 0i32;
+    #let _ @^ source_index_ref : i32 = 0i32;
     #loop {
-        #let byte = source_ref .> get (source_index_ref .> get);
+        #let byte : u8 = source_ref .> get (source_index_ref .> get);
         #if u8_eq byte '\0' {
             #break;
         };
@@ -86,7 +86,7 @@
 }
 
 #proc fill_u8 : (dest_ref : &^ RawArray u8) -> (byte : u8) -> () {
-    #let _ @^ index_ref = 0i32;
+    #let _ @^ index_ref : i32 = 0i32;
     #loop {
         #if i32_gte (index_ref .> get) (dest_ref .> len) {
             #break;

@@ -5,7 +5,7 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let x = i32_add 3i32 7i32;
-    #let _ <- IO::exit x;
+    #let x : i32 = i32_add 3i32 7i32;
+    #let _ : () <- IO::exit x;
     ()
 }

@@ -91,6 +91,7 @@ pub struct LoopStatement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LetStatement {
     pub binder: BindingPattern,
+    pub ty: Box<Term>,
     pub operator: LetOperator,
     pub value: Box<Term>,
 }
@@ -193,6 +194,8 @@ impl Parse for Block {
 impl Parse for LetStatement {
     fn parse(parser: &mut Parser) -> Result<Option<Self>> {
         let binder = BindingPattern::parse(parser)?.unwrap();
+        parser.expect_punctuation(TokenKind::Colon)?;
+        let ty = Term::parse(parser)?.unwrap();
         let operator = if parser.consume_punctuation(TokenKind::Equals) {
             LetOperator::Equals
         } else {
@@ -203,6 +206,7 @@ impl Parse for LetStatement {
         parser.expect_punctuation(TokenKind::Semicolon)?;
         Ok(Some(Self {
             binder,
+            ty: Box::new(ty),
             operator,
             value: Box::new(value),
         }))

@@ -35,8 +35,8 @@
                     #match rest {
                         Tokens::nil => left,
                         Tokens::cons rhs_token rhs_rest => {
-                            #let rhs = parse_atom rhs_token;
-                            #let combined = Expr::add left rhs;
+                            #let rhs : Expr = parse_atom rhs_token;
+                            #let combined : Expr = Expr::add left rhs;
                             parse_tail combined rhs_rest
                         },
                     }
@@ -52,7 +52,7 @@
     #match tokens {
         Tokens::nil => Expr::literal 0i32,
         Tokens::cons token rest => {
-            #let left = parse_atom token;
+            #let left : Expr = parse_atom token;
             parse_tail left rest
         },
     }
@@ -62,8 +62,8 @@
     #match expr {
         Expr::literal value => value,
         Expr::add lhs rhs => {
-            #let lhs_value = eval_expr lhs;
-            #let rhs_value = eval_expr rhs;
+            #let lhs_value : i32 = eval_expr lhs;
+            #let rhs_value : i32 = eval_expr rhs;
             i32_add lhs_value rhs_value
         },
     }
@@ -72,15 +72,15 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let tokens =
+    #let tokens : Tokens =
         Tokens::cons (Token::int 1i32)
             (Tokens::cons Token::plus
                 (Tokens::cons (Token::int 2i32)
                     (Tokens::cons Token::plus
                         (Tokens::cons (Token::int 39i32)
                             (Tokens::cons Token::eof Tokens::nil)))));
-    #let expr = parse_expr tokens;
-    #let code = eval_expr expr;
-    #let _ <- IO::exit code;
+    #let expr : Expr = parse_expr tokens;
+    #let code : i32 = eval_expr expr;
+    #let _ : () <- IO::exit code;
     ()
 }

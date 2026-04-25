@@ -30,7 +30,7 @@
     #match list {
         List::nil => 0i32,
         List::cons head tail => {
-            #let tail_sum = list_sum tail;
+            #let tail_sum : i32 = list_sum tail;
             i32_add head tail_sum
         }
     }

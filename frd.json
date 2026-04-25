@@ -394,7 +394,7 @@
           "description": "Source code can bind an intermediate value to a local name.",
           "acceptanceCriteria": [
             {
-              "description": "A `#let` form can bind the result of an expression to a local identifier for subsequent use."
+              "description": "A `#let` form can bind the result of an expression to a local identifier with an explicit type annotation for subsequent use."
             }
           ],
           "notes": "",
@@ -451,7 +451,7 @@
           "description": "Local let bindings can bind the result of an effectful expression using a left-arrow form.",
           "acceptanceCriteria": [
             {
-              "description": "A `#let` form can use `<-` to bind the result produced by an effectful expression."
+              "description": "A `#let` form can use `<name> : <type> <- <effectful-expression>` to bind the result produced by an effectful expression."
             }
           ],
           "notes": "",
@@ -465,7 +465,7 @@
           "description": "Local let bindings can introduce a value and a reference to that value at the same time.",
           "acceptanceCriteria": [
             {
-              "description": "A `#let` form can use `<value-binder> @ <reference-binder>` as its binding target."
+              "description": "A `#let` form can use `<value-binder> @ <reference-binder> : <type>` as its binding target."
             }
           ],
           "notes": "In this form, the left side binds the value itself and the right side binds a reference introduced together with that value.",

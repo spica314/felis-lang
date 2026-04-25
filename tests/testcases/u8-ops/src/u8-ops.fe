@@ -9,17 +9,17 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let a = 3u8;
-    #let b = 7u8;
-    #let c = 4u8;
-    #let d = 21u8;
-    #let e = 3u8;
-    #let f = 80u8;
-    #let x1 = u8_add a b;
-    #let x2 = u8_sub x1 c;
-    #let x3 = u8_mul x2 d;
-    #let x4 = u8_div x3 e;
-    #let x5 = u8_mod x4 f;
-    #let _ <- IO::exit x5;
+    #let a : u8 = 3u8;
+    #let b : u8 = 7u8;
+    #let c : u8 = 4u8;
+    #let d : u8 = 21u8;
+    #let e : u8 = 3u8;
+    #let f : u8 = 80u8;
+    #let x1 : u8 = u8_add a b;
+    #let x2 : u8 = u8_sub x1 c;
+    #let x3 : u8 = u8_mul x2 d;
+    #let x4 : u8 = u8_div x3 e;
+    #let x5 : u8 = u8_mod x4 f;
+    #let _ : () <- IO::exit x5;
     ()
 }

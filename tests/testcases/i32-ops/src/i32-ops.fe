@@ -9,17 +9,17 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let a = 3i32;
-    #let b = 7i32;
-    #let c = 4i32;
-    #let d = 61i32;
-    #let e = 3i32;
-    #let f = 80i32;
-    #let x1 = i32_add a b;
-    #let x2 = i32_sub x1 c;
-    #let x3 = i32_mul x2 d;
-    #let x4 = i32_div x3 e;
-    #let x5 = i32_mod x4 f;
-    #let _ <- IO::exit x5;
+    #let a : i32 = 3i32;
+    #let b : i32 = 7i32;
+    #let c : i32 = 4i32;
+    #let d : i32 = 61i32;
+    #let e : i32 = 3i32;
+    #let f : i32 = 80i32;
+    #let x1 : i32 = i32_add a b;
+    #let x2 : i32 = i32_sub x1 c;
+    #let x3 : i32 = i32_mul x2 d;
+    #let x4 : i32 = i32_div x3 e;
+    #let x5 : i32 = i32_mod x4 f;
+    #let _ : () <- IO::exit x5;
     ()
 }

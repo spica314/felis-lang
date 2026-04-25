@@ -13,11 +13,11 @@
 }
 
 #fn main : () #with IO {
-    #let digits_ref <- IO::arg 1i32;
-    #let _ @^ left_ref = 0i32;
-    #let _ @^ right_ref = 0i32;
+    #let digits_ref : & Array u8 <- IO::arg 1i32;
+    #let _ @^ left_ref : i32 = 0i32;
+    #let _ @^ right_ref : i32 = 0i32;
     read_digits digits_ref left_ref right_ref;
-    #let code = i32_add (left_ref .> get) (right_ref .> get);
-    #let _ <- IO::exit code;
+    #let code : i32 = i32_add (left_ref .> get) (right_ref .> get);
+    #let _ : () <- IO::exit code;
     ()
 }

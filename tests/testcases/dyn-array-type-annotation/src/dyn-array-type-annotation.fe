@@ -6,19 +6,19 @@
 #entrypoint main;
 
 #fn sum3 : (array_ref : &^ RawArray i32) -> i32 {
-    #let a0 = array_ref .> get 0i32;
-    #let a1 = array_ref .> get 1i32;
-    #let a2 = array_ref .> get 2i32;
-    #let a0_plus_a1 = i32_add a0 a1;
+    #let a0 : i32 = array_ref .> get 0i32;
+    #let a1 : i32 = array_ref .> get 1i32;
+    #let a2 : i32 = array_ref .> get 2i32;
+    #let a0_plus_a1 : i32 = i32_add a0 a1;
     i32_add a0_plus_a1 a2
 }
 
 #fn main : () #with IO {
-    #let _ @^ array_ref <- IO::raw_array_new i32 4i32;
+    #let _ @^ array_ref : &^ RawArray i32 <- IO::raw_array_new i32 4i32;
     array_ref .> set 0i32 7i32;
     array_ref .> set 1i32 14i32;
     array_ref .> set 2i32 21i32;
-    #let r = sum3 array_ref;
-    #let _ <- IO::exit r;
+    #let r : i32 = sum3 array_ref;
+    #let _ : () <- IO::exit r;
     ()
 }

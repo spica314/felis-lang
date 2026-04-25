@@ -1,11 +1,12 @@
 #use std_core::io::IO;
+#use std_core::io::FileDescriptor;
 #use std_core::primitive::u8::u8;
 
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let stdout <- IO::stdout;
-    #let _ @^ bytes_ref <- IO::array_new u8 13i32;
+    #let stdout : FileDescriptor <- IO::stdout;
+    #let _ @^ bytes_ref : &^ Array u8 13i32 <- IO::array_new u8 13i32;
     bytes_ref .> set 0i32 'h';
     bytes_ref .> set 1i32 'e';
     bytes_ref .> set 2i32 'l';
@@ -19,6 +20,6 @@
     bytes_ref .> set 10i32 'l';
     bytes_ref .> set 11i32 'd';
     bytes_ref .> set 12i32 '\n';
-    #let _ <- IO::write stdout bytes_ref 13i32;
+    #let _ : () <- IO::write stdout bytes_ref 13i32;
     ()
 }

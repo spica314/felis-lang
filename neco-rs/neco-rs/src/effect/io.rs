@@ -1,34 +1,42 @@
-use std::collections::HashMap;
-
 use neco_rs_parser::{BindingPattern, Term};
 
 use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::ir::{
     ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, LoweredProgram, OpenPath, Operation,
 };
-use crate::lowering::{LoweringState, lower_i32_expr, lower_u8_expr};
+use crate::lowering::{LoweringState, lower_i32_expr, lower_u8_expr, validate_value_against_type};
 use crate::{Error, Result};
 
 pub(crate) fn lower_io_reference(
     binder: &BindingPattern,
+    ty: &Term,
     path: &[&str],
-    environment: &mut HashMap<String, Value>,
+    state: &mut LoweringState,
+    program: &LoweredProgram,
 ) -> Option<Result<bool>> {
     match path {
         ["IO", "stdin"] => {
-            bind_pattern(
+            if let Err(error) = bind_checked_pattern(
                 binder,
                 Value::FileDescriptor(I32Expr::Literal(0)),
-                environment,
-            );
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
             Some(Ok(false))
         }
         ["IO", "stdout"] => {
-            bind_pattern(
+            if let Err(error) = bind_checked_pattern(
                 binder,
                 Value::FileDescriptor(I32Expr::Literal(1)),
-                environment,
-            );
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
             Some(Ok(false))
         }
         _ => None,
@@ -37,6 +45,7 @@ pub(crate) fn lower_io_reference(
 
 pub(crate) fn lower_io_call(
     binder: &BindingPattern,
+    ty: &Term,
     path: &[&str],
     arguments: &[Term],
     state: &mut LoweringState,
@@ -54,11 +63,15 @@ pub(crate) fn lower_io_call(
                 len,
                 result_slot,
             });
-            bind_pattern(
+            if let Err(error) = bind_checked_pattern(
                 binder,
                 Value::I32(I32Expr::Local(result_slot)),
-                &mut state.environment,
-            );
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
             Some(Ok(false))
         }
         ["IO", "open"] => {
@@ -72,11 +85,15 @@ pub(crate) fn lower_io_call(
                 mode,
                 result_slot,
             });
-            bind_pattern(
+            if let Err(error) = bind_checked_pattern(
                 binder,
                 Value::FileDescriptor(I32Expr::Local(result_slot)),
-                &mut state.environment,
-            );
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
             Some(Ok(false))
         }
         ["IO", "close"] => {
@@ -85,7 +102,9 @@ pub(crate) fn lower_io_call(
                 Err(err) => return Some(Err(err)),
             };
             program.operations.push(Operation::Close { fd });
-            bind_pattern(binder, Value::Unit, &mut state.environment);
+            if let Err(error) = bind_checked_pattern(binder, Value::Unit, ty, state, program) {
+                return Some(Err(error));
+            }
             Some(Ok(false))
         }
         ["IO", "write"] => {
@@ -94,7 +113,9 @@ pub(crate) fn lower_io_call(
                 Err(err) => return Some(Err(err)),
             };
             program.operations.push(operation);
-            bind_pattern(binder, Value::Unit, &mut state.environment);
+            if let Err(error) = bind_checked_pattern(binder, Value::Unit, ty, state, program) {
+                return Some(Err(error));
+            }
             Some(Ok(false))
         }
         ["IO", "exit"] => {
@@ -103,7 +124,9 @@ pub(crate) fn lower_io_call(
                 Err(err) => return Some(Err(err)),
             };
             program.operations.push(Operation::Exit(exit_code));
-            bind_pattern(binder, Value::Unit, &mut state.environment);
+            if let Err(error) = bind_checked_pattern(binder, Value::Unit, ty, state, program) {
+                return Some(Err(error));
+            }
             Some(Ok(true))
         }
         ["IO", "array_new"] | ["IO", "raw_array_new"] => {
@@ -117,15 +140,19 @@ pub(crate) fn lower_io_call(
                 _ => unreachable!(),
             };
             let array_slot = state.allocate_array(element_type, kind, length, program);
-            bind_pattern(
+            if let Err(error) = bind_checked_pattern(
                 binder,
                 Value::Array {
                     slot: array_slot,
                     element_type,
                     kind,
                 },
-                &mut state.environment,
-            );
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
             Some(Ok(false))
         }
         ["IO", "arg"] => {
@@ -133,11 +160,27 @@ pub(crate) fn lower_io_call(
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
-            bind_pattern(binder, Value::RuntimeArg(arg_index), &mut state.environment);
+            if let Err(error) =
+                bind_checked_pattern(binder, Value::RuntimeArg(arg_index), ty, state, program)
+            {
+                return Some(Err(error));
+            }
             Some(Ok(false))
         }
         _ => None,
     }
+}
+
+fn bind_checked_pattern(
+    binder: &BindingPattern,
+    value: Value,
+    ty: &Term,
+    state: &mut LoweringState,
+    program: &LoweredProgram,
+) -> Result<()> {
+    validate_value_against_type(&value, ty, program)?;
+    bind_pattern(binder, value, &mut state.environment);
+    Ok(())
 }
 
 fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Operation> {

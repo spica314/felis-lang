@@ -7,14 +7,14 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let _ @ source_ref = "ab";
-    #let source_bytes_ref = source_ref .> as_bytes;
-    #let _ @^ buffer_ref <- IO::raw_array_new u8 8i32;
-    #let _ @^ index_ref = 0i32;
+    #let _ @ source_ref : & Array u8 = "ab";
+    #let source_bytes_ref : & Array u8 = source_ref .> as_bytes;
+    #let _ @^ buffer_ref : &^ RawArray u8 <- IO::raw_array_new u8 8i32;
+    #let _ @^ index_ref : i32 = 0i32;
     fill_u8 buffer_ref '.';
     append_nul_terminated_u8 source_bytes_ref buffer_ref index_ref;
     append_u8 buffer_ref index_ref 'c';
-    #let exit_code = buffer_ref .> get 2i32;
-    #let _ <- IO::exit (i32_from_u8 exit_code);
+    #let exit_code : u8 = buffer_ref .> get 2i32;
+    #let _ : () <- IO::exit (i32_from_u8 exit_code);
     ()
 }

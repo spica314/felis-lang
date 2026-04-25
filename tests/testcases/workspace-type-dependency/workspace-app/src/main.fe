@@ -11,12 +11,12 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let explicit_choice = Choice::pair 20i32 22i32;
-    #let explicit_code = choice_code explicit_choice;
-    #let imported_code = choice_code default_choice;
-    #let imported_list_sum = list_sum default_list;
-    #let first_sum = i32_add explicit_code imported_code;
-    #let code = i32_add first_sum imported_list_sum;
-    #let _ <- IO::exit code;
+    #let explicit_choice : Choice = Choice::pair 20i32 22i32;
+    #let explicit_code : i32 = choice_code explicit_choice;
+    #let imported_code : i32 = choice_code default_choice;
+    #let imported_list_sum : i32 = list_sum default_list;
+    #let first_sum : i32 = i32_add explicit_code imported_code;
+    #let code : i32 = i32_add first_sum imported_list_sum;
+    #let _ : () <- IO::exit code;
     ()
 }

@@ -4,6 +4,6 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let _ <- IO::exit f;
+    #let _ : () <- IO::exit f;
     ()
 }

@@ -26,7 +26,7 @@
                 // required: Eq[0] Nat (nat_add (Nat::succ p) Nat::zero) (Nat::succ p)
                 //        => Eq[0] Nat (Nat::succ (nat_add p Nat::zero)) (Nat::succ p)
                 // s: Eq[0] Nat (nat_add p Nat::zero) p
-                #let s = proof p;
+                #let s : Eq[0] Nat (nat_add p Nat::zero) p = proof p;
                 #match s {
                     Eq[0]::eq_refl _ p2 => {
                         Eq[0]::eq_refl Nat (Nat::succ p2)

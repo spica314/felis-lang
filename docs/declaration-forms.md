@@ -223,21 +223,21 @@ library.
 Example:
 
 ```felis
-#let s = proof p;
-#let stdout <- IO::stdout;
-#let _ @ hello_world_ref = "Hello, world!";
+#let s : Eq[0] Nat (nat_add p Nat::zero) p = proof p;
+#let stdout : FileDescriptor <- IO::stdout;
+#let _ @ hello_world_ref : & Array u8 = "Hello, world!";
 ```
 
 The documented shape is:
 
 ```felis
-#let <name> = <value>;
+#let <name> : <type> = <value>;
 ```
 
 The currently observed variations are:
 
-- `#let <name> <- <value>;` for binding the result of an effectful expression.
-- `#let <value-binder> @ <reference-binder> = <value>;` for introducing the
+- `#let <name> : <type> <- <value>;` for binding the result of an effectful expression.
+- `#let <value-binder> @ <reference-binder> : <type> = <value>;` for introducing the
   value itself on the left and a reference to that value on the right as part
   of the same `#let`.
 
@@ -255,7 +255,7 @@ Current sources also use these expression forms:
 Example:
 
 ```felis
-#let hello_world_bytes_ref = hello_world_ref .> as_bytes;
+#let hello_world_bytes_ref : & Array u8 = hello_world_ref .> as_bytes;
 ```
 
 The `.>` form calls a method associated with the left-hand side type. This is

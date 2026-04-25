@@ -11,7 +11,7 @@
     #match list {
         List::nil => 0i32,
         List::cons x xs => {
-            #let tail_sum = list_sum xs;
+            #let tail_sum : i32 = list_sum xs;
             i32_add x tail_sum
         }
     }
@@ -20,7 +20,7 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let code = list_sum (List::cons 20i32 (List::cons 22i32 List::nil));
-    #let _ <- IO::exit code;
+    #let code : i32 = list_sum (List::cons 20i32 (List::cons 22i32 List::nil));
+    #let _ : () <- IO::exit code;
     ()
 }
