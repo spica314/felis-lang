@@ -1,5 +1,4 @@
 use neco_rs::compile_path_to_elf;
-use std::ffi::OsString;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -38,18 +37,26 @@ fn runtime_temp_dir(name: &str) -> PathBuf {
 }
 
 fn runtime_test_runner(binary: &Path) -> Command {
-    let qemu =
-        std::env::var_os("NECO_RS_TEST_QEMU").unwrap_or_else(|| OsString::from("qemu-x86_64"));
-    let mut command = Command::new(&qemu);
-    command.arg(binary);
-    command
+    if let Some(qemu) = std::env::var_os("NECO_RS_TEST_QEMU") {
+        let mut command = Command::new(qemu);
+        command.arg(binary);
+        return command;
+    }
+
+    if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        return Command::new(binary);
+    }
+
+    panic!(
+        "generated fixture binaries are Linux x86_64 ELF files; set NECO_RS_TEST_QEMU to run them on this host"
+    );
 }
 
 fn run_fixture_status(root: &Path, name: &str) -> std::process::ExitStatus {
     let output = compile_fixture(root, name);
     let status = runtime_test_runner(&output)
         .status()
-        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+        .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
     fs::remove_file(&output).expect("cleanup binary");
     fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
     status
@@ -59,7 +66,7 @@ fn run_fixture_output(root: &Path, name: &str) -> Output {
     let output = compile_fixture(root, name);
     let run = runtime_test_runner(&output)
         .output()
-        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+        .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
     fs::remove_file(&output).expect("cleanup binary");
     fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
     run
@@ -70,7 +77,7 @@ fn run_fixture_output_with_args(root: &Path, name: &str, args: &[&str]) -> Outpu
     let run = runtime_test_runner(&output)
         .args(args)
         .output()
-        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+        .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
     fs::remove_file(&output).expect("cleanup binary");
     fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
     run
@@ -81,7 +88,7 @@ fn run_fixture_output_in_dir(root: &Path, name: &str, current_dir: &Path) -> Out
     let run = runtime_test_runner(&output)
         .current_dir(current_dir)
         .output()
-        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+        .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
     fs::remove_file(&output).expect("cleanup binary");
     fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
     run
@@ -94,7 +101,7 @@ fn run_fixture_with_input(root: &Path, name: &str, stdin: &[u8]) -> Output {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+        .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
     child
         .stdin
         .as_mut()
@@ -116,12 +123,12 @@ fn run_neco_felis_fixture(input_root: &Path, temp_name: &str) -> (Output, Vec<u8
         .current_dir(&temp_dir)
         .arg(input_root)
         .output()
-        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+        .unwrap_or_else(|error| panic!("run neco-felis fixture binary: {error}"));
     let emitted = temp_dir.join("a.out");
     let emitted_bytes = fs::read(&emitted).expect("read emitted a.out");
     let emitted_run = runtime_test_runner(&emitted)
         .output()
-        .unwrap_or_else(|error| panic!("run emitted a.out with qemu-x86_64: {error}"));
+        .unwrap_or_else(|error| panic!("run emitted a.out: {error}"));
 
     fs::remove_file(&binary).expect("cleanup binary");
     fs::remove_dir_all(&temp_dir).expect("cleanup runtime temp dir");
@@ -220,7 +227,7 @@ fn compiles_and_runs_proc_cli_arg_reference_fixture() {
     let run = runtime_test_runner(&status)
         .arg("15")
         .status()
-        .unwrap_or_else(|error| panic!("run binary with qemu-x86_64: {error}"));
+        .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
     fs::remove_file(&status).expect("cleanup binary");
     fs::remove_dir(status.parent().expect("build temp dir")).expect("cleanup build temp dir");
     assert_eq!(run.code(), Some(102));

@@ -21,7 +21,7 @@ This directory is reserved for compiler-facing test cases.
 
 ## Runtime Execution Tests
 
-- Tests that actually execute generated x86_64 ELF binaries are expected to run
-  them via `qemu-x86_64`.
-- The Rust bootstrap tests in `neco-rs/neco-rs` follow this policy so runtime
-  coverage does not depend on directly executing the host binary format.
+- Tests that actually execute generated ELF binaries run the Linux x86_64
+  output directly on Linux x86_64 hosts.
+- On other hosts, or when explicit emulation is desired, set
+  `NECO_RS_TEST_QEMU` to a compatible runner such as `qemu-x86_64`.
