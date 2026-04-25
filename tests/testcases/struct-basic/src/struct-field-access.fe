@@ -14,7 +14,7 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let span : i32 = Span { start = 20i32, end = 22i32 };
+    #let span : Span = Span { start = 20i32, end = 22i32 };
     #let code : i32 = span_len span;
     #let _ : () <- IO::exit code;
     ()
