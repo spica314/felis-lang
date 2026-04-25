@@ -758,6 +758,64 @@ fn parses_struct_field_access_package_root() {
 }
 
 #[test]
+fn parses_struct_rc_field_access_package_root() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let parsed = parse_root(&root).expect("struct-basic package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    let source_file = package
+        .source_files
+        .iter()
+        .find(|file| file.path.ends_with("src/struct-rc-field-access.fe"))
+        .expect("struct-rc-field-access source file");
+    assert_eq!(source_file.role, SourceFileRole::BinaryEntrypoint);
+
+    let syntax = &source_file.syntax;
+    assert_eq!(syntax.items.len(), 7);
+
+    let Item::Struct(point_decl) = &syntax.items[3] else {
+        panic!("expected Point struct declaration");
+    };
+    assert_eq!(point_decl.name.name, "Point");
+    assert_eq!(point_decl.modifier.as_deref(), Some("rc"));
+    assert_eq!(point_decl.fields.len(), 2);
+
+    let Item::Function(point_code) = &syntax.items[4] else {
+        panic!("expected point_code function");
+    };
+    let Some(Term::Application { arguments, .. }) = point_code.body.tail.as_deref() else {
+        panic!("expected i32_add application");
+    };
+    assert_eq!(arguments.len(), 2);
+    for (argument, expected_field) in arguments.iter().zip(["x", "y"]) {
+        let Term::FieldAccess { receiver, field } = argument else {
+            panic!("expected field access argument");
+        };
+        assert_eq!(field, expected_field);
+        let Term::Path(path) = receiver.as_ref() else {
+            panic!("expected field access receiver path");
+        };
+        assert_eq!(path.segments[0].name, "point");
+    }
+
+    let Item::Function(main_fn) = &syntax.items[6] else {
+        panic!("expected main function");
+    };
+    let Statement::Let(point_let) = &main_fn.body.statements[0] else {
+        panic!("expected point let statement");
+    };
+    let Term::StructLiteral { path, fields } = point_let.value.as_ref() else {
+        panic!("expected Point struct literal");
+    };
+    assert_eq!(path.segments[0].name, "Point");
+    assert_eq!(fields.len(), 2);
+    assert_eq!(fields[0].name, "x");
+    assert_eq!(fields[1].name, "y");
+}
+
+#[test]
 fn parses_enum_match_payload_package_root() {
     let root = repo_root().join("tests/testcases/enum-match-payload");
     let parsed = parse_root(&root).expect("enum-match-payload package parses");

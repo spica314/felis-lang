@@ -184,6 +184,7 @@ pub(crate) struct ConstructorValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StructValue {
     pub(crate) type_name: String,
+    pub(crate) heap_slot: Option<usize>,
     pub(crate) fields: Vec<StructFieldValue>,
 }
 

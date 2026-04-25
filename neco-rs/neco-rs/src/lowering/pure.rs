@@ -147,12 +147,6 @@ fn lower_struct_literal_value(
     let Some(signature) = state.structs.get(type_name) else {
         return Err(Error::Unsupported(format!("unknown struct `{type_name}`")));
     };
-    if signature.is_rc {
-        return Err(Error::Unsupported(
-            "`struct(rc)` literals are not supported in entrypoint lowering yet".to_string(),
-        ));
-    }
-
     let mut values = HashMap::new();
     for field in fields {
         if values.contains_key(&field.name) {
@@ -187,10 +181,104 @@ fn lower_struct_literal_value(
         )));
     }
 
+    let heap_slot = if signature.is_rc {
+        Some(lower_rc_struct_allocation(&struct_fields, program)?)
+    } else {
+        None
+    };
+
     Ok(Value::Struct(StructValue {
         type_name: signature.type_name.clone(),
+        heap_slot,
         fields: struct_fields,
     }))
+}
+
+fn lower_rc_struct_allocation(
+    fields: &[StructFieldValue],
+    program: &mut LoweredProgram,
+) -> Result<usize> {
+    let heap_slot = allocate_heap_slot(program);
+    let object_len = 8 + fields
+        .iter()
+        .map(|field| rc_struct_field_size(&field.value))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .sum::<i32>();
+
+    program.operations.push(Operation::Mmap {
+        len: I32Expr::Literal(object_len),
+        result_slot: heap_slot,
+    });
+    program.operations.push(Operation::HeapStoreI32 {
+        heap_slot,
+        byte_offset: 0,
+        value: I32Expr::Literal(0),
+    });
+    program.operations.push(Operation::HeapStoreI32 {
+        heap_slot,
+        byte_offset: 4,
+        value: I32Expr::Literal(0),
+    });
+
+    let mut byte_offset = 8;
+    for field in fields {
+        lower_rc_struct_field_store(heap_slot, byte_offset, &field.value, program)?;
+        byte_offset += rc_struct_field_size(&field.value)?;
+    }
+
+    Ok(heap_slot)
+}
+
+fn rc_struct_field_size(value: &Value) -> Result<i32> {
+    match value {
+        Value::I32(_) => Ok(4),
+        Value::Constructor(ConstructorValue {
+            heap_slot: Some(_), ..
+        })
+        | Value::Struct(StructValue {
+            heap_slot: Some(_), ..
+        }) => Ok(8),
+        _ => Err(Error::Unsupported(
+            "`struct(rc)` currently supports only `i32` and nested rc payload fields".to_string(),
+        )),
+    }
+}
+
+fn lower_rc_struct_field_store(
+    heap_slot: usize,
+    byte_offset: i32,
+    value: &Value,
+    program: &mut LoweredProgram,
+) -> Result<()> {
+    match value {
+        Value::I32(value) => {
+            program.operations.push(Operation::HeapStoreI32 {
+                heap_slot,
+                byte_offset,
+                value: value.clone(),
+            });
+            Ok(())
+        }
+        Value::Constructor(ConstructorValue {
+            heap_slot: Some(source_heap_slot),
+            ..
+        })
+        | Value::Struct(StructValue {
+            heap_slot: Some(source_heap_slot),
+            ..
+        }) => {
+            program.operations.push(Operation::HeapStorePtr {
+                heap_slot,
+                byte_offset,
+                source_heap_slot: *source_heap_slot,
+            });
+            Ok(())
+        }
+        _ => Err(Error::Unsupported(
+            "`struct(rc)` currently supports only `i32` and nested rc payload fields".to_string(),
+        )),
+    }
 }
 
 pub(super) fn lower_constructor_value(
