@@ -4,6 +4,12 @@
 #use std_core::primitive::array::dyn_array_get_u8;
 #use std_core::primitive::array::dyn_array_len_u8;
 #use std_core::primitive::array::dyn_array_raw_u8;
+#use std_core::primitive::array::dyn_array_set_u8;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_sub;
+#use std_core::primitive::u8::u8_eq;
 
 #type String : Type[0] {
     string : DynArray u8 -> String,
@@ -11,6 +17,31 @@
 
 #fn string_from_dyn_array : (array : DynArray u8) -> String {
     String::string array
+}
+
+#fn string_from_raw_parts : (raw_array : RawArray u8) -> (capacity : i32) -> (len : i32) -> String {
+    #let array : DynArray u8 = DynArray::dyn_array raw_array capacity len;
+    String::string array
+}
+
+#fn string_with_len : (string : String) -> (len : i32) -> String {
+    #let array : DynArray u8 = string_as_dyn_array string;
+    String::string (DynArray::dyn_array (dyn_array_raw_u8 array) (dyn_array_capacity_u8 array) len)
+}
+
+#proc string_copy_from_dyn_array_range_into : (source : DynArray u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
+    #let len : i32 = i32_sub end start;
+    #letref #excl index_ref : &^ i32 := 0i32;
+    #loop {
+        #if i32_gte (index_ref .> get) len {
+            #break;
+        };
+        #let source_index : i32 = i32_add start (index_ref .> get);
+        #let byte : u8 = dyn_array_get_u8 source source_index;
+        string_set_u8 dest (index_ref .> get) byte;
+        index_ref .> set (i32_add (index_ref .> get) 1i32);
+    };
+    ()
 }
 
 #fn string_as_dyn_array : (string : String) -> DynArray u8 {
@@ -35,10 +66,77 @@
     dyn_array_get_u8 (string_as_dyn_array string) index
 }
 
+#proc string_set_u8 : (string : String) -> (index : i32) -> (byte : u8) -> () {
+    dyn_array_set_u8 (string_as_dyn_array string) index byte;
+    ()
+}
+
+#proc string_push_u8_unchecked : (string : String) -> (len_ref : &^ i32) -> (byte : u8) -> () {
+    string_set_u8 string (len_ref .> get) byte;
+    len_ref .> set (i32_add (len_ref .> get) 1i32);
+    ()
+}
+
+#proc mark_string_eq : (left : String) -> (right : String) -> (result_ref : &^ i32) -> () {
+    #let left_len : i32 = string_len left;
+    #let right_len : i32 = string_len right;
+    result_ref .> set 0i32;
+    #if i32_eq left_len right_len {
+        result_ref .> set 1i32;
+        #letref #excl index_ref : &^ i32 := 0i32;
+        #loop {
+            #if i32_gte (index_ref .> get) left_len {
+                #break;
+            };
+            #let left_byte : u8 = string_get_u8 left (index_ref .> get);
+            #let right_byte : u8 = string_get_u8 right (index_ref .> get);
+            #if u8_eq left_byte right_byte {
+                index_ref .> set (i32_add (index_ref .> get) 1i32);
+            } #else {
+                result_ref .> set 0i32;
+                #break;
+            };
+        };
+    };
+    ()
+}
+
+#proc mark_string_span_eq : (string : String) -> (source : DynArray u8) -> (start : i32) -> (end : i32) -> (result_ref : &^ i32) -> () {
+    #let string_len_value : i32 = string_len string;
+    #let span_len : i32 = i32_sub end start;
+    result_ref .> set 0i32;
+    #if i32_eq string_len_value span_len {
+        result_ref .> set 1i32;
+        #letref #excl index_ref : &^ i32 := 0i32;
+        #loop {
+            #if i32_gte (index_ref .> get) string_len_value {
+                #break;
+            };
+            #let source_index : i32 = i32_add start (index_ref .> get);
+            #let string_byte : u8 = string_get_u8 string (index_ref .> get);
+            #let source_byte : u8 = dyn_array_get_u8 source source_index;
+            #if u8_eq string_byte source_byte {
+                index_ref .> set (i32_add (index_ref .> get) 1i32);
+            } #else {
+                result_ref .> set 0i32;
+                #break;
+            };
+        };
+    };
+    ()
+}
+
 #pub #use String;
 #pub #use string_from_dyn_array;
+#pub #use string_from_raw_parts;
+#pub #use string_with_len;
+#pub #use string_copy_from_dyn_array_range_into;
 #pub #use string_as_dyn_array;
 #pub #use string_as_raw_array;
 #pub #use string_len;
 #pub #use string_capacity;
 #pub #use string_get_u8;
+#pub #use string_set_u8;
+#pub #use string_push_u8_unchecked;
+#pub #use mark_string_eq;
+#pub #use mark_string_span_eq;

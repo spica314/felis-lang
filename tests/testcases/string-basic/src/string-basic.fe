@@ -1,11 +1,19 @@
 #use std_core::io::IO;
 #use std_core::primitive::array::DynArray;
 #use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::i32::i32_from_u8;
 #use std_core::string::String;
+#use std_core::string::mark_string_eq;
+#use std_core::string::mark_string_span_eq;
+#use std_core::string::string_copy_from_dyn_array_range_into;
 #use std_core::string::string_from_dyn_array;
+#use std_core::string::string_from_raw_parts;
 #use std_core::string::string_get_u8;
 #use std_core::string::string_len;
+#use std_core::string::string_push_u8_unchecked;
+#use std_core::string::string_set_u8;
+#use std_core::string::string_with_len;
 
 #entrypoint main;
 
@@ -19,6 +27,42 @@
     #let len : i32 = string_len string;
     #let first_code : i32 = i32_from_u8 first;
     #let code : i32 = i32_add first_code len;
-    #let _ : () <- IO::exit code;
+
+    #letref #excl source_raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 7i32;
+    source_raw_ref .> set 0i32 'l';
+    source_raw_ref .> set 1i32 'e';
+    source_raw_ref .> set 2i32 't';
+    source_raw_ref .> set 3i32 ' ';
+    source_raw_ref .> set 4i32 'f';
+    source_raw_ref .> set 5i32 'o';
+    source_raw_ref .> set 6i32 'o';
+    #let source : DynArray u8 = DynArray::dyn_array source_raw_ref 7i32 7i32;
+    #letref #excl copied_raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 3i32;
+    #let copied_dest : String = string_from_raw_parts copied_raw_ref 3i32 0i32;
+    string_copy_from_dyn_array_range_into source 4i32 7i32 copied_dest;
+    #let copied_name : String = string_with_len copied_dest 3i32;
+
+    #letref #excl name_raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 4i32;
+    #let empty_name : String = string_from_raw_parts name_raw_ref 4i32 0i32;
+    #letref #excl name_len_ref : &^ i32 := 0i32;
+    string_push_u8_unchecked empty_name name_len_ref 'f';
+    string_push_u8_unchecked empty_name name_len_ref 'x';
+    string_set_u8 empty_name 1i32 'o';
+    string_push_u8_unchecked empty_name name_len_ref 'o';
+    #let built_name : String = string_with_len empty_name (name_len_ref .> get);
+
+    #letref #excl eq_ref : &^ i32 := 0i32;
+    mark_string_eq copied_name built_name eq_ref;
+    #letref #excl span_eq_ref : &^ i32 := 0i32;
+    mark_string_span_eq built_name source 4i32 7i32 span_eq_ref;
+
+    #let exit_code : i32 = code;
+    #if i32_eq (eq_ref .> get) 0i32 {
+        #let _ : () <- IO::exit 1i32;
+    };
+    #if i32_eq (span_eq_ref .> get) 0i32 {
+        #let _ : () <- IO::exit 2i32;
+    };
+    #let _ : () <- IO::exit exit_code;
     ()
 }
