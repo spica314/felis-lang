@@ -27,14 +27,11 @@ pub enum TokenKind {
     LeftBracket,
     RightBracket,
     Colon,
-    ColonEquals,
     Semicolon,
     Comma,
     Equals,
     Ampersand,
     AmpersandCaret,
-    At,
-    AtCaret,
     Underscore,
     DoubleColon,
     Arrow,
@@ -153,15 +150,6 @@ impl Lexer {
                 "::",
             ));
         }
-        if self.starts_with(":=") {
-            self.offset += 2;
-            return Ok(simple_token(
-                TokenKind::ColonEquals,
-                start,
-                self.offset,
-                ":=",
-            ));
-        }
         if self.starts_with("->") {
             self.offset += 2;
             return Ok(simple_token(TokenKind::Arrow, start, self.offset, "->"));
@@ -177,10 +165,6 @@ impl Lexer {
         if self.starts_with(".>") {
             self.offset += 2;
             return Ok(simple_token(TokenKind::DotArrow, start, self.offset, ".>"));
-        }
-        if self.starts_with("@^") {
-            self.offset += 2;
-            return Ok(simple_token(TokenKind::AtCaret, start, self.offset, "@^"));
         }
         if self.starts_with("&^") {
             self.offset += 2;
@@ -207,7 +191,6 @@ impl Lexer {
             ',' => simple_token(TokenKind::Comma, start, self.offset, ","),
             '=' => simple_token(TokenKind::Equals, start, self.offset, "="),
             '&' => simple_token(TokenKind::Ampersand, start, self.offset, "&"),
-            '@' => simple_token(TokenKind::At, start, self.offset, "@"),
             '.' => simple_token(TokenKind::Dot, start, self.offset, "."),
             '_' => simple_token(TokenKind::Underscore, start, self.offset, "_"),
             '"' => return self.string_literal(start),
