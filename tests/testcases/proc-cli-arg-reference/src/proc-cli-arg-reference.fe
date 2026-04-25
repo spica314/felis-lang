@@ -14,8 +14,10 @@
 
 #fn main : () #with IO {
     #let digits_ref : & Array u8 <- IO::arg 1i32;
-    #letref #excl left_ref : &^ i32 := 0i32;
-    #letref #excl right_ref : &^ i32 := 0i32;
+    #let left_ref : i32 = 0i32;
+    #letref #excl left_ref : &^ i32 #borrow left_ref;
+    #let right_ref : i32 = 0i32;
+    #letref #excl right_ref : &^ i32 #borrow right_ref;
     read_digits digits_ref left_ref right_ref;
     #let code : i32 = i32_add (left_ref .> get) (right_ref .> get);
     #let _ : () <- IO::exit code;

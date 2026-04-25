@@ -110,8 +110,7 @@ pub struct LetRefStatement {
     pub reference: String,
     pub exclusive: bool,
     pub ty: Box<Term>,
-    pub operator: LetOperator,
-    pub value: Box<Term>,
+    pub source: Box<Term>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -242,20 +241,14 @@ impl Parse for LetRefStatement {
         let reference = parser.expect_identifier()?;
         parser.expect_punctuation(TokenKind::Colon)?;
         let ty = Term::parse(parser)?.unwrap();
-        let operator = if parser.consume_punctuation(TokenKind::ColonEquals) {
-            LetOperator::Equals
-        } else {
-            parser.expect_punctuation(TokenKind::LeftArrow)?;
-            LetOperator::LeftArrow
-        };
-        let value = Term::parse(parser)?.unwrap();
+        parser.expect_keyword(Keyword::Borrow)?;
+        let source = Term::parse(parser)?.unwrap();
         parser.expect_punctuation(TokenKind::Semicolon)?;
         Ok(Some(Self {
             reference,
             exclusive,
             ty: Box::new(ty),
-            operator,
-            value: Box::new(value),
+            source: Box::new(source),
         }))
     }
 }

@@ -34,7 +34,7 @@ fn parses_single_package_root() {
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 4);
+    assert_eq!(main_fn.body.statements.len(), 5);
 }
 
 #[test]
@@ -221,7 +221,7 @@ fn parses_dyn_array_u8_helpers_package_root() {
     let Item::Function(main_fn) = &syntax.items[6] else {
         panic!("expected main function");
     };
-    assert_eq!(main_fn.body.statements.len(), 9);
+    assert_eq!(main_fn.body.statements.len(), 11);
 }
 
 #[test]
@@ -291,7 +291,7 @@ fn parses_i32_reference_annotation_package_root() {
     let Item::Function(main_fn) = &syntax.items[5] else {
         panic!("expected main function");
     };
-    assert_eq!(main_fn.body.statements.len(), 3);
+    assert_eq!(main_fn.body.statements.len(), 4);
 }
 
 #[test]
@@ -362,7 +362,7 @@ fn parses_proc_reference_annotation_package_root() {
     let Item::Function(main_fn) = &syntax.items[7] else {
         panic!("expected main function");
     };
-    assert_eq!(main_fn.body.statements.len(), 5);
+    assert_eq!(main_fn.body.statements.len(), 6);
 }
 
 #[test]
@@ -455,7 +455,7 @@ fn parses_proc_cli_arg_reference_package_root() {
     let Item::Function(main_fn) = &syntax.items[7] else {
         panic!("expected main function");
     };
-    assert_eq!(main_fn.body.statements.len(), 6);
+    assert_eq!(main_fn.body.statements.len(), 8);
 }
 
 #[test]
@@ -530,7 +530,7 @@ fn parses_comments_basic_package_root() {
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 4);
+    assert_eq!(main_fn.body.statements.len(), 5);
 }
 
 #[test]
@@ -1119,7 +1119,7 @@ fn parses_open_read_close_package_root() {
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 8);
+    assert_eq!(main_fn.body.statements.len(), 9);
 }
 
 #[test]
@@ -1144,7 +1144,7 @@ fn parses_open_write_close_package_root() {
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 7);
+    assert_eq!(main_fn.body.statements.len(), 9);
 }
 
 #[test]
@@ -1254,9 +1254,9 @@ fn parses_loop_package_root() {
     let Item::Function(main_fn) = &syntax.items[4] else {
         panic!("expected function");
     };
-    assert_eq!(main_fn.body.statements.len(), 4);
+    assert_eq!(main_fn.body.statements.len(), 6);
 
-    let Statement::Loop(loop_stmt) = &main_fn.body.statements[2] else {
+    let Statement::Loop(loop_stmt) = &main_fn.body.statements[4] else {
         panic!("expected loop statement");
     };
     assert_eq!(loop_stmt.body.statements.len(), 5);
@@ -1277,9 +1277,9 @@ fn parses_continue_package_root() {
     let Item::Function(main_fn) = &syntax.items[4] else {
         panic!("expected function");
     };
-    assert_eq!(main_fn.body.statements.len(), 4);
+    assert_eq!(main_fn.body.statements.len(), 6);
 
-    let Statement::Loop(loop_stmt) = &main_fn.body.statements[2] else {
+    let Statement::Loop(loop_stmt) = &main_fn.body.statements[4] else {
         panic!("expected loop statement");
     };
     assert_eq!(loop_stmt.body.statements.len(), 6);

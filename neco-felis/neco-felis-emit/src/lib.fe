@@ -79,7 +79,8 @@
 }
 
 #proc copy_felis_string_data : (source_ref : DynArray u8) -> (string_start : i32) -> (string_end : i32) -> (elf_ref : DynArray u8) -> (data_index_ref : &^ i32) -> (emit_u8_state_ref : DynArray u8) -> () {
-    #letref #excl source_index_ref : &^ i32 := string_start;
+    #let source_index_ref : i32 = string_start;
+    #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     dyn_array_set_u8 emit_u8_state_ref 0x01i32 0x00u8;
     #loop {
         #if i32_gte (source_index_ref .> get) string_end {
@@ -235,7 +236,8 @@
     #if u8_lt byte ':' {
         #if u8_gt byte '/' {
             scan_felis_number_end source_ref start end result_ref;
-            #letref #excl suffix_end_ref : &^ i32 := result_ref .> get;
+            #let suffix_end_ref : i32 = result_ref .> get;
+    #letref #excl suffix_end_ref : &^ i32 #borrow suffix_end_ref;
             scan_felis_ident_end source_ref (result_ref .> get) end suffix_end_ref;
             result_ref .> set (suffix_end_ref .> get);
         } #else {
@@ -248,7 +250,8 @@
 }
 
 #proc read_decimal_i32 : (source_ref : DynArray u8) -> (start : i32) -> (end : i32) -> (value_ref : &^ i32) -> () {
-    #letref #excl index_ref : &^ i32 := start;
+    #let index_ref : i32 = start;
+    #letref #excl index_ref : &^ i32 #borrow index_ref;
     value_ref .> set 0i32;
     #loop {
         #if i32_gte (index_ref .> get) end {
@@ -273,7 +276,8 @@
     result_ref .> set 0i32;
     #if i32_eq (i32_sub left_end left_start) (i32_sub right_end right_start) {
         result_ref .> set 1i32;
-        #letref #excl index_ref : &^ i32 := 0i32;
+        #let index_ref : i32 = 0i32;
+    #letref #excl index_ref : &^ i32 #borrow index_ref;
         #loop {
             #if i32_gte (index_ref .> get) (i32_sub left_end left_start) {
                 #break;
@@ -293,14 +297,16 @@
 
 #proc find_i32_local_slot : (source_ref : DynArray u8) -> (name_start : i32) -> (name_end : i32) -> (local_name_start_ref : DynArray i32) -> (local_name_end_ref : DynArray i32) -> (local_count : i32) -> (slot_ref : &^ i32) -> () {
     slot_ref .> set (i32_sub 0i32 1i32);
-    #letref #excl local_index_ref : &^ i32 := 0i32;
+    #let local_index_ref : i32 = 0i32;
+    #letref #excl local_index_ref : &^ i32 #borrow local_index_ref;
     #loop {
         #if i32_gte (local_index_ref .> get) local_count {
             #break;
         };
         #let local_name_start : i32 = dyn_array_get_i32 local_name_start_ref (local_index_ref .> get);
         #let local_name_end : i32 = dyn_array_get_i32 local_name_end_ref (local_index_ref .> get);
-        #letref #excl span_eq_ref : &^ i32 := 0i32;
+        #let span_eq_ref : i32 = 0i32;
+    #letref #excl span_eq_ref : &^ i32 #borrow span_eq_ref;
         mark_source_span_eq source_ref name_start name_end local_name_start local_name_end span_eq_ref;
         #if i32_eq (span_eq_ref .> get) 1i32 {
             slot_ref .> set (local_index_ref .> get);
@@ -357,7 +363,8 @@
 }
 
 #proc build_emit_simple_expr_node : (source_ref : DynArray u8) -> (expr_start : i32) -> (expr_end : i32) -> (local_name_start_ref : DynArray i32) -> (local_name_end_ref : DynArray i32) -> (local_count : i32) -> (expr_tag_ref : DynArray i32) -> (expr_value_ref : DynArray i32) -> (expr_lhs_ref : DynArray i32) -> (expr_rhs_ref : DynArray i32) -> (expr_count_ref : &^ i32) -> (node_ref : &^ i32) -> () {
-    #letref #excl start_ref : &^ i32 := expr_start;
+    #let start_ref : i32 = expr_start;
+    #letref #excl start_ref : &^ i32 #borrow start_ref;
     skip_felis_spaces source_ref expr_start expr_end start_ref;
     #if i32_gte (start_ref .> get) expr_end {
         #let payload : EmitExprNodePayload = EmitExprNodePayload {
@@ -371,7 +378,8 @@
         #let first_byte : u8 = dyn_array_get_u8 source_ref (start_ref .> get);
         #if u8_lt first_byte ':' {
             #if u8_gt first_byte '/' {
-                #letref #excl value_ref : &^ i32 := 0i32;
+                #let value_ref : i32 = 0i32;
+    #letref #excl value_ref : &^ i32 #borrow value_ref;
                 read_decimal_i32 source_ref (start_ref .> get) expr_end value_ref;
                 #let payload : EmitExprNodePayload = EmitExprNodePayload {
                     tag = 1i32,
@@ -390,9 +398,11 @@
                 append_emit_expr_node payload expr_tag_ref expr_value_ref expr_lhs_ref expr_rhs_ref expr_count_ref node_ref;
             };
         } #else {
-            #letref #excl ident_end_ref : &^ i32 := start_ref .> get;
+            #let ident_end_ref : i32 = start_ref .> get;
+    #letref #excl ident_end_ref : &^ i32 #borrow ident_end_ref;
             scan_felis_ident_end source_ref (start_ref .> get) expr_end ident_end_ref;
-            #letref #excl slot_ref : &^ i32 := 0i32;
+            #let slot_ref : i32 = 0i32;
+    #letref #excl slot_ref : &^ i32 #borrow slot_ref;
             find_i32_local_slot source_ref (start_ref .> get) (ident_end_ref .> get) local_name_start_ref local_name_end_ref local_count slot_ref;
             #if i32_eq (slot_ref .> get) (i32_sub 0i32 1i32) {
                 #let payload : EmitExprNodePayload = EmitExprNodePayload {
@@ -417,7 +427,8 @@
 }
 
 #proc build_emit_expr_node : (source_ref : DynArray u8) -> (expr_start : i32) -> (expr_end : i32) -> (local_name_start_ref : DynArray i32) -> (local_name_end_ref : DynArray i32) -> (local_count : i32) -> (expr_tag_ref : DynArray i32) -> (expr_value_ref : DynArray i32) -> (expr_lhs_ref : DynArray i32) -> (expr_rhs_ref : DynArray i32) -> (expr_count_ref : &^ i32) -> (node_ref : &^ i32) -> () {
-    #letref #excl start_ref : &^ i32 := expr_start;
+    #let start_ref : i32 = expr_start;
+    #letref #excl start_ref : &^ i32 #borrow start_ref;
     skip_felis_spaces source_ref expr_start expr_end start_ref;
     #if i32_gte (start_ref .> get) expr_end {
         #let payload : EmitExprNodePayload = EmitExprNodePayload {
@@ -431,7 +442,8 @@
         #let first_byte : u8 = dyn_array_get_u8 source_ref (start_ref .> get);
         #if u8_lt first_byte ':' {
             #if u8_gt first_byte '/' {
-                #letref #excl value_ref : &^ i32 := 0i32;
+                #let value_ref : i32 = 0i32;
+    #letref #excl value_ref : &^ i32 #borrow value_ref;
                 read_decimal_i32 source_ref (start_ref .> get) expr_end value_ref;
                 #let payload : EmitExprNodePayload = EmitExprNodePayload {
                     tag = 1i32,
@@ -450,23 +462,31 @@
                 append_emit_expr_node payload expr_tag_ref expr_value_ref expr_lhs_ref expr_rhs_ref expr_count_ref node_ref;
             };
         } #else {
-            #letref #excl ident_end_ref : &^ i32 := start_ref .> get;
+            #let ident_end_ref : i32 = start_ref .> get;
+    #letref #excl ident_end_ref : &^ i32 #borrow ident_end_ref;
             scan_felis_ident_end source_ref (start_ref .> get) expr_end ident_end_ref;
-            #letref #excl operator_kind_ref : &^ i32 := 0i32;
+            #let operator_kind_ref : i32 = 0i32;
+    #letref #excl operator_kind_ref : &^ i32 #borrow operator_kind_ref;
             mark_i32_operator_kind source_ref (start_ref .> get) (ident_end_ref .> get) operator_kind_ref;
             #if i32_eq (operator_kind_ref .> get) 0i32 {
                 build_emit_simple_expr_node source_ref expr_start expr_end local_name_start_ref local_name_end_ref local_count expr_tag_ref expr_value_ref expr_lhs_ref expr_rhs_ref expr_count_ref node_ref;
             } #else {
-                #letref #excl lhs_start_ref : &^ i32 := ident_end_ref .> get;
+                #let lhs_start_ref : i32 = ident_end_ref .> get;
+    #letref #excl lhs_start_ref : &^ i32 #borrow lhs_start_ref;
                 skip_felis_spaces source_ref (ident_end_ref .> get) expr_end lhs_start_ref;
-                #letref #excl lhs_end_ref : &^ i32 := lhs_start_ref .> get;
+                #let lhs_end_ref : i32 = lhs_start_ref .> get;
+    #letref #excl lhs_end_ref : &^ i32 #borrow lhs_end_ref;
                 scan_felis_simple_expr_end source_ref (lhs_start_ref .> get) expr_end lhs_end_ref;
-                #letref #excl rhs_start_ref : &^ i32 := lhs_end_ref .> get;
+                #let rhs_start_ref : i32 = lhs_end_ref .> get;
+    #letref #excl rhs_start_ref : &^ i32 #borrow rhs_start_ref;
                 skip_felis_spaces source_ref (lhs_end_ref .> get) expr_end rhs_start_ref;
-                #letref #excl rhs_end_ref : &^ i32 := rhs_start_ref .> get;
+                #let rhs_end_ref : i32 = rhs_start_ref .> get;
+    #letref #excl rhs_end_ref : &^ i32 #borrow rhs_end_ref;
                 scan_felis_simple_expr_end source_ref (rhs_start_ref .> get) expr_end rhs_end_ref;
-                #letref #excl lhs_node_ref : &^ i32 := 0i32;
-                #letref #excl rhs_node_ref : &^ i32 := 0i32;
+                #let lhs_node_ref : i32 = 0i32;
+    #letref #excl lhs_node_ref : &^ i32 #borrow lhs_node_ref;
+                #let rhs_node_ref : i32 = 0i32;
+    #letref #excl rhs_node_ref : &^ i32 #borrow rhs_node_ref;
                 build_emit_simple_expr_node source_ref (lhs_start_ref .> get) (lhs_end_ref .> get) local_name_start_ref local_name_end_ref local_count expr_tag_ref expr_value_ref expr_lhs_ref expr_rhs_ref expr_count_ref lhs_node_ref;
                 build_emit_simple_expr_node source_ref (rhs_start_ref .> get) (rhs_end_ref .> get) local_name_start_ref local_name_end_ref local_count expr_tag_ref expr_value_ref expr_lhs_ref expr_rhs_ref expr_count_ref rhs_node_ref;
                 #let payload : EmitExprNodePayload = EmitExprNodePayload {
@@ -524,11 +544,15 @@
 }
 
 #pub #proc emit_parsed_felis_stmts : (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (stmt_expr_node_ref : DynArray i32) -> (stmt_count : i32) -> (source_ref : DynArray u8) -> (elf_ref : DynArray u8) -> (emit_u8_state_ref : DynArray u8) -> (local_name_start_ref : DynArray i32) -> (local_name_end_ref : DynArray i32) -> (local_slot_ref : DynArray i32) -> (local_count_ref : &^ i32) -> (expr_tag_ref : DynArray i32) -> (expr_value_ref : DynArray i32) -> (expr_lhs_ref : DynArray i32) -> (expr_rhs_ref : DynArray i32) -> (expr_count_ref : &^ i32) -> () {
-    #letref #excl code_index_ref : &^ i32 := 0x1000i32;
-    #letref #excl data_index_ref : &^ i32 := 0x1028i32;
+    #let code_index_ref : i32 = 0x1000i32;
+    #letref #excl code_index_ref : &^ i32 #borrow code_index_ref;
+    #let data_index_ref : i32 = 0x1028i32;
+    #letref #excl data_index_ref : &^ i32 #borrow data_index_ref;
     dyn_array_set_u8 emit_u8_state_ref 0x00i32 0x28u8;
-    #letref #excl terminated_ref : &^ i32 := 0i32;
-    #letref #excl stmt_index_ref : &^ i32 := 0i32;
+    #let terminated_ref : i32 = 0i32;
+    #letref #excl terminated_ref : &^ i32 #borrow terminated_ref;
+    #let stmt_index_ref : i32 = 0i32;
+    #letref #excl stmt_index_ref : &^ i32 #borrow stmt_index_ref;
     #loop {
         #if i32_gte (stmt_index_ref .> get) stmt_count {
             #break;
@@ -542,7 +566,8 @@
         #let stmt_expr_start : i32 = dyn_array_get_i32 stmt_expr_start_ref (stmt_index_ref .> get);
         #let stmt_expr_end : i32 = dyn_array_get_i32 stmt_expr_end_ref (stmt_index_ref .> get);
         #if i32_eq stmt_tag 0x01i32 {
-            #letref #excl expr_node_ref : &^ i32 := 0i32;
+            #let expr_node_ref : i32 = 0i32;
+    #letref #excl expr_node_ref : &^ i32 #borrow expr_node_ref;
             #let first_expr_byte : u8 = dyn_array_get_u8 source_ref stmt_expr_start;
             #if u8_lt first_expr_byte ':' {
                 #if u8_gt first_expr_byte '/' {
@@ -560,19 +585,22 @@
                 build_emit_simple_expr_node source_ref stmt_expr_start stmt_expr_end local_name_start_ref local_name_end_ref (local_count_ref .> get) expr_tag_ref expr_value_ref expr_lhs_ref expr_rhs_ref expr_count_ref expr_node_ref;
             };
             dyn_array_set_i32 stmt_expr_node_ref (stmt_index_ref .> get) (expr_node_ref .> get);
-            #letref #excl local_index_ref : &^ i32 := 0i32;
+            #let local_index_ref : i32 = 0i32;
+    #letref #excl local_index_ref : &^ i32 #borrow local_index_ref;
             find_i32_local_slot source_ref stmt_expr_start stmt_expr_end local_name_start_ref local_name_end_ref (local_count_ref .> get) local_index_ref;
             #if i32_eq (local_index_ref .> get) (i32_sub 0i32 1i32) {
                 #let stmt : EmitFelisStmt = EmitFelisStmt::emit_exit_stmt (EmitFelisExpr::emit_int_literal_expr 0i32 stmt_expr_start stmt_expr_end);
                 emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
             } #else {
                 #if i32_eq (terminated_ref .> get) 0i32 {
-                    #letref #excl exit_success_ref : &^ i32 := 0i32;
+                    #let exit_success_ref : i32 = 0i32;
+    #letref #excl exit_success_ref : &^ i32 #borrow exit_success_ref;
                     #let local_index : i32 = local_index_ref .> get;
                     #let defining_stmt_index : i32 = dyn_array_get_i32 local_slot_ref local_index;
                     #let raw_defining_expr_start : i32 = dyn_array_get_i32 stmt_expr_start_ref defining_stmt_index;
                     #let defining_expr_end : i32 = dyn_array_get_i32 stmt_expr_end_ref defining_stmt_index;
-                    #letref #excl defining_expr_start_ref : &^ i32 := raw_defining_expr_start;
+                    #let defining_expr_start_ref : i32 = raw_defining_expr_start;
+    #letref #excl defining_expr_start_ref : &^ i32 #borrow defining_expr_start_ref;
                     skip_felis_spaces source_ref raw_defining_expr_start defining_expr_end defining_expr_start_ref;
                     #let defining_expr_start : i32 = defining_expr_start_ref .> get;
                     #let exit_digit : u8 = dyn_array_get_u8 source_ref defining_expr_start;
@@ -585,18 +613,22 @@
                         };
                     };
                     #if i32_eq (exit_success_ref .> get) 0i32 {
-                        #letref #excl operator_end_ref : &^ i32 := defining_expr_start;
+                        #let operator_end_ref : i32 = defining_expr_start;
+    #letref #excl operator_end_ref : &^ i32 #borrow operator_end_ref;
                         scan_felis_ident_end source_ref defining_expr_start defining_expr_end operator_end_ref;
                         #if i32_gte defining_expr_end (i32_add defining_expr_start 7i32) {
                             #let operator_byte4 : u8 = dyn_array_get_u8 source_ref (i32_add defining_expr_start 4i32);
                             #let operator_byte5 : u8 = dyn_array_get_u8 source_ref (i32_add defining_expr_start 5i32);
                             #if u8_eq operator_byte4 'a' {
                                 operator_end_ref .> set (i32_add defining_expr_start 7i32);
-                                #letref #excl lhs_start_ref : &^ i32 := operator_end_ref .> get;
+                                #let lhs_start_ref : i32 = operator_end_ref .> get;
+    #letref #excl lhs_start_ref : &^ i32 #borrow lhs_start_ref;
                                 skip_felis_spaces source_ref (operator_end_ref .> get) defining_expr_end lhs_start_ref;
-                                #letref #excl lhs_end_ref : &^ i32 := lhs_start_ref .> get;
+                                #let lhs_end_ref : i32 = lhs_start_ref .> get;
+    #letref #excl lhs_end_ref : &^ i32 #borrow lhs_end_ref;
                                 scan_felis_simple_expr_end source_ref (lhs_start_ref .> get) defining_expr_end lhs_end_ref;
-                                #letref #excl rhs_start_ref : &^ i32 := lhs_end_ref .> get;
+                                #let rhs_start_ref : i32 = lhs_end_ref .> get;
+    #letref #excl rhs_start_ref : &^ i32 #borrow rhs_start_ref;
                                 skip_felis_spaces source_ref (lhs_end_ref .> get) defining_expr_end rhs_start_ref;
                                 #let lhs_digit : u8 = dyn_array_get_u8 source_ref (lhs_start_ref .> get);
                                 #let rhs_digit : u8 = dyn_array_get_u8 source_ref (rhs_start_ref .> get);
@@ -628,7 +660,8 @@
                 };
             };
         } #else #if i32_eq stmt_tag 0x02i32 {
-            #letref #excl expr_node_ref : &^ i32 := 0i32;
+            #let expr_node_ref : i32 = 0i32;
+    #letref #excl expr_node_ref : &^ i32 #borrow expr_node_ref;
             #let payload : EmitExprNodePayload = EmitExprNodePayload {
                 tag = 2i32,
                 value = stmt_expr_start,
@@ -647,13 +680,15 @@
             record_i32_local payload local_name_start_ref local_name_end_ref local_slot_ref local_count_ref;
             #let local_index : i32 = i32_sub (local_count_ref .> get) 1i32;
             dyn_array_set_i32 local_slot_ref local_index (stmt_index_ref .> get);
-            #letref #excl expr_node_ref : &^ i32 := 0i32;
+            #let expr_node_ref : i32 = 0i32;
+    #letref #excl expr_node_ref : &^ i32 #borrow expr_node_ref;
             build_emit_expr_node source_ref stmt_expr_start stmt_expr_end local_name_start_ref local_name_end_ref (local_count_ref .> get) expr_tag_ref expr_value_ref expr_lhs_ref expr_rhs_ref expr_count_ref expr_node_ref;
             dyn_array_set_i32 stmt_expr_node_ref (stmt_index_ref .> get) (expr_node_ref .> get);
             #let stmt : EmitFelisStmt = EmitFelisStmt::emit_let_stmt stmt_name_start EmitFelisExpr::emit_unknown_expr;
             emit_felis_stmt stmt stmt_value source_ref elf_ref code_index_ref data_index_ref emit_u8_state_ref terminated_ref;
         } #else #if i32_eq stmt_tag 0x04i32 {
-            #letref #excl expr_node_ref : &^ i32 := 0i32;
+            #let expr_node_ref : i32 = 0i32;
+    #letref #excl expr_node_ref : &^ i32 #borrow expr_node_ref;
             build_emit_expr_node source_ref stmt_expr_start stmt_expr_end local_name_start_ref local_name_end_ref (local_count_ref .> get) expr_tag_ref expr_value_ref expr_lhs_ref expr_rhs_ref expr_count_ref expr_node_ref;
             dyn_array_set_i32 stmt_expr_node_ref (stmt_index_ref .> get) (expr_node_ref .> get);
             #let stmt : EmitFelisStmt = EmitFelisStmt::emit_expr_stmt EmitFelisExpr::emit_unknown_expr;

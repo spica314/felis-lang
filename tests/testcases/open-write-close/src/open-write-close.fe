@@ -4,10 +4,12 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #letref path_ref : & Array u8 := "created.txt";
+    #let path_ref : & Array u8 = "created.txt";
+    #letref path_ref : & Array u8 #borrow path_ref;
     #let path_bytes_ref : & Array u8 = path_ref .> as_bytes;
     #let fd : FileDescriptor <- IO::open path_bytes_ref 577i32 420i32;
-    #letref message_ref : & Array u8 := "open/write/close fixture\n";
+    #let message_ref : & Array u8 = "open/write/close fixture\n";
+    #letref message_ref : & Array u8 #borrow message_ref;
     #let message_bytes_ref : & Array u8 = message_ref .> as_bytes;
     #let _ : () <- IO::write fd message_bytes_ref 25i32;
     #let _ : () <- IO::close fd;

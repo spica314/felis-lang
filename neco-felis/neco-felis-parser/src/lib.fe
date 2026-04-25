@@ -311,12 +311,18 @@
 }
 
 #pub #proc parse_felis_source : (source_ref : DynArray u8) -> (source_len : i32) -> (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (number_byte_ref : DynArray u8) -> (stmt_count_ref : &^ i32) -> () {
-    #letref #excl parse_state_ref : &^ i32 := 0i32;
-    #letref #excl source_index_ref : &^ i32 := 0i32;
-    #letref #excl let_name_start_ref : &^ i32 := 0i32;
-    #letref #excl let_name_end_ref : &^ i32 := 0i32;
-    #letref #excl expr_start_ref : &^ i32 := 0i32;
-    #letref #excl expr_end_ref : &^ i32 := 0i32;
+    #let parse_state_ref : i32 = 0i32;
+    #letref #excl parse_state_ref : &^ i32 #borrow parse_state_ref;
+    #let source_index_ref : i32 = 0i32;
+    #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
+    #let let_name_start_ref : i32 = 0i32;
+    #letref #excl let_name_start_ref : &^ i32 #borrow let_name_start_ref;
+    #let let_name_end_ref : i32 = 0i32;
+    #letref #excl let_name_end_ref : &^ i32 #borrow let_name_end_ref;
+    #let expr_start_ref : i32 = 0i32;
+    #letref #excl expr_start_ref : &^ i32 #borrow expr_start_ref;
+    #let expr_end_ref : i32 = 0i32;
+    #letref #excl expr_end_ref : &^ i32 #borrow expr_end_ref;
     stmt_count_ref .> set 0i32;
     #loop {
         #if i32_gte (source_index_ref .> get) source_len {
@@ -325,7 +331,8 @@
         #let byte : u8 = dyn_array_get_u8 source_ref (source_index_ref .> get);
         #if u8_eq byte '"' {
             #let string_start : i32 = i32_add (source_index_ref .> get) 1i32;
-            #letref #excl string_end_ref : &^ i32 := string_start;
+            #let string_end_ref : i32 = string_start;
+    #letref #excl string_end_ref : &^ i32 #borrow string_end_ref;
             #loop {
                 #if i32_gte (string_end_ref .> get) source_len {
                     #break;
@@ -348,8 +355,10 @@
         } #else #if u8_lt byte ':' {
             #if u8_gt byte '/' {
                 #let number_start : i32 = source_index_ref .> get;
-                #letref #excl number_end_ref : &^ i32 := number_start;
-                #letref #excl parsed_number_ref : &^ i32 := 0i32;
+                #let number_end_ref : i32 = number_start;
+    #letref #excl number_end_ref : &^ i32 #borrow number_end_ref;
+                #let parsed_number_ref : i32 = 0i32;
+    #letref #excl parsed_number_ref : &^ i32 #borrow parsed_number_ref;
                 dyn_array_set_u8 number_byte_ref 0x00i32 0x00u8;
                 #loop {
                     #if i32_gte (number_end_ref .> get) source_len {
@@ -380,17 +389,20 @@
                 parse_felis_token token source_ref parse_state_ref stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref let_name_start_ref let_name_end_ref expr_start_ref expr_end_ref stmt_count_ref;
                 source_index_ref .> set (number_end_ref .> get);
             } #else {
-                #letref #excl is_ident_start_ref : &^ i32 := 0i32;
+                #let is_ident_start_ref : i32 = 0i32;
+    #letref #excl is_ident_start_ref : &^ i32 #borrow is_ident_start_ref;
                 mark_ident_start byte is_ident_start_ref;
                 #if i32_eq (is_ident_start_ref .> get) 1i32 {
                     #let ident_start : i32 = source_index_ref .> get;
-                    #letref #excl ident_end_ref : &^ i32 := ident_start;
+                    #let ident_end_ref : i32 = ident_start;
+    #letref #excl ident_end_ref : &^ i32 #borrow ident_end_ref;
                     #loop {
                         #if i32_gte (ident_end_ref .> get) source_len {
                             #break;
                         };
                         #let ident_byte : u8 = dyn_array_get_u8 source_ref (ident_end_ref .> get);
-                        #letref #excl is_ident_part_ref : &^ i32 := 0i32;
+                        #let is_ident_part_ref : i32 = 0i32;
+    #letref #excl is_ident_part_ref : &^ i32 #borrow is_ident_part_ref;
                         mark_ident_part ident_byte is_ident_part_ref;
                         #if i32_eq (is_ident_part_ref .> get) 1i32 {
                             ident_end_ref .> set (i32_add (ident_end_ref .> get) 1i32);
@@ -418,17 +430,20 @@
                 };
             };
         } #else {
-            #letref #excl is_ident_start_ref : &^ i32 := 0i32;
+            #let is_ident_start_ref : i32 = 0i32;
+    #letref #excl is_ident_start_ref : &^ i32 #borrow is_ident_start_ref;
             mark_ident_start byte is_ident_start_ref;
             #if i32_eq (is_ident_start_ref .> get) 1i32 {
                 #let ident_start : i32 = source_index_ref .> get;
-                #letref #excl ident_end_ref : &^ i32 := ident_start;
+                #let ident_end_ref : i32 = ident_start;
+    #letref #excl ident_end_ref : &^ i32 #borrow ident_end_ref;
                 #loop {
                     #if i32_gte (ident_end_ref .> get) source_len {
                         #break;
                     };
                     #let ident_byte : u8 = dyn_array_get_u8 source_ref (ident_end_ref .> get);
-                    #letref #excl is_ident_part_ref : &^ i32 := 0i32;
+                    #let is_ident_part_ref : i32 = 0i32;
+    #letref #excl is_ident_part_ref : &^ i32 #borrow is_ident_part_ref;
                     mark_ident_part ident_byte is_ident_part_ref;
                     #if i32_eq (is_ident_part_ref .> get) 1i32 {
                         ident_end_ref .> set (i32_add (ident_end_ref .> get) 1i32);
@@ -460,7 +475,8 @@
 }
 
 #pub #proc parse_felis_source_tokens : (source_ref : DynArray u8) -> (source_len : i32) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> () {
-    #letref #excl source_index_ref : &^ i32 := 0i32;
+    #let source_index_ref : i32 = 0i32;
+    #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     token_count_ref .> set 0i32;
     #loop {
         #if i32_gte (source_index_ref .> get) source_len {
@@ -469,7 +485,8 @@
         #let byte : u8 = dyn_array_get_u8 source_ref (source_index_ref .> get);
         #if u8_eq byte '"' {
             #let string_start : i32 = i32_add (source_index_ref .> get) 1i32;
-            #letref #excl string_end_ref : &^ i32 := string_start;
+            #let string_end_ref : i32 = string_start;
+    #letref #excl string_end_ref : &^ i32 #borrow string_end_ref;
             #loop {
                 #if i32_gte (string_end_ref .> get) source_len {
                     #break;
@@ -491,8 +508,10 @@
         } #else #if u8_lt byte ':' {
             #if u8_gt byte '/' {
                 #let number_start : i32 = source_index_ref .> get;
-                #letref #excl number_end_ref : &^ i32 := number_start;
-                #letref #excl parsed_number_ref : &^ i32 := 0i32;
+                #let number_end_ref : i32 = number_start;
+    #letref #excl number_end_ref : &^ i32 #borrow number_end_ref;
+                #let parsed_number_ref : i32 = 0i32;
+    #letref #excl parsed_number_ref : &^ i32 #borrow parsed_number_ref;
                 #loop {
                     #if i32_gte (number_end_ref .> get) source_len {
                         #break;
@@ -518,17 +537,20 @@
                 append_parsed_felis_token 3i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
                 source_index_ref .> set (number_end_ref .> get);
             } #else {
-                #letref #excl is_ident_start_ref : &^ i32 := 0i32;
+                #let is_ident_start_ref : i32 = 0i32;
+    #letref #excl is_ident_start_ref : &^ i32 #borrow is_ident_start_ref;
                 mark_ident_start byte is_ident_start_ref;
                 #if i32_eq (is_ident_start_ref .> get) 1i32 {
                     #let ident_start : i32 = source_index_ref .> get;
-                    #letref #excl ident_end_ref : &^ i32 := ident_start;
+                    #let ident_end_ref : i32 = ident_start;
+    #letref #excl ident_end_ref : &^ i32 #borrow ident_end_ref;
                     #loop {
                         #if i32_gte (ident_end_ref .> get) source_len {
                             #break;
                         };
                         #let ident_byte : u8 = dyn_array_get_u8 source_ref (ident_end_ref .> get);
-                        #letref #excl is_ident_part_ref : &^ i32 := 0i32;
+                        #let is_ident_part_ref : i32 = 0i32;
+    #letref #excl is_ident_part_ref : &^ i32 #borrow is_ident_part_ref;
                         mark_ident_part ident_byte is_ident_part_ref;
                         #if i32_eq (is_ident_part_ref .> get) 1i32 {
                             ident_end_ref .> set (i32_add (ident_end_ref .> get) 1i32);
@@ -554,17 +576,20 @@
                 };
             };
         } #else {
-            #letref #excl is_ident_start_ref : &^ i32 := 0i32;
+            #let is_ident_start_ref : i32 = 0i32;
+    #letref #excl is_ident_start_ref : &^ i32 #borrow is_ident_start_ref;
             mark_ident_start byte is_ident_start_ref;
             #if i32_eq (is_ident_start_ref .> get) 1i32 {
                 #let ident_start : i32 = source_index_ref .> get;
-                #letref #excl ident_end_ref : &^ i32 := ident_start;
+                #let ident_end_ref : i32 = ident_start;
+    #letref #excl ident_end_ref : &^ i32 #borrow ident_end_ref;
                 #loop {
                     #if i32_gte (ident_end_ref .> get) source_len {
                         #break;
                     };
                     #let ident_byte : u8 = dyn_array_get_u8 source_ref (ident_end_ref .> get);
-                    #letref #excl is_ident_part_ref : &^ i32 := 0i32;
+                    #let is_ident_part_ref : i32 = 0i32;
+    #letref #excl is_ident_part_ref : &^ i32 #borrow is_ident_part_ref;
                     mark_ident_part ident_byte is_ident_part_ref;
                     #if i32_eq (is_ident_part_ref .> get) 1i32 {
                         ident_end_ref .> set (i32_add (ident_end_ref .> get) 1i32);

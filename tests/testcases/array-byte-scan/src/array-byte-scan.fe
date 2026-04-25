@@ -22,9 +22,11 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #letref source_ref : & Array u8 := "abc:42";
+    #let source_ref : & Array u8 = "abc:42";
+    #letref source_ref : & Array u8 #borrow source_ref;
     #let bytes_ref : & Array u8 = source_ref .> as_bytes;
-    #letref #excl offset_ref : &^ i32 := 0i32;
+    #let offset_ref : i32 = 0i32;
+    #letref #excl offset_ref : &^ i32 #borrow offset_ref;
     find_byte_offset bytes_ref ':' 6i32 offset_ref;
     #let code : i32 = i32_add (offset_ref .> get) 39i32;
     #let _ : () <- IO::exit code;

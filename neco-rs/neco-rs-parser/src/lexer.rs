@@ -69,6 +69,7 @@ pub enum Keyword {
     Mod,
     With,
     Excl,
+    Borrow,
     Forall,
     Package,
 }
@@ -362,6 +363,7 @@ impl Lexer {
             "#mod" => Keyword::Mod,
             "#with" => Keyword::With,
             "#excl" => Keyword::Excl,
+            "#borrow" => Keyword::Borrow,
             "#forall" => Keyword::Forall,
             "#package" => Keyword::Package,
             _ => {

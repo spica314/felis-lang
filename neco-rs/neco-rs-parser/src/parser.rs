@@ -291,6 +291,7 @@ fn keyword_name(keyword: Keyword) -> &'static str {
         Keyword::Mod => "mod",
         Keyword::With => "with",
         Keyword::Excl => "excl",
+        Keyword::Borrow => "borrow",
         Keyword::Forall => "forall",
         Keyword::Package => "package",
     }

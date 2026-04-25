@@ -11,7 +11,7 @@ use neco_rs_parser::{
     ParsedWorkspace, Statement, Term, parse_root,
 };
 
-use crate::effect::{Value, bind_pattern, lower_effect};
+use crate::effect::{Value, bind_pattern, lower_effect, resolve_value};
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, LoweredProgram, Operation,
 };
@@ -338,27 +338,17 @@ pub(super) fn lower_statement(
                 program,
             ),
         },
-        Statement::LetRef(letref_stmt) => match letref_stmt.operator {
-            LetOperator::Equals => {
-                lower_letref_equals_statement(
-                    &letref_stmt.reference,
-                    letref_stmt.exclusive,
-                    letref_stmt.ty.as_ref(),
-                    letref_stmt.value.as_ref(),
-                    state,
-                    program,
-                )?;
-                Ok(false)
-            }
-            LetOperator::LeftArrow => lower_letref_effect_statement(
+        Statement::LetRef(letref_stmt) => {
+            lower_letref_borrow_statement(
                 &letref_stmt.reference,
                 letref_stmt.exclusive,
                 letref_stmt.ty.as_ref(),
-                letref_stmt.value.as_ref(),
+                letref_stmt.source.as_ref(),
                 state,
                 program,
-            ),
-        },
+            )?;
+            Ok(false)
+        }
         Statement::Expression(term) => {
             lower_expression_statement(term.as_ref(), state, program)?;
             Ok(false)
@@ -503,16 +493,16 @@ fn lower_let_equals_statement(
     Ok(())
 }
 
-fn lower_letref_equals_statement(
+fn lower_letref_borrow_statement(
     reference: &str,
     exclusive: bool,
     ty: &Term,
-    value_term: &Term,
+    source: &Term,
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<()> {
     validate_letref_annotation(exclusive, ty)?;
-    let value = lower_pure_value(value_term, state, program)?;
+    let value = resolve_value(source, &state.environment)?;
     let reference_value = match value {
         Value::I32(expr) => {
             let slot = state.allocate_i32_slot();
@@ -528,19 +518,6 @@ fn lower_letref_equals_statement(
         .environment
         .insert(reference.to_string(), reference_value);
     Ok(())
-}
-
-fn lower_letref_effect_statement(
-    reference: &str,
-    exclusive: bool,
-    ty: &Term,
-    value_term: &Term,
-    state: &mut LoweringState,
-    program: &mut LoweredProgram,
-) -> Result<bool> {
-    validate_letref_annotation(exclusive, ty)?;
-    let binder = BindingPattern::Name(reference.to_string());
-    lower_effect(&binder, ty, value_term, state, program)
 }
 
 fn validate_letref_annotation(exclusive: bool, ty: &Term) -> Result<()> {

@@ -2,7 +2,7 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #letref #excl array_ref : &^ RawArray u8 <- IO::raw_array_new u8 42i32;
+    #let array_ref : &^ RawArray u8 <- IO::raw_array_new u8 42i32;
     #let len : i32 = array_ref .> len;
     #let _ : () <- IO::exit len;
     ()

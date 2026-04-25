@@ -225,7 +225,8 @@ Example:
 ```felis
 #let s : Eq[0] Nat (nat_add p Nat::zero) p = proof p;
 #let stdout : FileDescriptor <- IO::stdout;
-#letref hello_world_ref : & Array u8 := "Hello, world!";
+#let hello_world : & Array u8 = "Hello, world!";
+#letref hello_world_ref : & Array u8 #borrow hello_world;
 ```
 
 The documented shape is:
@@ -237,10 +238,10 @@ The documented shape is:
 The currently observed variations are:
 
 - `#let <name> : <type> <- <value>;` for binding the result of an effectful expression.
-- `#letref <name> : & <type> := <value>;` for introducing an immutable reference.
-- `#letref #excl <name> : &^ <type> := <value>;` for introducing an exclusive reference.
-- `#letref #excl <name> : &^ <type> <- <value>;` for binding the reference result
-  of an effectful expression.
+- `#letref <name> : & <type> #borrow <source>;` for introducing an immutable
+  reference to an existing local binding.
+- `#letref #excl <name> : &^ <type> #borrow <source>;` for introducing an
+  exclusive reference to an existing local binding.
 
 In this form, `#excl` and `&^` must agree; the non-`#excl` form uses `&`.
 

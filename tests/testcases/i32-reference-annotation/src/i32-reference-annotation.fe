@@ -9,7 +9,8 @@
 }
 
 #fn main : () #with IO {
-    #letref value_ref : & i32 := 41i32;
+    #let value_ref : i32 = 41i32;
+    #letref value_ref : & i32 #borrow value_ref;
     #let r : i32 = add1 value_ref;
     #let _ : () <- IO::exit r;
     ()

@@ -7,7 +7,7 @@
 #fn main : () #with IO {
     #let stdin : FileDescriptor <- IO::stdin;
     #let stdout : FileDescriptor <- IO::stdout;
-    #letref #excl bytes_ref : &^ Array u8 1000i32 <- IO::array_new u8 1000i32;
+    #let bytes_ref : &^ Array u8 1000i32 <- IO::array_new u8 1000i32;
     #let len : i32 <- IO::read stdin bytes_ref 1000i32;
     #let _ : () <- IO::write stdout bytes_ref len;
     ()

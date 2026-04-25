@@ -7,10 +7,12 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #letref source_ref : & Array u8 := "ab";
+    #let source_ref : & Array u8 = "ab";
+    #letref source_ref : & Array u8 #borrow source_ref;
     #let source_bytes_ref : & Array u8 = source_ref .> as_bytes;
-    #letref #excl buffer_ref : &^ RawArray u8 <- IO::raw_array_new u8 8i32;
-    #letref #excl index_ref : &^ i32 := 0i32;
+    #let buffer_ref : &^ RawArray u8 <- IO::raw_array_new u8 8i32;
+    #let index_ref : i32 = 0i32;
+    #letref #excl index_ref : &^ i32 #borrow index_ref;
     fill_u8 buffer_ref '.';
     append_nul_terminated_u8 source_bytes_ref buffer_ref index_ref;
     append_u8 buffer_ref index_ref 'c';

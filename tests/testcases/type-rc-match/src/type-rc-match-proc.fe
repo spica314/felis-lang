@@ -17,7 +17,8 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #letref #excl code_ref : &^ i32 := 0i32;
+    #let code_ref : i32 = 0i32;
+    #letref #excl code_ref : &^ i32 #borrow code_ref;
     #let token : Token = Token::number 42i32;
     apply_token token code_ref;
     #let _ : () <- IO::exit (code_ref .> get);

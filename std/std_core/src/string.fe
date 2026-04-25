@@ -31,7 +31,8 @@
 
 #proc string_copy_from_dyn_array_range_into : (source : DynArray u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
     #let len : i32 = i32_sub end start;
-    #letref #excl index_ref : &^ i32 := 0i32;
+    #let index_ref : i32 = 0i32;
+    #letref #excl index_ref : &^ i32 #borrow index_ref;
     #loop {
         #if i32_gte (index_ref .> get) len {
             #break;
@@ -83,7 +84,8 @@
     result_ref .> set 0i32;
     #if i32_eq left_len right_len {
         result_ref .> set 1i32;
-        #letref #excl index_ref : &^ i32 := 0i32;
+        #let index_ref : i32 = 0i32;
+    #letref #excl index_ref : &^ i32 #borrow index_ref;
         #loop {
             #if i32_gte (index_ref .> get) left_len {
                 #break;
@@ -107,7 +109,8 @@
     result_ref .> set 0i32;
     #if i32_eq string_len_value span_len {
         result_ref .> set 1i32;
-        #letref #excl index_ref : &^ i32 := 0i32;
+        #let index_ref : i32 = 0i32;
+    #letref #excl index_ref : &^ i32 #borrow index_ref;
         #loop {
             #if i32_gte (index_ref .> get) string_len_value {
                 #break;

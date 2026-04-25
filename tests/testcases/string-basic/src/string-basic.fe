@@ -18,7 +18,7 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #letref #excl raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 8i32;
+    #let raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 8i32;
     raw_ref .> set 0i32 40u8;
     raw_ref .> set 1i32 2u8;
     #let array : DynArray u8 = DynArray::dyn_array raw_ref 8i32 2i32;
@@ -28,7 +28,7 @@
     #let first_code : i32 = i32_from_u8 first;
     #let code : i32 = i32_add first_code len;
 
-    #letref #excl source_raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 7i32;
+    #let source_raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 7i32;
     source_raw_ref .> set 0i32 'l';
     source_raw_ref .> set 1i32 'e';
     source_raw_ref .> set 2i32 't';
@@ -37,23 +37,26 @@
     source_raw_ref .> set 5i32 'o';
     source_raw_ref .> set 6i32 'o';
     #let source : DynArray u8 = DynArray::dyn_array source_raw_ref 7i32 7i32;
-    #letref #excl copied_raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 3i32;
+    #let copied_raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 3i32;
     #let copied_dest : String = string_from_raw_parts copied_raw_ref 3i32 0i32;
     string_copy_from_dyn_array_range_into source 4i32 7i32 copied_dest;
     #let copied_name : String = string_with_len copied_dest 3i32;
 
-    #letref #excl name_raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 4i32;
+    #let name_raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 4i32;
     #let empty_name : String = string_from_raw_parts name_raw_ref 4i32 0i32;
-    #letref #excl name_len_ref : &^ i32 := 0i32;
+    #let name_len_ref : i32 = 0i32;
+    #letref #excl name_len_ref : &^ i32 #borrow name_len_ref;
     string_push_u8_unchecked empty_name name_len_ref 'f';
     string_push_u8_unchecked empty_name name_len_ref 'x';
     string_set_u8 empty_name 1i32 'o';
     string_push_u8_unchecked empty_name name_len_ref 'o';
     #let built_name : String = string_with_len empty_name (name_len_ref .> get);
 
-    #letref #excl eq_ref : &^ i32 := 0i32;
+    #let eq_ref : i32 = 0i32;
+    #letref #excl eq_ref : &^ i32 #borrow eq_ref;
     mark_string_eq copied_name built_name eq_ref;
-    #letref #excl span_eq_ref : &^ i32 := 0i32;
+    #let span_eq_ref : i32 = 0i32;
+    #letref #excl span_eq_ref : &^ i32 #borrow span_eq_ref;
     mark_string_span_eq built_name source 4i32 7i32 span_eq_ref;
 
     #let exit_code : i32 = code;

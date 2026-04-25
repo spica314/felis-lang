@@ -7,9 +7,10 @@
 /* comments can also wrap statement boundaries */
 #fn main : () #with IO {
     #let stdout : FileDescriptor <- IO::stdout; // stdout fd
-    #letref hello_ref : & Array u8 :=
+    #let hello_ref : & Array u8 =
         /* comments can appear before a literal */
         "Hello, world!\n";
+    #letref hello_ref : & Array u8 #borrow hello_ref;
     #let hello_bytes_ref : & Array u8 = hello_ref /* and between terms */ .> as_bytes;
     #let _ : () <- IO::write stdout hello_bytes_ref 14i32; /* trailing block comment */
     ()

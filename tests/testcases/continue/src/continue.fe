@@ -5,8 +5,10 @@
 #entrypoint main;
 
 #proc main : () #with IO {
-    #letref #excl counter : &^ i32 := 0i32;
-    #letref #excl sum : &^ i32 := 0i32;
+    #let counter : i32 = 0i32;
+    #letref #excl counter : &^ i32 #borrow counter;
+    #let sum : i32 = 0i32;
+    #letref #excl sum : &^ i32 #borrow sum;
     #loop {
         #let new_counter : i32 = i32_add (counter .> get) 1i32;
         counter .> set new_counter;

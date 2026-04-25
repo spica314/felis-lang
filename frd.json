@@ -465,10 +465,10 @@
           "description": "Local reference let bindings can introduce named immutable or exclusive references.",
           "acceptanceCriteria": [
             {
-              "description": "A `#letref` form can use `<name> : & <type> := <value>` to introduce an immutable reference."
+              "description": "A `#letref` form can use `<name> : & <type> #borrow <source>` to introduce an immutable reference to an existing local binding."
             },
             {
-              "description": "A `#letref #excl` form can use `<name> : &^ <type> := <value>` or `<name> : &^ <type> <- <effectful-expression>` to introduce an exclusive reference."
+              "description": "A `#letref #excl` form can use `<name> : &^ <type> #borrow <source>` to introduce an exclusive reference to an existing local binding."
             }
           ],
           "notes": "The `#excl` marker and the `&^` type annotation must agree.",
