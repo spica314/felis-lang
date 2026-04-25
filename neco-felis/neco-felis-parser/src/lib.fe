@@ -17,11 +17,17 @@
 #use std_core::primitive::u8::u8_mul;
 #use std_core::primitive::u8::u8_sub;
 
-#pub #type(rc) FelisToken : Type[0] {
-    byte : i32 -> i32 -> i32 -> FelisToken,
-    ident : i32 -> i32 -> i32 -> FelisToken,
-    string : i32 -> i32 -> i32 -> FelisToken,
-    int_literal : i32 -> i32 -> i32 -> FelisToken,
+#pub #struct FelisTokenPayload : Type[0] {
+    value : i32,
+    start : i32,
+    end : i32,
+}
+
+#pub #type FelisToken : Type[0] {
+    byte : FelisTokenPayload -> FelisToken,
+    ident : FelisTokenPayload -> FelisToken,
+    string : FelisTokenPayload -> FelisToken,
+    int_literal : FelisTokenPayload -> FelisToken,
 }
 
 #pub #type(rc) FelisTokens : Type[0] {
@@ -55,6 +61,17 @@
 
 #pub #type(rc) FelisProgram : Type[0] {
     program : FelisStmts -> FelisProgram,
+}
+
+#struct ParsedFelisStmtPayload : Type[0] {
+    tag : i32,
+    value : u8,
+    start : i32,
+    end : i32,
+    name_start : i32,
+    name_end : i32,
+    expr_start : i32,
+    expr_end : i32,
 }
 
 #fn accumulate_decimal_i32 : (current : i32) -> (digit : i32) -> i32 {
@@ -129,86 +146,86 @@
     ()
 }
 
-#proc append_parsed_felis_stmt : (stmt_tag : i32) -> (stmt_value : u8) -> (stmt_start : i32) -> (stmt_end : i32) -> (name_start : i32) -> (name_end : i32) -> (expr_start : i32) -> (expr_end : i32) -> (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (stmt_count_ref : &^ i32) -> () {
+#proc append_parsed_felis_stmt : (payload : ParsedFelisStmtPayload) -> (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (stmt_count_ref : &^ i32) -> () {
     #let stmt_index : i32 = stmt_count_ref .> get;
-    dyn_array_set_i32 stmt_tag_ref stmt_index stmt_tag;
-    dyn_array_set_u8 stmt_value_ref stmt_index stmt_value;
-    dyn_array_set_i32 stmt_start_ref stmt_index stmt_start;
-    dyn_array_set_i32 stmt_end_ref stmt_index stmt_end;
-    dyn_array_set_i32 stmt_name_start_ref stmt_index name_start;
-    dyn_array_set_i32 stmt_name_end_ref stmt_index name_end;
-    dyn_array_set_i32 stmt_expr_start_ref stmt_index expr_start;
-    dyn_array_set_i32 stmt_expr_end_ref stmt_index expr_end;
+    dyn_array_set_i32 stmt_tag_ref stmt_index payload.tag;
+    dyn_array_set_u8 stmt_value_ref stmt_index payload.value;
+    dyn_array_set_i32 stmt_start_ref stmt_index payload.start;
+    dyn_array_set_i32 stmt_end_ref stmt_index payload.end;
+    dyn_array_set_i32 stmt_name_start_ref stmt_index payload.name_start;
+    dyn_array_set_i32 stmt_name_end_ref stmt_index payload.name_end;
+    dyn_array_set_i32 stmt_expr_start_ref stmt_index payload.expr_start;
+    dyn_array_set_i32 stmt_expr_end_ref stmt_index payload.expr_end;
     stmt_count_ref .> set (i32_add stmt_index 1i32);
     ()
 }
 
-#proc append_parsed_felis_token : (tag : i32) -> (value : i32) -> (start : i32) -> (end : i32) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> () {
+#proc append_parsed_felis_token : (tag : i32) -> (payload : FelisTokenPayload) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> () {
     #let token_index : i32 = token_count_ref .> get;
     dyn_array_set_i32 token_tag_ref token_index tag;
-    dyn_array_set_i32 token_value_ref token_index value;
-    dyn_array_set_i32 token_start_ref token_index start;
-    dyn_array_set_i32 token_end_ref token_index end;
+    dyn_array_set_i32 token_value_ref token_index payload.value;
+    dyn_array_set_i32 token_start_ref token_index payload.start;
+    dyn_array_set_i32 token_end_ref token_index payload.end;
     token_count_ref .> set (i32_add token_index 1i32);
     ()
 }
 
 #proc parse_felis_token : (token : FelisToken) -> (source_ref : DynArray u8) -> (parse_state_ref : &^ i32) -> (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (number_byte_ref : DynArray u8) -> (let_name_start_ref : &^ i32) -> (let_name_end_ref : &^ i32) -> (expr_start_ref : &^ i32) -> (expr_end_ref : &^ i32) -> (stmt_count_ref : &^ i32) -> () {
     #match token {
-        FelisToken::byte byte_value _ _ => {
-            #if i32_eq byte_value (i32_from_u8 '=') {
+        FelisToken::byte payload => {
+            #if i32_eq payload.value (i32_from_u8 '=') {
                 #if i32_eq (parse_state_ref .> get) 4i32 {
                     parse_state_ref .> set 5i32;
                 };
-            } #else #if i32_eq byte_value (i32_from_u8 ';') {
+            } #else #if i32_eq payload.value (i32_from_u8 ';') {
                 #if i32_eq (parse_state_ref .> get) 6i32 {
                     #let number_byte : u8 = dyn_array_get_u8 number_byte_ref 0x00i32;
-                    append_parsed_felis_stmt 0x03i32 number_byte (let_name_start_ref .> get) (expr_end_ref .> get) (let_name_start_ref .> get) (let_name_end_ref .> get) (expr_start_ref .> get) (expr_end_ref .> get) stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
+                    append_parsed_felis_stmt ParsedFelisStmtPayload { tag = 0x03i32, value = number_byte, start = let_name_start_ref .> get, end = expr_end_ref .> get, name_start = let_name_start_ref .> get, name_end = let_name_end_ref .> get, expr_start = expr_start_ref .> get, expr_end = expr_end_ref .> get } stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
                     parse_state_ref .> set 0i32;
                 } #else #if i32_eq (parse_state_ref .> get) 8i32 {
-                    append_parsed_felis_stmt 0x01i32 0x00u8 (expr_start_ref .> get) (expr_end_ref .> get) 0i32 0i32 (expr_start_ref .> get) (expr_end_ref .> get) stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
+                    append_parsed_felis_stmt ParsedFelisStmtPayload { tag = 0x01i32, value = 0x00u8, start = expr_start_ref .> get, end = expr_end_ref .> get, name_start = 0i32, name_end = 0i32, expr_start = expr_start_ref .> get, expr_end = expr_end_ref .> get } stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
                     parse_state_ref .> set 0i32;
                 };
             };
             ()
         },
-        FelisToken::ident ident_start ident_len _ => {
+        FelisToken::ident payload => {
             #let previous_state : i32 = parse_state_ref .> get;
             #if i32_eq previous_state 3i32 {
-                let_name_start_ref .> set ident_start;
-                let_name_end_ref .> set (i32_add ident_start ident_len);
+                let_name_start_ref .> set payload.start;
+                let_name_end_ref .> set (i32_add payload.start payload.value);
                 parse_state_ref .> set 4i32;
             } #else #if i32_eq previous_state 5i32 {
-                expr_start_ref .> set ident_start;
-                expr_end_ref .> set (i32_add ident_start ident_len);
+                expr_start_ref .> set payload.start;
+                expr_end_ref .> set (i32_add payload.start payload.value);
                 parse_state_ref .> set 6i32;
             } #else #if i32_eq previous_state 6i32 {
-                expr_end_ref .> set (i32_add ident_start ident_len);
+                expr_end_ref .> set (i32_add payload.start payload.value);
             } #else #if i32_eq previous_state 1i32 {
-                expr_start_ref .> set ident_start;
-                expr_end_ref .> set (i32_add ident_start ident_len);
+                expr_start_ref .> set payload.start;
+                expr_end_ref .> set (i32_add payload.start payload.value);
                 parse_state_ref .> set 8i32;
             } #else #if i32_eq previous_state 8i32 {
-                expr_end_ref .> set (i32_add ident_start ident_len);
+                expr_end_ref .> set (i32_add payload.start payload.value);
             } #else {
-                parse_felis_ident_token source_ref ident_start ident_len parse_state_ref;
+                parse_felis_ident_token source_ref payload.start payload.value parse_state_ref;
             };
             ()
         },
-        FelisToken::string string_start string_len string_end => {
+        FelisToken::string payload => {
             #if i32_eq (parse_state_ref .> get) 2i32 {
                 parse_state_ref .> set 0i32;
             };
-            record_expr_token_bounds string_start string_end parse_state_ref expr_start_ref expr_end_ref;
-            append_parsed_felis_stmt 0x02i32 0x00u8 string_start (i32_sub string_end 1i32) 0i32 0i32 string_start (i32_sub string_end 1i32) stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref
+            record_expr_token_bounds payload.start payload.end parse_state_ref expr_start_ref expr_end_ref;
+            append_parsed_felis_stmt ParsedFelisStmtPayload { tag = 0x02i32, value = 0x00u8, start = payload.start, end = i32_sub payload.end 1i32, name_start = 0i32, name_end = 0i32, expr_start = payload.start, expr_end = i32_sub payload.end 1i32 } stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref
         },
-        FelisToken::int_literal exit_code number_start number_end => {
+        FelisToken::int_literal payload => {
             #if i32_eq (parse_state_ref .> get) 1i32 {
                 parse_state_ref .> set 0i32;
                 #let exit_code_byte : u8 = dyn_array_get_u8 number_byte_ref 0x00i32;
-                append_parsed_felis_stmt 0x01i32 exit_code_byte number_start number_end 0i32 0i32 number_start number_end stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
+                append_parsed_felis_stmt ParsedFelisStmtPayload { tag = 0x01i32, value = exit_code_byte, start = payload.start, end = payload.end, name_start = 0i32, name_end = 0i32, expr_start = payload.start, expr_end = payload.end } stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
             } #else {
-                record_expr_token_bounds number_start number_end parse_state_ref expr_start_ref expr_end_ref;
+                record_expr_token_bounds payload.start payload.end parse_state_ref expr_start_ref expr_end_ref;
             };
         },
     };
@@ -281,7 +298,7 @@
                 string_end_ref .> set (i32_add (string_end_ref .> get) 1i32);
             };
             #let next_source_index : i32 = i32_add (string_end_ref .> get) 1i32;
-            #let token : FelisToken = FelisToken::string string_start (i32_sub (string_end_ref .> get) string_start) next_source_index;
+            #let token : FelisToken = FelisToken::string FelisTokenPayload { value = i32_sub (string_end_ref .> get) string_start, start = string_start, end = next_source_index };
             parse_felis_token token source_ref parse_state_ref stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref let_name_start_ref let_name_end_ref expr_start_ref expr_end_ref stmt_count_ref;
             source_index_ref .> set next_source_index;
         } #else #if u8_lt byte ':' {
@@ -310,7 +327,7 @@
                         #break;
                     };
                 };
-                #let token : FelisToken = FelisToken::int_literal (parsed_number_ref .> get) number_start (number_end_ref .> get);
+                #let token : FelisToken = FelisToken::int_literal FelisTokenPayload { value = parsed_number_ref .> get, start = number_start, end = number_end_ref .> get };
                 parse_felis_token token source_ref parse_state_ref stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref let_name_start_ref let_name_end_ref expr_start_ref expr_end_ref stmt_count_ref;
                 source_index_ref .> set (number_end_ref .> get);
             } #else {
@@ -332,11 +349,11 @@
                             #break;
                         };
                     };
-                    #let token : FelisToken = FelisToken::ident ident_start (i32_sub (ident_end_ref .> get) ident_start) (ident_end_ref .> get);
+                    #let token : FelisToken = FelisToken::ident FelisTokenPayload { value = i32_sub (ident_end_ref .> get) ident_start, start = ident_start, end = ident_end_ref .> get };
                     parse_felis_token token source_ref parse_state_ref stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref let_name_start_ref let_name_end_ref expr_start_ref expr_end_ref stmt_count_ref;
                     source_index_ref .> set (ident_end_ref .> get);
                 } #else {
-                    #let token : FelisToken = FelisToken::byte (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32);
+                    #let token : FelisToken = FelisToken::byte FelisTokenPayload { value = i32_from_u8 byte, start = source_index_ref .> get, end = i32_add (source_index_ref .> get) 1i32 };
                     parse_felis_token token source_ref parse_state_ref stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref let_name_start_ref let_name_end_ref expr_start_ref expr_end_ref stmt_count_ref;
                     source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
                 };
@@ -360,11 +377,11 @@
                         #break;
                     };
                 };
-                #let token : FelisToken = FelisToken::ident ident_start (i32_sub (ident_end_ref .> get) ident_start) (ident_end_ref .> get);
+                #let token : FelisToken = FelisToken::ident FelisTokenPayload { value = i32_sub (ident_end_ref .> get) ident_start, start = ident_start, end = ident_end_ref .> get };
                 parse_felis_token token source_ref parse_state_ref stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref let_name_start_ref let_name_end_ref expr_start_ref expr_end_ref stmt_count_ref;
                 source_index_ref .> set (ident_end_ref .> get);
             } #else {
-                #let token : FelisToken = FelisToken::byte (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32);
+                #let token : FelisToken = FelisToken::byte FelisTokenPayload { value = i32_from_u8 byte, start = source_index_ref .> get, end = i32_add (source_index_ref .> get) 1i32 };
                 parse_felis_token token source_ref parse_state_ref stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref let_name_start_ref let_name_end_ref expr_start_ref expr_end_ref stmt_count_ref;
                 source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
             };
@@ -395,7 +412,7 @@
                 string_end_ref .> set (i32_add (string_end_ref .> get) 1i32);
             };
             #let next_source_index : i32 = i32_add (string_end_ref .> get) 1i32;
-            append_parsed_felis_token 2i32 (i32_sub (string_end_ref .> get) string_start) string_start next_source_index token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+            append_parsed_felis_token 2i32 FelisTokenPayload { value = i32_sub (string_end_ref .> get) string_start, start = string_start, end = next_source_index } token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
             source_index_ref .> set next_source_index;
         } #else #if u8_lt byte ':' {
             #if u8_gt byte '/' {
@@ -419,7 +436,7 @@
                         #break;
                     };
                 };
-                append_parsed_felis_token 3i32 (parsed_number_ref .> get) number_start (number_end_ref .> get) token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                append_parsed_felis_token 3i32 FelisTokenPayload { value = parsed_number_ref .> get, start = number_start, end = number_end_ref .> get } token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
                 source_index_ref .> set (number_end_ref .> get);
             } #else {
                 #letref #excl is_ident_start_ref : &^ i32 := 0i32;
@@ -440,10 +457,10 @@
                             #break;
                         };
                     };
-                    append_parsed_felis_token 1i32 (i32_sub (ident_end_ref .> get) ident_start) ident_start (ident_end_ref .> get) token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                    append_parsed_felis_token 1i32 FelisTokenPayload { value = i32_sub (ident_end_ref .> get) ident_start, start = ident_start, end = ident_end_ref .> get } token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
                     source_index_ref .> set (ident_end_ref .> get);
                 } #else {
-                    append_parsed_felis_token 0i32 (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32) token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                    append_parsed_felis_token 0i32 FelisTokenPayload { value = i32_from_u8 byte, start = source_index_ref .> get, end = i32_add (source_index_ref .> get) 1i32 } token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
                     source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
                 };
             };
@@ -466,10 +483,10 @@
                         #break;
                     };
                 };
-                append_parsed_felis_token 1i32 (i32_sub (ident_end_ref .> get) ident_start) ident_start (ident_end_ref .> get) token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                append_parsed_felis_token 1i32 FelisTokenPayload { value = i32_sub (ident_end_ref .> get) ident_start, start = ident_start, end = ident_end_ref .> get } token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
                 source_index_ref .> set (ident_end_ref .> get);
             } #else {
-                append_parsed_felis_token 0i32 (i32_from_u8 byte) (source_index_ref .> get) (i32_add (source_index_ref .> get) 1i32) token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+                append_parsed_felis_token 0i32 FelisTokenPayload { value = i32_from_u8 byte, start = source_index_ref .> get, end = i32_add (source_index_ref .> get) 1i32 } token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
                 source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
             };
         };

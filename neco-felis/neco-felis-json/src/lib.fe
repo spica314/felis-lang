@@ -8,9 +8,15 @@
 #use std_core::primitive::i32::i32_sub;
 #use std_core::primitive::u8::u8_eq;
 
-#type(rc) JsonToken : Type[0] {
-    byte : i32 -> i32 -> i32 -> JsonToken,
-    string : i32 -> i32 -> i32 -> JsonToken,
+#struct JsonTokenPayload : Type[0] {
+    value : i32,
+    start : i32,
+    end : i32,
+}
+
+#type JsonToken : Type[0] {
+    byte : JsonTokenPayload -> JsonToken,
+    string : JsonTokenPayload -> JsonToken,
 }
 
 #proc set_string_eq_key_pattern : (manifest_ref : DynArray u8) -> (string_start : i32) -> (string_len : i32) -> (result_ref : &^ i32) -> () {
@@ -79,8 +85,8 @@
 
 #proc parse_json_token : (token : JsonToken) -> (manifest_ref : DynArray u8) -> (entrypoint_ref : DynArray u8) -> (entrypoint_parser_mode_ref : &^ i32) -> (entrypoint_len_ref : &^ i32) -> (done_ref : &^ i32) -> () {
     #match token {
-        JsonToken::byte byte _ _ => parse_json_byte_token byte entrypoint_parser_mode_ref,
-        JsonToken::string string_start string_len _ => parse_json_string_token manifest_ref string_start string_len entrypoint_ref entrypoint_parser_mode_ref entrypoint_len_ref done_ref,
+        JsonToken::byte payload => parse_json_byte_token payload.value entrypoint_parser_mode_ref,
+        JsonToken::string payload => parse_json_string_token manifest_ref payload.start payload.value entrypoint_ref entrypoint_parser_mode_ref entrypoint_len_ref done_ref,
     };
     ()
 }
@@ -113,12 +119,12 @@
             };
             #let string_len : i32 = i32_sub (string_end_ref .> get) string_start;
             #let next_manifest_index : i32 = i32_add (string_end_ref .> get) 1i32;
-            #let token : JsonToken = JsonToken::string string_start string_len next_manifest_index;
+            #let token : JsonToken = JsonToken::string JsonTokenPayload { value = string_len, start = string_start, end = next_manifest_index };
             parse_json_token token manifest_ref entrypoint_ref entrypoint_parser_mode_ref entrypoint_len_ref done_ref;
             manifest_index_ref .> set next_manifest_index;
         } #else {
             #let next_manifest_index : i32 = i32_add (manifest_index_ref .> get) 1i32;
-            #let token : JsonToken = JsonToken::byte (i32_from_u8 byte) (manifest_index_ref .> get) next_manifest_index;
+            #let token : JsonToken = JsonToken::byte JsonTokenPayload { value = i32_from_u8 byte, start = manifest_index_ref .> get, end = next_manifest_index };
             parse_json_token token manifest_ref entrypoint_ref entrypoint_parser_mode_ref entrypoint_len_ref done_ref;
             manifest_index_ref .> set next_manifest_index;
         };
