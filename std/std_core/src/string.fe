@@ -1,0 +1,44 @@
+#use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::RawArray;
+#use std_core::primitive::array::dyn_array_capacity_u8;
+#use std_core::primitive::array::dyn_array_get_u8;
+#use std_core::primitive::array::dyn_array_len_u8;
+#use std_core::primitive::array::dyn_array_raw_u8;
+
+#type String : Type[0] {
+    string : DynArray u8 -> String,
+}
+
+#fn string_from_dyn_array : (array : DynArray u8) -> String {
+    String::string array
+}
+
+#fn string_as_dyn_array : (string : String) -> DynArray u8 {
+    #match string {
+        String::string array => array,
+    }
+}
+
+#fn string_as_raw_array : (string : String) -> RawArray u8 {
+    dyn_array_raw_u8 (string_as_dyn_array string)
+}
+
+#fn string_len : (string : String) -> i32 {
+    dyn_array_len_u8 (string_as_dyn_array string)
+}
+
+#fn string_capacity : (string : String) -> i32 {
+    dyn_array_capacity_u8 (string_as_dyn_array string)
+}
+
+#fn string_get_u8 : (string : String) -> (index : i32) -> u8 {
+    dyn_array_get_u8 (string_as_dyn_array string) index
+}
+
+#pub #use String;
+#pub #use string_from_dyn_array;
+#pub #use string_as_dyn_array;
+#pub #use string_as_raw_array;
+#pub #use string_len;
+#pub #use string_capacity;
+#pub #use string_get_u8;

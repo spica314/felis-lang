@@ -1,0 +1,4 @@
+{
+    "name": "string-basic",
+    "felis-bin-entrypoints": ["src/string-basic.fe"]
+}

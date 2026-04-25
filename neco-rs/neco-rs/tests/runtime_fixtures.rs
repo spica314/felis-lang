@@ -217,6 +217,13 @@ fn compiles_and_runs_dyn_array_len_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_string_basic_fixture() {
+    let root = repo_root().join("tests/testcases/string-basic");
+    let status = run_fixture_status(&root, "string-basic");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_array_byte_scan_fixture() {
     let root = repo_root().join("tests/testcases/array-byte-scan");
     let status = run_fixture_status(&root, "array-byte-scan");

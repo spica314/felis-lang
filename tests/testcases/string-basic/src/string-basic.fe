@@ -1,0 +1,24 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::DynArray;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_from_u8;
+#use std_core::string::String;
+#use std_core::string::string_from_dyn_array;
+#use std_core::string::string_get_u8;
+#use std_core::string::string_len;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #letref #excl raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 8i32;
+    raw_ref .> set 0i32 40u8;
+    raw_ref .> set 1i32 2u8;
+    #let array : DynArray u8 = DynArray::dyn_array raw_ref 8i32 2i32;
+    #let string : String = string_from_dyn_array array;
+    #let first : u8 = string_get_u8 string 0i32;
+    #let len : i32 = string_len string;
+    #let first_code : i32 = i32_from_u8 first;
+    #let code : i32 = i32_add first_code len;
+    #let _ : () <- IO::exit code;
+    ()
+}

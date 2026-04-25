@@ -21,14 +21,28 @@
     }
 }
 
+#fn dyn_array_capacity_u8 : (array : DynArray u8) -> i32 {
+    #match array {
+        DynArray::dyn_array _ capacity _ => capacity,
+    }
+}
+
+#fn dyn_array_capacity_i32 : (array : DynArray i32) -> i32 {
+    #match array {
+        DynArray::dyn_array _ capacity _ => capacity,
+    }
+}
+
 #fn dyn_array_len_u8 : (array : DynArray u8) -> i32 {
-    #let raw_array : RawArray u8 = dyn_array_raw_u8 array;
-    raw_array .> len
+    #match array {
+        DynArray::dyn_array _ _ len => len,
+    }
 }
 
 #fn dyn_array_len_i32 : (array : DynArray i32) -> i32 {
-    #let raw_array : RawArray i32 = dyn_array_raw_i32 array;
-    raw_array .> len
+    #match array {
+        DynArray::dyn_array _ _ len => len,
+    }
 }
 
 #fn dyn_array_get_u8 : (array : DynArray u8) -> (index : i32) -> u8 {
@@ -102,6 +116,8 @@
 #pub #use DynArray;
 #pub #use dyn_array_raw_u8;
 #pub #use dyn_array_raw_i32;
+#pub #use dyn_array_capacity_u8;
+#pub #use dyn_array_capacity_i32;
 #pub #use dyn_array_len_u8;
 #pub #use dyn_array_len_i32;
 #pub #use dyn_array_get_u8;

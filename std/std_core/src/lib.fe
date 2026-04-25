@@ -1,2 +1,3 @@
 #pub #mod primitive;
 #pub #mod io;
+#pub #mod string;
