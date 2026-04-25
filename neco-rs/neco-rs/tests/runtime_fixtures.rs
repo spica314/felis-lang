@@ -2,8 +2,11 @@ use neco_rs::compile_path_to_elf;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Child, Command, Output, Stdio};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static FIXTURE_EXEC_LOCK: Mutex<()> = Mutex::new(());
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -52,56 +55,73 @@ fn runtime_test_runner(binary: &Path) -> Command {
     );
 }
 
-fn run_fixture_status(root: &Path, name: &str) -> std::process::ExitStatus {
+fn compile_and_spawn_fixture(
+    root: &Path,
+    name: &str,
+    configure: impl FnOnce(&mut Command),
+) -> (PathBuf, Child) {
+    let _guard = FIXTURE_EXEC_LOCK.lock().expect("fixture exec lock");
     let output = compile_fixture(root, name);
-    let status = runtime_test_runner(&output)
-        .status()
+    let mut command = runtime_test_runner(&output);
+    configure(&mut command);
+    let child = command
+        .spawn()
         .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
-    fs::remove_file(&output).expect("cleanup binary");
+    (output, child)
+}
+
+fn cleanup_fixture_binary(output: &Path) {
+    fs::remove_file(output).expect("cleanup binary");
     fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
+}
+
+fn run_fixture_status(root: &Path, name: &str) -> std::process::ExitStatus {
+    let (output, mut child) = compile_and_spawn_fixture(root, name, |_| {});
+    let status = child.wait().expect("collect child status");
+    cleanup_fixture_binary(&output);
     status
 }
 
 fn run_fixture_output(root: &Path, name: &str) -> Output {
-    let output = compile_fixture(root, name);
-    let run = runtime_test_runner(&output)
-        .output()
-        .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
-    fs::remove_file(&output).expect("cleanup binary");
-    fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
+    let (output, child) = compile_and_spawn_fixture(root, name, |command| {
+        command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    });
+    let run = child.wait_with_output().expect("collect child output");
+    cleanup_fixture_binary(&output);
     run
 }
 
 fn run_fixture_output_with_args(root: &Path, name: &str, args: &[&str]) -> Output {
-    let output = compile_fixture(root, name);
-    let run = runtime_test_runner(&output)
-        .args(args)
-        .output()
-        .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
-    fs::remove_file(&output).expect("cleanup binary");
-    fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
+    let (output, child) = compile_and_spawn_fixture(root, name, |command| {
+        command
+            .args(args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+    });
+    let run = child.wait_with_output().expect("collect child output");
+    cleanup_fixture_binary(&output);
     run
 }
 
 fn run_fixture_output_in_dir(root: &Path, name: &str, current_dir: &Path) -> Output {
-    let output = compile_fixture(root, name);
-    let run = runtime_test_runner(&output)
-        .current_dir(current_dir)
-        .output()
-        .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
-    fs::remove_file(&output).expect("cleanup binary");
-    fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
+    let (output, child) = compile_and_spawn_fixture(root, name, |command| {
+        command
+            .current_dir(current_dir)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+    });
+    let run = child.wait_with_output().expect("collect child output");
+    cleanup_fixture_binary(&output);
     run
 }
 
 fn run_fixture_with_input(root: &Path, name: &str, stdin: &[u8]) -> Output {
-    let output = compile_fixture(root, name);
-    let mut child = runtime_test_runner(&output)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
+    let (output, mut child) = compile_and_spawn_fixture(root, name, |command| {
+        command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+    });
     child
         .stdin
         .as_mut()
@@ -109,28 +129,39 @@ fn run_fixture_with_input(root: &Path, name: &str, stdin: &[u8]) -> Output {
         .write_all(stdin)
         .expect("write child stdin");
     let run = child.wait_with_output().expect("collect child output");
-    fs::remove_file(&output).expect("cleanup binary");
-    fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
+    cleanup_fixture_binary(&output);
     run
 }
 
 fn run_neco_felis_fixture(input_root: &Path, temp_name: &str) -> (Output, Vec<u8>, Output) {
     let root = repo_root().join("neco-felis");
     let temp_dir = runtime_temp_dir(temp_name);
-    let binary = compile_fixture(&root, "neco-felis");
 
-    let run = runtime_test_runner(&binary)
-        .current_dir(&temp_dir)
-        .arg(input_root)
-        .output()
-        .unwrap_or_else(|error| panic!("run neco-felis fixture binary: {error}"));
+    let (binary, child) = compile_and_spawn_fixture(&root, "neco-felis", |command| {
+        command
+            .current_dir(&temp_dir)
+            .arg(input_root)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+    });
+    let run = child
+        .wait_with_output()
+        .expect("collect neco-felis fixture output");
     let emitted = temp_dir.join("a.out");
     let emitted_bytes = fs::read(&emitted).expect("read emitted a.out");
-    let emitted_run = runtime_test_runner(&emitted)
-        .output()
-        .unwrap_or_else(|error| panic!("run emitted a.out: {error}"));
+    let emitted_child = {
+        let _guard = FIXTURE_EXEC_LOCK.lock().expect("fixture exec lock");
+        let mut command = runtime_test_runner(&emitted);
+        command.stdout(Stdio::piped()).stderr(Stdio::piped());
+        command
+            .spawn()
+            .unwrap_or_else(|error| panic!("run emitted a.out: {error}"))
+    };
+    let emitted_run = emitted_child
+        .wait_with_output()
+        .expect("collect emitted a.out output");
 
-    fs::remove_file(&binary).expect("cleanup binary");
+    cleanup_fixture_binary(&binary);
     fs::remove_dir_all(&temp_dir).expect("cleanup runtime temp dir");
 
     (run, emitted_bytes, emitted_run)
@@ -223,13 +254,12 @@ fn compiles_and_runs_proc_reference_annotation_fixture() {
 #[test]
 fn compiles_and_runs_proc_cli_arg_reference_fixture() {
     let root = repo_root().join("tests/testcases/proc-cli-arg-reference");
-    let status = compile_fixture(&root, "proc-cli-arg-reference");
-    let run = runtime_test_runner(&status)
-        .arg("15")
-        .status()
-        .unwrap_or_else(|error| panic!("run fixture binary: {error}"));
-    fs::remove_file(&status).expect("cleanup binary");
-    fs::remove_dir(status.parent().expect("build temp dir")).expect("cleanup build temp dir");
+    let (output, mut child) =
+        compile_and_spawn_fixture(&root, "proc-cli-arg-reference", |command| {
+            command.arg("15");
+        });
+    let run = child.wait().expect("collect child status");
+    cleanup_fixture_binary(&output);
     assert_eq!(run.code(), Some(102));
 }
 

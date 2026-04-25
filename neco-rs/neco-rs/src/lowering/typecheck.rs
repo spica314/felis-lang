@@ -278,9 +278,9 @@ fn parse_raw_array_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>
     }
 
     let [element_type_term] = arguments.as_slice() else {
-        return Err(Error::Unsupported(
-            format!("`{type_name}` type annotation must receive exactly one element type"),
-        ));
+        return Err(Error::Unsupported(format!(
+            "`{type_name}` type annotation must receive exactly one element type"
+        )));
     };
 
     parse_array_element_type(element_type_term, type_name).map(Some)
