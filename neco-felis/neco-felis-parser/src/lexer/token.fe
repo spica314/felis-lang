@@ -1,3 +1,8 @@
+#use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::dyn_array_get_i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::i32::i32_sub;
 #pub #use #package::syntax::term::FelisKeywordKind;
 #pub #use #package::syntax::term::FelisPunctKind;
 #pub #use #package::syntax::term::FelisToken;
@@ -10,3 +15,145 @@
 #pub #use #package::syntax::term::encode_felis_keyword_kind;
 #pub #use #package::syntax::term::encode_felis_punct_kind;
 #pub #use #package::syntax::term::encode_felis_token_kind;
+
+#proc parse_token_kind_impl : (token_tag_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (expected_kind : FelisTokenKind) -> (matched_ref : &^ i32) -> () {
+    matched_ref .> set 0i32;
+    #let expected_code : i32 = encode_felis_token_kind expected_kind 0i32;
+    #let raw_kind : i32 = dyn_array_get_i32 token_tag_ref (cursor_ref .> get);
+    #if i32_eq raw_kind expected_code {
+        matched_ref .> set 1i32;
+        cursor_ref .> set (i32_add (cursor_ref .> get) 1i32);
+    };
+    ()
+}
+
+#proc parse_token_with_payload : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (expected_kind : FelisTokenKind) -> (matched_ref : &^ i32) -> (value_ref : &^ i32) -> (start_ref : &^ i32) -> (end_ref : &^ i32) -> () {
+    parse_token_kind_impl token_tag_ref cursor_ref expected_kind matched_ref;
+    #if i32_eq (matched_ref .> get) 1i32 {
+        #let token_index : i32 = i32_sub (cursor_ref .> get) 1i32;
+        value_ref .> set (dyn_array_get_i32 token_value_ref token_index);
+        start_ref .> set (dyn_array_get_i32 token_start_ref token_index);
+        end_ref .> set (dyn_array_get_i32 token_end_ref token_index);
+    };
+    ()
+}
+
+#pub #proc parse_token_identifier : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> (value_ref : &^ i32) -> (start_ref : &^ i32) -> (end_ref : &^ i32) -> () {
+    parse_token_with_payload token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref FelisTokenKind::token_ident matched_ref value_ref start_ref end_ref;
+    ()
+}
+
+#pub #proc parse_token_integer_literal : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> (value_ref : &^ i32) -> (start_ref : &^ i32) -> (end_ref : &^ i32) -> () {
+    parse_token_with_payload token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref FelisTokenKind::token_int_literal matched_ref value_ref start_ref end_ref;
+    ()
+}
+
+#pub #proc parse_token_string_literal : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> (value_ref : &^ i32) -> (start_ref : &^ i32) -> (end_ref : &^ i32) -> () {
+    parse_token_with_payload token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref FelisTokenKind::token_string matched_ref value_ref start_ref end_ref;
+    ()
+}
+
+#pub #proc parse_token_char_literal : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> (value_ref : &^ i32) -> (start_ref : &^ i32) -> (end_ref : &^ i32) -> () {
+    parse_token_with_payload token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref FelisTokenKind::token_char_literal matched_ref value_ref start_ref end_ref;
+    ()
+}
+
+#pub #proc parse_token_keyword_kind : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (expected_kind : FelisKeywordKind) -> (matched_ref : &^ i32) -> () {
+    matched_ref .> set 0i32;
+    #let keyword_token_code : i32 = encode_felis_token_kind FelisTokenKind::token_keyword 0i32;
+    #let raw_token_kind : i32 = dyn_array_get_i32 token_tag_ref (cursor_ref .> get);
+    #if i32_eq raw_token_kind keyword_token_code {
+        #let expected_code : i32 = encode_felis_keyword_kind expected_kind 0i32;
+        #let raw_keyword_kind : i32 = dyn_array_get_i32 token_value_ref (cursor_ref .> get);
+        #if i32_eq raw_keyword_kind expected_code {
+            matched_ref .> set 1i32;
+            cursor_ref .> set (i32_add (cursor_ref .> get) 1i32);
+        };
+    };
+    ()
+}
+
+#pub #proc parse_token_end_of_file : (token_tag_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_kind_impl token_tag_ref cursor_ref FelisTokenKind::token_eof matched_ref;
+    ()
+}
+
+#pub #proc parse_token_punct_kind : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (expected_kind : FelisPunctKind) -> (matched_ref : &^ i32) -> () {
+    matched_ref .> set 0i32;
+    #let punct_token_code : i32 = encode_felis_token_kind FelisTokenKind::token_punct 0i32;
+    #let raw_token_kind : i32 = dyn_array_get_i32 token_tag_ref (cursor_ref .> get);
+    #if i32_eq raw_token_kind punct_token_code {
+        #let expected_code : i32 = encode_felis_punct_kind expected_kind 0i32;
+        #let raw_punct_kind : i32 = dyn_array_get_i32 token_value_ref (cursor_ref .> get);
+        #if i32_eq raw_punct_kind expected_code {
+            matched_ref .> set 1i32;
+            cursor_ref .> set (i32_add (cursor_ref .> get) 1i32);
+        };
+    };
+    ()
+}
+
+#pub #proc parse_token_left_paren : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_left_paren matched_ref;
+    ()
+}
+
+#pub #proc parse_token_right_paren : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_right_paren matched_ref;
+    ()
+}
+
+#pub #proc parse_token_left_brace : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_left_brace matched_ref;
+    ()
+}
+
+#pub #proc parse_token_right_brace : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_right_brace matched_ref;
+    ()
+}
+
+#pub #proc parse_token_colon : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_colon matched_ref;
+    ()
+}
+
+#pub #proc parse_token_semicolon : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_semicolon matched_ref;
+    ()
+}
+
+#pub #proc parse_token_comma : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_comma matched_ref;
+    ()
+}
+
+#pub #proc parse_token_dot : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_dot matched_ref;
+    ()
+}
+
+#pub #proc parse_token_arrow : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_arrow matched_ref;
+    ()
+}
+
+#pub #proc parse_token_dot_arrow : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_dot_arrow matched_ref;
+    ()
+}
+
+#pub #proc parse_token_double_colon : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_double_colon matched_ref;
+    ()
+}
+
+#pub #proc parse_token_left_bracket : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_left_bracket matched_ref;
+    ()
+}
+
+#pub #proc parse_token_right_bracket : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref FelisPunctKind::punct_right_bracket matched_ref;
+    ()
+}
