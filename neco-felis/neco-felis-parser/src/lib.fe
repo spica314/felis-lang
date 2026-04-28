@@ -45,5 +45,6 @@
 #pub #use #package::parser::expect_comma;
 #pub #use #package::parser::expect_right_paren;
 #pub #use #package::parser::expect_right_brace;
+#pub #use #package::parser::parse_felis_tokens_to_stmts;
 #pub #use #package::parser::parse_felis_first_string_literal_expr;
 #pub #use #package::parser::parse_felis_source;
