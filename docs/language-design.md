@@ -1,8 +1,6 @@
 # Language Design
 
 This document records high-level language design decisions and their rationale.
-Detailed functional requirements remain in [`frd.json`](../frd.json), while this
-file explains why those requirements exist.
 
 ## Keywords And Identifiers
 

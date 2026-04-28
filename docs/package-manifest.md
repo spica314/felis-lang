@@ -21,7 +21,7 @@ the same `neco-package.json`.
 
 ## Package Fields
 
-The current functional requirements cover these manifest fields:
+The current manifest design covers these manifest fields:
 
 - `name`: identifies the package.
 - `felis-lib-entrypoint`: identifies the Felis library entrypoint file for the
@@ -103,8 +103,8 @@ The fixture at `tests/testcases/workspace-basic/` captures this shape.
 The manifest should capture package-level and workspace-level information that
 must be understood by tools before loading Felis modules.
 
-Additional manifest fields may be defined later, but the current functional
-requirements constrain only:
+Additional manifest fields may be defined later, but the current scope
+constrains only:
 
 - package name and Felis entrypoint fields,
 - workspace member enumeration, and

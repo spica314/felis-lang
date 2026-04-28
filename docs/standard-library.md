@@ -3,9 +3,6 @@
 This document records the currently documented public surface of the Felis
 standard library.
 
-Detailed functional requirements remain in [`frd.json`](../frd.json). This file
-summarizes the observable API shape exposed from [`std/`](../std/).
-
 ## Workspace Layout
 
 The standard library is now split into two workspace packages:
