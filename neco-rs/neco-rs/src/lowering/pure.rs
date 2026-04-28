@@ -463,8 +463,14 @@ fn lower_constructor_application(
                 Value::I64(_) => Ok(8),
                 Value::Constructor(ConstructorValue {
                     heap_slot: Some(_), ..
+                })
+                | Value::Struct(StructValue {
+                    heap_slot: Some(_), ..
                 }) => Ok(8),
                 Value::Constructor(ConstructorValue {
+                    heap_slot: None, ..
+                })
+                | Value::Struct(StructValue {
                     heap_slot: None, ..
                 }) => Ok(0),
                 _ => Err(Error::Unsupported(
@@ -511,6 +517,10 @@ fn lower_constructor_application(
                 Value::Constructor(ConstructorValue {
                     heap_slot: Some(source_heap_slot),
                     ..
+                })
+                | Value::Struct(StructValue {
+                    heap_slot: Some(source_heap_slot),
+                    ..
                 }) => {
                     program.operations.push(Operation::HeapStorePtr {
                         heap_slot,
@@ -520,6 +530,9 @@ fn lower_constructor_application(
                     byte_offset += 8;
                 }
                 Value::Constructor(ConstructorValue {
+                    heap_slot: None, ..
+                })
+                | Value::Struct(StructValue {
                     heap_slot: None, ..
                 }) => {}
                 _ => {

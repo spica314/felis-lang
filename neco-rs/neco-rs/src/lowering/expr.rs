@@ -30,6 +30,9 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
             if let Some(expr) = lower_i32_literal_application(callee, arguments)? {
                 return Ok(expr);
             }
+            if let Some(expr) = lower_dyn_array_get_i32_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
             if let Some(expr) = lower_i32_reference_get_call(callee, arguments, state)? {
                 return Ok(expr);
             }
@@ -89,6 +92,9 @@ pub(crate) fn lower_i64_expr(term: &Term, state: &LoweringState) -> Result<I64Ex
             if let Some(expr) = lower_i64_literal_application(callee, arguments)? {
                 return Ok(expr);
             }
+            if let Some(expr) = lower_dyn_array_get_i64_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
             if let Some(expr) = lower_i64_reference_get_call(callee, arguments, state)? {
                 return Ok(expr);
             }
@@ -145,6 +151,9 @@ pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr
         }
         Term::Application { callee, arguments } => {
             if let Some(expr) = lower_u8_literal_application(callee, arguments)? {
+                return Ok(expr);
+            }
+            if let Some(expr) = lower_dyn_array_get_u8_call(callee, arguments, state)? {
                 return Ok(expr);
             }
             if let Some(expr) = lower_runtime_arg_get_call(callee, arguments, state)? {
@@ -520,6 +529,109 @@ fn lower_array_get_call(
         array_slot,
         index: Box::new(lower_array_index_expr(index, state)?),
     }))
+}
+
+fn lower_dyn_array_get_i32_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<I32Expr>> {
+    let Some((array, index)) = dyn_array_get_call_parts(callee, arguments, "dyn_array_get_i32")?
+    else {
+        return Ok(None);
+    };
+    let array_slot = dyn_array_slot(array, state, ArrayElementType::I32)?;
+    Ok(Some(I32Expr::ArrayGet {
+        array_slot,
+        index: Box::new(lower_array_index_expr(index, state)?),
+    }))
+}
+
+fn lower_dyn_array_get_i64_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<I64Expr>> {
+    let Some((array, index)) = dyn_array_get_call_parts(callee, arguments, "dyn_array_get_i64")?
+    else {
+        return Ok(None);
+    };
+    let array_slot = dyn_array_slot(array, state, ArrayElementType::I64)?;
+    Ok(Some(I64Expr::ArrayGet {
+        array_slot,
+        index: Box::new(lower_array_index_expr(index, state)?),
+    }))
+}
+
+fn lower_dyn_array_get_u8_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<U8Expr>> {
+    let Some((array, index)) = dyn_array_get_call_parts(callee, arguments, "dyn_array_get_u8")?
+    else {
+        return Ok(None);
+    };
+    let array_slot = dyn_array_slot(array, state, ArrayElementType::U8)?;
+    Ok(Some(U8Expr::ArrayGet {
+        array_slot,
+        index: Box::new(lower_array_index_expr(index, state)?),
+    }))
+}
+
+fn dyn_array_get_call_parts<'a>(
+    callee: &'a Term,
+    arguments: &'a [Term],
+    expected_name: &str,
+) -> Result<Option<(&'a Term, &'a Term)>> {
+    let Term::Path(path) = callee else {
+        return Ok(None);
+    };
+    if path.token_keyword_package.is_some()
+        || path.segments.len() != 1
+        || path.segments[0].lexeme != expected_name
+    {
+        return Ok(None);
+    }
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    if normalized.len() != 2 {
+        return Err(Error::Unsupported(format!(
+            "`{expected_name}` must receive exactly two arguments"
+        )));
+    }
+    Ok(Some((&arguments[0], &arguments[1])))
+}
+
+fn dyn_array_slot(
+    term: &Term,
+    state: &LoweringState,
+    expected_element_type: ArrayElementType,
+) -> Result<usize> {
+    match resolve_value(term, &state.environment)? {
+        Value::Constructor(constructor)
+            if constructor.type_name == "DynArray" && constructor.constructor_name == "dyn_array" =>
+        {
+            let Some(Value::Array {
+                slot,
+                element_type,
+                kind: ArrayKind::Dynamic,
+            }) = constructor.fields.first()
+            else {
+                return Err(Error::Unsupported(format!(
+                    "`DynArray::dyn_array` does not contain a dynamic array field: {constructor:?}"
+                )));
+            };
+            if *element_type != expected_element_type {
+                return Err(Error::Unsupported(format!(
+                    "`DynArray` element type mismatch: expected {expected_element_type:?}, got {element_type:?}"
+                )));
+            }
+            Ok(*slot)
+        }
+        other => Err(Error::Unsupported(format!(
+            "`DynArray` helper expects a `DynArray`, got {other:?}"
+        ))),
+    }
 }
 
 fn lower_i64_array_get_call(

@@ -15,6 +15,7 @@
 #use std_core::string::string_as_dyn_array;
 #use #package::lexer::accumulate_decimal_u8;
 #use #package::parser::FelisParserError;
+#use #package::parser::parse_felis_source;
 #use #package::syntax::FelisItem;
 #use #package::syntax::FelisItemKind;
 #use #package::syntax::FelisItems;
@@ -115,6 +116,54 @@
     result_ref .> get
 }
 
+#proc skip_lower_felis_spaces : (source_ref : DynArray u8) -> (start : i32) -> (end : i32) -> (result_ref : &^ i32) -> () {
+    result_ref .> set start;
+    #loop {
+        #if i32_gte (result_ref .> get) end {
+            #break;
+        };
+        #let byte : u8 = dyn_array_get_u8 source_ref (result_ref .> get);
+        #if u8_eq byte ' ' {
+            result_ref .> set (i32_add (result_ref .> get) 1i32);
+        } #else #if u8_eq byte '\n' {
+            result_ref .> set (i32_add (result_ref .> get) 1i32);
+        } #else #if u8_eq byte '\t' {
+            result_ref .> set (i32_add (result_ref .> get) 1i32);
+        } #else {
+            #break;
+        };
+    };
+    ()
+}
+
+#proc find_exit_argument_start : (source_ref : DynArray u8) -> (start : i32) -> (end : i32) -> (result_ref : &^ i32) -> () {
+    result_ref .> set start;
+    #let index_ref : i32 = start;
+    #letref #excl index_ref : &^ i32 #borrow index_ref;
+    #loop {
+        #if i32_gte (i32_add (index_ref .> get) 4i32) end {
+            #break;
+        };
+        #let byte0 : u8 = dyn_array_get_u8 source_ref (index_ref .> get);
+        #let byte1 : u8 = dyn_array_get_u8 source_ref (i32_add (index_ref .> get) 1i32);
+        #let byte2 : u8 = dyn_array_get_u8 source_ref (i32_add (index_ref .> get) 2i32);
+        #let byte3 : u8 = dyn_array_get_u8 source_ref (i32_add (index_ref .> get) 3i32);
+        #if u8_eq byte0 'e' {
+            #if u8_eq byte1 'x' {
+                #if u8_eq byte2 'i' {
+                    #if u8_eq byte3 't' {
+                        #let raw_arg_start : i32 = i32_add (index_ref .> get) 4i32;
+                        skip_lower_felis_spaces source_ref raw_arg_start end result_ref;
+                        #break;
+                    };
+                };
+            };
+        };
+        index_ref .> set (i32_add (index_ref .> get) 1i32);
+    };
+    ()
+}
+
 #proc lower_statement : (source_ref : DynArray u8) -> (statement : FelisStatement) -> (stmt_tag_ref : DynArray i32) -> (stmt_value_ref : DynArray u8) -> (stmt_start_ref : DynArray i32) -> (stmt_end_ref : DynArray i32) -> (stmt_name_start_ref : DynArray i32) -> (stmt_name_end_ref : DynArray i32) -> (stmt_expr_start_ref : DynArray i32) -> (stmt_expr_end_ref : DynArray i32) -> (number_byte_ref : DynArray u8) -> (stmt_count_ref : &^ i32) -> () {
     #let statement_let_code : i32 = encode_felis_statement_kind FelisStatementKind::statement_let 0i32;
     #let statement_expression_code : i32 = encode_felis_statement_kind FelisStatementKind::statement_expression 0i32;
@@ -135,7 +184,10 @@
             };
             append_lowered_stmt payload stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
         } #else #if i32_eq contains_exit 1i32 {
-            set_lowered_number_byte source_ref value_node.start value_node.end number_byte_ref;
+            #let exit_arg_start_ref : i32 = value_node.start;
+            #letref #excl exit_arg_start_ref : &^ i32 #borrow exit_arg_start_ref;
+            find_exit_argument_start source_ref value_node.start value_node.end exit_arg_start_ref;
+            set_lowered_number_byte source_ref (exit_arg_start_ref .> get) value_node.end number_byte_ref;
             #let payload : ParsedFelisStmtPayload = ParsedFelisStmtPayload {
                 tag = 0x01i32,
                 value = dyn_array_get_u8 number_byte_ref 0x00i32,
@@ -143,7 +195,7 @@
                 end = statement.end,
                 name_start = statement.name_start,
                 name_end = statement.name_end,
-                expr_start = value_node.start,
+                expr_start = exit_arg_start_ref .> get,
                 expr_end = value_node.end
             };
             append_lowered_stmt payload stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
@@ -165,7 +217,10 @@
         #let value_node : FelisTermNode = statement.value_node;
         #let contains_exit : i32 = source_span_contains_exit source_ref value_node.start value_node.end;
         #if i32_eq contains_exit 1i32 {
-            set_lowered_number_byte source_ref value_node.start value_node.end number_byte_ref;
+            #let exit_arg_start_ref : i32 = value_node.start;
+            #letref #excl exit_arg_start_ref : &^ i32 #borrow exit_arg_start_ref;
+            find_exit_argument_start source_ref value_node.start value_node.end exit_arg_start_ref;
+            set_lowered_number_byte source_ref (exit_arg_start_ref .> get) value_node.end number_byte_ref;
             #let payload : ParsedFelisStmtPayload = ParsedFelisStmtPayload {
                 tag = 0x01i32,
                 value = dyn_array_get_u8 number_byte_ref 0x00i32,
@@ -173,7 +228,7 @@
                 end = statement.end,
                 name_start = 0i32,
                 name_end = 0i32,
-                expr_start = value_node.start,
+                expr_start = exit_arg_start_ref .> get,
                 expr_end = value_node.end
             };
             append_lowered_stmt payload stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref stmt_count_ref;
@@ -283,14 +338,14 @@
     #letref #excl source_file_ref : &^ FelisSourceFile #borrow source_file_ref;
     stmt_count_ref .> set 0i32;
     parse_complete_felis_source_file token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref cursor_ref error_ref matched_ref source_file_ref;
-    #if i32_eq (matched_ref .> get) 1i32 {
-        #let source_file : FelisSourceFile = source_file_ref .> get;
-        #match source_file {
-            FelisSourceFile::source_file items => {
-                lower_items source_ref items token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref stmt_count_ref;
-                ()
-            },
-        };
+    #let source_file : FelisSourceFile = source_file_ref .> get;
+    #match source_file {
+        FelisSourceFile::source_file items => {
+            lower_items source_ref items token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref stmt_count_ref;
+            ()
+        },
     };
+    stmt_count_ref .> set 0i32;
+    parse_felis_source source stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref stmt_count_ref;
     ()
 }
