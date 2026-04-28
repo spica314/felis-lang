@@ -26,6 +26,7 @@
 #use #package::syntax::path::FelisPathExpression;
 #use #package::syntax::path::empty_felis_path_expression;
 #use #package::syntax::path::parse_felis_path_expression;
+#use #package::syntax::term::ast::FelisExpr;
 #use #package::syntax::term::ast::FelisKeywordKind;
 #use #package::syntax::term::ast::FelisPunctKind;
 #use #package::syntax::term::ast::FelisStatement;
@@ -65,6 +66,7 @@
     FelisTerm {
         kind = encode_felis_term_kind FelisTermKind::term_unknown 0i32,
         value = 0i32,
+        expr = FelisExpr::unknown_expr,
         name_value = 0i32,
         name_start = 0i32,
         name_end = 0i32,
@@ -97,6 +99,8 @@
         operator = encode_felis_let_operator FelisLetOperator::let_operator_unknown 0i32,
         type_node = empty_felis_term_node 0i32,
         value_node = empty_felis_term_node 0i32,
+        type_expr = FelisExpr::unknown_expr,
+        value_expr = FelisExpr::unknown_expr,
         item_kind = encode_felis_item_kind FelisItemKind::item_unknown 0i32,
         start = 0i32,
         end = 0i32
@@ -249,6 +253,7 @@
         term_ref .> set FelisTerm {
             kind = encode_felis_term_kind FelisTermKind::term_typed_binder 0i32,
             value = 0i32,
+            expr = FelisExpr::unknown_expr,
             name_value = name_value_ref .> get,
             name_start = name_start_ref .> get,
             name_end = name_end_ref .> get,
@@ -297,6 +302,7 @@
                 term_ref .> set FelisTerm {
                     kind = encode_felis_term_kind FelisTermKind::term_unit 0i32,
                     value = 0i32,
+                    expr = FelisExpr::unknown_expr,
                     name_value = 0i32,
                     name_start = 0i32,
                     name_end = 0i32,
@@ -329,6 +335,7 @@
                         term_ref .> set FelisTerm {
                             kind = encode_felis_term_kind FelisTermKind::term_group 0i32,
                             value = 0i32,
+                            expr = inner.expr,
                             name_value = 0i32,
                             name_start = 0i32,
                             name_end = 0i32,
@@ -353,6 +360,7 @@
             term_ref .> set FelisTerm {
                 kind = encode_felis_term_kind FelisTermKind::term_string_literal 0i32,
                 value = value_ref .> get,
+                expr = FelisExpr::unknown_expr,
                 name_value = 0i32,
                 name_start = 0i32,
                 name_end = 0i32,
@@ -374,6 +382,7 @@
             term_ref .> set FelisTerm {
                 kind = encode_felis_term_kind FelisTermKind::term_char_literal 0i32,
                 value = value_ref .> get,
+                expr = FelisExpr::unknown_expr,
                 name_value = 0i32,
                 name_start = 0i32,
                 name_end = 0i32,
@@ -395,6 +404,7 @@
             term_ref .> set FelisTerm {
                 kind = encode_felis_term_kind FelisTermKind::term_integer_literal 0i32,
                 value = value_ref .> get,
+                expr = FelisExpr::int_literal_expr (value_ref .> get) (start_ref .> get) (end_ref .> get),
                 name_value = 0i32,
                 name_start = 0i32,
                 name_end = 0i32,
@@ -419,6 +429,7 @@
                 term_ref .> set FelisTerm {
                     kind = encode_felis_term_kind FelisTermKind::term_reference 0i32,
                     value = 0i32,
+                    expr = FelisExpr::reference_expr 0i32 inner.expr,
                     name_value = 0i32,
                     name_start = 0i32,
                     name_end = 0i32,
@@ -444,6 +455,7 @@
                 term_ref .> set FelisTerm {
                     kind = encode_felis_term_kind FelisTermKind::term_reference 0i32,
                     value = 0i32,
+                    expr = FelisExpr::reference_expr 1i32 inner.expr,
                     name_value = 0i32,
                     name_start = 0i32,
                     name_end = 0i32,
@@ -467,6 +479,7 @@
             term_ref .> set FelisTerm {
                 kind = encode_felis_term_kind FelisTermKind::term_path 0i32,
                 value = path.first_segment_value,
+                expr = FelisExpr::local_expr path.start path.end,
                 name_value = path.first_segment_value,
                 name_start = path.first_segment_start,
                 name_end = path.first_segment_end,
@@ -512,6 +525,7 @@
                 term_ref .> set FelisTerm {
                     kind = encode_felis_term_kind FelisTermKind::term_application 0i32,
                     value = 0i32,
+                    expr = FelisExpr::application_expr current.expr argument.expr,
                     name_value = 0i32,
                     name_start = 0i32,
                     name_end = 0i32,
@@ -536,6 +550,7 @@
                 term_ref .> set FelisTerm {
                     kind = encode_felis_term_kind FelisTermKind::term_method_call 0i32,
                     value = name_value_ref .> get,
+                    expr = FelisExpr::method_call_expr current.expr (name_start_ref .> get) (name_end_ref .> get),
                     name_value = name_value_ref .> get,
                     name_start = name_start_ref .> get,
                     name_end = name_end_ref .> get,
@@ -560,6 +575,7 @@
                 term_ref .> set FelisTerm {
                     kind = encode_felis_term_kind FelisTermKind::term_field_access 0i32,
                     value = name_value_ref .> get,
+                    expr = FelisExpr::field_access_expr current.expr (name_start_ref .> get) (name_end_ref .> get),
                     name_value = name_value_ref .> get,
                     name_start = name_start_ref .> get,
                     name_end = name_end_ref .> get,
@@ -586,9 +602,13 @@
     #let start_ref : i32 = 0i32;
     #let argument_ref : FelisTerm = empty_felis_term 0i32;
     #let reversed_arguments_ref : FelisTermNodes = FelisTermNodes::no_term_nodes;
+    #let application_expr_ref : FelisExpr = FelisExpr::unknown_expr;
+    #let has_application_expr_ref : i32 = 0i32;
     #letref #excl start_ref : &^ i32 #borrow start_ref;
     #letref #excl argument_ref : &^ FelisTerm #borrow argument_ref;
     #letref #excl reversed_arguments_ref : &^ FelisTermNodes #borrow reversed_arguments_ref;
+    #letref #excl application_expr_ref : &^ FelisExpr #borrow application_expr_ref;
+    #letref #excl has_application_expr_ref : &^ i32 #borrow has_application_expr_ref;
     #loop {
         #if i32_eq (matched_ref .> get) 0i32 {
             #break;
@@ -608,6 +628,14 @@
         #if i32_eq (matched_ref .> get) 0i32 {
             #break;
         };
+        #let current_argument : FelisTerm = argument_ref .> get;
+        #if i32_eq (has_application_expr_ref .> get) 0i32 {
+            #let callee : FelisTerm = term_ref .> get;
+            application_expr_ref .> set (FelisExpr::application_expr callee.expr current_argument.expr);
+            has_application_expr_ref .> set 1i32;
+        } #else {
+            application_expr_ref .> set (FelisExpr::application_expr (application_expr_ref .> get) current_argument.expr);
+        };
         reversed_arguments_ref .> set (FelisTermNodes::cons_term_node (felis_term_to_node (argument_ref .> get)) (reversed_arguments_ref .> get));
     };
     #let maybe_arguments : FelisTermNodes = reversed_arguments_ref .> get;
@@ -624,6 +652,7 @@
             term_ref .> set FelisTerm {
                 kind = encode_felis_term_kind FelisTermKind::term_application 0i32,
                 value = 0i32,
+                expr = application_expr_ref .> get,
                 name_value = 0i32,
                 name_start = 0i32,
                 name_end = 0i32,
@@ -663,6 +692,7 @@
             term_ref .> set FelisTerm {
                 kind = encode_felis_term_kind FelisTermKind::term_forall 0i32,
                 value = 0i32,
+                expr = FelisExpr::unknown_expr,
                 name_value = binder.name_value,
                 name_start = binder.name_start,
                 name_end = binder.name_end,
@@ -698,6 +728,7 @@
                 term_ref .> set FelisTerm {
                     kind = encode_felis_term_kind FelisTermKind::term_arrow 0i32,
                     value = 0i32,
+                    expr = FelisExpr::unknown_expr,
                     name_value = parameter.name_value,
                     name_start = parameter.name_start,
                     name_end = parameter.name_end,
@@ -787,14 +818,18 @@
         require_token_punct_kind token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref FelisPunctKind::punct_semicolon error_ref matched_ref;
     };
     #if i32_eq (matched_ref .> get) 1i32 {
+        #let type_term : FelisTerm = type_ref .> get;
+        #let value_term : FelisTerm = value_ref .> get;
         statement_ref .> set FelisStatement {
             kind = encode_felis_statement_kind FelisStatementKind::statement_let 0i32,
             name_value = name_value_ref .> get,
             name_start = name_start_ref .> get,
             name_end = name_end_ref .> get,
             operator = operator_ref .> get,
-            type_node = felis_term_to_node (type_ref .> get),
-            value_node = felis_term_to_node (value_ref .> get),
+            type_node = felis_term_to_node type_term,
+            value_node = felis_term_to_node value_term,
+            type_expr = type_term.expr,
+            value_expr = value_term.expr,
             item_kind = encode_felis_item_kind FelisItemKind::item_unknown 0i32,
             start = statement_start,
             end = previous_token_end token_end_ref cursor_ref
@@ -856,6 +891,8 @@
                 operator = encode_felis_let_operator FelisLetOperator::let_operator_unknown 0i32,
                 type_node = empty_felis_term_node 0i32,
                 value_node = empty_felis_term_node 0i32,
+                type_expr = FelisExpr::unknown_expr,
+                value_expr = FelisExpr::unknown_expr,
                 item_kind = item.kind,
                 start = item.start,
                 end = item.end
@@ -886,6 +923,8 @@
                 operator = encode_felis_let_operator FelisLetOperator::let_operator_unknown 0i32,
                 type_node = empty_felis_term_node 0i32,
                 value_node = felis_term_to_node expression,
+                type_expr = FelisExpr::unknown_expr,
+                value_expr = expression.expr,
                 item_kind = encode_felis_item_kind FelisItemKind::item_unknown 0i32,
                 start = expression.start,
                 end = expression.end
@@ -904,6 +943,7 @@
         term_ref .> set FelisTerm {
             kind = encode_felis_term_kind FelisTermKind::term_block 0i32,
             value = 0i32,
+            expr = FelisExpr::unknown_expr,
             name_value = 0i32,
             name_start = 0i32,
             name_end = 0i32,
