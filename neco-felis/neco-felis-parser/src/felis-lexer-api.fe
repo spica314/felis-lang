@@ -1,0 +1,125 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::dyn_array_get_i32;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::string::String;
+#use std_core::string::string_from_slice_parts;
+#use std_core::string::string_set_u8;
+#use neco-felis-parser::parse_felis_source_tokens_with_status;
+
+#entrypoint main;
+
+#proc expect_i32 : (actual : i32) -> (expected : i32) -> (failure_code : i32) -> (exit_code_ref : &^ i32) -> () {
+    #if i32_eq (exit_code_ref .> get) 42i32 {
+        #if i32_eq actual expected {
+            ()
+        } #else {
+            exit_code_ref .> set failure_code;
+        };
+    };
+    ()
+}
+
+#fn main : () #with IO {
+    #let token_tag_slice_ref : &^ Slice i32 <- IO::slice_new i32 0x20i32;
+    #let token_tag_ref : DynArray i32 = DynArray::dyn_array token_tag_slice_ref 0i64;
+    #letref #excl token_tag_ref : &^ DynArray #borrow token_tag_ref;
+    #let token_value_slice_ref : &^ Slice i32 <- IO::slice_new i32 0x20i32;
+    #let token_value_ref : DynArray i32 = DynArray::dyn_array token_value_slice_ref 0i64;
+    #letref #excl token_value_ref : &^ DynArray #borrow token_value_ref;
+    #let token_start_slice_ref : &^ Slice i32 <- IO::slice_new i32 0x20i32;
+    #let token_start_ref : DynArray i32 = DynArray::dyn_array token_start_slice_ref 0i64;
+    #letref #excl token_start_ref : &^ DynArray #borrow token_start_ref;
+    #let token_end_slice_ref : &^ Slice i32 <- IO::slice_new i32 0x20i32;
+    #let token_end_ref : DynArray i32 = DynArray::dyn_array token_end_slice_ref 0i64;
+    #letref #excl token_end_ref : &^ DynArray #borrow token_end_ref;
+    #let token_count_ref : i32 = 0i32;
+    #letref #excl token_count_ref : &^ i32 #borrow token_count_ref;
+    #let status_ref : i32 = 0i32;
+    #letref #excl status_ref : &^ i32 #borrow status_ref;
+    #let error_start_ref : i32 = 0i32;
+    #letref #excl error_start_ref : &^ i32 #borrow error_start_ref;
+    #let error_end_ref : i32 = 0i32;
+    #letref #excl error_end_ref : &^ i32 #borrow error_end_ref;
+    #let exit_code_ref : i32 = 42i32;
+    #letref #excl exit_code_ref : &^ i32 #borrow exit_code_ref;
+
+    #let source_slice_ref : &^ Slice u8 <- IO::slice_new u8 23i32;
+    #let source : String = string_from_slice_parts source_slice_ref 23i32 23i32;
+    string_set_u8 source 0i32 '#';
+    string_set_u8 source 1i32 'f';
+    string_set_u8 source 2i32 'n';
+    string_set_u8 source 3i32 ' ';
+    string_set_u8 source 4i32 'm';
+    string_set_u8 source 5i32 'a';
+    string_set_u8 source 6i32 'i';
+    string_set_u8 source 7i32 'n';
+    string_set_u8 source 8i32 ' ';
+    string_set_u8 source 9i32 ':';
+    string_set_u8 source 10i32 ' ';
+    string_set_u8 source 11i32 'i';
+    string_set_u8 source 12i32 '3';
+    string_set_u8 source 13i32 '2';
+    string_set_u8 source 14i32 ' ';
+    string_set_u8 source 15i32 '{';
+    string_set_u8 source 16i32 ' ';
+    string_set_u8 source 17i32 0x22u8;
+    string_set_u8 source 18i32 'h';
+    string_set_u8 source 19i32 'i';
+    string_set_u8 source 20i32 0x22u8;
+    string_set_u8 source 21i32 ' ';
+    string_set_u8 source 22i32 '}';
+    parse_felis_source_tokens_with_status source token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref status_ref error_start_ref error_end_ref;
+
+    expect_i32 (status_ref .> get) 0i32 1i32 exit_code_ref;
+    expect_i32 (token_count_ref .> get) 8i32 2i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_tag_ref 0i32) 4i32 3i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_value_ref 0i32) 3i32 4i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_start_ref 0i32) 0i32 5i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_end_ref 0i32) 3i32 6i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_tag_ref 1i32) 1i32 7i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_value_ref 1i32) 4i32 8i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_start_ref 1i32) 4i32 9i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_end_ref 1i32) 8i32 10i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_tag_ref 2i32) 5i32 11i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_value_ref 2i32) 7i32 12i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_tag_ref 5i32) 2i32 13i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_value_ref 5i32) 2i32 14i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_start_ref 5i32) 17i32 15i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_end_ref 5i32) 21i32 16i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_tag_ref 7i32) 7i32 17i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_start_ref 7i32) 23i32 18i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_end_ref 7i32) 23i32 19i32 exit_code_ref;
+
+    #let bad_string_slice_ref : &^ Slice u8 <- IO::slice_new u8 4i32;
+    #let bad_string : String = string_from_slice_parts bad_string_slice_ref 4i32 4i32;
+    string_set_u8 bad_string 0i32 0x22u8;
+    string_set_u8 bad_string 1i32 'b';
+    string_set_u8 bad_string 2i32 'a';
+    string_set_u8 bad_string 3i32 'd';
+    parse_felis_source_tokens_with_status bad_string token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref status_ref error_start_ref error_end_ref;
+    expect_i32 (status_ref .> get) 1i32 24i32 exit_code_ref;
+    expect_i32 (error_start_ref .> get) 0i32 25i32 exit_code_ref;
+    expect_i32 (error_end_ref .> get) 4i32 26i32 exit_code_ref;
+    expect_i32 (dyn_array_get_i32 token_end_ref 0i32) 4i32 27i32 exit_code_ref;
+
+    #let bad_char_slice_ref : &^ Slice u8 <- IO::slice_new u8 2i32;
+    #let bad_char : String = string_from_slice_parts bad_char_slice_ref 2i32 2i32;
+    string_set_u8 bad_char 0i32 0x27u8;
+    string_set_u8 bad_char 1i32 'x';
+    parse_felis_source_tokens_with_status bad_char token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref status_ref error_start_ref error_end_ref;
+    expect_i32 (status_ref .> get) 2i32 28i32 exit_code_ref;
+    expect_i32 (error_start_ref .> get) 0i32 29i32 exit_code_ref;
+    expect_i32 (error_end_ref .> get) 2i32 30i32 exit_code_ref;
+
+    #let bad_byte_slice_ref : &^ Slice u8 <- IO::slice_new u8 1i32;
+    #let bad_byte : String = string_from_slice_parts bad_byte_slice_ref 1i32 1i32;
+    string_set_u8 bad_byte 0i32 '@';
+    parse_felis_source_tokens_with_status bad_byte token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref status_ref error_start_ref error_end_ref;
+    expect_i32 (status_ref .> get) 3i32 31i32 exit_code_ref;
+    expect_i32 (error_start_ref .> get) 0i32 32i32 exit_code_ref;
+    expect_i32 (error_end_ref .> get) 1i32 33i32 exit_code_ref;
+
+    #let _ : () <- IO::exit (exit_code_ref .> get);
+    ()
+}

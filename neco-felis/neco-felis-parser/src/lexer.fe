@@ -37,6 +37,16 @@
     token_count_ref .> set (i32_add token_index 1i32);
     ()
 }
+
+#proc mark_felis_lexer_error : (status : i32) -> (start : i32) -> (end : i32) -> (status_ref : &^ i32) -> (error_start_ref : &^ i32) -> (error_end_ref : &^ i32) -> () {
+    #if i32_eq (status_ref .> get) 0i32 {
+        status_ref .> set status;
+        error_start_ref .> set start;
+        error_end_ref .> set end;
+    };
+    ()
+}
+
 #pub #proc mark_ident_part : (byte : u8) -> (is_ident_ref : &^ i32) -> () {
     #if u8_gt byte '`' {
         #if u8_lt byte '{' {
@@ -434,12 +444,15 @@
     ()
 }
 
-#pub #proc parse_felis_source_tokens : (source : String) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> () {
+#pub #proc parse_felis_source_tokens_with_status : (source : String) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> (status_ref : &^ i32) -> (error_start_ref : &^ i32) -> (error_end_ref : &^ i32) -> () {
     #let source_ref : DynArray u8 = string_as_dyn_array source;
     #let source_len : i32 = string_len source;
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     token_count_ref .> set 0i32;
+    status_ref .> set 0i32;
+    error_start_ref .> set 0i32;
+    error_end_ref .> set 0i32;
     #loop {
         #if i32_gte (source_index_ref .> get) source_len {
             #break;
@@ -555,7 +568,7 @@
                 append_parsed_felis_token 0i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
                 source_index_ref .> set keyword_start;
             };
-        } #else #if u8_eq byte '"' {
+        } #else #if u8_eq byte 0x22u8 {
             #let string_start : i32 = source_index_ref .> get;
             #let string_value_start : i32 = i32_add string_start 1i32;
             #let string_end_ref : i32 = string_value_start;
@@ -565,20 +578,27 @@
                     #break;
                 };
                 #let string_byte : u8 = dyn_array_get_u8 source_ref (string_end_ref .> get);
-                #if u8_eq string_byte '"' {
+                #if u8_eq string_byte 0x22u8 {
                     #break;
                 };
                 string_end_ref .> set (i32_add (string_end_ref .> get) 1i32);
             };
-            #let next_source_index : i32 = i32_add (string_end_ref .> get) 1i32;
+            #let next_source_index_ref : i32 = source_len;
+            #letref #excl next_source_index_ref : &^ i32 #borrow next_source_index_ref;
+            #if i32_gte (string_end_ref .> get) source_len {
+                mark_felis_lexer_error 1i32 string_start source_len status_ref error_start_ref error_end_ref;
+                next_source_index_ref .> set source_len;
+            } #else {
+                next_source_index_ref .> set (i32_add (string_end_ref .> get) 1i32);
+            };
             #let token_payload : FelisTokenPayload = FelisTokenPayload {
                 value = i32_sub (string_end_ref .> get) string_value_start,
                 start = string_start,
-                end = next_source_index
+                end = next_source_index_ref .> get
             };
             append_parsed_felis_token 2i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
-            source_index_ref .> set next_source_index;
-        } #else #if u8_eq byte '\'' {
+            source_index_ref .> set (next_source_index_ref .> get);
+        } #else #if u8_eq byte 0x27u8 {
             #let char_start : i32 = source_index_ref .> get;
             #let char_value_index : i32 = i32_add char_start 1i32;
             #let char_value_ref : i32 = 0i32;
@@ -587,17 +607,23 @@
                 #let char_byte : u8 = dyn_array_get_u8 source_ref char_value_index;
                 char_value_ref .> set (i32_from_u8 char_byte);
             };
-            #let char_end_ref : i32 = i32_add char_value_index 1i32;
+            #let char_end_ref : i32 = char_value_index;
             #letref #excl char_end_ref : &^ i32 #borrow char_end_ref;
+            #let char_terminated_ref : i32 = 0i32;
+            #letref #excl char_terminated_ref : &^ i32 #borrow char_terminated_ref;
             #loop {
                 #if i32_gte (char_end_ref .> get) source_len {
                     #break;
                 };
                 #let char_end_byte : u8 = dyn_array_get_u8 source_ref (char_end_ref .> get);
                 char_end_ref .> set (i32_add (char_end_ref .> get) 1i32);
-                #if u8_eq char_end_byte '\'' {
+                #if u8_eq char_end_byte 0x27u8 {
+                    char_terminated_ref .> set 1i32;
                     #break;
                 };
+            };
+            #if i32_eq (char_terminated_ref .> get) 0i32 {
+                mark_felis_lexer_error 2i32 char_start source_len status_ref error_start_ref error_end_ref;
             };
             #let token_payload : FelisTokenPayload = FelisTokenPayload {
                 value = char_value_ref .> get,
@@ -742,6 +768,7 @@
                             append_parsed_felis_token 1i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
                             source_index_ref .> set (ident_end_ref .> get);
                         } #else {
+                            mark_felis_lexer_error 3i32 (source_index_ref .> get) next_index status_ref error_start_ref error_end_ref;
                             #let token_payload : FelisTokenPayload = FelisTokenPayload {
                                 value = i32_from_u8 byte,
                                 start = source_index_ref .> get,
@@ -781,6 +808,7 @@
                         append_parsed_felis_token 1i32 token_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
                         source_index_ref .> set (ident_end_ref .> get);
                     } #else {
+                        mark_felis_lexer_error 3i32 (source_index_ref .> get) next_index status_ref error_start_ref error_end_ref;
                         #let token_payload : FelisTokenPayload = FelisTokenPayload {
                             value = i32_from_u8 byte,
                             start = source_index_ref .> get,
@@ -807,5 +835,16 @@
         end = source_len
     };
     append_parsed_felis_token 7i32 eof_payload token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
+    ()
+}
+
+#pub #proc parse_felis_source_tokens : (source : String) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> () {
+    #let status_ref : i32 = 0i32;
+    #letref #excl status_ref : &^ i32 #borrow status_ref;
+    #let error_start_ref : i32 = 0i32;
+    #letref #excl error_start_ref : &^ i32 #borrow error_start_ref;
+    #let error_end_ref : i32 = 0i32;
+    #letref #excl error_end_ref : &^ i32 #borrow error_end_ref;
+    parse_felis_source_tokens_with_status source token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref status_ref error_start_ref error_end_ref;
     ()
 }

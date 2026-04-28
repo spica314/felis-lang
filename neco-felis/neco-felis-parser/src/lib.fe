@@ -22,5 +22,6 @@
 #pub #use #package::syntax::decode_felis_punct_kind;
 #pub #use #package::syntax::encode_parsed_felis_stmt_kind;
 #pub #use #package::lexer::parse_felis_source_tokens;
+#pub #use #package::lexer::parse_felis_source_tokens_with_status;
 #pub #use #package::parser::parse_felis_first_string_literal_expr;
 #pub #use #package::parser::parse_felis_source;
