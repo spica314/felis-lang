@@ -914,6 +914,58 @@ fn parses_enum_match_string_package_root() {
 }
 
 #[test]
+fn parses_enum_match_struct_string_package_root() {
+    let root = repo_root().join("tests/testcases/enum-match-struct-string");
+    let parsed = parse_root(&root).expect("enum-match-struct-string package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "enum-match-struct-string");
+    assert_eq!(package.source_files.len(), 1);
+
+    let syntax = &package.source_files[0].syntax;
+    let struct_decl = syntax
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::Struct(struct_decl) => Some(struct_decl),
+            _ => None,
+        })
+        .expect("struct declaration");
+    assert_eq!(struct_decl.name.name, "Envelope");
+    assert_eq!(struct_decl.fields.len(), 1);
+    assert_eq!(struct_decl.fields[0].name, "body");
+    let Term::Path(field_ty) = &struct_decl.fields[0].ty else {
+        panic!("expected String field type");
+    };
+    assert_eq!(field_ty.segments[0].name, "String");
+
+    let type_decl = syntax
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::Type(type_decl) => Some(type_decl),
+            _ => None,
+        })
+        .expect("type declaration");
+    assert_eq!(type_decl.name.name, "Event");
+    assert_eq!(type_decl.constructors.len(), 1);
+    assert_eq!(type_decl.constructors[0].name.name, "received");
+
+    let Term::Arrow(arrow) = &type_decl.constructors[0].ty else {
+        panic!("expected Envelope payload constructor");
+    };
+    let ArrowParameter::Domain(payload_ty) = &arrow.parameter else {
+        panic!("expected Envelope payload type");
+    };
+    let Term::Path(payload_path) = payload_ty.as_ref() else {
+        panic!("expected Envelope payload type");
+    };
+    assert_eq!(payload_path.segments[0].name, "Envelope");
+}
+
+#[test]
 fn parses_type_rc_match_package_root() {
     let root = repo_root().join("tests/testcases/type-rc-match");
     let parsed = parse_root(&root).expect("type-rc-match package parses");

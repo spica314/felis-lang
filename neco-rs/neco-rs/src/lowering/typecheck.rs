@@ -87,6 +87,7 @@ pub(crate) fn validate_value_against_type(
                 "i32" if matches!(value, Value::I32(_)) => Ok(()),
                 "u8" if matches!(value, Value::U8(_)) => Ok(()),
                 "FileDescriptor" if matches!(value, Value::FileDescriptor(_)) => Ok(()),
+                "String" if matches!(value, Value::ByteString(_)) => Ok(()),
                 type_name => match value {
                     Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
                     Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),

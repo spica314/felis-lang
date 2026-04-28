@@ -354,6 +354,13 @@ fn compiles_and_runs_enum_match_string_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_enum_match_struct_string_fixture() {
+    let root = repo_root().join("tests/testcases/enum-match-struct-string");
+    let status = run_fixture_status(&root, "enum-match-struct-string");
+    assert_eq!(status.code(), Some(65));
+}
+
+#[test]
 fn compiles_and_runs_type_rc_match_single_fixture() {
     let root = repo_root().join("tests/testcases/type-rc-match");
     let status = run_fixture_status(&root, "type-rc-match-single");
