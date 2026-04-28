@@ -1,6 +1,6 @@
 #use std_core::io::IO;
 #use std_core::primitive::array::DynArray;
-#use std_core::primitive::array::RawArray;
+#use std_core::primitive::array::Slice;
 #use std_core::primitive::array::dyn_array_get_u8;
 #use std_core::primitive::array::dyn_array_set_i32;
 #use std_core::primitive::array::dyn_array_set_u8;
@@ -17,7 +17,7 @@
 #use std_core::string::String;
 #use std_core::string::string_as_dyn_array;
 #use std_core::string::string_copy_from_string_range_into;
-#use std_core::string::string_from_raw_parts;
+#use std_core::string::string_from_slice_parts;
 #use std_core::string::string_len;
 #use #package::syntax::FelisExpr;
 #use #package::syntax::FelisToken;
@@ -248,8 +248,8 @@
         };
     };
     #let value_len : i32 = i32_sub (string_end_ref .> get) (string_start_ref .> get);
-    #let raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 0x100000i32;
-    #let value : String = string_from_raw_parts raw_ref 0x100000i32 value_len;
+    #let slice_ref : &^ Slice u8 <- IO::slice_new u8 0x100000i32;
+    #let value : String = string_from_slice_parts slice_ref 0x100000i32 value_len;
     string_copy_from_string_range_into source (string_start_ref .> get) (string_end_ref .> get) value;
     FelisExpr::string_literal_expr value
 }

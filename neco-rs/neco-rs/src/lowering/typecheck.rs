@@ -9,7 +9,7 @@ pub(crate) fn validate_value_against_type(
     ty: &Term,
     program: &LoweredProgram,
 ) -> Result<()> {
-    if let Some(element_type) = parse_raw_array_type_annotation(ty)? {
+    if let Some(element_type) = parse_slice_type_annotation(ty)? {
         return match value {
             Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
@@ -108,7 +108,7 @@ fn validate_reference_value_against_type(
     referent: &Term,
     program: &LoweredProgram,
 ) -> Result<()> {
-    if let Some(element_type) = parse_raw_array_type_annotation(referent)? {
+    if let Some(element_type) = parse_slice_type_annotation(referent)? {
         return match value {
             Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
@@ -264,7 +264,7 @@ fn parse_unsized_array_type_annotation(ty: &Term) -> Result<Option<ArrayElementT
     parse_array_element_type(element_type_term, "Array").map(Some)
 }
 
-fn parse_raw_array_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
+fn parse_slice_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
     let Term::Application { callee, arguments } = ty else {
         return Ok(None);
     };
@@ -274,7 +274,7 @@ fn parse_raw_array_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>
     let Some(type_name) = path.segments.last().map(|segment| segment.name.as_str()) else {
         return Ok(None);
     };
-    if type_name != "RawArray" {
+    if type_name != "Slice" {
         return Ok(None);
     }
     if path.starts_with_package

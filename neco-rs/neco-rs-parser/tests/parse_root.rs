@@ -177,17 +177,17 @@ fn parses_dyn_array_type_annotation_package_root() {
         exclusive,
     } = array_ref.ty.as_ref()
     else {
-        panic!("expected `&^ RawArray i32` reference type");
+        panic!("expected `&^ Slice i32` reference type");
     };
     assert!(*exclusive);
     let Term::Application { callee, arguments } = referent.as_ref() else {
-        panic!("expected `RawArray i32` application");
+        panic!("expected `Slice i32` application");
     };
     let Term::Path(array_path) = callee.as_ref() else {
-        panic!("expected `RawArray` callee path");
+        panic!("expected `Slice` callee path");
     };
     assert_eq!(array_path.segments.len(), 1);
-    assert_eq!(array_path.segments[0].name, "RawArray");
+    assert_eq!(array_path.segments[0].name, "Slice");
     assert_eq!(arguments.len(), 1);
     let Term::Path(element_type_path) = &arguments[0] else {
         panic!("expected element type path");

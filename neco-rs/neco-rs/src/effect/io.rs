@@ -131,14 +131,14 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(true))
         }
-        ["IO", "array_new"] | ["IO", "raw_array_new"] => {
+        ["IO", "array_new"] | ["IO", "slice_new"] => {
             let (element_type, length) = match parse_array_new_arguments(path[1], arguments) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
             let kind = match path[1] {
                 "array_new" => ArrayKind::Fixed,
-                "raw_array_new" => ArrayKind::Dynamic,
+                "slice_new" => ArrayKind::Dynamic,
                 _ => unreachable!(),
             };
             let array_slot = state.allocate_array(element_type, kind, length, program);

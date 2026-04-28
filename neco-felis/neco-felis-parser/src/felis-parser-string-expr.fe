@@ -1,8 +1,8 @@
 #use std_core::io::IO;
-#use std_core::primitive::array::RawArray;
+#use std_core::primitive::array::Slice;
 #use std_core::primitive::i32::i32;
 #use std_core::string::String;
-#use std_core::string::string_from_raw_parts;
+#use std_core::string::string_from_slice_parts;
 #use std_core::string::string_len;
 #use std_core::string::string_set_u8;
 #use neco-felis-parser::FelisExpr;
@@ -11,8 +11,8 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let source_raw_ref : &^ RawArray u8 <- IO::raw_array_new u8 0x0ei32;
-    #let source : String = string_from_raw_parts source_raw_ref 0x0ei32 0x0ei32;
+    #let source_slice_ref : &^ Slice u8 <- IO::slice_new u8 0x0ei32;
+    #let source : String = string_from_slice_parts source_slice_ref 0x0ei32 0x0ei32;
     string_set_u8 source 0i32 'w';
     string_set_u8 source 1i32 'r';
     string_set_u8 source 2i32 'i';

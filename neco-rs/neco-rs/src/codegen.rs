@@ -715,16 +715,12 @@ fn array_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
     panic!("unknown array slot {slot}");
 }
 
-fn array_capacity_offset(program: &LoweredProgram, slot: usize) -> i32 {
+fn array_len_offset(program: &LoweredProgram, slot: usize) -> i32 {
     array_slot_offset(program, slot) + 8
 }
 
 fn array_logical_len_offset(program: &LoweredProgram, slot: usize) -> i32 {
-    let array = array_allocation(program, slot);
-    match array.kind {
-        ArrayKind::Fixed => array_slot_offset(program, slot) + 8,
-        ArrayKind::Dynamic => array_slot_offset(program, slot) + 16,
-    }
+    array_len_offset(program, slot)
 }
 
 fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
@@ -779,23 +775,17 @@ fn emit_array_initializers(program: &LoweredProgram, code: &mut Vec<u8>) {
         code.extend_from_slice(&data_offset.to_le_bytes());
         code.extend_from_slice(&[0x48, 0x89, 0x85]);
         code.extend_from_slice(&slot_offset.to_le_bytes());
-        let capacity_offset = array_capacity_offset(program, array.slot);
+        let len_offset = array_len_offset(program, array.slot);
         code.extend_from_slice(&[0x48, 0xc7, 0x85]);
-        code.extend_from_slice(&capacity_offset.to_le_bytes());
+        code.extend_from_slice(&len_offset.to_le_bytes());
         code.extend_from_slice(&(array.len as u32).to_le_bytes());
-        if array.kind == ArrayKind::Dynamic {
-            let logical_len_offset = array_logical_len_offset(program, array.slot);
-            code.extend_from_slice(&[0x48, 0xc7, 0x85]);
-            code.extend_from_slice(&logical_len_offset.to_le_bytes());
-            code.extend_from_slice(&(array.len as u32).to_le_bytes());
-        }
     }
 }
 
 fn array_descriptor_size(array: &ArrayAllocation) -> usize {
     match array.kind {
         ArrayKind::Fixed => 16,
-        ArrayKind::Dynamic => 24,
+        ArrayKind::Dynamic => 16,
     }
 }
 
