@@ -3,12 +3,24 @@
 #pub #mod parser;
 
 #pub #use #package::syntax::FelisTokenPayload;
+#pub #use #package::syntax::FelisTokenKind;
+#pub #use #package::syntax::FelisKeywordKind;
+#pub #use #package::syntax::FelisPunctKind;
+#pub #use #package::syntax::FelisParseState;
+#pub #use #package::syntax::ParsedFelisStmtKind;
 #pub #use #package::syntax::FelisToken;
 #pub #use #package::syntax::FelisTokens;
 #pub #use #package::syntax::FelisExpr;
 #pub #use #package::syntax::FelisStmt;
 #pub #use #package::syntax::FelisStmts;
 #pub #use #package::syntax::FelisProgram;
+#pub #use #package::syntax::encode_felis_token_kind;
+#pub #use #package::syntax::decode_felis_token_kind;
+#pub #use #package::syntax::encode_felis_keyword_kind;
+#pub #use #package::syntax::decode_felis_keyword_kind;
+#pub #use #package::syntax::encode_felis_punct_kind;
+#pub #use #package::syntax::decode_felis_punct_kind;
+#pub #use #package::syntax::encode_parsed_felis_stmt_kind;
 #pub #use #package::lexer::parse_felis_source_tokens;
 #pub #use #package::parser::parse_felis_first_string_literal_expr;
 #pub #use #package::parser::parse_felis_source;

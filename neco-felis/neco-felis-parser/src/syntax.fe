@@ -1,10 +1,94 @@
 #use std_core::primitive::u8::u8;
+#use std_core::primitive::i32::i32_eq;
 #use std_core::string::String;
 
 #pub #struct FelisTokenPayload : Type[0] {
     value : i32,
     start : i32,
     end : i32,
+}
+
+#pub #type FelisTokenKind : Type[0] {
+    token_byte : FelisTokenKind,
+    token_ident : FelisTokenKind,
+    token_string : FelisTokenKind,
+    token_int_literal : FelisTokenKind,
+    token_keyword : FelisTokenKind,
+    token_punct : FelisTokenKind,
+    token_char_literal : FelisTokenKind,
+    token_eof : FelisTokenKind,
+    token_unknown : FelisTokenKind,
+}
+
+#pub #type FelisKeywordKind : Type[0] {
+    keyword_entrypoint : FelisKeywordKind,
+    keyword_use : FelisKeywordKind,
+    keyword_fn : FelisKeywordKind,
+    keyword_proc : FelisKeywordKind,
+    keyword_let : FelisKeywordKind,
+    keyword_letref : FelisKeywordKind,
+    keyword_if : FelisKeywordKind,
+    keyword_else : FelisKeywordKind,
+    keyword_loop : FelisKeywordKind,
+    keyword_break : FelisKeywordKind,
+    keyword_continue : FelisKeywordKind,
+    keyword_match : FelisKeywordKind,
+    keyword_type : FelisKeywordKind,
+    keyword_struct : FelisKeywordKind,
+    keyword_pub : FelisKeywordKind,
+    keyword_with : FelisKeywordKind,
+    keyword_borrow : FelisKeywordKind,
+    keyword_excl : FelisKeywordKind,
+    keyword_forall : FelisKeywordKind,
+    keyword_package : FelisKeywordKind,
+    keyword_as : FelisKeywordKind,
+    keyword_bind_builtin : FelisKeywordKind,
+    keyword_mod : FelisKeywordKind,
+    keyword_theorem : FelisKeywordKind,
+    keyword_prop : FelisKeywordKind,
+    keyword_unknown : FelisKeywordKind,
+}
+
+#pub #type FelisPunctKind : Type[0] {
+    punct_left_paren : FelisPunctKind,
+    punct_right_paren : FelisPunctKind,
+    punct_left_brace : FelisPunctKind,
+    punct_right_brace : FelisPunctKind,
+    punct_left_bracket : FelisPunctKind,
+    punct_right_bracket : FelisPunctKind,
+    punct_colon : FelisPunctKind,
+    punct_semicolon : FelisPunctKind,
+    punct_comma : FelisPunctKind,
+    punct_equals : FelisPunctKind,
+    punct_dot : FelisPunctKind,
+    punct_ampersand : FelisPunctKind,
+    punct_underscore : FelisPunctKind,
+    punct_double_colon : FelisPunctKind,
+    punct_arrow : FelisPunctKind,
+    punct_fat_arrow : FelisPunctKind,
+    punct_left_arrow : FelisPunctKind,
+    punct_dot_arrow : FelisPunctKind,
+    punct_ampersand_caret : FelisPunctKind,
+    punct_unknown : FelisPunctKind,
+}
+
+#pub #type FelisParseState : Type[0] {
+    parse_idle : FelisParseState,
+    parse_exit_expr : FelisParseState,
+    parse_write_expr : FelisParseState,
+    parse_let_name : FelisParseState,
+    parse_let_after_name : FelisParseState,
+    parse_let_expr_start : FelisParseState,
+    parse_let_expr : FelisParseState,
+    parse_expr_stmt : FelisParseState,
+}
+
+#pub #type ParsedFelisStmtKind : Type[0] {
+    parsed_exit_stmt : ParsedFelisStmtKind,
+    parsed_write_stmt : ParsedFelisStmtKind,
+    parsed_let_i32_stmt : ParsedFelisStmtKind,
+    parsed_expr_stmt : ParsedFelisStmtKind,
+    parsed_unknown_stmt : ParsedFelisStmtKind,
 }
 
 #pub #type FelisToken : Type[0] {
@@ -16,6 +100,208 @@
     char_literal : FelisTokenPayload -> FelisToken,
     int_literal : FelisTokenPayload -> FelisToken,
     eof : FelisTokenPayload -> FelisToken,
+}
+
+#pub #fn encode_felis_token_kind : (kind : FelisTokenKind) -> (unknown_code : i32) -> i32 {
+    #match kind {
+        FelisTokenKind::token_byte => 0i32,
+        FelisTokenKind::token_ident => 1i32,
+        FelisTokenKind::token_string => 2i32,
+        FelisTokenKind::token_int_literal => 3i32,
+        FelisTokenKind::token_keyword => 4i32,
+        FelisTokenKind::token_punct => 5i32,
+        FelisTokenKind::token_char_literal => 6i32,
+        FelisTokenKind::token_eof => 7i32,
+        FelisTokenKind::token_unknown => unknown_code,
+    }
+}
+
+#pub #proc decode_felis_token_kind : (code : i32) -> (kind_ref : &^ FelisTokenKind) -> () {
+    kind_ref .> set FelisTokenKind::token_unknown;
+    #if i32_eq code 0i32 {
+        kind_ref .> set FelisTokenKind::token_byte;
+    } #else #if i32_eq code 1i32 {
+        kind_ref .> set FelisTokenKind::token_ident;
+    } #else #if i32_eq code 2i32 {
+        kind_ref .> set FelisTokenKind::token_string;
+    } #else #if i32_eq code 3i32 {
+        kind_ref .> set FelisTokenKind::token_int_literal;
+    } #else #if i32_eq code 4i32 {
+        kind_ref .> set FelisTokenKind::token_keyword;
+    } #else #if i32_eq code 5i32 {
+        kind_ref .> set FelisTokenKind::token_punct;
+    } #else #if i32_eq code 6i32 {
+        kind_ref .> set FelisTokenKind::token_char_literal;
+    } #else #if i32_eq code 7i32 {
+        kind_ref .> set FelisTokenKind::token_eof;
+    };
+    ()
+}
+
+#pub #fn encode_felis_keyword_kind : (kind : FelisKeywordKind) -> (unknown_code : i32) -> i32 {
+    #match kind {
+        FelisKeywordKind::keyword_entrypoint => 1i32,
+        FelisKeywordKind::keyword_use => 2i32,
+        FelisKeywordKind::keyword_fn => 3i32,
+        FelisKeywordKind::keyword_proc => 4i32,
+        FelisKeywordKind::keyword_let => 5i32,
+        FelisKeywordKind::keyword_letref => 6i32,
+        FelisKeywordKind::keyword_if => 7i32,
+        FelisKeywordKind::keyword_else => 8i32,
+        FelisKeywordKind::keyword_loop => 9i32,
+        FelisKeywordKind::keyword_break => 10i32,
+        FelisKeywordKind::keyword_continue => 11i32,
+        FelisKeywordKind::keyword_match => 12i32,
+        FelisKeywordKind::keyword_type => 13i32,
+        FelisKeywordKind::keyword_struct => 14i32,
+        FelisKeywordKind::keyword_pub => 15i32,
+        FelisKeywordKind::keyword_with => 16i32,
+        FelisKeywordKind::keyword_borrow => 17i32,
+        FelisKeywordKind::keyword_excl => 18i32,
+        FelisKeywordKind::keyword_forall => 19i32,
+        FelisKeywordKind::keyword_package => 20i32,
+        FelisKeywordKind::keyword_as => 21i32,
+        FelisKeywordKind::keyword_bind_builtin => 22i32,
+        FelisKeywordKind::keyword_mod => 23i32,
+        FelisKeywordKind::keyword_theorem => 24i32,
+        FelisKeywordKind::keyword_prop => 25i32,
+        FelisKeywordKind::keyword_unknown => unknown_code,
+    }
+}
+
+#pub #proc decode_felis_keyword_kind : (code : i32) -> (kind_ref : &^ FelisKeywordKind) -> () {
+    kind_ref .> set FelisKeywordKind::keyword_unknown;
+    #if i32_eq code 1i32 {
+        kind_ref .> set FelisKeywordKind::keyword_entrypoint;
+    } #else #if i32_eq code 2i32 {
+        kind_ref .> set FelisKeywordKind::keyword_use;
+    } #else #if i32_eq code 3i32 {
+        kind_ref .> set FelisKeywordKind::keyword_fn;
+    } #else #if i32_eq code 4i32 {
+        kind_ref .> set FelisKeywordKind::keyword_proc;
+    } #else #if i32_eq code 5i32 {
+        kind_ref .> set FelisKeywordKind::keyword_let;
+    } #else #if i32_eq code 6i32 {
+        kind_ref .> set FelisKeywordKind::keyword_letref;
+    } #else #if i32_eq code 7i32 {
+        kind_ref .> set FelisKeywordKind::keyword_if;
+    } #else #if i32_eq code 8i32 {
+        kind_ref .> set FelisKeywordKind::keyword_else;
+    } #else #if i32_eq code 9i32 {
+        kind_ref .> set FelisKeywordKind::keyword_loop;
+    } #else #if i32_eq code 10i32 {
+        kind_ref .> set FelisKeywordKind::keyword_break;
+    } #else #if i32_eq code 11i32 {
+        kind_ref .> set FelisKeywordKind::keyword_continue;
+    } #else #if i32_eq code 12i32 {
+        kind_ref .> set FelisKeywordKind::keyword_match;
+    } #else #if i32_eq code 13i32 {
+        kind_ref .> set FelisKeywordKind::keyword_type;
+    } #else #if i32_eq code 14i32 {
+        kind_ref .> set FelisKeywordKind::keyword_struct;
+    } #else #if i32_eq code 15i32 {
+        kind_ref .> set FelisKeywordKind::keyword_pub;
+    } #else #if i32_eq code 16i32 {
+        kind_ref .> set FelisKeywordKind::keyword_with;
+    } #else #if i32_eq code 17i32 {
+        kind_ref .> set FelisKeywordKind::keyword_borrow;
+    } #else #if i32_eq code 18i32 {
+        kind_ref .> set FelisKeywordKind::keyword_excl;
+    } #else #if i32_eq code 19i32 {
+        kind_ref .> set FelisKeywordKind::keyword_forall;
+    } #else #if i32_eq code 20i32 {
+        kind_ref .> set FelisKeywordKind::keyword_package;
+    } #else #if i32_eq code 21i32 {
+        kind_ref .> set FelisKeywordKind::keyword_as;
+    } #else #if i32_eq code 22i32 {
+        kind_ref .> set FelisKeywordKind::keyword_bind_builtin;
+    } #else #if i32_eq code 23i32 {
+        kind_ref .> set FelisKeywordKind::keyword_mod;
+    } #else #if i32_eq code 24i32 {
+        kind_ref .> set FelisKeywordKind::keyword_theorem;
+    } #else #if i32_eq code 25i32 {
+        kind_ref .> set FelisKeywordKind::keyword_prop;
+    };
+    ()
+}
+
+#pub #fn encode_felis_punct_kind : (kind : FelisPunctKind) -> (unknown_code : i32) -> i32 {
+    #match kind {
+        FelisPunctKind::punct_left_paren => 1i32,
+        FelisPunctKind::punct_right_paren => 2i32,
+        FelisPunctKind::punct_left_brace => 3i32,
+        FelisPunctKind::punct_right_brace => 4i32,
+        FelisPunctKind::punct_left_bracket => 5i32,
+        FelisPunctKind::punct_right_bracket => 6i32,
+        FelisPunctKind::punct_colon => 7i32,
+        FelisPunctKind::punct_semicolon => 8i32,
+        FelisPunctKind::punct_comma => 9i32,
+        FelisPunctKind::punct_equals => 10i32,
+        FelisPunctKind::punct_dot => 11i32,
+        FelisPunctKind::punct_ampersand => 12i32,
+        FelisPunctKind::punct_underscore => 13i32,
+        FelisPunctKind::punct_double_colon => 14i32,
+        FelisPunctKind::punct_arrow => 15i32,
+        FelisPunctKind::punct_fat_arrow => 16i32,
+        FelisPunctKind::punct_left_arrow => 17i32,
+        FelisPunctKind::punct_dot_arrow => 18i32,
+        FelisPunctKind::punct_ampersand_caret => 19i32,
+        FelisPunctKind::punct_unknown => unknown_code,
+    }
+}
+
+#pub #proc decode_felis_punct_kind : (code : i32) -> (kind_ref : &^ FelisPunctKind) -> () {
+    kind_ref .> set FelisPunctKind::punct_unknown;
+    #if i32_eq code 1i32 {
+        kind_ref .> set FelisPunctKind::punct_left_paren;
+    } #else #if i32_eq code 2i32 {
+        kind_ref .> set FelisPunctKind::punct_right_paren;
+    } #else #if i32_eq code 3i32 {
+        kind_ref .> set FelisPunctKind::punct_left_brace;
+    } #else #if i32_eq code 4i32 {
+        kind_ref .> set FelisPunctKind::punct_right_brace;
+    } #else #if i32_eq code 5i32 {
+        kind_ref .> set FelisPunctKind::punct_left_bracket;
+    } #else #if i32_eq code 6i32 {
+        kind_ref .> set FelisPunctKind::punct_right_bracket;
+    } #else #if i32_eq code 7i32 {
+        kind_ref .> set FelisPunctKind::punct_colon;
+    } #else #if i32_eq code 8i32 {
+        kind_ref .> set FelisPunctKind::punct_semicolon;
+    } #else #if i32_eq code 9i32 {
+        kind_ref .> set FelisPunctKind::punct_comma;
+    } #else #if i32_eq code 10i32 {
+        kind_ref .> set FelisPunctKind::punct_equals;
+    } #else #if i32_eq code 11i32 {
+        kind_ref .> set FelisPunctKind::punct_dot;
+    } #else #if i32_eq code 12i32 {
+        kind_ref .> set FelisPunctKind::punct_ampersand;
+    } #else #if i32_eq code 13i32 {
+        kind_ref .> set FelisPunctKind::punct_underscore;
+    } #else #if i32_eq code 14i32 {
+        kind_ref .> set FelisPunctKind::punct_double_colon;
+    } #else #if i32_eq code 15i32 {
+        kind_ref .> set FelisPunctKind::punct_arrow;
+    } #else #if i32_eq code 16i32 {
+        kind_ref .> set FelisPunctKind::punct_fat_arrow;
+    } #else #if i32_eq code 17i32 {
+        kind_ref .> set FelisPunctKind::punct_left_arrow;
+    } #else #if i32_eq code 18i32 {
+        kind_ref .> set FelisPunctKind::punct_dot_arrow;
+    } #else #if i32_eq code 19i32 {
+        kind_ref .> set FelisPunctKind::punct_ampersand_caret;
+    };
+    ()
+}
+
+#pub #fn encode_parsed_felis_stmt_kind : (kind : ParsedFelisStmtKind) -> (unknown_code : i32) -> i32 {
+    #match kind {
+        ParsedFelisStmtKind::parsed_exit_stmt => 0x01i32,
+        ParsedFelisStmtKind::parsed_write_stmt => 0x02i32,
+        ParsedFelisStmtKind::parsed_let_i32_stmt => 0x03i32,
+        ParsedFelisStmtKind::parsed_expr_stmt => 0x04i32,
+        ParsedFelisStmtKind::parsed_unknown_stmt => unknown_code,
+    }
 }
 
 #pub #type(rc) FelisTokens : Type[0] {
@@ -61,4 +347,3 @@
     expr_start : i32,
     expr_end : i32,
 }
-
