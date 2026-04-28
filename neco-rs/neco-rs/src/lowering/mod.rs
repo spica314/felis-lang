@@ -600,6 +600,31 @@ fn lower_expression_statement(
         )));
     }
 
+    if let Some(name) = single_segment_path_name(receiver.as_ref()) {
+        if matches!(
+            state.environment.get(name),
+            Some(Value::Struct(_) | Value::Constructor(_))
+        ) {
+            let [value] = arguments.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`set` must receive exactly one argument for struct references".to_string(),
+                ));
+            };
+            let lowered_value = lower_pure_value(value, state, program)?;
+            match lowered_value {
+                Value::Struct(_) | Value::Constructor(_) => {
+                    state.environment.insert(name.to_string(), lowered_value);
+                    return Ok(());
+                }
+                other => {
+                    return Err(Error::Unsupported(format!(
+                        "`set` expected a struct value, got {other:?}"
+                    )));
+                }
+            }
+        }
+    }
+
     match crate::effect::resolve_value(receiver.as_ref(), &state.environment)? {
         Value::I32Reference(slot) => {
             let normalized = normalize_numeric_literal_arguments(arguments);
@@ -683,6 +708,16 @@ fn lower_expression_statement(
         }
     }
     Ok(())
+}
+
+fn single_segment_path_name(term: &Term) -> Option<&str> {
+    let Term::Path(path) = term else {
+        return None;
+    };
+    if path.token_keyword_package.is_some() || path.segments.len() != 1 {
+        return None;
+    }
+    Some(path.segments[0].lexeme.as_str())
 }
 
 fn lower_effectful_block(

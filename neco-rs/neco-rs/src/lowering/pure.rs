@@ -4,7 +4,7 @@ use neco_rs_parser::{Block, MatchExpression, PathExpression, Pattern, Statement,
 
 use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::ir::{
-    ConstructorValue, I32Expr, LoweredProgram, Operation, StructFieldValue, StructValue,
+    ConstructorValue, I32Expr, I64Expr, LoweredProgram, Operation, StructFieldValue, StructValue,
     intern_data,
 };
 use crate::{Error, Result};
@@ -43,6 +43,9 @@ pub(super) fn lower_pure_value(
             )))
         }
         Term::IntegerLiteral(_) | Term::Application { .. } | Term::MethodCall { .. } => {
+            if let Some(value) = lower_reference_get_value(term, state)? {
+                return Ok(value);
+            }
             if let Term::Application { callee, arguments } = term
                 && let Some(value) =
                     lower_constructor_application(callee.as_ref(), arguments, state, program)?
@@ -74,6 +77,31 @@ pub(super) fn lower_pure_value(
             "unsupported pure expression in entrypoint body: {term:?}"
         ))),
     }
+}
+
+fn lower_reference_get_value(term: &Term, state: &LoweringState) -> Result<Option<Value>> {
+    let (receiver, arguments) = match term {
+        Term::MethodCall { receiver, method } if method == "get" => (receiver.as_ref(), &[][..]),
+        Term::Application { callee, arguments } => {
+            let Term::MethodCall { receiver, method } = callee.as_ref() else {
+                return Ok(None);
+            };
+            if method != "get" {
+                return Ok(None);
+            }
+            (receiver.as_ref(), arguments.as_slice())
+        }
+        _ => return Ok(None),
+    };
+    if !arguments.is_empty() {
+        return Ok(None);
+    }
+    let value = resolve_value(receiver, &state.environment)?;
+    Ok(Some(match value {
+        Value::I32Reference(slot) => Value::I32(I32Expr::Local(slot)),
+        Value::I64Reference(slot) => Value::I64(I64Expr::Local(slot)),
+        other => other,
+    }))
 }
 
 fn lower_path_value(
