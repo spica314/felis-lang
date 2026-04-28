@@ -389,7 +389,7 @@ fn parse_array_new_arguments(
             "`IO::{builtin_name}` element type must be a simple path"
         )));
     };
-    let element_type = match segment.name.as_str() {
+    let element_type = match segment.lexeme.as_str() {
         "i32" => ArrayElementType::I32,
         "i64" => ArrayElementType::I64,
         "u8" => ArrayElementType::U8,
@@ -425,21 +425,21 @@ fn parse_arg_arguments(
 
 fn is_i32_suffix(term: &Term) -> bool {
     match term {
-        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i32",
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].lexeme == "i32",
         _ => false,
     }
 }
 
 fn is_i64_suffix(term: &Term) -> bool {
     match term {
-        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i64",
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].lexeme == "i64",
         _ => false,
     }
 }
 
 fn is_u8_suffix(term: &Term) -> bool {
     match term {
-        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "u8",
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].lexeme == "u8",
         _ => false,
     }
 }

@@ -174,7 +174,7 @@ fn struct_signature_from_decl(struct_decl: &StructDeclaration) -> StructSignatur
             .fields
             .iter()
             .map(|field| StructFieldSignature {
-                name: field.name.clone(),
+                name: field.token_ident.lexeme.clone(),
                 ty: field.ty.clone(),
             })
             .collect(),
@@ -202,9 +202,9 @@ fn constructor_arity(
         }
         _ => return None,
     };
-    if !path.starts_with_package
+    if !path.token_keyword_package.is_some()
         && path.segments.len() == 1
-        && path.segments[0].name == type_name.name
+        && path.segments[0].lexeme == type_name.name
     {
         Some(arity)
     } else {

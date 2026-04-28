@@ -108,7 +108,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
         .iter()
         .flat_map(|file| file.syntax.items.iter())
         .find_map(|item| match item {
-            Item::EntryPoint(entrypoint) => Some(entrypoint.name.as_str()),
+            Item::EntryPoint(entrypoint) => Some(entrypoint.token_ident.lexeme.as_str()),
             _ => None,
         })
         .ok_or_else(|| Error::Unsupported("missing #entrypoint declaration".to_string()))?;
@@ -199,7 +199,7 @@ fn initialize_zero_arg_use_bindings(
             .segments
             .last()
             .expect("use path always has at least one segment")
-            .name
+            .lexeme
             .clone();
         let value = lower_pure_block_value(&function.body, state, program)?;
         validate_value_against_type(&value, &function.result_ty, program)?;
@@ -217,14 +217,10 @@ fn resolve_zero_arg_imported_pure_function(
     let Some(last_segment) = path.segments.last() else {
         return Ok(None);
     };
-    if !last_segment.suffixes.is_empty() {
-        return Ok(None);
-    }
-
-    let target_package = if path.starts_with_package || path.segments.len() == 1 {
+    let target_package = if path.token_keyword_package.is_some() || path.segments.len() == 1 {
         package
     } else {
-        let package_name = &path.segments[0].name;
+        let package_name = &path.segments[0].lexeme;
         available_packages
             .iter()
             .find(|candidate| candidate.manifest.name == *package_name)
@@ -242,7 +238,7 @@ fn resolve_zero_arg_imported_pure_function(
         if function.kind != neco_rs_parser::FunctionKind::Fn || function.effect.is_some() {
             continue;
         }
-        if function.name.name != last_segment.name {
+        if function.name.name != last_segment.lexeme {
             continue;
         }
 

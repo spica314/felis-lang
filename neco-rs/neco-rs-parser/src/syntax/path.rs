@@ -1,11 +1,14 @@
-use crate::{Keyword, Parse, Parser, Result, TokenKind};
+use crate::{
+    Error, Parse, Result, Token,
+    lexer::{TokenDoubleColon, TokenIdentifier, TokenKeyword, TokenKeywordKind},
+};
 
 use super::Term;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PathExpression {
-    pub starts_with_package: bool,
-    pub segments: Vec<PathSegment>,
+    pub token_keyword_package: Option<TokenKeyword>,
+    pub segments: Vec<TokenIdentifier>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,40 +18,49 @@ pub struct PathSegment {
 }
 
 impl Parse for PathExpression {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let mut starts_with_package = false;
-        let mut segments = Vec::new();
+    type ParseOption = ();
 
-        if parser.consume_keyword(Keyword::Package) {
-            starts_with_package = true;
-            parser.expect_punctuation(TokenKind::DoubleColon)?;
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        let mut k = *i;
+
+        let mut segments = vec![];
+
+        let token_keyword_package =
+            TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Package))?;
+        if token_keyword_package.is_some() {
+            let Some(_) = TokenDoubleColon::parse(tokens, &mut k)? else {
+                return Err(Error::Message("expected `::` after `package`".to_string()));
+            };
+            let Some(token_identifier) = TokenIdentifier::parse(tokens, &mut k)? else {
+                return Err(Error::Message(
+                    "expected path segment after `package::`".to_string(),
+                ));
+            };
+            segments.push(token_identifier);
+        } else {
+            let Some(token_identifier) = TokenIdentifier::parse(tokens, &mut k)? else {
+                return Err(Error::Message("expected path segment".to_string()));
+            };
+            segments.push(token_identifier);
         }
 
-        segments.push(PathSegment::parse(parser)?.unwrap());
-        while parser.consume_punctuation(TokenKind::DoubleColon) {
-            segments.push(PathSegment::parse(parser)?.unwrap());
+        while let Some(_double_colon) = TokenDoubleColon::parse(tokens, &mut k)? {
+            let Some(token_identifier) = TokenIdentifier::parse(tokens, &mut k)? else {
+                return Err(Error::Message(
+                    "expected path segment after `::`".to_string(),
+                ));
+            };
+            segments.push(token_identifier);
         }
 
+        *i = k;
         Ok(Some(Self {
-            starts_with_package,
+            token_keyword_package,
             segments,
         }))
     }
-}
-
-impl Parse for PathSegment {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let name = parser.expect_identifier()?;
-        let suffixes = parse_suffixes(parser)?;
-        Ok(Some(Self { name, suffixes }))
-    }
-}
-
-pub(crate) fn parse_suffixes(parser: &mut Parser) -> Result<Vec<Term>> {
-    let mut suffixes = Vec::new();
-    while parser.consume_punctuation(TokenKind::LeftBracket) {
-        suffixes.push(Term::parse(parser)?.unwrap());
-        parser.expect_punctuation(TokenKind::RightBracket)?;
-    }
-    Ok(suffixes)
 }

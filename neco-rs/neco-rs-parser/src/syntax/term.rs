@@ -1,6 +1,14 @@
-use crate::{Keyword, Parse, Parser, Result, TokenKind};
+use crate::lexer::{
+    TokenAmpersand, TokenAmpersandCaret, TokenArrow, TokenCharLiteral, TokenColon, TokenComma,
+    TokenDot, TokenDotArrow, TokenDoubleColon, TokenEquals, TokenFatArrow, TokenIdentifier,
+    TokenIntegerLiteral, TokenKeyword, TokenKeywordKind, TokenLeftArrow, TokenLeftBrace,
+    TokenLeftBracket, TokenLeftParen, TokenRightBrace, TokenRightBracket, TokenRightParen,
+    TokenSemicolon, TokenStringLiteral, TokenUnderscore,
+};
+use crate::{Error, Parse, Result, Token};
 
 use super::{Item, PathExpression, Pattern};
+use crate::syntax::pattern::is_pattern_start;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
@@ -143,89 +151,171 @@ pub struct StructLiteralField {
     pub value: Term,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct TermParseOption {
+    pub stop_at_left_brace: bool,
+    pub stop_at_match_arm_boundary: bool,
+}
+
 impl Parse for Term {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        parse_arrow_term(parser)
+    type ParseOption = TermParseOption;
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        option: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        parse_arrow_term(tokens, i, option.unwrap_or_default())
     }
 }
 
 impl Parse for TypedBinder {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let name = parser.expect_identifier()?;
-        parser.expect_punctuation(TokenKind::Colon)?;
-        let ty = Term::parse(parser)?.unwrap();
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        let mut k = *i;
+        let Some(name) = TokenIdentifier::parse(tokens, &mut k)? else {
+            return Ok(None);
+        };
+        let Some(_) = TokenColon::parse(tokens, &mut k)? else {
+            return Ok(None);
+        };
+        let Some(ty) = Term::parse(tokens, &mut k)? else {
+            return Err(expected("type after typed binder colon"));
+        };
+        *i = k;
         Ok(Some(Self {
-            name,
+            name: name.lexeme,
             ty: Box::new(ty),
         }))
     }
 }
 
 impl Parse for Block {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        parser.expect_punctuation(TokenKind::LeftBrace)?;
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        let mut k = *i;
+        let Some(_) = TokenLeftBrace::parse(tokens, &mut k)? else {
+            return Ok(None);
+        };
+
         let mut statements = Vec::new();
         let mut tail = None;
-
-        while !parser.check_punctuation(TokenKind::RightBrace) {
-            if parser.is_item_start() {
-                statements.push(Statement::Item(Box::new(Item::parse(parser)?.unwrap())));
+        while TokenRightBrace::parse(tokens, &mut k)?.is_none() {
+            let mut item_k = k;
+            if let Some(item) = Item::parse(tokens, &mut item_k)? {
+                k = item_k;
+                statements.push(Statement::Item(Box::new(item)));
                 continue;
             }
-            if parser.consume_keyword(Keyword::Let) {
-                statements.push(Statement::Let(LetStatement::parse(parser)?.unwrap()));
+            if TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Let))?
+                .is_some()
+            {
+                let Some(statement) = LetStatement::parse(tokens, &mut k)? else {
+                    return Err(expected("let statement"));
+                };
+                statements.push(Statement::Let(statement));
                 continue;
             }
-            if parser.consume_keyword(Keyword::LetRef) {
-                statements.push(Statement::LetRef(LetRefStatement::parse(parser)?.unwrap()));
+            if TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::LetRef))?
+                .is_some()
+            {
+                let Some(statement) = LetRefStatement::parse(tokens, &mut k)? else {
+                    return Err(expected("let-ref statement"));
+                };
+                statements.push(Statement::LetRef(statement));
                 continue;
             }
-            if parser.consume_keyword(Keyword::If) {
-                statements.push(Statement::If(IfStatement::parse(parser)?.unwrap()));
+            if TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::If))?
+                .is_some()
+            {
+                let Some(statement) = IfStatement::parse(tokens, &mut k)? else {
+                    return Err(expected("if statement"));
+                };
+                statements.push(Statement::If(statement));
                 continue;
             }
-            if parser.consume_keyword(Keyword::Loop) {
-                statements.push(Statement::Loop(LoopStatement::parse(parser)?.unwrap()));
+            if TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Loop))?
+                .is_some()
+            {
+                let Some(statement) = LoopStatement::parse(tokens, &mut k)? else {
+                    return Err(expected("loop statement"));
+                };
+                statements.push(Statement::Loop(statement));
                 continue;
             }
-            if parser.consume_keyword(Keyword::Break) {
-                parser.expect_punctuation(TokenKind::Semicolon)?;
+            if TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Break))?
+                .is_some()
+            {
+                expect_semicolon(tokens, &mut k)?;
                 statements.push(Statement::Break);
                 continue;
             }
-            if parser.consume_keyword(Keyword::Continue) {
-                parser.expect_punctuation(TokenKind::Semicolon)?;
+            if TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Continue))?
+                .is_some()
+            {
+                expect_semicolon(tokens, &mut k)?;
                 statements.push(Statement::Continue);
                 continue;
             }
 
-            let expression = Term::parse(parser)?.unwrap();
-            if parser.consume_punctuation(TokenKind::Semicolon) {
+            let Some(expression) = Term::parse(tokens, &mut k)? else {
+                return Err(expected("block statement or tail expression"));
+            };
+            if TokenSemicolon::parse(tokens, &mut k)?.is_some() {
                 statements.push(Statement::Expression(Box::new(expression)));
             } else {
                 tail = Some(Box::new(expression));
+                expect_right_brace(tokens, &mut k)?;
                 break;
             }
         }
 
-        parser.expect_punctuation(TokenKind::RightBrace)?;
+        *i = k;
         Ok(Some(Self { statements, tail }))
     }
 }
 
 impl Parse for LetStatement {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let binder = BindingPattern::parse(parser)?.unwrap();
-        parser.expect_punctuation(TokenKind::Colon)?;
-        let ty = Term::parse(parser)?.unwrap();
-        let operator = if parser.consume_punctuation(TokenKind::Equals) {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        let mut k = *i;
+        let Some(binder) = BindingPattern::parse(tokens, &mut k)? else {
+            return Ok(None);
+        };
+        let Some(_) = TokenColon::parse(tokens, &mut k)? else {
+            return Err(expected("`:` after let binding pattern"));
+        };
+        let Some(ty) = Term::parse(tokens, &mut k)? else {
+            return Err(expected("let binding type"));
+        };
+        let operator = if TokenEquals::parse(tokens, &mut k)?.is_some() {
             LetOperator::Equals
         } else {
-            parser.expect_punctuation(TokenKind::LeftArrow)?;
+            let Some(_) = TokenLeftArrow::parse(tokens, &mut k)? else {
+                return Err(expected("`=` or `<-` in let statement"));
+            };
             LetOperator::LeftArrow
         };
-        let value = Term::parse(parser)?.unwrap();
-        parser.expect_punctuation(TokenKind::Semicolon)?;
+        let Some(value) = Term::parse(tokens, &mut k)? else {
+            return Err(expected("let binding value"));
+        };
+        expect_semicolon(tokens, &mut k)?;
+        *i = k;
         Ok(Some(Self {
             binder,
             ty: Box::new(ty),
@@ -236,16 +326,38 @@ impl Parse for LetStatement {
 }
 
 impl Parse for LetRefStatement {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let exclusive = parser.consume_keyword(Keyword::Excl);
-        let reference = parser.expect_identifier()?;
-        parser.expect_punctuation(TokenKind::Colon)?;
-        let ty = Term::parse(parser)?.unwrap();
-        parser.expect_keyword(Keyword::Borrow)?;
-        let source = Term::parse(parser)?.unwrap();
-        parser.expect_punctuation(TokenKind::Semicolon)?;
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        let mut k = *i;
+        let exclusive =
+            TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Excl))?
+                .is_some();
+        let Some(reference) = TokenIdentifier::parse(tokens, &mut k)? else {
+            return Ok(None);
+        };
+        let Some(_) = TokenColon::parse(tokens, &mut k)? else {
+            return Err(expected("`:` after let-ref name"));
+        };
+        let Some(ty) = Term::parse(tokens, &mut k)? else {
+            return Err(expected("let-ref type"));
+        };
+        let Some(_) =
+            TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Borrow))?
+        else {
+            return Err(expected("`borrow` in let-ref statement"));
+        };
+        let Some(source) = Term::parse(tokens, &mut k)? else {
+            return Err(expected("let-ref source expression"));
+        };
+        expect_semicolon(tokens, &mut k)?;
+        *i = k;
         Ok(Some(Self {
-            reference,
+            reference: reference.lexeme,
             exclusive,
             ty: Box::new(ty),
             source: Box::new(source),
@@ -254,23 +366,51 @@ impl Parse for LetRefStatement {
 }
 
 impl Parse for IfStatement {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let condition = parser.with_left_brace_boundary(true, Term::parse)?.unwrap();
-        let then_block = Block::parse(parser)?.unwrap();
-        let else_branch = if parser.consume_keyword(Keyword::Else) {
-            if parser.consume_keyword(Keyword::If) {
-                Some(ElseBranch::If(Box::new(
-                    IfStatement::parse(parser)?.unwrap(),
-                )))
-            } else {
-                Some(ElseBranch::Block(Block::parse(parser)?.unwrap()))
-            }
-        } else {
-            None
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        let mut k = *i;
+        let Some(condition) = Term::parse_with_option(
+            tokens,
+            &mut k,
+            Some(TermParseOption {
+                stop_at_left_brace: true,
+                stop_at_match_arm_boundary: false,
+            }),
+        )?
+        else {
+            return Ok(None);
         };
+        let Some(then_block) = Block::parse(tokens, &mut k)? else {
+            return Err(expected("then block after if condition"));
+        };
+        let else_branch =
+            if TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Else))?
+                .is_some()
+            {
+                if TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::If))?
+                    .is_some()
+                {
+                    Some(ElseBranch::If(Box::new(
+                        IfStatement::parse(tokens, &mut k)?
+                            .ok_or_else(|| expected("if statement after `else if`"))?,
+                    )))
+                } else {
+                    Some(ElseBranch::Block(
+                        Block::parse(tokens, &mut k)?.ok_or_else(|| expected("else block"))?,
+                    ))
+                }
+            } else {
+                None
+            };
         if !matches!(else_branch, Some(ElseBranch::If(_))) {
-            parser.expect_punctuation(TokenKind::Semicolon)?;
+            expect_semicolon(tokens, &mut k)?;
         }
+        *i = k;
         Ok(Some(Self {
             condition: Box::new(condition),
             then_block,
@@ -280,32 +420,72 @@ impl Parse for IfStatement {
 }
 
 impl Parse for LoopStatement {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let body = Block::parse(parser)?.unwrap();
-        parser.expect_punctuation(TokenKind::Semicolon)?;
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        let mut k = *i;
+        let Some(body) = Block::parse(tokens, &mut k)? else {
+            return Ok(None);
+        };
+        expect_semicolon(tokens, &mut k)?;
+        *i = k;
         Ok(Some(Self { body }))
     }
 }
 
 impl Parse for BindingPattern {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let pattern = if parser.consume_punctuation(TokenKind::Underscore) {
-            Self::Wildcard
-        } else {
-            Self::Name(parser.expect_identifier()?)
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        if TokenUnderscore::parse(tokens, i)?.is_some() {
+            return Ok(Some(Self::Wildcard));
+        }
+        let Some(name) = TokenIdentifier::parse(tokens, i)? else {
+            return Ok(None);
         };
-        Ok(Some(pattern))
+        Ok(Some(Self::Name(name.lexeme)))
     }
 }
 
 impl Parse for MatchExpression {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let scrutinee = parser.with_left_brace_boundary(true, Term::parse)?.unwrap();
-        parser.expect_punctuation(TokenKind::LeftBrace)?;
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        let mut k = *i;
+        let Some(scrutinee) = Term::parse_with_option(
+            tokens,
+            &mut k,
+            Some(TermParseOption {
+                stop_at_left_brace: true,
+                stop_at_match_arm_boundary: false,
+            }),
+        )?
+        else {
+            return Ok(None);
+        };
+        let Some(_) = TokenLeftBrace::parse(tokens, &mut k)? else {
+            return Err(expected("match arm block"));
+        };
         let mut arms = Vec::new();
-        while !parser.consume_punctuation(TokenKind::RightBrace) {
-            arms.push(MatchArm::parse(parser)?.unwrap());
+        while TokenRightBrace::parse(tokens, &mut k)?.is_none() {
+            let Some(arm) = MatchArm::parse(tokens, &mut k)? else {
+                return Err(expected("match arm"));
+            };
+            arms.push(arm);
         }
+        *i = k;
         Ok(Some(Self {
             scrutinee: Box::new(scrutinee),
             arms,
@@ -314,15 +494,37 @@ impl Parse for MatchExpression {
 }
 
 impl Parse for MatchArm {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
-        let pattern = Pattern::parse(parser)?.unwrap();
-        parser.expect_punctuation(TokenKind::FatArrow)?;
-        let result = parser.with_match_arm_boundary(true, Term::parse)?.unwrap();
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        let mut k = *i;
+        let Some(pattern) = Pattern::parse(tokens, &mut k)? else {
+            return Ok(None);
+        };
+        let Some(_) = TokenFatArrow::parse(tokens, &mut k)? else {
+            return Err(expected("`=>` after match pattern"));
+        };
+        let Some(result) = Term::parse_with_option(
+            tokens,
+            &mut k,
+            Some(TermParseOption {
+                stop_at_left_brace: false,
+                stop_at_match_arm_boundary: true,
+            }),
+        )?
+        else {
+            return Err(expected("match arm result expression"));
+        };
         if matches!(result, Term::Block(_)) {
-            parser.consume_punctuation(TokenKind::Comma);
+            let _ = TokenComma::parse(tokens, &mut k)?;
         } else {
-            parser.expect_punctuation(TokenKind::Comma)?;
+            expect_comma(tokens, &mut k)?;
         }
+        *i = k;
         Ok(Some(Self {
             pattern,
             result: Box::new(result),
@@ -330,10 +532,17 @@ impl Parse for MatchArm {
     }
 }
 
-fn parse_arrow_term(parser: &mut Parser) -> Result<Option<Term>> {
-    let left = parse_forall_term(parser)?;
-    if parser.consume_punctuation(TokenKind::Arrow) {
-        let result = parse_arrow_term(parser)?.unwrap();
+fn parse_arrow_term(
+    tokens: &[Token],
+    i: &mut usize,
+    option: TermParseOption,
+) -> Result<Option<Term>> {
+    let Some(left) = parse_forall_term(tokens, i, option)? else {
+        return Ok(None);
+    };
+    if TokenArrow::parse(tokens, i)?.is_some() {
+        let result =
+            parse_arrow_term(tokens, i, option)?.ok_or_else(|| expected("arrow result type"))?;
         let parameter = match left {
             Term::TypedBinder(binder) => ArrowParameter::Binder(binder),
             other => ArrowParameter::Domain(Box::new(other)),
@@ -346,33 +555,42 @@ fn parse_arrow_term(parser: &mut Parser) -> Result<Option<Term>> {
     Ok(Some(left))
 }
 
-fn parse_forall_term(parser: &mut Parser) -> Result<Term> {
-    if parser.consume_keyword(Keyword::Forall) {
-        let binder = TypedBinder::parse(parser)?.unwrap();
-        parser.expect_punctuation(TokenKind::Comma)?;
-        let body = Term::parse(parser)?.unwrap();
-        return Ok(Term::Forall(ForallTerm {
+fn parse_forall_term(
+    tokens: &[Token],
+    i: &mut usize,
+    option: TermParseOption,
+) -> Result<Option<Term>> {
+    if TokenKeyword::parse_with_option(tokens, i, Some(TokenKeywordKind::Forall))?.is_some() {
+        let binder = TypedBinder::parse(tokens, i)?.ok_or_else(|| expected("forall binder"))?;
+        expect_comma(tokens, i)?;
+        let body = Term::parse_with_option(tokens, i, Some(option))?
+            .ok_or_else(|| expected("forall body"))?;
+        return Ok(Some(Term::Forall(ForallTerm {
             binder,
             body: Box::new(body),
-        }));
+        })));
     }
-    parse_application_term(parser)
+    parse_application_term(tokens, i, option).map(Some)
 }
 
-fn parse_application_term(parser: &mut Parser) -> Result<Term> {
-    let mut term = parse_postfix_term(parser)?;
+fn parse_application_term(
+    tokens: &[Token],
+    i: &mut usize,
+    option: TermParseOption,
+) -> Result<Term> {
+    let mut term = parse_postfix_term(tokens, i, option)?;
     loop {
-        if parser.stop_at_left_brace() && parser.check_punctuation(TokenKind::LeftBrace) {
+        if option.stop_at_left_brace && matches!(tokens.get(*i), Some(Token::LeftBrace(_))) {
             break;
         }
-        if parser.stop_at_match_arm_boundary()
-            && parser.looks_like_match_arm_boundary()
-            && !looks_like_numeric_literal_suffix_continuation(&term, parser)
+        if option.stop_at_match_arm_boundary
+            && looks_like_match_arm_boundary(tokens, *i)
+            && !looks_like_numeric_literal_suffix_continuation(&term, tokens, *i)
         {
             break;
         }
-        if parser.is_term_start() {
-            let argument = parse_postfix_term(parser)?;
+        if is_term_start(tokens, *i) {
+            let argument = parse_postfix_term(tokens, i, option)?;
             term = match term {
                 Term::Application {
                     callee,
@@ -393,31 +611,59 @@ fn parse_application_term(parser: &mut Parser) -> Result<Term> {
     Ok(term)
 }
 
-fn parse_postfix_term(parser: &mut Parser) -> Result<Term> {
-    let mut term = parse_primary_term(parser)?;
+fn parse_postfix_term(tokens: &[Token], i: &mut usize, option: TermParseOption) -> Result<Term> {
+    let mut term = parse_primary_term(tokens, i)?;
     loop {
-        if parser.consume_punctuation(TokenKind::DotArrow) {
-            let method = parser.expect_identifier()?;
+        if TokenLeftBracket::parse(tokens, i)?.is_some() {
+            let argument =
+                Term::parse(tokens, i)?.ok_or_else(|| expected("bracket suffix argument"))?;
+            let Some(_) = TokenRightBracket::parse(tokens, i)? else {
+                return Err(expected("`]` after bracket suffix"));
+            };
+            term = match term {
+                Term::Application {
+                    callee,
+                    mut arguments,
+                } => {
+                    arguments.push(argument);
+                    Term::Application { callee, arguments }
+                }
+                other => Term::Application {
+                    callee: Box::new(other),
+                    arguments: vec![argument],
+                },
+            };
+            continue;
+        }
+        if TokenDoubleColon::parse(tokens, i)?.is_some() {
+            let Some(segment) = TokenIdentifier::parse(tokens, i)? else {
+                return Err(expected("path segment after `::`"));
+            };
+            term = append_path_segment(term, segment)?;
+            continue;
+        }
+        if TokenDotArrow::parse(tokens, i)?.is_some() {
+            let method = expect_identifier(tokens, i)?;
             term = Term::MethodCall {
                 receiver: Box::new(term),
                 method,
             };
             continue;
         }
-        if parser.consume_punctuation(TokenKind::Dot) {
-            let field = parser.expect_identifier()?;
+        if TokenDot::parse(tokens, i)?.is_some() {
+            let field = expect_identifier(tokens, i)?;
             term = Term::FieldAccess {
                 receiver: Box::new(term),
                 field,
             };
             continue;
         }
-        if !parser.stop_at_left_brace() && parser.check_punctuation(TokenKind::LeftBrace) {
+        if !option.stop_at_left_brace && matches!(tokens.get(*i), Some(Token::LeftBrace(_))) {
             match term {
-                Term::Path(path) if path_has_no_suffixes(&path) => {
+                Term::Path(path) => {
                     term = Term::StructLiteral {
                         path,
-                        fields: parse_struct_literal_fields(parser)?,
+                        fields: parse_struct_literal_fields(tokens, i)?,
                     };
                     continue;
                 }
@@ -431,91 +677,295 @@ fn parse_postfix_term(parser: &mut Parser) -> Result<Term> {
     Ok(term)
 }
 
-fn looks_like_numeric_literal_suffix_continuation(term: &Term, parser: &Parser) -> bool {
-    matches!(term, Term::IntegerLiteral(_))
-        && matches!(
-            parser.peek_kind(),
-            TokenKind::Identifier(name) if name == "i32" || name == "u8"
-        )
+fn append_path_segment(term: Term, segment: TokenIdentifier) -> Result<Term> {
+    match term {
+        Term::Path(mut path) => {
+            path.segments.push(segment);
+            Ok(Term::Path(path))
+        }
+        Term::Application { callee, arguments } => {
+            let Term::Path(mut path) = *callee else {
+                return Err(Error::Message(
+                    "`::` can only extend a path expression".to_string(),
+                ));
+            };
+            path.segments.push(segment);
+            Ok(Term::Application {
+                callee: Box::new(Term::Path(path)),
+                arguments,
+            })
+        }
+        _ => Err(Error::Message(
+            "`::` can only extend a path expression".to_string(),
+        )),
+    }
 }
 
-fn parse_primary_term(parser: &mut Parser) -> Result<Term> {
-    if parser.consume_keyword(Keyword::Match) {
-        return Ok(Term::Match(MatchExpression::parse(parser)?.unwrap()));
+fn parse_primary_term(tokens: &[Token], i: &mut usize) -> Result<Term> {
+    if TokenKeyword::parse_with_option(tokens, i, Some(TokenKeywordKind::Match))?.is_some() {
+        return Ok(Term::Match(
+            MatchExpression::parse(tokens, i)?.ok_or_else(|| expected("match expression"))?,
+        ));
     }
 
-    if parser.check_punctuation(TokenKind::LeftBrace) {
-        return Ok(Term::Block(Block::parse(parser)?.unwrap()));
+    if matches!(tokens.get(*i), Some(Token::LeftBrace(_))) {
+        return Ok(Term::Block(
+            Block::parse(tokens, i)?.ok_or_else(|| expected("block expression"))?,
+        ));
     }
 
-    if parser.consume_punctuation(TokenKind::LeftParen) {
-        if parser.consume_punctuation(TokenKind::RightParen) {
+    if TokenLeftParen::parse(tokens, i)?.is_some() {
+        if TokenRightParen::parse(tokens, i)?.is_some() {
             return Ok(Term::Unit);
         }
-
-        if parser.looks_like_typed_binder() {
-            let binder = TypedBinder::parse(parser)?;
-            parser.expect_punctuation(TokenKind::RightParen)?;
-            return Ok(Term::TypedBinder(binder.unwrap()));
+        if looks_like_typed_binder(tokens, *i) {
+            let binder = TypedBinder::parse(tokens, i)?.ok_or_else(|| expected("typed binder"))?;
+            expect_right_paren(tokens, i)?;
+            return Ok(Term::TypedBinder(binder));
         }
-
-        let inner = Term::parse(parser)?;
-        parser.expect_punctuation(TokenKind::RightParen)?;
-        return Ok(Term::Group(Box::new(inner.unwrap())));
+        let inner = Term::parse(tokens, i)?.ok_or_else(|| expected("grouped expression"))?;
+        expect_right_paren(tokens, i)?;
+        return Ok(Term::Group(Box::new(inner)));
     }
 
-    if let Some(text) = parser.consume_string_literal() {
-        return Ok(Term::StringLiteral(text));
+    if let Some(text) = TokenStringLiteral::parse(tokens, i)? {
+        return Ok(Term::StringLiteral(parse_string_literal(&text.lexeme)?));
     }
 
-    if let Some(ch) = parser.consume_char_literal() {
-        return Ok(Term::CharLiteral(ch));
+    if let Some(ch) = TokenCharLiteral::parse(tokens, i)? {
+        return Ok(Term::CharLiteral(parse_char_literal(&ch.lexeme)?));
     }
 
-    if let Some(number) = parser.consume_integer_literal() {
-        return Ok(Term::IntegerLiteral(number));
+    if let Some(number) = TokenIntegerLiteral::parse(tokens, i)? {
+        return Ok(Term::IntegerLiteral(number.lexeme));
     }
 
-    if parser.consume_punctuation(TokenKind::Ampersand) {
+    if TokenAmpersand::parse(tokens, i)?.is_some() {
         return Ok(Term::Reference {
-            referent: Box::new(parse_application_term(parser)?),
+            referent: Box::new(parse_application_term(
+                tokens,
+                i,
+                TermParseOption::default(),
+            )?),
             exclusive: false,
         });
     }
 
-    if parser.consume_punctuation(TokenKind::AmpersandCaret) {
+    if TokenAmpersandCaret::parse(tokens, i)?.is_some() {
         return Ok(Term::Reference {
-            referent: Box::new(parse_application_term(parser)?),
+            referent: Box::new(parse_application_term(
+                tokens,
+                i,
+                TermParseOption::default(),
+            )?),
             exclusive: true,
         });
     }
 
-    if parser.is_path_start() {
-        return Ok(Term::Path(PathExpression::parse(parser)?.unwrap()));
+    if is_path_start(tokens, *i) {
+        return Ok(Term::Path(
+            PathExpression::parse(tokens, i)?.ok_or_else(|| expected("path expression"))?,
+        ));
     }
 
-    Err(parser.error_here("expected term"))
+    Err(expected("term"))
 }
 
-fn parse_struct_literal_fields(parser: &mut Parser) -> Result<Vec<StructLiteralField>> {
-    parser.expect_punctuation(TokenKind::LeftBrace)?;
+fn parse_struct_literal_fields(tokens: &[Token], i: &mut usize) -> Result<Vec<StructLiteralField>> {
+    let Some(_) = TokenLeftBrace::parse(tokens, i)? else {
+        return Err(expected("struct literal field block"));
+    };
     let mut fields = Vec::new();
-    while !parser.consume_punctuation(TokenKind::RightBrace) {
-        let name = parser.expect_identifier()?;
-        parser.expect_punctuation(TokenKind::Equals)?;
-        let value = Term::parse(parser)?.unwrap();
+    while TokenRightBrace::parse(tokens, i)?.is_none() {
+        let name = expect_identifier(tokens, i)?;
+        let Some(_) = TokenEquals::parse(tokens, i)? else {
+            return Err(expected("`=` after struct literal field name"));
+        };
+        let value =
+            Term::parse(tokens, i)?.ok_or_else(|| expected("struct literal field value"))?;
         fields.push(StructLiteralField { name, value });
-        if parser.consume_punctuation(TokenKind::Comma) {
+        if TokenComma::parse(tokens, i)?.is_some() {
             continue;
         }
-        parser.expect_punctuation(TokenKind::RightBrace)?;
+        expect_right_brace(tokens, i)?;
         break;
     }
     Ok(fields)
 }
 
-fn path_has_no_suffixes(path: &PathExpression) -> bool {
-    path.segments
-        .iter()
-        .all(|segment| segment.suffixes.is_empty())
+fn is_term_start(tokens: &[Token], i: usize) -> bool {
+    matches!(
+        tokens.get(i),
+        Some(Token::StringLiteral(_))
+            | Some(Token::CharLiteral(_))
+            | Some(Token::IntegerLiteral(_))
+            | Some(Token::Identifier(_))
+            | Some(Token::Ampersand(_))
+            | Some(Token::AmpersandCaret(_))
+            | Some(Token::LeftParen(_))
+            | Some(Token::LeftBrace(_))
+    ) || matches!(
+        tokens.get(i),
+        Some(Token::Keyword(keyword))
+            if matches!(
+                keyword.kind,
+                TokenKeywordKind::Package
+                    | TokenKeywordKind::Match
+                    | TokenKeywordKind::Forall
+            )
+    )
+}
+
+fn is_path_start(tokens: &[Token], i: usize) -> bool {
+    matches!(tokens.get(i), Some(Token::Identifier(_)))
+        || matches!(
+            tokens.get(i),
+            Some(Token::Keyword(keyword)) if keyword.kind == TokenKeywordKind::Package
+        )
+}
+
+fn looks_like_typed_binder(tokens: &[Token], i: usize) -> bool {
+    matches!(tokens.get(i), Some(Token::Identifier(_)))
+        && matches!(tokens.get(i + 1), Some(Token::Colon(_)))
+}
+
+fn looks_like_match_arm_boundary(tokens: &[Token], i: usize) -> bool {
+    if !is_pattern_start(tokens, i) {
+        return false;
+    }
+
+    let mut index = i;
+    let mut bracket_depth = 0usize;
+    while let Some(token) = tokens.get(index) {
+        match token {
+            Token::FatArrow(_) if bracket_depth == 0 => return true,
+            Token::RightBrace(_) if bracket_depth == 0 => return false,
+            Token::LeftBracket(_) => bracket_depth += 1,
+            Token::RightBracket(_) => {
+                if bracket_depth == 0 {
+                    return false;
+                }
+                bracket_depth -= 1;
+            }
+            Token::Identifier(_) | Token::DoubleColon(_) | Token::Underscore(_) => {}
+            Token::Keyword(keyword) if keyword.kind == TokenKeywordKind::Package => {}
+            _ => return false,
+        }
+        index += 1;
+    }
+    false
+}
+
+fn looks_like_numeric_literal_suffix_continuation(term: &Term, tokens: &[Token], i: usize) -> bool {
+    matches!(term, Term::IntegerLiteral(_))
+        && matches!(
+            tokens.get(i),
+            Some(Token::Identifier(identifier)) if identifier.lexeme == "i32" || identifier.lexeme == "u8"
+        )
+}
+
+fn expect_identifier(tokens: &[Token], i: &mut usize) -> Result<String> {
+    let Some(identifier) = TokenIdentifier::parse(tokens, i)? else {
+        return Err(expected("identifier"));
+    };
+    Ok(identifier.lexeme)
+}
+
+fn expect_semicolon(tokens: &[Token], i: &mut usize) -> Result<()> {
+    let Some(_) = TokenSemicolon::parse(tokens, i)? else {
+        return Err(expected("`;`"));
+    };
+    Ok(())
+}
+
+fn expect_comma(tokens: &[Token], i: &mut usize) -> Result<()> {
+    let Some(_) = TokenComma::parse(tokens, i)? else {
+        return Err(expected("`,`"));
+    };
+    Ok(())
+}
+
+fn expect_right_paren(tokens: &[Token], i: &mut usize) -> Result<()> {
+    let Some(_) = TokenRightParen::parse(tokens, i)? else {
+        return Err(expected("`)`"));
+    };
+    Ok(())
+}
+
+fn expect_right_brace(tokens: &[Token], i: &mut usize) -> Result<()> {
+    let Some(_) = TokenRightBrace::parse(tokens, i)? else {
+        return Err(Error::Message(format!(
+            "expected `}}`, found {:?}",
+            tokens.get(*i)
+        )));
+    };
+    Ok(())
+}
+
+fn parse_char_literal(lexeme: &str) -> Result<char> {
+    let inner = lexeme
+        .strip_prefix('\'')
+        .and_then(|text| text.strip_suffix('\''))
+        .ok_or_else(|| invalid("char literal"))?;
+    if let Some(escaped) = inner.strip_prefix('\\') {
+        return match escaped {
+            "'" => Ok('\''),
+            "\"" => Ok('"'),
+            "\\" => Ok('\\'),
+            "0" => Ok('\0'),
+            "n" => Ok('\n'),
+            "r" => Ok('\r'),
+            "t" => Ok('\t'),
+            _ => Err(invalid("char literal escape sequence")),
+        };
+    }
+    let mut chars = inner.chars();
+    let Some(ch) = chars.next() else {
+        return Err(invalid("empty char literal"));
+    };
+    if chars.next().is_some() {
+        return Err(invalid("char literal with more than one character"));
+    }
+    if !ch.is_ascii() {
+        return Err(Error::Message("char literal must be ASCII".to_string()));
+    }
+    Ok(ch)
+}
+
+fn parse_string_literal(lexeme: &str) -> Result<String> {
+    let inner = lexeme
+        .strip_prefix('"')
+        .and_then(|text| text.strip_suffix('"'))
+        .ok_or_else(|| invalid("string literal"))?;
+    let mut result = String::new();
+    let mut chars = inner.chars();
+    while let Some(ch) = chars.next() {
+        if ch != '\\' {
+            result.push(ch);
+            continue;
+        }
+        let Some(escaped) = chars.next() else {
+            return Err(invalid("string literal escape sequence"));
+        };
+        let value = match escaped {
+            '\'' => '\'',
+            '"' => '"',
+            '\\' => '\\',
+            '0' => '\0',
+            'n' => '\n',
+            'r' => '\r',
+            't' => '\t',
+            _ => return Err(invalid("string literal escape sequence")),
+        };
+        result.push(value);
+    }
+    Ok(result)
+}
+
+fn expected(what: &str) -> Error {
+    Error::Message(format!("expected {what}"))
+}
+
+fn invalid(what: &str) -> Error {
+    Error::Message(format!("invalid {what}"))
 }

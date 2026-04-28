@@ -1,4 +1,4 @@
-use crate::{Parse, Parser, Result};
+use crate::{Parse, Result, Token};
 
 use super::Item;
 
@@ -8,11 +8,21 @@ pub struct SourceFile {
 }
 
 impl Parse for SourceFile {
-    fn parse(parser: &mut Parser) -> Result<Option<Self>> {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        let mut k = *i;
+
         let mut items = Vec::new();
-        while !parser.at_end() {
-            items.push(Item::parse(parser)?.unwrap());
+        while let Some(item) = Item::parse(tokens, &mut k)? {
+            items.push(item);
         }
+
+        *i = k;
         Ok(Some(Self { items }))
     }
 }

@@ -7,9 +7,9 @@ mod source;
 mod syntax;
 
 pub use error::{Error, Result};
-pub use lexer::{Keyword, Span, Token, TokenKind};
+pub use lexer::{FilePos, Span, Token, TokenKeywordKind};
 pub use manifest::{Dependency, DependencySource, PackageManifest, WorkspaceManifest};
-pub use parser::{Parse, Parser};
+pub use parser::Parse;
 pub use root::{
     ParsedPackage, ParsedRoot, ParsedSourceFile, ParsedWorkspace, SourceFileRole, parse_root,
 };

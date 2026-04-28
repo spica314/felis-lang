@@ -189,13 +189,12 @@ fn lower_bool_builtin_path(term: &Term) -> Result<ConditionExpr> {
             "unsupported `bool` expression in entrypoint body: {term:?}"
         )));
     };
-    if path.starts_with_package || path.segments.len() != 1 || !path.segments[0].suffixes.is_empty()
-    {
+    if path.token_keyword_package.is_some() || path.segments.len() != 1 {
         return Err(Error::Unsupported(format!(
             "unsupported `bool` expression in entrypoint body: {term:?}"
         )));
     }
-    match path.segments[0].name.as_str() {
+    match path.segments[0].lexeme.as_str() {
         "true" => Ok(ConditionExpr::Literal(true)),
         "false" => Ok(ConditionExpr::Literal(false)),
         name => Err(Error::Unsupported(format!(
@@ -226,7 +225,7 @@ fn lower_comparison_expr(term: &Term, state: &LoweringState) -> Result<Condition
     let primitive = path
         .segments
         .last()
-        .map(|segment| segment.name.as_str())
+        .map(|segment| segment.lexeme.as_str())
         .unwrap_or_default();
 
     if let Some(kind) = i32_comparison_kind(primitive) {
@@ -342,7 +341,7 @@ fn lower_i32_primitive_call(
     let segments: Vec<_> = path
         .segments
         .iter()
-        .map(|segment| segment.name.as_str())
+        .map(|segment| segment.lexeme.as_str())
         .collect();
     let normalized = normalize_numeric_literal_arguments(arguments);
     let primitive = segments.last().copied().unwrap_or_default();
@@ -400,7 +399,7 @@ fn lower_i64_primitive_call(
     let segments: Vec<_> = path
         .segments
         .iter()
-        .map(|segment| segment.name.as_str())
+        .map(|segment| segment.lexeme.as_str())
         .collect();
     let normalized = normalize_numeric_literal_arguments(arguments);
     let primitive = segments.last().copied().unwrap_or_default();
@@ -458,7 +457,7 @@ fn lower_u8_primitive_call(
     let segments: Vec<_> = path
         .segments
         .iter()
-        .map(|segment| segment.name.as_str())
+        .map(|segment| segment.lexeme.as_str())
         .collect();
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [lhs, rhs] = normalized.as_slice() else {

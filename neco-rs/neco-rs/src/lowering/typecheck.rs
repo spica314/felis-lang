@@ -78,12 +78,9 @@ pub(crate) fn validate_value_against_type(
                 )))
             }
         }
-        Term::Path(path) if !path.starts_with_package && path.segments.len() == 1 => {
+        Term::Path(path) if !path.token_keyword_package.is_some() && path.segments.len() == 1 => {
             let segment = &path.segments[0];
-            if !segment.suffixes.is_empty() {
-                return Ok(());
-            }
-            match segment.name.as_str() {
+            match segment.lexeme.as_str() {
                 "i32" if matches!(value, Value::I32(_)) => Ok(()),
                 "i64" if matches!(value, Value::I64(_)) => Ok(()),
                 "u8" if matches!(value, Value::U8(_)) => Ok(()),
@@ -176,12 +173,8 @@ fn validate_reference_value_against_type(
     }
 
     match referent {
-        Term::Path(path)
-            if !path.starts_with_package
-                && path.segments.len() == 1
-                && path.segments[0].suffixes.is_empty() =>
-        {
-            match path.segments[0].name.as_str() {
+        Term::Path(path) if !path.token_keyword_package.is_some() && path.segments.len() == 1 => {
+            match path.segments[0].lexeme.as_str() {
                 "i32" if matches!(value, Value::I32Reference(_)) => Ok(()),
                 "i64" if matches!(value, Value::I64Reference(_)) => Ok(()),
                 type_name => match value {
@@ -208,15 +201,11 @@ fn parse_array_type_annotation(ty: &Term) -> Result<Option<(ArrayElementType, us
     let Term::Path(path) = callee.as_ref() else {
         return Ok(None);
     };
-    if path.starts_with_package
+    if path.token_keyword_package.is_some()
         || path
             .segments
             .last()
-            .is_none_or(|segment| segment.name != "Array")
-        || path
-            .segments
-            .iter()
-            .any(|segment| !segment.suffixes.is_empty())
+            .is_none_or(|segment| segment.lexeme != "Array")
     {
         return Ok(None);
     }
@@ -244,15 +233,11 @@ fn parse_unsized_array_type_annotation(ty: &Term) -> Result<Option<ArrayElementT
     let Term::Path(path) = callee.as_ref() else {
         return Ok(None);
     };
-    if path.starts_with_package
+    if path.token_keyword_package.is_some()
         || path
             .segments
             .last()
-            .is_none_or(|segment| segment.name != "Array")
-        || path
-            .segments
-            .iter()
-            .any(|segment| !segment.suffixes.is_empty())
+            .is_none_or(|segment| segment.lexeme != "Array")
     {
         return Ok(None);
     }
@@ -271,18 +256,13 @@ fn parse_slice_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
     let Term::Path(path) = callee.as_ref() else {
         return Ok(None);
     };
-    let Some(type_name) = path.segments.last().map(|segment| segment.name.as_str()) else {
+    let Some(type_name) = path.segments.last().map(|segment| segment.lexeme.as_str()) else {
         return Ok(None);
     };
     if type_name != "Slice" {
         return Ok(None);
     }
-    if path.starts_with_package
-        || path
-            .segments
-            .iter()
-            .any(|segment| !segment.suffixes.is_empty())
-    {
+    if path.token_keyword_package.is_some() {
         return Ok(None);
     }
 
@@ -297,12 +277,8 @@ fn parse_slice_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
 
 fn parse_array_element_type(term: &Term, type_name: &str) -> Result<ArrayElementType> {
     match term {
-        Term::Path(path)
-            if !path.starts_with_package
-                && path.segments.len() == 1
-                && path.segments[0].suffixes.is_empty() =>
-        {
-            match path.segments[0].name.as_str() {
+        Term::Path(path) if !path.token_keyword_package.is_some() && path.segments.len() == 1 => {
+            match path.segments[0].lexeme.as_str() {
                 "i32" => Ok(ArrayElementType::I32),
                 "i64" => Ok(ArrayElementType::I64),
                 "u8" => Ok(ArrayElementType::U8),
@@ -444,7 +420,7 @@ fn render_term(term: &Term) -> String {
         Term::IntegerLiteral(value) => value.clone(),
         Term::Path(path) => {
             let mut rendered = String::new();
-            if path.starts_with_package {
+            if path.token_keyword_package.is_some() {
                 rendered.push_str("#package");
                 if !path.segments.is_empty() {
                     rendered.push_str("::");
@@ -454,12 +430,7 @@ fn render_term(term: &Term) -> String {
                 if index > 0 {
                     rendered.push_str("::");
                 }
-                rendered.push_str(&segment.name);
-                for suffix in &segment.suffixes {
-                    rendered.push('[');
-                    rendered.push_str(&render_term(suffix));
-                    rendered.push(']');
-                }
+                rendered.push_str(&segment.lexeme);
             }
             rendered
         }
@@ -520,21 +491,21 @@ fn render_reference_term(referent: &Term, exclusive: bool) -> String {
 
 pub(super) fn is_i32_suffix_term(term: &Term) -> bool {
     match term {
-        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i32",
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].lexeme == "i32",
         _ => false,
     }
 }
 
 pub(super) fn is_i64_suffix_term(term: &Term) -> bool {
     match term {
-        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i64",
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].lexeme == "i64",
         _ => false,
     }
 }
 
 pub(super) fn is_u8_suffix_term(term: &Term) -> bool {
     match term {
-        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "u8",
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].lexeme == "u8",
         _ => false,
     }
 }

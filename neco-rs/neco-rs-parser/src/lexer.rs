@@ -1,49 +1,638 @@
-use crate::{Error, Result};
+use crate::{Error, Parse, Result};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FilePos {
+    pub r: usize,
+    pub c: usize,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
-    pub start: usize,
-    pub end: usize,
+    pub start: FilePos,
+    pub end: FilePos,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Token {
-    pub kind: TokenKind,
+pub enum Token {
+    Keyword(TokenKeyword),
+    Identifier(TokenIdentifier),
+    StringLiteral(TokenStringLiteral),
+    CharLiteral(TokenCharLiteral),
+    IntegerLiteral(TokenIntegerLiteral),
+    LeftParen(TokenLeftParen),
+    RightParen(TokenRightParen),
+    LeftBrace(TokenLeftBrace),
+    RightBrace(TokenRightBrace),
+    LeftBracket(TokenLeftBracket),
+    RightBracket(TokenRightBracket),
+    Colon(TokenColon),
+    Semicolon(TokenSemicolon),
+    Comma(TokenComma),
+    Equals(TokenEquals),
+    Ampersand(TokenAmpersand),
+    AmpersandCaret(TokenAmpersandCaret),
+    Underscore(TokenUnderscore),
+    DoubleColon(TokenDoubleColon),
+    Arrow(TokenArrow),
+    FatArrow(TokenFatArrow),
+    LeftArrow(TokenLeftArrow),
+    Dot(TokenDot),
+    DotArrow(TokenDotArrow),
+    EndOfFile(TokenEndOfFile),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenKeyword {
+    pub span: Span,
+    pub lexeme: String,
+    pub kind: TokenKeywordKind,
+}
+
+impl Parse for TokenKeyword {
+    type ParseOption = TokenKeywordKind;
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        option: Option<Self::ParseOption>,
+    ) -> Result<Option<TokenKeyword>> {
+        match &tokens[*i] {
+            Token::Keyword(keyword) => {
+                if let Some(kind) = option {
+                    if kind == keyword.kind {
+                        *i += 1;
+                        Ok(Some(keyword.clone()))
+                    } else {
+                        Ok(None)
+                    }
+                } else {
+                    *i += 1;
+                    Ok(Some(keyword.clone()))
+                }
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenIdentifier {
     pub span: Span,
     pub lexeme: String,
 }
 
+impl Parse for TokenIdentifier {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::Identifier(identifier) => {
+                *i += 1;
+                Ok(Some(identifier.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TokenKind {
-    Keyword(Keyword),
-    Identifier(String),
-    StringLiteral(String),
-    CharLiteral(char),
-    IntegerLiteral(String),
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    LeftBracket,
-    RightBracket,
-    Colon,
-    Semicolon,
-    Comma,
-    Equals,
-    Ampersand,
-    AmpersandCaret,
-    Underscore,
-    DoubleColon,
-    Arrow,
-    FatArrow,
-    LeftArrow,
-    Dot,
-    DotArrow,
-    EndOfFile,
+pub struct TokenStringLiteral {
+    pub span: Span,
+    pub lexeme: String,
+}
+
+impl Parse for TokenStringLiteral {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::StringLiteral(string_literal) => {
+                *i += 1;
+                Ok(Some(string_literal.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenCharLiteral {
+    pub span: Span,
+    pub lexeme: String,
+}
+
+impl Parse for TokenCharLiteral {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::CharLiteral(char_literal) => {
+                *i += 1;
+                Ok(Some(char_literal.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenIntegerLiteral {
+    pub span: Span,
+    pub lexeme: String,
+}
+
+impl Parse for TokenIntegerLiteral {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::IntegerLiteral(integer_literal) => {
+                *i += 1;
+                Ok(Some(integer_literal.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenLeftParen {
+    pub span: Span,
+}
+
+impl Parse for TokenLeftParen {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::LeftParen(left_paren) => {
+                *i += 1;
+                Ok(Some(left_paren.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenRightParen {
+    pub span: Span,
+}
+
+impl Parse for TokenRightParen {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::RightParen(right_paren) => {
+                *i += 1;
+                Ok(Some(right_paren.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenLeftBrace {
+    pub span: Span,
+}
+
+impl Parse for TokenLeftBrace {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::LeftBrace(left_brace) => {
+                *i += 1;
+                Ok(Some(left_brace.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenRightBrace {
+    pub span: Span,
+}
+
+impl Parse for TokenRightBrace {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::RightBrace(right_brace) => {
+                *i += 1;
+                Ok(Some(right_brace.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenLeftBracket {
+    pub span: Span,
+}
+
+impl Parse for TokenLeftBracket {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::LeftBracket(left_bracket) => {
+                *i += 1;
+                Ok(Some(left_bracket.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenRightBracket {
+    pub span: Span,
+}
+
+impl Parse for TokenRightBracket {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::RightBracket(right_bracket) => {
+                *i += 1;
+                Ok(Some(right_bracket.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenColon {
+    pub span: Span,
+}
+
+impl Parse for TokenColon {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::Colon(colon) => {
+                *i += 1;
+                Ok(Some(colon.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenSemicolon {
+    pub span: Span,
+}
+
+impl Parse for TokenSemicolon {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::Semicolon(semicolon) => {
+                *i += 1;
+                Ok(Some(semicolon.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenComma {
+    pub span: Span,
+}
+
+impl Parse for TokenComma {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::Comma(comma) => {
+                *i += 1;
+                Ok(Some(comma.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenEquals {
+    pub span: Span,
+}
+
+impl Parse for TokenEquals {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::Equals(equals) => {
+                *i += 1;
+                Ok(Some(equals.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenAmpersand {
+    pub span: Span,
+}
+
+impl Parse for TokenAmpersand {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::Ampersand(ampersand) => {
+                *i += 1;
+                Ok(Some(ampersand.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenAmpersandCaret {
+    pub span: Span,
+}
+
+impl Parse for TokenAmpersandCaret {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::AmpersandCaret(ampersand_caret) => {
+                *i += 1;
+                Ok(Some(ampersand_caret.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenUnderscore {
+    pub span: Span,
+}
+
+impl Parse for TokenUnderscore {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::Underscore(underscore) => {
+                *i += 1;
+                Ok(Some(underscore.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenDoubleColon {
+    pub span: Span,
+}
+
+impl Parse for TokenDoubleColon {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::DoubleColon(double_colon) => {
+                *i += 1;
+                Ok(Some(double_colon.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenArrow {
+    pub span: Span,
+}
+
+impl Parse for TokenArrow {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::Arrow(arrow) => {
+                *i += 1;
+                Ok(Some(arrow.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenFatArrow {
+    pub span: Span,
+}
+
+impl Parse for TokenFatArrow {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::FatArrow(fat_arrow) => {
+                *i += 1;
+                Ok(Some(fat_arrow.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenLeftArrow {
+    pub span: Span,
+}
+
+impl Parse for TokenLeftArrow {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::LeftArrow(left_arrow) => {
+                *i += 1;
+                Ok(Some(left_arrow.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenDot {
+    pub span: Span,
+}
+
+impl Parse for TokenDot {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::Dot(dot) => {
+                *i += 1;
+                Ok(Some(dot.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenDotArrow {
+    pub span: Span,
+}
+
+impl Parse for TokenDotArrow {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::DotArrow(dot_arrow) => {
+                *i += 1;
+                Ok(Some(dot_arrow.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenEndOfFile {
+    pub span: Span,
+}
+
+impl Parse for TokenEndOfFile {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        match &tokens[*i] {
+            Token::EndOfFile(end_of_file) => {
+                *i += 1;
+                Ok(Some(end_of_file.clone()))
+            }
+            _ => Ok(None),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Keyword {
+pub enum TokenKeywordKind {
     As,
     BindBuiltin,
     Break,
@@ -71,397 +660,441 @@ pub enum Keyword {
     Package,
 }
 
-pub(crate) struct Lexer {
-    source: Vec<char>,
-    offset: usize,
+pub fn skip_trivia(chars: &[char], i: &mut usize, r: &mut usize, c: &mut usize) {
+    while *i < chars.len() {
+        if chars[*i].is_whitespace() {
+            if chars[*i] == '\n' {
+                *r += 1;
+                *c = 0;
+            } else {
+                *c += 1;
+            }
+            *i += 1;
+            continue;
+        }
+
+        if chars[*i..].starts_with(&['/', '/']) {
+            while *i < chars.len() {
+                let ch = chars[*i];
+                *i += 1;
+                if ch == '\n' {
+                    *r += 1;
+                    *c = 0;
+                    break;
+                }
+                *c += 1;
+            }
+            continue;
+        }
+
+        if chars[*i..].starts_with(&['/', '*']) {
+            *i += 2;
+            *c += 2;
+            while *i < chars.len() && !chars[*i..].starts_with(&['*', '/']) {
+                if chars[*i] == '\n' {
+                    *r += 1;
+                    *c = 0;
+                } else {
+                    *c += 1;
+                }
+                *i += 1;
+            }
+            if *i < chars.len() {
+                *i += 2;
+                *c += 2;
+            }
+            continue;
+        }
+
+        break;
+    }
 }
 
-impl Lexer {
-    pub(crate) fn new(source: &str) -> Self {
-        Self {
-            source: source.chars().collect(),
-            offset: 0,
-        }
-    }
+pub(crate) fn lex(source: &str) -> Result<Vec<Token>> {
+    let chars: Vec<_> = source.chars().collect();
 
-    pub(crate) fn lex(&mut self) -> Result<Vec<Token>> {
-        let mut tokens = Vec::new();
-        while self.skip_trivia()? {
-            if self.is_eof() {
-                break;
-            }
-            tokens.push(self.next_token()?);
-        }
-        tokens.push(Token {
-            kind: TokenKind::EndOfFile,
-            span: Span {
-                start: self.offset,
-                end: self.offset,
-            },
-            lexeme: String::new(),
-        });
-        Ok(tokens)
-    }
+    let mut tokens = vec![];
+    let mut i = 0;
+    let mut r = 0;
+    let mut c = 0;
 
-    fn skip_trivia(&mut self) -> Result<bool> {
-        while let Some(ch) = self.peek_char() {
-            if ch.is_whitespace() {
-                self.bump_char();
-                continue;
-            }
-            if self.starts_with("//") {
-                while let Some(ch) = self.bump_char() {
-                    if ch == '\n' {
-                        break;
-                    }
-                }
-                continue;
-            }
-            if self.starts_with("/*") {
-                let start = self.offset;
-                self.offset += 2;
-                while !self.starts_with("*/") {
-                    if self.bump_char().is_none() {
-                        break;
-                    }
-                }
-                if self.starts_with("*/") {
-                    self.offset += 2;
-                    continue;
-                }
-                return Err(Error::new("unterminated block comment").with_span(Span {
-                    start,
-                    end: self.source.len(),
-                }));
-            }
+    while i < chars.len() {
+        skip_trivia(&chars, &mut i, &mut r, &mut c);
+        if i == chars.len() {
             break;
         }
-        Ok(true)
-    }
 
-    fn next_token(&mut self) -> Result<Token> {
-        let start = self.offset;
-        if self.starts_with("::") {
-            self.offset += 2;
-            return Ok(simple_token(
-                TokenKind::DoubleColon,
-                start,
-                self.offset,
-                "::",
-            ));
-        }
-        if self.starts_with("->") {
-            self.offset += 2;
-            return Ok(simple_token(TokenKind::Arrow, start, self.offset, "->"));
-        }
-        if self.starts_with("=>") {
-            self.offset += 2;
-            return Ok(simple_token(TokenKind::FatArrow, start, self.offset, "=>"));
-        }
-        if self.starts_with("<-") {
-            self.offset += 2;
-            return Ok(simple_token(TokenKind::LeftArrow, start, self.offset, "<-"));
-        }
-        if self.starts_with(".>") {
-            self.offset += 2;
-            return Ok(simple_token(TokenKind::DotArrow, start, self.offset, ".>"));
-        }
-        if self.starts_with("&^") {
-            self.offset += 2;
-            return Ok(simple_token(
-                TokenKind::AmpersandCaret,
-                start,
-                self.offset,
-                "&^",
-            ));
-        }
-
-        let ch = self
-            .bump_char()
-            .ok_or_else(|| Error::new("unexpected end of input"))?;
-        let token = match ch {
-            '(' => simple_token(TokenKind::LeftParen, start, self.offset, "("),
-            ')' => simple_token(TokenKind::RightParen, start, self.offset, ")"),
-            '{' => simple_token(TokenKind::LeftBrace, start, self.offset, "{"),
-            '}' => simple_token(TokenKind::RightBrace, start, self.offset, "}"),
-            '[' => simple_token(TokenKind::LeftBracket, start, self.offset, "["),
-            ']' => simple_token(TokenKind::RightBracket, start, self.offset, "]"),
-            ':' => simple_token(TokenKind::Colon, start, self.offset, ":"),
-            ';' => simple_token(TokenKind::Semicolon, start, self.offset, ";"),
-            ',' => simple_token(TokenKind::Comma, start, self.offset, ","),
-            '=' => simple_token(TokenKind::Equals, start, self.offset, "="),
-            '&' => simple_token(TokenKind::Ampersand, start, self.offset, "&"),
-            '.' => simple_token(TokenKind::Dot, start, self.offset, "."),
-            '_' => simple_token(TokenKind::Underscore, start, self.offset, "_"),
-            '"' => return self.string_literal(start),
-            '\'' => return self.char_literal(start),
-            '#' => return self.keyword(start),
-            ch if ch.is_ascii_digit() => return Ok(self.integer_literal(start, ch)),
-            ch if is_identifier_start(ch) => return Ok(self.identifier(start, ch)),
-            _ => {
-                return Err(
-                    Error::new(format!("unexpected character `{ch}`")).with_span(Span {
-                        start,
-                        end: self.offset,
-                    }),
-                );
+        if chars[i] == '#' {
+            // keyword
+            let start = FilePos { r, c };
+            let start_i = i;
+            i += 1;
+            c += 1;
+            while i < chars.len()
+                && (chars[i].is_ascii_alphanumeric() || chars[i] == '_' || chars[i] == '-')
+            {
+                i += 1;
+                c += 1;
             }
-        };
-        Ok(token)
-    }
+            let lexeme: String = chars[start_i..i].iter().collect();
+            let kind = match lexeme.as_str() {
+                "#as" => TokenKeywordKind::As,
+                "#bind_builtin" => TokenKeywordKind::BindBuiltin,
+                "#break" => TokenKeywordKind::Break,
+                "#continue" => TokenKeywordKind::Continue,
+                "#entrypoint" => TokenKeywordKind::EntryPoint,
+                "#else" => TokenKeywordKind::Else,
+                "#fn" => TokenKeywordKind::Fn,
+                "#proc" => TokenKeywordKind::Proc,
+                "#struct" => TokenKeywordKind::Struct,
+                "#pub" => TokenKeywordKind::Pub,
+                "#type" => TokenKeywordKind::Type,
+                "#theorem" => TokenKeywordKind::Theorem,
+                "#prop" => TokenKeywordKind::Prop,
+                "#if" => TokenKeywordKind::If,
+                "#match" => TokenKeywordKind::Match,
+                "#let" => TokenKeywordKind::Let,
+                "#letref" => TokenKeywordKind::LetRef,
+                "#loop" => TokenKeywordKind::Loop,
+                "#use" => TokenKeywordKind::Use,
+                "#mod" => TokenKeywordKind::Mod,
+                "#with" => TokenKeywordKind::With,
+                "#excl" => TokenKeywordKind::Excl,
+                "#borrow" => TokenKeywordKind::Borrow,
+                "#forall" => TokenKeywordKind::Forall,
+                "#package" => TokenKeywordKind::Package,
+                _ => {
+                    return Err(Error::MessageWithSpan(
+                        format!("unknown keyword `{lexeme}`"),
+                        Span {
+                            start,
+                            end: FilePos { r, c },
+                        },
+                    ));
+                }
+            };
+            tokens.push(Token::Keyword(TokenKeyword {
+                span: Span {
+                    start,
+                    end: FilePos { r, c },
+                },
+                lexeme,
+                kind,
+            }));
+            continue;
+        }
 
-    fn string_literal(&mut self, start: usize) -> Result<Token> {
-        let mut value = String::new();
-        while let Some(ch) = self.bump_char() {
-            match ch {
-                '"' => {
-                    return Ok(Token {
-                        kind: TokenKind::StringLiteral(value.clone()),
+        /* symbols */
+        if chars[i..].starts_with(&[':', ':']) {
+            let start = FilePos { r, c };
+            i += 2;
+            c += 2;
+            tokens.push(Token::DoubleColon(TokenDoubleColon {
+                span: Span {
+                    start,
+                    end: FilePos { r, c },
+                },
+            }));
+            continue;
+        }
+        if chars[i..].starts_with(&['-', '>']) {
+            let start = FilePos { r, c };
+            i += 2;
+            c += 2;
+            tokens.push(Token::Arrow(TokenArrow {
+                span: Span {
+                    start,
+                    end: FilePos { r, c },
+                },
+            }));
+            continue;
+        }
+        if chars[i..].starts_with(&['=', '>']) {
+            let start = FilePos { r, c };
+            i += 2;
+            c += 2;
+            tokens.push(Token::FatArrow(TokenFatArrow {
+                span: Span {
+                    start,
+                    end: FilePos { r, c },
+                },
+            }));
+            continue;
+        }
+        if chars[i..].starts_with(&['<', '-']) {
+            let start = FilePos { r, c };
+            i += 2;
+            c += 2;
+            tokens.push(Token::LeftArrow(TokenLeftArrow {
+                span: Span {
+                    start,
+                    end: FilePos { r, c },
+                },
+            }));
+            continue;
+        }
+        if chars[i..].starts_with(&['.', '>']) {
+            let start = FilePos { r, c };
+            i += 2;
+            c += 2;
+            tokens.push(Token::DotArrow(TokenDotArrow {
+                span: Span {
+                    start,
+                    end: FilePos { r, c },
+                },
+            }));
+            continue;
+        }
+        if chars[i..].starts_with(&['&', '^']) {
+            let start = FilePos { r, c };
+            i += 2;
+            c += 2;
+            tokens.push(Token::AmpersandCaret(TokenAmpersandCaret {
+                span: Span {
+                    start,
+                    end: FilePos { r, c },
+                },
+            }));
+            continue;
+        }
+        let start = FilePos { r, c };
+        let token = match chars[i] {
+            '(' => Some(Token::LeftParen(TokenLeftParen {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            ')' => Some(Token::RightParen(TokenRightParen {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            '{' => Some(Token::LeftBrace(TokenLeftBrace {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            '}' => Some(Token::RightBrace(TokenRightBrace {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            '[' => Some(Token::LeftBracket(TokenLeftBracket {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            ']' => Some(Token::RightBracket(TokenRightBracket {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            ':' => Some(Token::Colon(TokenColon {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            ';' => Some(Token::Semicolon(TokenSemicolon {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            ',' => Some(Token::Comma(TokenComma {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            '=' => Some(Token::Equals(TokenEquals {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            '&' => Some(Token::Ampersand(TokenAmpersand {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            '_' => Some(Token::Underscore(TokenUnderscore {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            '.' => Some(Token::Dot(TokenDot {
+                span: Span {
+                    start,
+                    end: FilePos { r, c: c + 1 },
+                },
+            })),
+            _ => None,
+        };
+        if let Some(token) = token {
+            tokens.push(token);
+            i += 1;
+            c += 1;
+            continue;
+        }
+
+        /* literals */
+        let start = FilePos { r, c };
+        let start_i = i;
+        if chars[i] == '"' {
+            let mut terminated = false;
+            i += 1;
+            c += 1;
+            while i < chars.len() {
+                if chars[i] == '"' {
+                    i += 1;
+                    c += 1;
+                    terminated = true;
+                    let lexeme: String = chars[start_i..i].iter().collect();
+                    tokens.push(Token::StringLiteral(TokenStringLiteral {
                         span: Span {
                             start,
-                            end: self.offset,
+                            end: FilePos { r, c },
                         },
-                        lexeme: self.source[start..self.offset].iter().collect(),
-                    });
+                        lexeme,
+                    }));
+                    break;
                 }
-                '\\' => {
-                    let escaped = self.bump_char().ok_or_else(|| {
-                        Error::new("unterminated string literal").with_span(Span {
+                if chars[i] == '\\' && i + 1 < chars.len() {
+                    i += 1;
+                    c += 1;
+                }
+                if chars[i] == '\n' {
+                    r += 1;
+                    c = 0;
+                } else {
+                    c += 1;
+                }
+                i += 1;
+            }
+            if !terminated {
+                return Err(Error::MessageWithSpan(
+                    "unterminated string literal".to_string(),
+                    Span {
+                        start,
+                        end: FilePos { r, c },
+                    },
+                ));
+            }
+            continue;
+        }
+        if chars[i] == '\'' {
+            let mut terminated = false;
+            i += 1;
+            c += 1;
+            while i < chars.len() {
+                if chars[i] == '\'' {
+                    i += 1;
+                    c += 1;
+                    terminated = true;
+                    let lexeme: String = chars[start_i..i].iter().collect();
+                    tokens.push(Token::CharLiteral(TokenCharLiteral {
+                        span: Span {
                             start,
-                            end: self.offset,
-                        })
-                    })?;
-                    value.push(match escaped {
-                        '"' => '"',
-                        '\\' => '\\',
-                        'n' => '\n',
-                        't' => '\t',
-                        other => other,
-                    });
-                }
-                other => value.push(other),
-            }
-        }
-        Err(Error::new("unterminated string literal").with_span(Span {
-            start,
-            end: self.offset,
-        }))
-    }
-
-    fn char_literal(&mut self, start: usize) -> Result<Token> {
-        let value = match self.bump_char() {
-            Some('\'') => {
-                return Err(Error::new("empty char literal").with_span(Span {
-                    start,
-                    end: self.offset,
-                }));
-            }
-            Some('\\') => {
-                let escaped = self.bump_char().ok_or_else(|| {
-                    Error::new("unterminated char literal").with_span(Span {
-                        start,
-                        end: self.offset,
-                    })
-                })?;
-                match escaped {
-                    '\'' => '\'',
-                    '"' => '"',
-                    '\\' => '\\',
-                    '0' => '\0',
-                    'n' => '\n',
-                    'r' => '\r',
-                    't' => '\t',
-                    other => {
-                        return Err(Error::new(format!("unsupported char escape `\\{other}`"))
-                            .with_span(Span {
-                                start,
-                                end: self.offset,
-                            }));
-                    }
-                }
-            }
-            Some(ch) => ch,
-            None => {
-                return Err(Error::new("unterminated char literal").with_span(Span {
-                    start,
-                    end: self.offset,
-                }));
-            }
-        };
-
-        if !value.is_ascii() {
-            return Err(Error::new("char literal must be ASCII").with_span(Span {
-                start,
-                end: self.offset,
-            }));
-        }
-
-        if !matches!(self.bump_char(), Some('\'')) {
-            return Err(Error::new("unterminated char literal").with_span(Span {
-                start,
-                end: self.offset,
-            }));
-        }
-
-        Ok(Token {
-            kind: TokenKind::CharLiteral(value),
-            span: Span {
-                start,
-                end: self.offset,
-            },
-            lexeme: self.source[start..self.offset].iter().collect(),
-        })
-    }
-
-    fn keyword(&mut self, start: usize) -> Result<Token> {
-        let mut text = String::from("#");
-        while let Some(ch) = self.peek_char() {
-            if is_identifier_continue(ch) {
-                text.push(ch);
-                self.bump_char();
-            } else {
-                break;
-            }
-        }
-        let keyword = match text.as_str() {
-            "#as" => Keyword::As,
-            "#bind_builtin" => Keyword::BindBuiltin,
-            "#break" => Keyword::Break,
-            "#continue" => Keyword::Continue,
-            "#entrypoint" => Keyword::EntryPoint,
-            "#else" => Keyword::Else,
-            "#fn" => Keyword::Fn,
-            "#proc" => Keyword::Proc,
-            "#struct" => Keyword::Struct,
-            "#pub" => Keyword::Pub,
-            "#type" => Keyword::Type,
-            "#theorem" => Keyword::Theorem,
-            "#prop" => Keyword::Prop,
-            "#if" => Keyword::If,
-            "#match" => Keyword::Match,
-            "#let" => Keyword::Let,
-            "#letref" => Keyword::LetRef,
-            "#loop" => Keyword::Loop,
-            "#use" => Keyword::Use,
-            "#mod" => Keyword::Mod,
-            "#with" => Keyword::With,
-            "#excl" => Keyword::Excl,
-            "#borrow" => Keyword::Borrow,
-            "#forall" => Keyword::Forall,
-            "#package" => Keyword::Package,
-            _ => {
-                return Err(
-                    Error::new(format!("unknown keyword `{text}`")).with_span(Span {
-                        start,
-                        end: self.offset,
-                    }),
-                );
-            }
-        };
-        Ok(Token {
-            kind: TokenKind::Keyword(keyword),
-            span: Span {
-                start,
-                end: self.offset,
-            },
-            lexeme: text,
-        })
-    }
-
-    fn integer_literal(&mut self, start: usize, first: char) -> Token {
-        let mut text = String::new();
-        text.push(first);
-
-        if first == '0' && matches!(self.peek_char(), Some('x' | 'X')) {
-            text.push(self.bump_char().expect("peeked hexadecimal prefix"));
-            while let Some(ch) = self.peek_char() {
-                if ch.is_ascii_hexdigit() {
-                    text.push(ch);
-                    self.bump_char();
-                } else {
+                            end: FilePos { r, c },
+                        },
+                        lexeme,
+                    }));
                     break;
                 }
-            }
-        } else {
-            while let Some(ch) = self.peek_char() {
-                if ch.is_ascii_digit() {
-                    text.push(ch);
-                    self.bump_char();
+                if chars[i] == '\\' && i + 1 < chars.len() {
+                    i += 1;
+                    c += 1;
+                }
+                if chars[i] == '\n' {
+                    r += 1;
+                    c = 0;
                 } else {
-                    break;
+                    c += 1;
+                }
+                i += 1;
+            }
+            if !terminated {
+                return Err(Error::MessageWithSpan(
+                    "unterminated char literal".to_string(),
+                    Span {
+                        start,
+                        end: FilePos { r, c },
+                    },
+                ));
+            }
+            continue;
+        }
+        if chars[i].is_ascii_digit() {
+            i += 1;
+            c += 1;
+            if chars[start_i] == '0' && i < chars.len() && matches!(chars[i], 'x' | 'X') {
+                i += 1;
+                c += 1;
+                while i < chars.len() && chars[i].is_ascii_hexdigit() {
+                    i += 1;
+                    c += 1;
+                }
+            } else {
+                while i < chars.len() && chars[i].is_ascii_digit() {
+                    i += 1;
+                    c += 1;
                 }
             }
+            let lexeme: String = chars[start_i..i].iter().collect();
+            tokens.push(Token::IntegerLiteral(TokenIntegerLiteral {
+                span: Span {
+                    start,
+                    end: FilePos { r, c },
+                },
+                lexeme,
+            }));
+            continue;
         }
-
-        Token {
-            kind: TokenKind::IntegerLiteral(text.clone()),
-            span: Span {
-                start,
-                end: self.offset,
-            },
-            lexeme: text,
-        }
-    }
-
-    fn identifier(&mut self, start: usize, first: char) -> Token {
-        let mut text = String::new();
-        text.push(first);
-        while let Some(ch) = self.peek_char() {
-            if is_identifier_continue(ch) {
-                text.push(ch);
-                self.bump_char();
-            } else {
-                break;
+        if chars[i].is_ascii_alphabetic() {
+            i += 1;
+            c += 1;
+            while i < chars.len()
+                && (chars[i].is_ascii_alphanumeric() || chars[i] == '_' || chars[i] == '-')
+            {
+                i += 1;
+                c += 1;
             }
+            let lexeme: String = chars[start_i..i].iter().collect();
+            tokens.push(Token::Identifier(TokenIdentifier {
+                span: Span {
+                    start,
+                    end: FilePos { r, c },
+                },
+                lexeme,
+            }));
+            continue;
         }
-        Token {
-            kind: TokenKind::Identifier(text.clone()),
-            span: Span {
+
+        return Err(Error::MessageWithSpan(
+            format!("unexpected character `{}`", chars[i]),
+            Span {
                 start,
-                end: self.offset,
+                end: FilePos { r, c: c + 1 },
             },
-            lexeme: text,
-        }
+        ));
     }
 
-    fn is_eof(&self) -> bool {
-        self.offset >= self.source.len()
-    }
+    // eof
+    tokens.push(Token::EndOfFile(TokenEndOfFile {
+        span: Span {
+            start: FilePos { r, c },
+            end: FilePos { r, c },
+        },
+    }));
 
-    fn starts_with(&self, text: &str) -> bool {
-        let mut index = self.offset;
-        for ch in text.chars() {
-            if self.source.get(index).copied() != Some(ch) {
-                return false;
-            }
-            index += 1;
-        }
-        true
-    }
-
-    fn peek_char(&self) -> Option<char> {
-        self.source.get(self.offset).copied()
-    }
-
-    fn bump_char(&mut self) -> Option<char> {
-        let ch = self.peek_char()?;
-        self.offset += 1;
-        Some(ch)
-    }
-}
-
-fn simple_token(kind: TokenKind, start: usize, end: usize, lexeme: &str) -> Token {
-    Token {
-        kind,
-        span: Span { start, end },
-        lexeme: lexeme.to_string(),
-    }
-}
-
-fn is_identifier_start(ch: char) -> bool {
-    ch.is_ascii_alphabetic()
-}
-
-fn is_identifier_continue(ch: char) -> bool {
-    ch.is_ascii_alphanumeric() || ch == '_' || ch == '-'
+    Ok(tokens)
 }

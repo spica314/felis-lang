@@ -148,11 +148,8 @@ fn collect_source_file(
 
     let source = fs::read_to_string(&canonical)
         .map_err(|error| Error::new(error.to_string()).with_path(canonical.clone()))?;
-    let (tokens, syntax) = parse_source(&source).map_err(|error| Error {
-        path: Some(canonical.clone()),
-        span: error.span,
-        message: error.message,
-    })?;
+    let (tokens, syntax) =
+        parse_source(&source).map_err(|error| error.with_path(canonical.clone()))?;
     let syntax = syntax.unwrap();
 
     let module_names: Vec<String> = syntax

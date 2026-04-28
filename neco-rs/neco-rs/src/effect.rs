@@ -136,25 +136,15 @@ pub(crate) fn resolve_value(term: &Term, environment: &HashMap<String, Value>) -
 }
 
 fn path_segments(path: &PathExpression) -> Result<Vec<&str>> {
-    if path.starts_with_package {
+    if path.token_keyword_package.is_some() {
         return Err(Error::Unsupported(
             "package-qualified paths are not supported in entrypoint lowering".to_string(),
-        ));
-    }
-
-    if path
-        .segments
-        .iter()
-        .any(|segment| !segment.suffixes.is_empty())
-    {
-        return Err(Error::Unsupported(
-            "path suffixes are not supported in entrypoint lowering".to_string(),
         ));
     }
 
     Ok(path
         .segments
         .iter()
-        .map(|segment| segment.name.as_str())
+        .map(|segment| segment.lexeme.as_str())
         .collect())
 }

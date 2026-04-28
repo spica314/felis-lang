@@ -81,9 +81,8 @@ fn lower_path_value(
     state: &LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<Value> {
-    if !path.starts_with_package && path.segments.len() == 1 && path.segments[0].suffixes.is_empty()
-    {
-        let name = path.segments[0].name.as_str();
+    if !path.token_keyword_package.is_some() && path.segments.len() == 1 {
+        let name = path.segments[0].lexeme.as_str();
         if let Some(value) = state.environment.get(name) {
             return Ok(value.clone());
         }
@@ -142,14 +141,13 @@ fn lower_struct_literal_value(
     state: &LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<Value> {
-    if path.starts_with_package || path.segments.len() != 1 || !path.segments[0].suffixes.is_empty()
-    {
+    if path.token_keyword_package.is_some() || path.segments.len() != 1 {
         return Err(Error::Unsupported(
             "only simple struct literal paths are supported in entrypoint lowering".to_string(),
         ));
     }
 
-    let type_name = path.segments[0].name.as_str();
+    let type_name = path.segments[0].lexeme.as_str();
     let Some(signature) = state.structs.get(type_name) else {
         return Err(Error::Unsupported(format!("unknown struct `{type_name}`")));
     };
@@ -300,25 +298,20 @@ pub(super) fn lower_constructor_value(
     path: &PathExpression,
     constructors: &HashMap<String, ConstructorSignature>,
 ) -> Result<ConstructorSignature> {
-    if path.starts_with_package {
+    if path.token_keyword_package.is_some() {
         return Err(Error::Unsupported(
             "package-qualified constructor paths are not supported in entrypoint lowering"
                 .to_string(),
         ));
     }
-    if path.segments.len() != 2
-        || path
-            .segments
-            .iter()
-            .any(|segment| !segment.suffixes.is_empty())
-    {
+    if path.segments.len() != 2 {
         return Err(Error::Unsupported(
             "only simple `Type::constructor` paths are supported in entrypoint lowering"
                 .to_string(),
         ));
     }
 
-    let key = constructor_key(&path.segments[0].name, &path.segments[1].name);
+    let key = constructor_key(&path.segments[0].lexeme, &path.segments[1].lexeme);
     constructors
         .get(&key)
         .cloned()
@@ -537,12 +530,11 @@ fn lower_pure_function_call(
     let Term::Path(path) = callee.as_ref() else {
         return Ok(None);
     };
-    if path.starts_with_package || path.segments.len() != 1 || !path.segments[0].suffixes.is_empty()
-    {
+    if path.token_keyword_package.is_some() || path.segments.len() != 1 {
         return Ok(None);
     }
 
-    let name = path.segments[0].name.as_str();
+    let name = path.segments[0].lexeme.as_str();
     let Some(function) = state.functions.get(name) else {
         return Ok(None);
     };
@@ -703,12 +695,11 @@ fn resolve_procedure_call<'a>(
     let Term::Path(path) = callee.as_ref() else {
         return Ok(None);
     };
-    if path.starts_with_package || path.segments.len() != 1 || !path.segments[0].suffixes.is_empty()
-    {
+    if path.token_keyword_package.is_some() || path.segments.len() != 1 {
         return Ok(None);
     }
 
-    let name = path.segments[0].name.as_str();
+    let name = path.segments[0].lexeme.as_str();
     if state.environment.contains_key(name) {
         return Ok(None);
     }

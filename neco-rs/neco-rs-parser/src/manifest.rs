@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use neco_rs_json::{JsonEntry, JsonValue};
 
-use crate::{Error, Result, Span};
+use crate::{Error, FilePos, Result, Span};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageManifest {
@@ -197,8 +197,11 @@ fn convert_json_error(path: &Path, error: neco_rs_json::Error) -> Error {
     let mut converted = Error::new(error.message).with_path(path.to_path_buf());
     if let Some(span) = error.span {
         converted = converted.with_span(Span {
-            start: span.start,
-            end: span.end,
+            start: FilePos {
+                r: 0,
+                c: span.start,
+            },
+            end: FilePos { r: 0, c: span.end },
         });
     }
     converted
@@ -253,7 +256,7 @@ mod tests {
 
         assert!(
             error
-                .message
+                .to_string()
                 .contains("dependency entry only supports `workspace: true`"),
             "unexpected error: {error:?}"
         );
