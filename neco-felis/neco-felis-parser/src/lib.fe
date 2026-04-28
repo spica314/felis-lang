@@ -1,6 +1,7 @@
 #pub #mod syntax;
 #pub #mod lexer;
 #pub #mod parser;
+#pub #mod lower;
 
 #pub #use #package::syntax::FelisTokenPayload;
 #pub #use #package::syntax::FelisTokenKind;
@@ -103,5 +104,6 @@
 #pub #use #package::parser::expect_right_paren;
 #pub #use #package::parser::expect_right_brace;
 #pub #use #package::parser::parse_felis_tokens_to_stmts;
+#pub #use #package::lower::parse_felis_source_file_to_stmts;
 #pub #use #package::parser::parse_felis_first_string_literal_expr;
 #pub #use #package::parser::parse_felis_source;
