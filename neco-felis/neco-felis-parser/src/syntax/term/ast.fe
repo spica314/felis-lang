@@ -347,3 +347,124 @@
     expr_start : i32,
     expr_end : i32,
 }
+
+#pub #type FelisTermKind : Type[0] {
+    term_unit : FelisTermKind,
+    term_string_literal : FelisTermKind,
+    term_char_literal : FelisTermKind,
+    term_integer_literal : FelisTermKind,
+    term_path : FelisTermKind,
+    term_group : FelisTermKind,
+    term_typed_binder : FelisTermKind,
+    term_block : FelisTermKind,
+    term_application : FelisTermKind,
+    term_method_call : FelisTermKind,
+    term_field_access : FelisTermKind,
+    term_reference : FelisTermKind,
+    term_arrow : FelisTermKind,
+    term_forall : FelisTermKind,
+    term_unknown : FelisTermKind,
+}
+
+#pub #type FelisStatementKind : Type[0] {
+    statement_let : FelisStatementKind,
+    statement_nested_item : FelisStatementKind,
+    statement_expression : FelisStatementKind,
+    statement_tail : FelisStatementKind,
+    statement_unknown : FelisStatementKind,
+}
+
+#pub #type FelisLetOperator : Type[0] {
+    let_operator_equals : FelisLetOperator,
+    let_operator_left_arrow : FelisLetOperator,
+    let_operator_unknown : FelisLetOperator,
+}
+
+#pub #fn encode_felis_term_kind : (kind : FelisTermKind) -> (unknown_code : i32) -> i32 {
+    #match kind {
+        FelisTermKind::term_unit => 1i32,
+        FelisTermKind::term_string_literal => 2i32,
+        FelisTermKind::term_char_literal => 3i32,
+        FelisTermKind::term_integer_literal => 4i32,
+        FelisTermKind::term_path => 5i32,
+        FelisTermKind::term_group => 6i32,
+        FelisTermKind::term_typed_binder => 7i32,
+        FelisTermKind::term_block => 8i32,
+        FelisTermKind::term_application => 9i32,
+        FelisTermKind::term_method_call => 10i32,
+        FelisTermKind::term_field_access => 11i32,
+        FelisTermKind::term_reference => 12i32,
+        FelisTermKind::term_arrow => 13i32,
+        FelisTermKind::term_forall => 14i32,
+        FelisTermKind::term_unknown => unknown_code,
+    }
+}
+
+#pub #fn encode_felis_statement_kind : (kind : FelisStatementKind) -> (unknown_code : i32) -> i32 {
+    #match kind {
+        FelisStatementKind::statement_let => 1i32,
+        FelisStatementKind::statement_nested_item => 2i32,
+        FelisStatementKind::statement_expression => 3i32,
+        FelisStatementKind::statement_tail => 4i32,
+        FelisStatementKind::statement_unknown => unknown_code,
+    }
+}
+
+#pub #fn encode_felis_let_operator : (operator : FelisLetOperator) -> (unknown_code : i32) -> i32 {
+    #match operator {
+        FelisLetOperator::let_operator_equals => 1i32,
+        FelisLetOperator::let_operator_left_arrow => 2i32,
+        FelisLetOperator::let_operator_unknown => unknown_code,
+    }
+}
+
+#pub #struct FelisTermNode : Type[0] {
+    kind : i32,
+    value : i32,
+    start : i32,
+    end : i32,
+}
+
+#pub #type(rc) FelisTermNodes : Type[0] {
+    no_term_nodes : FelisTermNodes,
+    cons_term_node : FelisTermNode -> FelisTermNodes -> FelisTermNodes,
+}
+
+#pub #struct FelisStatement : Type[0] {
+    kind : i32,
+    name_value : i32,
+    name_start : i32,
+    name_end : i32,
+    operator : i32,
+    type_node : FelisTermNode,
+    value_node : FelisTermNode,
+    item_kind : i32,
+    start : i32,
+    end : i32,
+}
+
+#pub #type(rc) FelisStatements : Type[0] {
+    no_statements : FelisStatements,
+    cons_statement : FelisStatement -> FelisStatements -> FelisStatements,
+}
+
+#pub #struct FelisTermParseOption : Type[0] {
+    stop_at_left_brace : i32,
+    stop_at_match_arm_boundary : i32,
+}
+
+#pub #struct FelisTerm : Type[0] {
+    kind : i32,
+    value : i32,
+    name_value : i32,
+    name_start : i32,
+    name_end : i32,
+    exclusive : i32,
+    start : i32,
+    end : i32,
+    left : FelisTermNode,
+    right : FelisTermNode,
+    arguments : FelisTermNodes,
+    statements : FelisStatements,
+    tail : FelisTermNode,
+}
