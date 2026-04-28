@@ -56,6 +56,7 @@ fn lower_i32_method_call(term: &Term, state: &LoweringState) -> Result<I32Expr> 
             ))),
         },
         "len" => match resolve_value(receiver.as_ref(), &state.environment)? {
+            Value::StaticSlice { len, .. } => Ok(I32Expr::Literal(len)),
             Value::Array {
                 slot,
                 kind: ArrayKind::Dynamic,
@@ -615,7 +616,7 @@ fn lower_runtime_arg_get_call(
             arg_index: Box::new(arg_index),
             index: Box::new(lower_array_index_expr(index, state)?),
         })),
-        Value::ByteString(data_index) => Ok(Some(U8Expr::StaticDataGet {
+        Value::StaticSlice { data_index, .. } => Ok(Some(U8Expr::StaticDataGet {
             data_index,
             index: Box::new(lower_array_index_expr(index, state)?),
         })),

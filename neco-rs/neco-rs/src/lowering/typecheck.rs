@@ -11,7 +11,7 @@ pub(crate) fn validate_value_against_type(
 ) -> Result<()> {
     if let Some(element_type) = parse_slice_type_annotation(ty)? {
         return match value {
-            Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
+            Value::StaticSlice { .. } if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
                 kind: ArrayKind::Dynamic,
@@ -88,7 +88,6 @@ pub(crate) fn validate_value_against_type(
                 "i64" if matches!(value, Value::I64(_)) => Ok(()),
                 "u8" if matches!(value, Value::U8(_)) => Ok(()),
                 "FileDescriptor" if matches!(value, Value::FileDescriptor(_)) => Ok(()),
-                "String" if matches!(value, Value::ByteString(_)) => Ok(()),
                 type_name => match value {
                     Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
                     Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
@@ -110,7 +109,7 @@ fn validate_reference_value_against_type(
 ) -> Result<()> {
     if let Some(element_type) = parse_slice_type_annotation(referent)? {
         return match value {
-            Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
+            Value::StaticSlice { .. } if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
                 kind: ArrayKind::Dynamic,
@@ -126,7 +125,7 @@ fn validate_reference_value_against_type(
 
     if let Some(element_type) = parse_unsized_array_type_annotation(referent)? {
         return match value {
-            Value::ByteString(_) if element_type == ArrayElementType::U8 => Ok(()),
+            Value::StaticSlice { .. } if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
                 kind: ArrayKind::Dynamic,

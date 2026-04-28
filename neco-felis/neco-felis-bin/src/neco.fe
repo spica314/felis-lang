@@ -26,12 +26,10 @@
     #let manifest_path_bytes_ref : Slice u8 = string_as_slice manifest_path;
     #let manifest_path_index_ref : i32 = 0i32;
     #letref #excl manifest_path_index_ref : &^ i32 #borrow manifest_path_index_ref;
-    #let manifest_suffix_ref : & Array u8 = "neco-package.json";
-    #letref manifest_suffix_ref : & Array u8 #borrow manifest_suffix_ref;
-    #let manifest_suffix_bytes_ref : & Array u8 = manifest_suffix_ref .> as_bytes;
+    #let manifest_suffix_bytes_ref : Slice u8 = "neco-package.json";
     append_nul_terminated_u8 package_root_ref manifest_path_bytes_ref manifest_path_index_ref;
     append_u8 manifest_path_bytes_ref manifest_path_index_ref '/';
-    append_nul_terminated_u8 manifest_suffix_bytes_ref manifest_path_bytes_ref manifest_path_index_ref;
+    append_dyn_nul_terminated_u8 manifest_suffix_bytes_ref manifest_path_bytes_ref manifest_path_index_ref;
     append_u8 manifest_path_bytes_ref manifest_path_index_ref '\0';
     #let manifest_fd : FileDescriptor <- IO::open manifest_path_bytes_ref 0i32 0i32;
     #let manifest_slice_ref : &^ Slice u8 <- IO::slice_new u8 0x100i32;
@@ -144,9 +142,7 @@
     #letref #excl expr_count_ref : &^ i32 #borrow expr_count_ref;
     parse_felis_source_tokens source token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref;
     parse_felis_source source stmt_tag_ref stmt_value_ref stmt_start_ref stmt_end_ref stmt_name_start_ref stmt_name_end_ref stmt_expr_start_ref stmt_expr_end_ref number_byte_ref stmt_count_ref;
-    #let output_path_ref : & Array u8 = "a.out";
-    #letref output_path_ref : & Array u8 #borrow output_path_ref;
-    #let output_path_bytes_ref : & Array u8 = output_path_ref .> as_bytes;
+    #let output_path_bytes_ref : Slice u8 = "a.out";
     #let fd : FileDescriptor <- IO::open output_path_bytes_ref 0x241i32 0x1edi32;
     #let elf_slice_ref : &^ Slice u8 <- IO::slice_new u8 0x1040i32;
     #let elf_ref : DynArray = DynArray::dyn_array elf_slice_ref 0i64;

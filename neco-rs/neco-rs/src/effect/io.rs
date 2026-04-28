@@ -189,8 +189,7 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [fd_term, bytes_term, len_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::write` must receive a file descriptor, a byte string reference, and a length"
-                .to_string(),
+            "`IO::write` must receive a file descriptor, a `Slice u8`, and a length".to_string(),
         ));
     };
 
@@ -208,7 +207,7 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
     })?;
 
     match resolve_value(bytes_term, &state.environment)? {
-        Value::ByteString(data_index) => Ok(Operation::WriteStatic {
+        Value::StaticSlice { data_index, .. } => Ok(Operation::WriteStatic {
             fd,
             data_index,
             len,
@@ -223,7 +222,7 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
             len,
         }),
         other => Err(Error::Unsupported(format!(
-            "`IO::write` expects a byte string reference or `u8` array as its second argument, got {other:?}"
+            "`IO::write` expects a `Slice u8` or `u8` array as its second argument, got {other:?}"
         ))),
     }
 }
@@ -276,12 +275,12 @@ fn parse_open_arguments(
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [path_term, flags_term, mode_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::open` must receive a byte string path, flags, and mode".to_string(),
+            "`IO::open` must receive a `Slice u8` path, flags, and mode".to_string(),
         ));
     };
 
     let path = match resolve_value(path_term, &state.environment)? {
-        Value::ByteString(data_index) => OpenPath::StaticData(data_index),
+        Value::StaticSlice { data_index, .. } => OpenPath::StaticData(data_index),
         Value::RuntimeArg(arg_index) => OpenPath::RuntimeArg(arg_index),
         Value::Array {
             slot,
@@ -290,7 +289,7 @@ fn parse_open_arguments(
         } => OpenPath::Array(slot),
         other => {
             return Err(Error::Unsupported(format!(
-                "`IO::open` expects a byte string path, `u8` array, or CLI argument as its first argument, got {other:?}"
+                "`IO::open` expects a `Slice u8` path, `u8` array, or CLI argument as its first argument, got {other:?}"
             )));
         }
     };

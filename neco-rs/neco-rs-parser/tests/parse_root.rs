@@ -34,7 +34,7 @@ fn parses_single_package_root() {
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 5);
+    assert_eq!(main_fn.body.statements.len(), 3);
 }
 
 #[test]
@@ -221,7 +221,7 @@ fn parses_dyn_array_u8_helpers_package_root() {
     let Item::Function(main_fn) = &syntax.items[6] else {
         panic!("expected main function");
     };
-    assert_eq!(main_fn.body.statements.len(), 11);
+    assert_eq!(main_fn.body.statements.len(), 9);
 }
 
 #[test]
@@ -530,7 +530,7 @@ fn parses_comments_basic_package_root() {
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 5);
+    assert_eq!(main_fn.body.statements.len(), 3);
 }
 
 #[test]
@@ -902,15 +902,25 @@ fn parses_enum_match_string_package_root() {
     assert_eq!(type_decl.constructors[0].name.name, "text");
 
     let Term::Arrow(arrow) = &type_decl.constructors[0].ty else {
-        panic!("expected String payload constructor");
+        panic!("expected Slice payload constructor");
     };
     let ArrowParameter::Domain(payload_ty) = &arrow.parameter else {
-        panic!("expected String payload type");
+        panic!("expected Slice payload type");
     };
-    let Term::Path(payload_path) = payload_ty.as_ref() else {
-        panic!("expected String payload type");
+    let Term::Application { callee, arguments } = payload_ty.as_ref() else {
+        panic!("expected Slice payload type");
     };
-    assert_eq!(payload_path.segments[0].name, "String");
+    let Term::Path(payload_path) = callee.as_ref() else {
+        panic!("expected Slice path");
+    };
+    assert_eq!(payload_path.segments[0].name, "Slice");
+    let [element_ty] = arguments.as_slice() else {
+        panic!("expected Slice element type");
+    };
+    let Term::Path(element_path) = element_ty else {
+        panic!("expected Slice element path");
+    };
+    assert_eq!(element_path.segments[0].name, "u8");
 }
 
 #[test]
@@ -936,10 +946,20 @@ fn parses_enum_match_struct_string_package_root() {
     assert_eq!(struct_decl.name.name, "Envelope");
     assert_eq!(struct_decl.fields.len(), 1);
     assert_eq!(struct_decl.fields[0].name, "body");
-    let Term::Path(field_ty) = &struct_decl.fields[0].ty else {
-        panic!("expected String field type");
+    let Term::Application { callee, arguments } = &struct_decl.fields[0].ty else {
+        panic!("expected Slice field type");
     };
-    assert_eq!(field_ty.segments[0].name, "String");
+    let Term::Path(field_ty) = callee.as_ref() else {
+        panic!("expected Slice field path");
+    };
+    assert_eq!(field_ty.segments[0].name, "Slice");
+    let [element_ty] = arguments.as_slice() else {
+        panic!("expected Slice element type");
+    };
+    let Term::Path(element_path) = element_ty else {
+        panic!("expected Slice element path");
+    };
+    assert_eq!(element_path.segments[0].name, "u8");
 
     let type_decl = syntax
         .items
@@ -1207,7 +1227,7 @@ fn parses_open_read_close_package_root() {
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 9);
+    assert_eq!(main_fn.body.statements.len(), 7);
 }
 
 #[test]
@@ -1232,7 +1252,7 @@ fn parses_open_write_close_package_root() {
     };
     assert_eq!(main_fn.visibility, Visibility::Private);
     assert!(main_fn.effect.is_some());
-    assert_eq!(main_fn.body.statements.len(), 9);
+    assert_eq!(main_fn.body.statements.len(), 5);
 }
 
 #[test]

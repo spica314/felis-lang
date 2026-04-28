@@ -29,7 +29,10 @@ pub(super) fn lower_pure_value(
         }
         Term::StringLiteral(literal) => {
             let data_index = intern_data(program, nul_terminated_bytes(literal));
-            Ok(Value::ByteString(data_index))
+            let len = i32::try_from(literal.len()).map_err(|_| {
+                Error::Unsupported("string literal is too long for `Slice u8` length".to_string())
+            })?;
+            Ok(Value::StaticSlice { data_index, len })
         }
         Term::CharLiteral(_) => {
             if let Ok(expr) = super::lower_u8_expr(term, state) {
@@ -38,14 +41,6 @@ pub(super) fn lower_pure_value(
             Err(Error::Unsupported(format!(
                 "unsupported pure expression in entrypoint body: {term:?}"
             )))
-        }
-        Term::MethodCall { receiver, method } if method == "as_bytes" => {
-            match resolve_value(receiver.as_ref(), &state.environment)? {
-                Value::ByteString(data_index) => Ok(Value::ByteString(data_index)),
-                other => Err(Error::Unsupported(format!(
-                    "`as_bytes` expects a string reference, got {other:?}"
-                ))),
-            }
         }
         Term::IntegerLiteral(_) | Term::Application { .. } | Term::MethodCall { .. } => {
             if let Term::Application { callee, arguments } = term

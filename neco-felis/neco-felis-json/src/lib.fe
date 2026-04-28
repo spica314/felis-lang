@@ -23,9 +23,7 @@
 #proc set_string_eq_key_pattern : (manifest : String) -> (string_start : i32) -> (token_string_len : i32) -> (result_ref : &^ i32) -> () {
     result_ref .> set 0i32;
     #if i32_eq token_string_len 0x15i32 {
-        #let key_pattern_ref : & Array u8 = "felis-bin-entrypoints";
-    #letref key_pattern_ref : & Array u8 #borrow key_pattern_ref;
-        #let key_pattern_bytes_ref : & Array u8 = key_pattern_ref .> as_bytes;
+        #let key_pattern_bytes_ref : Slice u8 = "felis-bin-entrypoints";
         #let index_ref : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
         result_ref .> set 1i32;

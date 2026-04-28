@@ -17,7 +17,10 @@ pub(crate) enum Value {
     Constructor(ConstructorValue),
     Struct(StructValue),
     FileDescriptor(I32Expr),
-    ByteString(usize),
+    StaticSlice {
+        data_index: usize,
+        len: i32,
+    },
     RuntimeArg(I32Expr),
     I32(I32Expr),
     I32Reference(usize),

@@ -1,5 +1,5 @@
 #use std_core::io::IO;
-#use std_core::primitive::array::append_nul_terminated_u8;
+#use std_core::primitive::array::append_dyn_nul_terminated_u8;
 #use std_core::primitive::array::append_u8;
 #use std_core::primitive::array::fill_u8;
 #use std_core::primitive::i32::i32_from_u8;
@@ -7,14 +7,12 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let source_ref : & Array u8 = "ab";
-    #letref source_ref : & Array u8 #borrow source_ref;
-    #let source_bytes_ref : & Array u8 = source_ref .> as_bytes;
+    #let source_bytes_ref : Slice u8 = "ab";
     #let buffer_ref : &^ Slice u8 <- IO::slice_new u8 8i32;
     #let index_ref : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
     fill_u8 buffer_ref '.';
-    append_nul_terminated_u8 source_bytes_ref buffer_ref index_ref;
+    append_dyn_nul_terminated_u8 source_bytes_ref buffer_ref index_ref;
     append_u8 buffer_ref index_ref 'c';
     #let exit_code : u8 = buffer_ref .> get 2i32;
     #let _ : () <- IO::exit (i32_from_u8 exit_code);
