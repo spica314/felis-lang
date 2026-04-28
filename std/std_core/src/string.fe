@@ -9,6 +9,7 @@
 #use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::i32::i32_gte;
 #use std_core::primitive::i32::i32_sub;
+#use std_core::primitive::i64::i64_from_i32;
 #use std_core::primitive::u8::u8_eq;
 
 #type String : Type[0] {
@@ -20,13 +21,13 @@
 }
 
 #fn string_from_slice_parts : (slice : Slice u8) -> (capacity : i32) -> (len : i32) -> String {
-    #let array : DynArray u8 = DynArray::dyn_array slice capacity len;
+    #let array : DynArray u8 = DynArray::dyn_array slice (i64_from_i32 len);
     String::string array
 }
 
 #fn string_with_len : (string : String) -> (len : i32) -> String {
     #let array : DynArray u8 = string_as_dyn_array string;
-    String::string (DynArray::dyn_array (dyn_array_slice_u8 array) (dyn_array_capacity_u8 array) len)
+    String::string (DynArray::dyn_array (dyn_array_slice_u8 array) (i64_from_i32 len))
 }
 
 #proc string_copy_from_dyn_array_range_into : (source : DynArray u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () {

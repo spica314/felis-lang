@@ -21,7 +21,7 @@
     #let slice_ref : &^ Slice u8 <- IO::slice_new u8 8i32;
     slice_ref .> set 0i32 40u8;
     slice_ref .> set 1i32 2u8;
-    #let array : DynArray u8 = DynArray::dyn_array slice_ref 8i32 2i32;
+    #let array : DynArray u8 = DynArray::dyn_array slice_ref 2i64;
     #let string : String = string_from_dyn_array array;
     #let first : u8 = string_get_u8 string 0i32;
     #let len : i32 = string_len string;
@@ -36,7 +36,7 @@
     source_slice_ref .> set 4i32 'f';
     source_slice_ref .> set 5i32 'o';
     source_slice_ref .> set 6i32 'o';
-    #let source : DynArray u8 = DynArray::dyn_array source_slice_ref 7i32 7i32;
+    #let source : DynArray u8 = DynArray::dyn_array source_slice_ref 7i64;
     #let copied_slice_ref : &^ Slice u8 <- IO::slice_new u8 3i32;
     #let copied_dest : String = string_from_slice_parts copied_slice_ref 3i32 0i32;
     string_copy_from_dyn_array_range_into source 4i32 7i32 copied_dest;

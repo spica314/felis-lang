@@ -222,33 +222,33 @@ fn lowers_array_basic_fixture_to_runtime_array_operations() {
         vec![
             Operation::ArraySetI32 {
                 array_slot: 0,
-                index: I32Expr::Literal(0),
+                index: I64Expr::Literal(0),
                 value: I32Expr::Literal(7),
             },
             Operation::ArraySetI32 {
                 array_slot: 0,
-                index: I32Expr::Literal(1),
+                index: I64Expr::Literal(1),
                 value: I32Expr::Literal(14),
             },
             Operation::ArraySetI32 {
                 array_slot: 0,
-                index: I32Expr::Literal(2),
+                index: I64Expr::Literal(2),
                 value: I32Expr::Literal(21),
             },
             Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
                 Box::new(I32Expr::Add(
                     Box::new(I32Expr::ArrayGet {
                         array_slot: 0,
-                        index: Box::new(I32Expr::Literal(0)),
+                        index: Box::new(I64Expr::Literal(0)),
                     }),
                     Box::new(I32Expr::ArrayGet {
                         array_slot: 0,
-                        index: Box::new(I32Expr::Literal(1)),
+                        index: Box::new(I64Expr::Literal(1)),
                     }),
                 )),
                 Box::new(I32Expr::ArrayGet {
                     array_slot: 0,
-                    index: Box::new(I32Expr::Literal(2)),
+                    index: Box::new(I64Expr::Literal(2)),
                 }),
             ))),
         ]
@@ -277,33 +277,33 @@ fn lowers_array_type_annotation_fixture_to_runtime_array_operations() {
         vec![
             Operation::ArraySetI32 {
                 array_slot: 0,
-                index: I32Expr::Literal(0),
+                index: I64Expr::Literal(0),
                 value: I32Expr::Literal(7),
             },
             Operation::ArraySetI32 {
                 array_slot: 0,
-                index: I32Expr::Literal(1),
+                index: I64Expr::Literal(1),
                 value: I32Expr::Literal(14),
             },
             Operation::ArraySetI32 {
                 array_slot: 0,
-                index: I32Expr::Literal(2),
+                index: I64Expr::Literal(2),
                 value: I32Expr::Literal(21),
             },
             Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
                 Box::new(I32Expr::Add(
                     Box::new(I32Expr::ArrayGet {
                         array_slot: 0,
-                        index: Box::new(I32Expr::Literal(0)),
+                        index: Box::new(I64Expr::Literal(0)),
                     }),
                     Box::new(I32Expr::ArrayGet {
                         array_slot: 0,
-                        index: Box::new(I32Expr::Literal(1)),
+                        index: Box::new(I64Expr::Literal(1)),
                     }),
                 )),
                 Box::new(I32Expr::ArrayGet {
                     array_slot: 0,
-                    index: Box::new(I32Expr::Literal(2)),
+                    index: Box::new(I64Expr::Literal(2)),
                 }),
             ))),
         ]
@@ -332,33 +332,33 @@ fn lowers_dyn_array_type_annotation_fixture_to_runtime_array_operations() {
         vec![
             Operation::ArraySetI32 {
                 array_slot: 0,
-                index: I32Expr::Literal(0),
+                index: I64Expr::Literal(0),
                 value: I32Expr::Literal(7),
             },
             Operation::ArraySetI32 {
                 array_slot: 0,
-                index: I32Expr::Literal(1),
+                index: I64Expr::Literal(1),
                 value: I32Expr::Literal(14),
             },
             Operation::ArraySetI32 {
                 array_slot: 0,
-                index: I32Expr::Literal(2),
+                index: I64Expr::Literal(2),
                 value: I32Expr::Literal(21),
             },
             Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
                 Box::new(I32Expr::Add(
                     Box::new(I32Expr::ArrayGet {
                         array_slot: 0,
-                        index: Box::new(I32Expr::Literal(0)),
+                        index: Box::new(I64Expr::Literal(0)),
                     }),
                     Box::new(I32Expr::ArrayGet {
                         array_slot: 0,
-                        index: Box::new(I32Expr::Literal(1)),
+                        index: Box::new(I64Expr::Literal(1)),
                     }),
                 )),
                 Box::new(I32Expr::ArrayGet {
                     array_slot: 0,
-                    index: Box::new(I32Expr::Literal(2)),
+                    index: Box::new(I64Expr::Literal(2)),
                 }),
             ))),
         ]
@@ -463,12 +463,12 @@ fn lowers_proc_reference_annotation_fixture_to_runtime_expression_tree() {
             },
             Operation::ArraySetI32 {
                 array_slot: 0,
-                index: I32Expr::Literal(0),
+                index: I64Expr::Literal(0),
                 value: I32Expr::Literal(1),
             },
             Operation::ArraySetI32 {
                 array_slot: 0,
-                index: I32Expr::Literal(1),
+                index: I64Expr::Literal(1),
                 value: I32Expr::Literal(2),
             },
             Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
@@ -476,11 +476,11 @@ fn lowers_proc_reference_annotation_fixture_to_runtime_expression_tree() {
                 Box::new(I32Expr::Add(
                     Box::new(I32Expr::ArrayGet {
                         array_slot: 0,
-                        index: Box::new(I32Expr::Literal(0)),
+                        index: Box::new(I64Expr::Literal(0)),
                     }),
                     Box::new(I32Expr::ArrayGet {
                         array_slot: 0,
-                        index: Box::new(I32Expr::Literal(1)),
+                        index: Box::new(I64Expr::Literal(1)),
                     }),
                 )),
             ))),
@@ -511,14 +511,14 @@ fn lowers_proc_cli_arg_reference_fixture_to_runtime_expression_tree() {
                 slot: 0,
                 value: I32Expr::FromU8(Box::new(U8Expr::RuntimeArgGet {
                     arg_index: Box::new(I32Expr::Literal(1)),
-                    index: Box::new(I32Expr::Literal(0)),
+                    index: Box::new(I64Expr::Literal(0)),
                 })),
             },
             Operation::StoreI32 {
                 slot: 1,
                 value: I32Expr::FromU8(Box::new(U8Expr::RuntimeArgGet {
                     arg_index: Box::new(I32Expr::Literal(1)),
-                    index: Box::new(I32Expr::Literal(1)),
+                    index: Box::new(I64Expr::Literal(1)),
                 })),
             },
             Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
@@ -551,67 +551,67 @@ fn lowers_u8_array_hello_world_fixture_to_runtime_array_operations() {
         vec![
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(0),
+                index: I64Expr::Literal(0),
                 value: U8Expr::Literal(104),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(1),
+                index: I64Expr::Literal(1),
                 value: U8Expr::Literal(101),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(2),
+                index: I64Expr::Literal(2),
                 value: U8Expr::Literal(108),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(3),
+                index: I64Expr::Literal(3),
                 value: U8Expr::Literal(108),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(4),
+                index: I64Expr::Literal(4),
                 value: U8Expr::Literal(111),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(5),
+                index: I64Expr::Literal(5),
                 value: U8Expr::Literal(44),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(6),
+                index: I64Expr::Literal(6),
                 value: U8Expr::Literal(32),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(7),
+                index: I64Expr::Literal(7),
                 value: U8Expr::Literal(119),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(8),
+                index: I64Expr::Literal(8),
                 value: U8Expr::Literal(111),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(9),
+                index: I64Expr::Literal(9),
                 value: U8Expr::Literal(114),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(10),
+                index: I64Expr::Literal(10),
                 value: U8Expr::Literal(108),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(11),
+                index: I64Expr::Literal(11),
                 value: U8Expr::Literal(100),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(12),
+                index: I64Expr::Literal(12),
                 value: U8Expr::Literal(10),
             },
             Operation::WriteArray {
@@ -648,12 +648,12 @@ fn lowers_hex_literals_fixture_to_runtime_array_operations() {
         vec![
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(0),
+                index: I64Expr::Literal(0),
                 value: U8Expr::Literal(65),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(1),
+                index: I64Expr::Literal(1),
                 value: U8Expr::Literal(10),
             },
             Operation::WriteArray {
@@ -731,7 +731,7 @@ fn lowers_enum_match_string_fixture_to_runtime_exit() {
         vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::FromU8(
             Box::new(U8Expr::StaticDataGet {
                 data_index: 0,
-                index: Box::new(I32Expr::Literal(0)),
+                index: Box::new(I64Expr::Literal(0)),
             })
         )))]
     );
@@ -753,7 +753,7 @@ fn lowers_enum_match_struct_string_fixture_to_runtime_exit() {
         vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::FromU8(
             Box::new(U8Expr::StaticDataGet {
                 data_index: 0,
-                index: Box::new(I32Expr::Literal(0)),
+                index: Box::new(I64Expr::Literal(0)),
             })
         )))]
     );
@@ -1293,11 +1293,11 @@ fn lowers_cli_args_fixture_to_runtime_io_operations() {
             Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
                 Box::new(I32Expr::FromU8(Box::new(U8Expr::RuntimeArgGet {
                     arg_index: Box::new(I32Expr::Literal(2)),
-                    index: Box::new(I32Expr::Literal(0)),
+                    index: Box::new(I64Expr::Literal(0)),
                 }))),
                 Box::new(I32Expr::FromU8(Box::new(U8Expr::RuntimeArgGet {
                     arg_index: Box::new(I32Expr::Literal(2)),
-                    index: Box::new(I32Expr::Literal(1)),
+                    index: Box::new(I64Expr::Literal(1)),
                 }))),
             ))),
         ]
@@ -1346,62 +1346,62 @@ fn lowers_open_array_path_fixture_to_runtime_io_operations() {
         vec![
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(0),
+                index: I64Expr::Literal(0),
                 value: U8Expr::Literal(0x6d),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(1),
+                index: I64Expr::Literal(1),
                 value: U8Expr::Literal(0x65),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(2),
+                index: I64Expr::Literal(2),
                 value: U8Expr::Literal(0x73),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(3),
+                index: I64Expr::Literal(3),
                 value: U8Expr::Literal(0x73),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(4),
+                index: I64Expr::Literal(4),
                 value: U8Expr::Literal(0x61),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(5),
+                index: I64Expr::Literal(5),
                 value: U8Expr::Literal(0x67),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(6),
+                index: I64Expr::Literal(6),
                 value: U8Expr::Literal(0x65),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(7),
+                index: I64Expr::Literal(7),
                 value: U8Expr::Literal(0x2e),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(8),
+                index: I64Expr::Literal(8),
                 value: U8Expr::Literal(0x74),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(9),
+                index: I64Expr::Literal(9),
                 value: U8Expr::Literal(0x78),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(10),
+                index: I64Expr::Literal(10),
                 value: U8Expr::Literal(0x74),
             },
             Operation::ArraySetU8 {
                 array_slot: 0,
-                index: I32Expr::Literal(11),
+                index: I64Expr::Literal(11),
                 value: U8Expr::Literal(0x00),
             },
             Operation::Open {

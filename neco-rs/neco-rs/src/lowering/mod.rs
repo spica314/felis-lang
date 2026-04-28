@@ -29,7 +29,8 @@ use pure::{
 pub(crate) use typecheck::validate_value_against_type;
 
 pub(crate) use expr::{
-    lower_i32_expr, lower_i64_expr, lower_u8_expr, normalize_numeric_literal_arguments,
+    lower_array_index_expr, lower_i32_expr, lower_i64_expr, lower_u8_expr,
+    normalize_numeric_literal_arguments,
 };
 
 #[derive(Clone)]
@@ -641,7 +642,7 @@ fn lower_expression_statement(
             };
             program.operations.push(Operation::ArraySetI32 {
                 array_slot: slot,
-                index: lower_i32_expr(index, state)?,
+                index: lower_array_index_expr(index, state)?,
                 value: lower_i32_expr(value, state)?,
             });
         }
@@ -658,7 +659,7 @@ fn lower_expression_statement(
             };
             program.operations.push(Operation::ArraySetI64 {
                 array_slot: slot,
-                index: lower_i32_expr(index, state)?,
+                index: lower_array_index_expr(index, state)?,
                 value: lower_i64_expr(value, state)?,
             });
         }
@@ -675,7 +676,7 @@ fn lower_expression_statement(
             };
             program.operations.push(Operation::ArraySetU8 {
                 array_slot: slot,
-                index: lower_i32_expr(index, state)?,
+                index: lower_array_index_expr(index, state)?,
                 value: lower_u8_expr(value, state)?,
             });
         }

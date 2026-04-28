@@ -21,6 +21,7 @@ pub(crate) enum I32Expr {
     Literal(i32),
     Local(usize),
     FromU8(Box<U8Expr>),
+    FromI64(Box<I64Expr>),
     Add(Box<I32Expr>, Box<I32Expr>),
     Sub(Box<I32Expr>, Box<I32Expr>),
     Mul(Box<I32Expr>, Box<I32Expr>),
@@ -28,7 +29,7 @@ pub(crate) enum I32Expr {
     Mod(Box<I32Expr>, Box<I32Expr>),
     ArrayGet {
         array_slot: usize,
-        index: Box<I32Expr>,
+        index: Box<I64Expr>,
     },
     ArrayLen {
         array_slot: usize,
@@ -48,7 +49,10 @@ pub(crate) enum I64Expr {
     Mod(Box<I64Expr>, Box<I64Expr>),
     ArrayGet {
         array_slot: usize,
-        index: Box<I32Expr>,
+        index: Box<I64Expr>,
+    },
+    ArrayLen {
+        array_slot: usize,
     },
 }
 
@@ -90,15 +94,15 @@ pub(crate) enum U8Expr {
     Mod(Box<U8Expr>, Box<U8Expr>),
     RuntimeArgGet {
         arg_index: Box<I32Expr>,
-        index: Box<I32Expr>,
+        index: Box<I64Expr>,
     },
     StaticDataGet {
         data_index: usize,
-        index: Box<I32Expr>,
+        index: Box<I64Expr>,
     },
     ArrayGet {
         array_slot: usize,
-        index: Box<I32Expr>,
+        index: Box<I64Expr>,
     },
 }
 
@@ -186,17 +190,17 @@ pub(crate) enum Operation {
     },
     ArraySetI32 {
         array_slot: usize,
-        index: I32Expr,
+        index: I64Expr,
         value: I32Expr,
     },
     ArraySetI64 {
         array_slot: usize,
-        index: I32Expr,
+        index: I64Expr,
         value: I64Expr,
     },
     ArraySetU8 {
         array_slot: usize,
-        index: I32Expr,
+        index: I64Expr,
         value: U8Expr,
     },
     If {

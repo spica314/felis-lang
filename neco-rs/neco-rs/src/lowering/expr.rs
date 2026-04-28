@@ -113,6 +113,16 @@ fn lower_i64_method_call(term: &Term, state: &LoweringState) -> Result<I64Expr> 
                 "`get` expects an `i64` reference, got {other:?}"
             ))),
         },
+        "len" => match resolve_value(receiver.as_ref(), &state.environment)? {
+            Value::Array {
+                slot,
+                kind: ArrayKind::Dynamic,
+                ..
+            } => Ok(I64Expr::ArrayLen { array_slot: slot }),
+            other => Err(Error::Unsupported(format!(
+                "`len` expects a dynamic array reference, got {other:?}"
+            ))),
+        },
         _ => Err(Error::Unsupported(format!(
             "unsupported `i64` expression in entrypoint body: {term:?}"
         ))),
@@ -301,6 +311,15 @@ fn lower_i32_primitive_call(
         };
         return Ok(I32Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
     }
+    if primitive == "i32_from_i64" {
+        let [value] = normalized.as_slice() else {
+            return Err(Error::Unsupported(format!(
+                "`{}` must receive exactly one argument",
+                segments.join("::")
+            )));
+        };
+        return Ok(I32Expr::FromI64(Box::new(lower_i64_expr(value, state)?)));
+    }
     let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
             "`{}` must receive exactly two arguments",
@@ -456,7 +475,7 @@ fn lower_array_get_call(
 
     Ok(Some(I32Expr::ArrayGet {
         array_slot,
-        index: Box::new(lower_i32_expr(index, state)?),
+        index: Box::new(lower_array_index_expr(index, state)?),
     }))
 }
 
@@ -494,7 +513,7 @@ fn lower_i64_array_get_call(
 
     Ok(Some(I64Expr::ArrayGet {
         array_slot,
-        index: Box::new(lower_i32_expr(index, state)?),
+        index: Box::new(lower_array_index_expr(index, state)?),
     }))
 }
 
@@ -568,7 +587,7 @@ fn lower_u8_array_get_call(
 
     Ok(Some(U8Expr::ArrayGet {
         array_slot,
-        index: Box::new(lower_i32_expr(index, state)?),
+        index: Box::new(lower_array_index_expr(index, state)?),
     }))
 }
 
@@ -594,14 +613,23 @@ fn lower_runtime_arg_get_call(
     match resolve_value(receiver.as_ref(), &state.environment)? {
         Value::RuntimeArg(arg_index) => Ok(Some(U8Expr::RuntimeArgGet {
             arg_index: Box::new(arg_index),
-            index: Box::new(lower_i32_expr(index, state)?),
+            index: Box::new(lower_array_index_expr(index, state)?),
         })),
         Value::ByteString(data_index) => Ok(Some(U8Expr::StaticDataGet {
             data_index,
-            index: Box::new(lower_i32_expr(index, state)?),
+            index: Box::new(lower_array_index_expr(index, state)?),
         })),
         _ => Ok(None),
     }
+}
+
+pub(crate) fn lower_array_index_expr(term: &Term, state: &LoweringState) -> Result<I64Expr> {
+    lower_i64_expr(term, state).or_else(|_| {
+        lower_i32_expr(term, state).map(|index| match index {
+            I32Expr::Literal(value) => I64Expr::Literal(i64::from(value)),
+            other => I64Expr::FromI32(Box::new(other)),
+        })
+    })
 }
 
 pub(crate) fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {

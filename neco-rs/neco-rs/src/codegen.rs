@@ -457,6 +457,7 @@ fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>, program: &LoweredPro
             code.extend_from_slice(&slot_offset.to_le_bytes());
         }
         I32Expr::FromU8(value) => emit_u8_expr_to_eax(value, code, program),
+        I32Expr::FromI64(value) => emit_i64_expr_to_rax(value, code, program),
         I32Expr::Add(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0x01, 0xc8]),
         I32Expr::Sub(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0x29, 0xc8]),
         I32Expr::Mul(lhs, rhs) => {
@@ -535,6 +536,7 @@ fn emit_i64_expr_to_rax(expr: &I64Expr, code: &mut Vec<u8>, program: &LoweredPro
         I64Expr::ArrayGet { array_slot, index } => {
             emit_i64_array_get(*array_slot, index, code, program)
         }
+        I64Expr::ArrayLen { array_slot } => emit_i64_array_len(*array_slot, code, program),
     }
 }
 
@@ -643,12 +645,12 @@ fn emit_u8_div_mod_expr(
 
 fn emit_static_data_u8_get(
     data_index: usize,
-    index: &I32Expr,
+    index: &I64Expr,
     code: &mut Vec<u8>,
     program: &LoweredProgram,
 ) {
     let data_address = static_data_address(program, data_index);
-    emit_i32_expr_to_eax(index, code, program);
+    emit_i64_expr_to_rax(index, code, program);
     code.extend_from_slice(&[0x48, 0xbb]);
     code.extend_from_slice(&data_address.to_le_bytes());
     code.extend_from_slice(&[0x0f, 0xb6, 0x04, 0x03]);
@@ -678,15 +680,15 @@ fn emit_runtime_arg_ptr_to_rax(
 
 fn emit_runtime_arg_u8_get(
     arg_index: &I32Expr,
-    index: &I32Expr,
+    index: &I64Expr,
     code: &mut Vec<u8>,
     program: &LoweredProgram,
     argv_global_address: u64,
 ) {
     emit_runtime_arg_ptr_to_rax(arg_index, code, program, argv_global_address);
     code.push(0x50);
-    emit_i32_expr_to_eax(index, code, program);
-    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    emit_i64_expr_to_rax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc1]);
     code.push(0x58);
     code.extend_from_slice(&[0x0f, 0xb6, 0x04, 0x08]);
 }
@@ -808,13 +810,13 @@ fn array_allocation(program: &LoweredProgram, slot: usize) -> &ArrayAllocation {
 
 fn emit_i32_array_set(
     array_slot: usize,
-    index: &I32Expr,
+    index: &I64Expr,
     value: &I32Expr,
     code: &mut Vec<u8>,
     program: &LoweredProgram,
 ) {
-    emit_i32_expr_to_eax(index, code, program);
-    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    emit_i64_expr_to_rax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc1]);
     code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x02]);
     code.push(0x51);
     emit_i32_expr_to_eax(value, code, program);
@@ -828,13 +830,13 @@ fn emit_i32_array_set(
 
 fn emit_i64_array_set(
     array_slot: usize,
-    index: &I32Expr,
+    index: &I64Expr,
     value: &I64Expr,
     code: &mut Vec<u8>,
     program: &LoweredProgram,
 ) {
-    emit_i32_expr_to_eax(index, code, program);
-    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    emit_i64_expr_to_rax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc1]);
     code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x03]);
     code.push(0x51);
     emit_i64_expr_to_rax(value, code, program);
@@ -852,15 +854,21 @@ fn emit_array_len(array_slot: usize, code: &mut Vec<u8>, program: &LoweredProgra
     code.extend_from_slice(&len_offset.to_le_bytes());
 }
 
+fn emit_i64_array_len(array_slot: usize, code: &mut Vec<u8>, program: &LoweredProgram) {
+    let len_offset = array_logical_len_offset(program, array_slot);
+    code.extend_from_slice(&[0x48, 0x8b, 0x85]);
+    code.extend_from_slice(&len_offset.to_le_bytes());
+}
+
 fn emit_u8_array_set(
     array_slot: usize,
-    index: &I32Expr,
+    index: &I64Expr,
     value: &U8Expr,
     code: &mut Vec<u8>,
     program: &LoweredProgram,
 ) {
-    emit_i32_expr_to_eax(index, code, program);
-    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    emit_i64_expr_to_rax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc1]);
     code.push(0x51);
     emit_u8_expr_to_eax(value, code, program);
     code.extend_from_slice(&[0x89, 0xc2]);
@@ -873,12 +881,12 @@ fn emit_u8_array_set(
 
 fn emit_array_get(
     array_slot: usize,
-    index: &I32Expr,
+    index: &I64Expr,
     code: &mut Vec<u8>,
     program: &LoweredProgram,
 ) {
-    emit_i32_expr_to_eax(index, code, program);
-    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    emit_i64_expr_to_rax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc1]);
     code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x02]);
     let slot_offset = array_slot_offset(program, array_slot);
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
@@ -888,12 +896,12 @@ fn emit_array_get(
 
 fn emit_i64_array_get(
     array_slot: usize,
-    index: &I32Expr,
+    index: &I64Expr,
     code: &mut Vec<u8>,
     program: &LoweredProgram,
 ) {
-    emit_i32_expr_to_eax(index, code, program);
-    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    emit_i64_expr_to_rax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc1]);
     code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x03]);
     let slot_offset = array_slot_offset(program, array_slot);
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
@@ -903,12 +911,12 @@ fn emit_i64_array_get(
 
 fn emit_u8_array_get(
     array_slot: usize,
-    index: &I32Expr,
+    index: &I64Expr,
     code: &mut Vec<u8>,
     program: &LoweredProgram,
 ) {
-    emit_i32_expr_to_eax(index, code, program);
-    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    emit_i64_expr_to_rax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc1]);
     let slot_offset = array_slot_offset(program, array_slot);
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());

@@ -6,11 +6,11 @@
 
 #fn main : () #with IO {
     #let array_ref : &^ Array i64 3i32 <- IO::array_new i64 3i32;
-    array_ref .> set 0i32 10i64;
-    array_ref .> set 1i32 20i64;
-    array_ref .> set 2i32 12i64;
-    #let first_sum : i64 = i64_add (array_ref .> get 0i32) (array_ref .> get 1i32);
-    #let code : i64 = i64_add first_sum (array_ref .> get 2i32);
+    array_ref .> set 0i64 10i64;
+    array_ref .> set 1i64 20i64;
+    array_ref .> set 2i64 12i64;
+    #let first_sum : i64 = i64_add (array_ref .> get 0i64) (array_ref .> get 1i64);
+    #let code : i64 = i64_add first_sum (array_ref .> get 2i64);
     #let _ : () <- IO::exit code;
     ()
 }

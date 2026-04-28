@@ -1,98 +1,94 @@
 #use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_from_i64;
 #use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i64::i64_from_i32;
 #use std_core::primitive::u8::u8_eq;
 
 #bind_builtin "Array" #as Array;
 #bind_builtin "Slice" #as Slice;
 
 #type DynArray : (t : Type[0]) -> Type[0] {
-    dyn_array : Slice t -> i32 -> i32 -> DynArray t,
+    dyn_array : Slice t -> i64 -> DynArray t,
 }
 
 #fn dyn_array_slice_u8 : (array : DynArray u8) -> Slice u8 {
     #match array {
-        DynArray::dyn_array slice _ _ => slice,
+        DynArray::dyn_array slice _ => slice,
     }
 }
 
 #fn dyn_array_slice_i32 : (array : DynArray i32) -> Slice i32 {
     #match array {
-        DynArray::dyn_array slice _ _ => slice,
+        DynArray::dyn_array slice _ => slice,
     }
 }
 
 #fn dyn_array_slice_i64 : (array : DynArray i64) -> Slice i64 {
     #match array {
-        DynArray::dyn_array slice _ _ => slice,
+        DynArray::dyn_array slice _ => slice,
     }
 }
 
 #fn dyn_array_capacity_u8 : (array : DynArray u8) -> i32 {
-    #match array {
-        DynArray::dyn_array _ capacity _ => capacity,
-    }
+    i32_from_i64 ((dyn_array_slice_u8 array) .> len)
 }
 
 #fn dyn_array_capacity_i32 : (array : DynArray i32) -> i32 {
-    #match array {
-        DynArray::dyn_array _ capacity _ => capacity,
-    }
+    i32_from_i64 ((dyn_array_slice_i32 array) .> len)
 }
 
 #fn dyn_array_capacity_i64 : (array : DynArray i64) -> i32 {
-    #match array {
-        DynArray::dyn_array _ capacity _ => capacity,
-    }
+    i32_from_i64 ((dyn_array_slice_i64 array) .> len)
 }
 
 #fn dyn_array_len_u8 : (array : DynArray u8) -> i32 {
     #match array {
-        DynArray::dyn_array _ _ len => len,
+        DynArray::dyn_array _ len => i32_from_i64 len,
     }
 }
 
 #fn dyn_array_len_i32 : (array : DynArray i32) -> i32 {
     #match array {
-        DynArray::dyn_array _ _ len => len,
+        DynArray::dyn_array _ len => i32_from_i64 len,
     }
 }
 
 #fn dyn_array_len_i64 : (array : DynArray i64) -> i32 {
     #match array {
-        DynArray::dyn_array _ _ len => len,
+        DynArray::dyn_array _ len => i32_from_i64 len,
     }
 }
 
 #fn dyn_array_get_u8 : (array : DynArray u8) -> (index : i32) -> u8 {
     #let slice : Slice u8 = dyn_array_slice_u8 array;
-    slice .> get index
+    slice .> get (i64_from_i32 index)
 }
 
 #fn dyn_array_get_i32 : (array : DynArray i32) -> (index : i32) -> i32 {
     #let slice : Slice i32 = dyn_array_slice_i32 array;
-    slice .> get index
+    slice .> get (i64_from_i32 index)
 }
 
 #fn dyn_array_get_i64 : (array : DynArray i64) -> (index : i32) -> i64 {
     #let slice : Slice i64 = dyn_array_slice_i64 array;
-    slice .> get index
+    slice .> get (i64_from_i32 index)
 }
 
 #proc dyn_array_set_u8 : (array : DynArray u8) -> (index : i32) -> (byte : u8) -> () {
     #let slice : Slice u8 = dyn_array_slice_u8 array;
-    slice .> set index byte;
+    slice .> set (i64_from_i32 index) byte;
     ()
 }
 
 #proc dyn_array_set_i32 : (array : DynArray i32) -> (index : i32) -> (value : i32) -> () {
     #let slice : Slice i32 = dyn_array_slice_i32 array;
-    slice .> set index value;
+    slice .> set (i64_from_i32 index) value;
     ()
 }
 
 #proc dyn_array_set_i64 : (array : DynArray i64) -> (index : i32) -> (value : i64) -> () {
     #let slice : Slice i64 = dyn_array_slice_i64 array;
-    slice .> set index value;
+    slice .> set (i64_from_i32 index) value;
     ()
 }
 

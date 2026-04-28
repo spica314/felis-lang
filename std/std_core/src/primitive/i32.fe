@@ -10,6 +10,7 @@
 #bind_builtin "i32_gte" #as i32_gte;
 #bind_builtin "i32_gt" #as i32_gt;
 #bind_builtin "i32_from_u8" #as i32_from_u8;
+#bind_builtin "i32_from_i64" #as i32_from_i64;
 
 #pub #use i32;
 #pub #use i32_add;
@@ -23,3 +24,4 @@
 #pub #use i32_gte;
 #pub #use i32_gt;
 #pub #use i32_from_u8;
+#pub #use i32_from_i64;
