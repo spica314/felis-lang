@@ -17,6 +17,13 @@
 #pub #use #package::syntax::FelisItem;
 #pub #use #package::syntax::FelisItemKind;
 #pub #use #package::syntax::FelisItems;
+#pub #use #package::syntax::FelisPathExpression;
+#pub #use #package::syntax::FelisPathSegment;
+#pub #use #package::syntax::FelisPathSegments;
+#pub #use #package::syntax::FelisPattern;
+#pub #use #package::syntax::FelisPatternKind;
+#pub #use #package::syntax::FelisPatternNode;
+#pub #use #package::syntax::FelisPatterns;
 #pub #use #package::syntax::FelisSourceFile;
 #pub #use #package::syntax::encode_felis_token_kind;
 #pub #use #package::syntax::decode_felis_token_kind;
@@ -26,7 +33,13 @@
 #pub #use #package::syntax::decode_felis_punct_kind;
 #pub #use #package::syntax::encode_parsed_felis_stmt_kind;
 #pub #use #package::syntax::encode_felis_item_kind;
+#pub #use #package::syntax::encode_felis_pattern_kind;
+#pub #use #package::syntax::empty_felis_path_expression;
 #pub #use #package::syntax::parse_felis_item;
+#pub #use #package::syntax::parse_felis_path_expression;
+#pub #use #package::syntax::require_felis_path_expression;
+#pub #use #package::syntax::parse_felis_pattern;
+#pub #use #package::syntax::require_felis_pattern;
 #pub #use #package::syntax::parse_felis_source_file;
 #pub #use #package::syntax::parse_complete_felis_source_file;
 #pub #use #package::syntax::parse_felis_source_file_from_source;

@@ -17,6 +17,9 @@
 #use #package::parser::require_token_identifier;
 #use #package::parser::require_token_keyword_kind;
 #use #package::parser::require_token_punct_kind;
+#use #package::syntax::path::FelisPathExpression;
+#use #package::syntax::path::empty_felis_path_expression;
+#use #package::syntax::path::require_felis_path_expression;
 #use #package::syntax::term::FelisKeywordKind;
 #use #package::syntax::term::FelisPunctKind;
 #use #package::syntax::term::FelisTokenKind;
@@ -277,6 +280,48 @@
     ()
 }
 
+#proc parse_use_item : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (item_ref : &^ FelisItem) -> () {
+    #let attempt_cursor_ref : i32 = 0i32;
+    #letref #excl attempt_cursor_ref : &^ i32 #borrow attempt_cursor_ref;
+    parser_begin_attempt cursor_ref attempt_cursor_ref;
+    #let item_start : i32 = current_token_start token_start_ref attempt_cursor_ref;
+    #let is_public_ref : i32 = 0i32;
+    #let path_ref : FelisPathExpression = empty_felis_path_expression 0i32;
+    #letref #excl is_public_ref : &^ i32 #borrow is_public_ref;
+    #letref #excl path_ref : &^ FelisPathExpression #borrow path_ref;
+    parse_optional_pub token_tag_ref token_value_ref attempt_cursor_ref is_public_ref;
+    require_token_keyword_kind token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref FelisKeywordKind::keyword_use error_ref matched_ref;
+    #if i32_eq (matched_ref .> get) 1i32 {
+        require_felis_path_expression token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref error_ref matched_ref path_ref;
+    };
+    #if i32_eq (matched_ref .> get) 1i32 {
+        require_semicolon token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref error_ref matched_ref;
+    };
+    #if i32_eq (matched_ref .> get) 1i32 {
+        #let path : FelisPathExpression = path_ref .> get;
+        item_ref .> set FelisItem {
+            kind = encode_felis_item_kind FelisItemKind::item_use 0i32,
+            is_public = is_public_ref .> get,
+            name_value = path.first_segment_value,
+            name_start = path.first_segment_start,
+            name_end = path.first_segment_end,
+            path_start = path.start,
+            path_end = path.end,
+            builtin_name_value = 0i32,
+            type_start = 0i32,
+            type_end = 0i32,
+            effect_start = 0i32,
+            effect_end = 0i32,
+            body_start = 0i32,
+            body_end = 0i32,
+            start = item_start,
+            end = previous_token_end token_end_ref attempt_cursor_ref
+        };
+    };
+    parser_commit_attempt cursor_ref attempt_cursor_ref matched_ref;
+    ()
+}
+
 #proc parse_fn_like_item : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> (cursor_ref : &^ i32) -> (keyword_kind : FelisKeywordKind) -> (item_kind : FelisItemKind) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (item_ref : &^ FelisItem) -> () {
     #let attempt_cursor_ref : i32 = 0i32;
     #letref #excl attempt_cursor_ref : &^ i32 #borrow attempt_cursor_ref;
@@ -364,7 +409,7 @@
     parse_simple_named_item token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref FelisKeywordKind::keyword_entrypoint FelisItemKind::item_entrypoint 0i32 error_ref matched_ref item_ref;
     #if i32_eq (matched_ref .> get) 0i32 {
         error_ref .> set first_error;
-        parse_simple_named_item token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref FelisKeywordKind::keyword_use FelisItemKind::item_use 1i32 error_ref matched_ref item_ref;
+        parse_use_item token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref error_ref matched_ref item_ref;
     };
     #if i32_eq (matched_ref .> get) 0i32 {
         error_ref .> set first_error;
