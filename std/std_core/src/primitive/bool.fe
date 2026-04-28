@@ -1,0 +1,3 @@
+#bind_builtin "bool" #as bool;
+#bind_builtin "true" #as true;
+#bind_builtin "false" #as false;

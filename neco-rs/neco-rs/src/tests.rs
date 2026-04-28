@@ -201,6 +201,42 @@ fn lowers_u8_ops_fixture_to_runtime_expression_tree() {
 }
 
 #[test]
+fn lowers_bool_basic_fixture_to_runtime_conditions() {
+    let root = repo_root().join("tests/testcases/bool-basic");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::If {
+                condition: ConditionExpr::Literal(false),
+                then_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(1)))],
+                else_operations: vec![],
+            },
+            Operation::If {
+                condition: ConditionExpr::Literal(true),
+                then_operations: vec![Operation::If {
+                    condition: ConditionExpr::I32 {
+                        kind: ComparisonKind::Eq,
+                        lhs: I32Expr::Literal(7),
+                        rhs: I32Expr::Literal(7),
+                    },
+                    then_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))],
+                    else_operations: vec![],
+                }],
+                else_operations: vec![],
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(2))),
+        ]
+    );
+    assert!(program.data.is_empty());
+    assert!(program.arrays.is_empty());
+}
+
+#[test]
 fn lowers_array_basic_fixture_to_runtime_array_operations() {
     let root = repo_root().join("tests/testcases/array-basic");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

@@ -389,6 +389,13 @@ fn emit_condition_false_jump(
     program: &LoweredProgram,
 ) {
     match condition {
+        ConditionExpr::Literal(true) => {
+            code.extend_from_slice(&[0x39, 0xc0]);
+            emit_jcc_false(ComparisonKind::Eq, false, code);
+        }
+        ConditionExpr::Literal(false) => {
+            code.push(0xe9);
+        }
         ConditionExpr::I32 { kind, lhs, rhs } => {
             emit_i32_expr_to_eax(lhs, code, program);
             code.push(0x50);

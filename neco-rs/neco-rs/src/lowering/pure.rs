@@ -52,6 +52,9 @@ pub(super) fn lower_pure_value(
             if let Some(value) = lower_pure_function_call(term, state, program)? {
                 return Ok(value);
             }
+            if let Ok(condition) = super::lower_bool_expr(term, state) {
+                return Ok(Value::Bool(condition));
+            }
             if let Ok(expr) = super::lower_i32_expr(term, state) {
                 return Ok(Value::I32(expr));
             }
@@ -83,6 +86,11 @@ fn lower_path_value(
         let name = path.segments[0].name.as_str();
         if let Some(value) = state.environment.get(name) {
             return Ok(value.clone());
+        }
+        match name {
+            "true" => return Ok(Value::Bool(crate::ir::ConditionExpr::Literal(true))),
+            "false" => return Ok(Value::Bool(crate::ir::ConditionExpr::Literal(false))),
+            _ => {}
         }
         return Err(Error::Unsupported(format!(
             "unknown entrypoint local `{name}`"

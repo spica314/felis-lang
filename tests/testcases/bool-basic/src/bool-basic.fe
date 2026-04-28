@@ -1,0 +1,22 @@
+#use std_core::io::IO;
+#use std_core::primitive::bool::bool;
+#use std_core::primitive::bool::true;
+#use std_core::primitive::bool::false;
+#use std_core::primitive::i32::i32_eq;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let literal_true : bool = true;
+    #let comparison_true : bool = i32_eq 7i32 7i32;
+    #if false {
+        #let _ : () <- IO::exit 1i32;
+    };
+    #if literal_true {
+        #if comparison_true {
+            #let _ : () <- IO::exit 42i32;
+        };
+    };
+    #let _ : () <- IO::exit 2i32;
+    ()
+}

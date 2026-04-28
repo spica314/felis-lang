@@ -1,0 +1,4 @@
+{
+    "name": "bool-basic",
+    "felis-bin-entrypoints": ["src/bool-basic.fe"]
+}

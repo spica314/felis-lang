@@ -162,21 +162,64 @@ pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr
 }
 
 pub(super) fn lower_condition_expr(term: &Term, state: &LoweringState) -> Result<ConditionExpr> {
+    lower_bool_expr(term, state)
+        .map_err(|_| Error::Unsupported("`#if` condition must be a `bool` expression".to_string()))
+}
+
+pub(crate) fn lower_bool_expr(term: &Term, state: &LoweringState) -> Result<ConditionExpr> {
+    match term {
+        Term::Group(inner) => lower_bool_expr(inner, state),
+        Term::Path(_) | Term::FieldAccess { .. } => match resolve_value(term, &state.environment) {
+            Ok(Value::Bool(condition)) => Ok(condition),
+            Ok(other) => Err(Error::Unsupported(format!(
+                "expected a `bool` value, got {other:?}"
+            ))),
+            Err(_) => lower_bool_builtin_path(term),
+        },
+        Term::Application { .. } => lower_comparison_expr(term, state),
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `bool` expression in entrypoint body: {term:?}"
+        ))),
+    }
+}
+
+fn lower_bool_builtin_path(term: &Term) -> Result<ConditionExpr> {
+    let Term::Path(path) = term else {
+        return Err(Error::Unsupported(format!(
+            "unsupported `bool` expression in entrypoint body: {term:?}"
+        )));
+    };
+    if path.starts_with_package || path.segments.len() != 1 || !path.segments[0].suffixes.is_empty()
+    {
+        return Err(Error::Unsupported(format!(
+            "unsupported `bool` expression in entrypoint body: {term:?}"
+        )));
+    }
+    match path.segments[0].name.as_str() {
+        "true" => Ok(ConditionExpr::Literal(true)),
+        "false" => Ok(ConditionExpr::Literal(false)),
+        name => Err(Error::Unsupported(format!(
+            "unknown entrypoint local `{name}`"
+        ))),
+    }
+}
+
+fn lower_comparison_expr(term: &Term, state: &LoweringState) -> Result<ConditionExpr> {
     let Term::Application { callee, arguments } = term else {
         return Err(Error::Unsupported(
-            "`#if` condition must be a comparison call".to_string(),
+            "`bool` expression must be a comparison call".to_string(),
         ));
     };
     let Term::Path(path) = callee.as_ref() else {
         return Err(Error::Unsupported(
-            "`#if` condition must use a path callee".to_string(),
+            "`bool` comparison must use a path callee".to_string(),
         ));
     };
 
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`#if` condition must receive exactly two arguments".to_string(),
+            "`bool` comparison must receive exactly two arguments".to_string(),
         ));
     };
 
@@ -209,7 +252,7 @@ pub(super) fn lower_condition_expr(term: &Term, state: &LoweringState) -> Result
     }
 
     Err(Error::Unsupported(format!(
-        "unsupported `#if` condition `{primitive}`"
+        "unsupported `bool` comparison `{primitive}`"
     )))
 }
 

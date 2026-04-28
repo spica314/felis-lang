@@ -29,7 +29,7 @@ use pure::{
 pub(crate) use typecheck::validate_value_against_type;
 
 pub(crate) use expr::{
-    lower_array_index_expr, lower_i32_expr, lower_i64_expr, lower_u8_expr,
+    lower_array_index_expr, lower_bool_expr, lower_i32_expr, lower_i64_expr, lower_u8_expr,
     normalize_numeric_literal_arguments,
 };
 
