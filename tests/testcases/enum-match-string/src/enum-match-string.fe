@@ -1,0 +1,24 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::i32::i32_from_u8;
+#use std_core::primitive::u8::u8;
+#use std_core::string::String;
+
+#type Message : Type[0] {
+    text : String -> Message,
+}
+
+#fn message_bytes : (message : Message) -> & Array u8 {
+    #match message {
+        Message::text text => text .> as_bytes,
+    }
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let bytes_ref : & Array u8 = message_bytes (Message::text "A");
+    #let code : i32 = i32_from_u8 (bytes_ref .> get 0i32);
+    #let _ : () <- IO::exit code;
+    ()
+}

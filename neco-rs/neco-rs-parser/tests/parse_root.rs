@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use neco_rs_parser::{
-    ElseBranch, Item, ParsedRoot, Pattern, SourceFileRole, Statement, Term, Visibility, parse_root,
-    parse_source,
+    ArrowParameter, ElseBranch, Item, ParsedRoot, Pattern, SourceFileRole, Statement, Term,
+    Visibility, parse_root, parse_source,
 };
 
 fn repo_root() -> PathBuf {
@@ -875,6 +875,42 @@ fn parses_enum_match_payload_package_root() {
         assert!(matches!(&subpatterns[0], Pattern::Bind(name) if name == "x"));
         assert!(matches!(&subpatterns[1], Pattern::Bind(name) if name == "y"));
     }
+}
+
+#[test]
+fn parses_enum_match_string_package_root() {
+    let root = repo_root().join("tests/testcases/enum-match-string");
+    let parsed = parse_root(&root).expect("enum-match-string package parses");
+    let ParsedRoot::Package(package) = parsed else {
+        panic!("expected package root");
+    };
+
+    assert_eq!(package.manifest.name, "enum-match-string");
+    assert_eq!(package.source_files.len(), 1);
+
+    let syntax = &package.source_files[0].syntax;
+    let type_decl = syntax
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::Type(type_decl) => Some(type_decl),
+            _ => None,
+        })
+        .expect("type declaration");
+    assert_eq!(type_decl.name.name, "Message");
+    assert_eq!(type_decl.constructors.len(), 1);
+    assert_eq!(type_decl.constructors[0].name.name, "text");
+
+    let Term::Arrow(arrow) = &type_decl.constructors[0].ty else {
+        panic!("expected String payload constructor");
+    };
+    let ArrowParameter::Domain(payload_ty) = &arrow.parameter else {
+        panic!("expected String payload type");
+    };
+    let Term::Path(payload_path) = payload_ty.as_ref() else {
+        panic!("expected String payload type");
+    };
+    assert_eq!(payload_path.segments[0].name, "String");
 }
 
 #[test]

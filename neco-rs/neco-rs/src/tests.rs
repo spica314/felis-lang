@@ -688,6 +688,28 @@ fn lowers_enum_match_payload_pair_fixture_to_runtime_exit() {
 }
 
 #[test]
+fn lowers_enum_match_string_fixture_to_runtime_exit() {
+    let root = repo_root().join("tests/testcases/enum-match-string");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::FromU8(
+            Box::new(U8Expr::StaticDataGet {
+                data_index: 0,
+                index: Box::new(I32Expr::Literal(0)),
+            })
+        )))]
+    );
+    assert_eq!(program.data, vec![b"A\0".to_vec()]);
+    assert!(program.arrays.is_empty());
+    assert_eq!(program.i32_slots, 0);
+}
+
+#[test]
 fn lowers_type_rc_match_single_fixture_to_runtime_exit() {
     let root = repo_root().join("tests/testcases/type-rc-match");
     let package = selected_fixture_package(&root, "type-rc-match-single");

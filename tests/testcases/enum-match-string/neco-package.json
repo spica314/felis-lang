@@ -1,0 +1,4 @@
+{
+    "name": "enum-match-string",
+    "felis-bin-entrypoints": ["src/enum-match-string.fe"]
+}
