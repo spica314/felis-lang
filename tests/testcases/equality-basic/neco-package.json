@@ -1,0 +1,11 @@
+{
+    "name": "equality-basic",
+    "felis-bin-entrypoints": [
+        "src/enum-eq-true.fe",
+        "src/enum-eq-false.fe",
+        "src/enum-payload-eq-true.fe",
+        "src/enum-payload-eq-false.fe",
+        "src/struct-eq-true.fe",
+        "src/struct-eq-false.fe"
+    ]
+}

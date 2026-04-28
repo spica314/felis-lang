@@ -225,6 +225,48 @@ fn compiles_and_runs_bool_basic_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_enum_equality_true_fixture() {
+    let root = repo_root().join("tests/testcases/equality-basic");
+    let status = run_fixture_status(&root, "enum-eq-true");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_enum_equality_false_fixture() {
+    let root = repo_root().join("tests/testcases/equality-basic");
+    let status = run_fixture_status(&root, "enum-eq-false");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_enum_payload_equality_true_fixture() {
+    let root = repo_root().join("tests/testcases/equality-basic");
+    let status = run_fixture_status(&root, "enum-payload-eq-true");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_enum_payload_equality_false_fixture() {
+    let root = repo_root().join("tests/testcases/equality-basic");
+    let status = run_fixture_status(&root, "enum-payload-eq-false");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_struct_equality_true_fixture() {
+    let root = repo_root().join("tests/testcases/equality-basic");
+    let status = run_fixture_status(&root, "struct-eq-true");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_struct_equality_false_fixture() {
+    let root = repo_root().join("tests/testcases/equality-basic");
+    let status = run_fixture_status(&root, "struct-eq-false");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_array_basic_fixture() {
     let root = repo_root().join("tests/testcases/array-basic");
     let status = run_fixture_status(&root, "array-basic");

@@ -1,0 +1,25 @@
+#use std_core::io::IO;
+#use std_core::primitive::bool::bool;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_eq;
+
+#struct Code : Type[0] {
+    value : i32,
+}
+
+#fn code_eq : (left : Code) -> (right : Code) -> bool {
+    i32_eq left.value right.value
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let left : Code = Code { value = 41i32 };
+    #let right : Code = Code { value = 42i32 };
+    #let equal : bool = code_eq left right;
+    #if equal {
+        #let _ : () <- IO::exit 1i32;
+    };
+    #let _ : () <- IO::exit 42i32;
+    ()
+}

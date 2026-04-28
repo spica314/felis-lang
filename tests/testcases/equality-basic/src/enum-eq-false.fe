@@ -1,0 +1,33 @@
+#use std_core::io::IO;
+#use std_core::primitive::bool::bool;
+#use std_core::primitive::bool::true;
+#use std_core::primitive::bool::false;
+
+#type Color : Type[0] {
+    red : Color,
+    blue : Color,
+}
+
+#fn color_eq : (left : Color) -> (right : Color) -> bool {
+    #match left {
+        Color::red => #match right {
+            Color::red => true,
+            _ => false,
+        },
+        Color::blue => #match right {
+            Color::blue => true,
+            _ => false,
+        },
+    }
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let equal : bool = color_eq Color::red Color::blue;
+    #if equal {
+        #let _ : () <- IO::exit 1i32;
+    };
+    #let _ : () <- IO::exit 42i32;
+    ()
+}

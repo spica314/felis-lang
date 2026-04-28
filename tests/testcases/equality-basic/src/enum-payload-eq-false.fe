@@ -1,0 +1,35 @@
+#use std_core::io::IO;
+#use std_core::primitive::bool::bool;
+#use std_core::primitive::bool::true;
+#use std_core::primitive::bool::false;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_eq;
+
+#type Token : Type[0] {
+    eof : Token,
+    int : i32 -> Token,
+}
+
+#fn token_eq : (left : Token) -> (right : Token) -> bool {
+    #match left {
+        Token::eof => #match right {
+            Token::eof => true,
+            _ => false,
+        },
+        Token::int x => #match right {
+            Token::int y => i32_eq x y,
+            _ => false,
+        },
+    }
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let equal : bool = token_eq (Token::int 41i32) (Token::int 42i32);
+    #if equal {
+        #let _ : () <- IO::exit 1i32;
+    };
+    #let _ : () <- IO::exit 42i32;
+    ()
+}

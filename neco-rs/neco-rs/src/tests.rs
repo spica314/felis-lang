@@ -236,6 +236,109 @@ fn lowers_bool_basic_fixture_to_runtime_conditions() {
     assert!(program.arrays.is_empty());
 }
 
+fn assert_equality_fixture_lowers_to_condition(
+    binary_name: &str,
+    condition: ConditionExpr,
+    then_exit: i32,
+    final_exit: i32,
+) {
+    let root = repo_root().join("tests/testcases/equality-basic");
+    let package = selected_fixture_package(&root, binary_name);
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::If {
+                condition,
+                then_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(
+                    then_exit
+                )))],
+                else_operations: vec![],
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(final_exit))),
+        ]
+    );
+    assert!(program.data.is_empty());
+    assert!(program.arrays.is_empty());
+}
+
+#[test]
+fn lowers_enum_equality_true_fixture_to_bool_condition() {
+    assert_equality_fixture_lowers_to_condition(
+        "enum-eq-true",
+        ConditionExpr::Literal(true),
+        42,
+        1,
+    );
+}
+
+#[test]
+fn lowers_enum_equality_false_fixture_to_bool_condition() {
+    assert_equality_fixture_lowers_to_condition(
+        "enum-eq-false",
+        ConditionExpr::Literal(false),
+        1,
+        42,
+    );
+}
+
+#[test]
+fn lowers_enum_payload_equality_true_fixture_to_bool_condition() {
+    assert_equality_fixture_lowers_to_condition(
+        "enum-payload-eq-true",
+        ConditionExpr::I32 {
+            kind: ComparisonKind::Eq,
+            lhs: I32Expr::Literal(42),
+            rhs: I32Expr::Literal(42),
+        },
+        42,
+        1,
+    );
+}
+
+#[test]
+fn lowers_enum_payload_equality_false_fixture_to_bool_condition() {
+    assert_equality_fixture_lowers_to_condition(
+        "enum-payload-eq-false",
+        ConditionExpr::I32 {
+            kind: ComparisonKind::Eq,
+            lhs: I32Expr::Literal(41),
+            rhs: I32Expr::Literal(42),
+        },
+        1,
+        42,
+    );
+}
+
+#[test]
+fn lowers_struct_equality_true_fixture_to_bool_condition() {
+    assert_equality_fixture_lowers_to_condition(
+        "struct-eq-true",
+        ConditionExpr::I32 {
+            kind: ComparisonKind::Eq,
+            lhs: I32Expr::Literal(42),
+            rhs: I32Expr::Literal(42),
+        },
+        42,
+        1,
+    );
+}
+
+#[test]
+fn lowers_struct_equality_false_fixture_to_bool_condition() {
+    assert_equality_fixture_lowers_to_condition(
+        "struct-eq-false",
+        ConditionExpr::I32 {
+            kind: ComparisonKind::Eq,
+            lhs: I32Expr::Literal(41),
+            rhs: I32Expr::Literal(42),
+        },
+        1,
+        42,
+    );
+}
+
 #[test]
 fn lowers_array_basic_fixture_to_runtime_array_operations() {
     let root = repo_root().join("tests/testcases/array-basic");
