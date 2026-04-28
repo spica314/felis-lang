@@ -1,0 +1,390 @@
+#use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::dyn_array_get_i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_sub;
+#use #package::parser::FelisParserError;
+#use #package::parser::FelisParserExpectedKind;
+#use #package::parser::current_token_end;
+#use #package::parser::current_token_start;
+#use #package::parser::mark_felis_parser_error;
+#use #package::parser::parse_token_keyword_kind;
+#use #package::parser::parse_token_punct_kind;
+#use #package::parser::parse_token_string_literal;
+#use #package::parser::parser_begin_attempt;
+#use #package::parser::parser_commit_attempt;
+#use #package::parser::require_token_identifier;
+#use #package::parser::require_token_keyword_kind;
+#use #package::parser::require_token_punct_kind;
+#use #package::syntax::term::FelisKeywordKind;
+#use #package::syntax::term::FelisPunctKind;
+#use #package::syntax::term::FelisTokenKind;
+#use #package::syntax::term::encode_felis_keyword_kind;
+#use #package::syntax::term::encode_felis_punct_kind;
+#use #package::syntax::term::encode_felis_token_kind;
+
+#pub #type FelisItemKind : Type[0] {
+    item_entrypoint : FelisItemKind,
+    item_use : FelisItemKind,
+    item_mod : FelisItemKind,
+    item_bind_builtin : FelisItemKind,
+    item_fn : FelisItemKind,
+    item_proc : FelisItemKind,
+    item_unknown : FelisItemKind,
+}
+
+#pub #struct FelisItem : Type[0] {
+    kind : i32,
+    is_public : i32,
+    name_value : i32,
+    name_start : i32,
+    name_end : i32,
+    path_start : i32,
+    path_end : i32,
+    builtin_name_value : i32,
+    type_start : i32,
+    type_end : i32,
+    effect_start : i32,
+    effect_end : i32,
+    body_start : i32,
+    body_end : i32,
+    start : i32,
+    end : i32,
+}
+
+#pub #type(rc) FelisItems : Type[0] {
+    no_items : FelisItems,
+    cons_item : FelisItem -> FelisItems -> FelisItems,
+}
+
+#pub #fn encode_felis_item_kind : (kind : FelisItemKind) -> (unknown_code : i32) -> i32 {
+    #match kind {
+        FelisItemKind::item_entrypoint => 1i32,
+        FelisItemKind::item_use => 2i32,
+        FelisItemKind::item_mod => 3i32,
+        FelisItemKind::item_bind_builtin => 4i32,
+        FelisItemKind::item_fn => 5i32,
+        FelisItemKind::item_proc => 6i32,
+        FelisItemKind::item_unknown => unknown_code,
+    }
+}
+
+#proc parse_optional_pub : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (is_public_ref : &^ i32) -> () {
+    #let matched_ref : i32 = 0i32;
+    #letref #excl matched_ref : &^ i32 #borrow matched_ref;
+    is_public_ref .> set 0i32;
+    parse_token_keyword_kind token_tag_ref token_value_ref cursor_ref FelisKeywordKind::keyword_pub matched_ref;
+    #if i32_eq (matched_ref .> get) 1i32 {
+        is_public_ref .> set 1i32;
+    };
+    ()
+}
+
+#proc require_identifier_span : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (value_ref : &^ i32) -> (start_ref : &^ i32) -> (end_ref : &^ i32) -> () {
+    require_token_identifier token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref error_ref matched_ref value_ref start_ref end_ref;
+    ()
+}
+
+#fn previous_token_end : (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> i32 {
+    dyn_array_get_i32 token_end_ref (i32_sub (cursor_ref .> get) 1i32)
+}
+
+#proc require_string_literal_span : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (value_ref : &^ i32) -> (start_ref : &^ i32) -> (end_ref : &^ i32) -> () {
+    parse_token_string_literal token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref matched_ref value_ref start_ref end_ref;
+    #if i32_eq (matched_ref .> get) 0i32 {
+        mark_felis_parser_error FelisParserExpectedKind::expected_token (encode_felis_token_kind FelisTokenKind::token_string 0i32) (current_token_start token_start_ref cursor_ref) (current_token_end token_end_ref cursor_ref) error_ref;
+    };
+    ()
+}
+
+#proc require_semicolon : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> () {
+    require_token_punct_kind token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref FelisPunctKind::punct_semicolon error_ref matched_ref;
+    ()
+}
+
+#proc mark_expected_item : (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> () {
+    mark_felis_parser_error FelisParserExpectedKind::expected_syntax_node (encode_felis_item_kind FelisItemKind::item_unknown 0i32) (current_token_start token_start_ref cursor_ref) (current_token_end token_end_ref cursor_ref) error_ref;
+    ()
+}
+
+#proc skip_until_keyword : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_count_ref : &^ i32) -> (cursor_ref : &^ i32) -> (keyword_kind : FelisKeywordKind) -> () {
+    #let keyword_token_code : i32 = encode_felis_token_kind FelisTokenKind::token_keyword 0i32;
+    #let expected_keyword_code : i32 = encode_felis_keyword_kind keyword_kind 0i32;
+    #loop {
+        #if i32_gte (cursor_ref .> get) (token_count_ref .> get) {
+            #break;
+        };
+        #let token_index : i32 = cursor_ref .> get;
+        #let raw_token_kind : i32 = dyn_array_get_i32 token_tag_ref token_index;
+        #if i32_eq raw_token_kind keyword_token_code {
+            #let raw_keyword_kind : i32 = dyn_array_get_i32 token_value_ref token_index;
+            #if i32_eq raw_keyword_kind expected_keyword_code {
+                #break;
+            };
+        };
+        cursor_ref .> set (i32_add token_index 1i32);
+    };
+    ()
+}
+
+#proc skip_until_punct : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_count_ref : &^ i32) -> (cursor_ref : &^ i32) -> (punct_kind : FelisPunctKind) -> () {
+    #let punct_token_code : i32 = encode_felis_token_kind FelisTokenKind::token_punct 0i32;
+    #let expected_punct_code : i32 = encode_felis_punct_kind punct_kind 0i32;
+    #loop {
+        #if i32_gte (cursor_ref .> get) (token_count_ref .> get) {
+            #break;
+        };
+        #let token_index : i32 = cursor_ref .> get;
+        #let raw_token_kind : i32 = dyn_array_get_i32 token_tag_ref token_index;
+        #if i32_eq raw_token_kind punct_token_code {
+            #let raw_punct_kind : i32 = dyn_array_get_i32 token_value_ref token_index;
+            #if i32_eq raw_punct_kind expected_punct_code {
+                #break;
+            };
+        };
+        cursor_ref .> set (i32_add token_index 1i32);
+    };
+    ()
+}
+
+#proc skip_balanced_brace_body : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_count_ref : &^ i32) -> (cursor_ref : &^ i32) -> () {
+    #let punct_token_code : i32 = encode_felis_token_kind FelisTokenKind::token_punct 0i32;
+    #let left_brace_code : i32 = encode_felis_punct_kind FelisPunctKind::punct_left_brace 0i32;
+    #let right_brace_code : i32 = encode_felis_punct_kind FelisPunctKind::punct_right_brace 0i32;
+    #let depth_ref : i32 = 1i32;
+    #letref #excl depth_ref : &^ i32 #borrow depth_ref;
+    #loop {
+        #if i32_gte (cursor_ref .> get) (token_count_ref .> get) {
+            #break;
+        };
+        #if i32_eq (depth_ref .> get) 0i32 {
+            #break;
+        };
+        #let token_index : i32 = cursor_ref .> get;
+        #let raw_token_kind : i32 = dyn_array_get_i32 token_tag_ref token_index;
+        #if i32_eq raw_token_kind punct_token_code {
+            #let raw_punct_kind : i32 = dyn_array_get_i32 token_value_ref token_index;
+            #if i32_eq raw_punct_kind left_brace_code {
+                depth_ref .> set (i32_add (depth_ref .> get) 1i32);
+            } #else #if i32_eq raw_punct_kind right_brace_code {
+                depth_ref .> set (i32_sub (depth_ref .> get) 1i32);
+            };
+        };
+        cursor_ref .> set (i32_add token_index 1i32);
+    };
+    ()
+}
+
+#proc parse_simple_named_item : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (keyword_kind : FelisKeywordKind) -> (item_kind : FelisItemKind) -> (allow_pub : i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (item_ref : &^ FelisItem) -> () {
+    #let attempt_cursor_ref : i32 = 0i32;
+    #letref #excl attempt_cursor_ref : &^ i32 #borrow attempt_cursor_ref;
+    parser_begin_attempt cursor_ref attempt_cursor_ref;
+    #let item_start : i32 = current_token_start token_start_ref attempt_cursor_ref;
+    #let is_public_ref : i32 = 0i32;
+    #letref #excl is_public_ref : &^ i32 #borrow is_public_ref;
+    #if i32_eq allow_pub 1i32 {
+        parse_optional_pub token_tag_ref token_value_ref attempt_cursor_ref is_public_ref;
+    };
+    require_token_keyword_kind token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref keyword_kind error_ref matched_ref;
+    #if i32_eq (matched_ref .> get) 1i32 {
+        #let name_value_ref : i32 = 0i32;
+        #let name_start_ref : i32 = 0i32;
+        #let name_end_ref : i32 = 0i32;
+        #letref #excl name_value_ref : &^ i32 #borrow name_value_ref;
+        #letref #excl name_start_ref : &^ i32 #borrow name_start_ref;
+        #letref #excl name_end_ref : &^ i32 #borrow name_end_ref;
+        require_identifier_span token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref error_ref matched_ref name_value_ref name_start_ref name_end_ref;
+        #if i32_eq (matched_ref .> get) 1i32 {
+            require_semicolon token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref error_ref matched_ref;
+        };
+        #if i32_eq (matched_ref .> get) 1i32 {
+            item_ref .> set FelisItem {
+                kind = encode_felis_item_kind item_kind 0i32,
+                is_public = is_public_ref .> get,
+                name_value = name_value_ref .> get,
+                name_start = name_start_ref .> get,
+                name_end = name_end_ref .> get,
+                path_start = name_start_ref .> get,
+                path_end = name_end_ref .> get,
+                builtin_name_value = 0i32,
+                type_start = 0i32,
+                type_end = 0i32,
+                effect_start = 0i32,
+                effect_end = 0i32,
+                body_start = 0i32,
+                body_end = 0i32,
+                start = item_start,
+                end = previous_token_end token_end_ref attempt_cursor_ref
+            };
+        };
+    };
+    parser_commit_attempt cursor_ref attempt_cursor_ref matched_ref;
+    ()
+}
+
+#proc parse_bind_builtin_item : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (item_ref : &^ FelisItem) -> () {
+    #let attempt_cursor_ref : i32 = 0i32;
+    #letref #excl attempt_cursor_ref : &^ i32 #borrow attempt_cursor_ref;
+    parser_begin_attempt cursor_ref attempt_cursor_ref;
+    #let item_start : i32 = current_token_start token_start_ref attempt_cursor_ref;
+    require_token_keyword_kind token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref FelisKeywordKind::keyword_bind_builtin error_ref matched_ref;
+    #if i32_eq (matched_ref .> get) 1i32 {
+        #let builtin_value_ref : i32 = 0i32;
+        #let builtin_start_ref : i32 = 0i32;
+        #let builtin_end_ref : i32 = 0i32;
+        #let alias_value_ref : i32 = 0i32;
+        #let alias_start_ref : i32 = 0i32;
+        #let alias_end_ref : i32 = 0i32;
+        #letref #excl builtin_value_ref : &^ i32 #borrow builtin_value_ref;
+        #letref #excl builtin_start_ref : &^ i32 #borrow builtin_start_ref;
+        #letref #excl builtin_end_ref : &^ i32 #borrow builtin_end_ref;
+        #letref #excl alias_value_ref : &^ i32 #borrow alias_value_ref;
+        #letref #excl alias_start_ref : &^ i32 #borrow alias_start_ref;
+        #letref #excl alias_end_ref : &^ i32 #borrow alias_end_ref;
+        require_string_literal_span token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref error_ref matched_ref builtin_value_ref builtin_start_ref builtin_end_ref;
+        #if i32_eq (matched_ref .> get) 1i32 {
+            require_token_keyword_kind token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref FelisKeywordKind::keyword_as error_ref matched_ref;
+        };
+        #if i32_eq (matched_ref .> get) 1i32 {
+            require_identifier_span token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref error_ref matched_ref alias_value_ref alias_start_ref alias_end_ref;
+        };
+        #if i32_eq (matched_ref .> get) 1i32 {
+            require_semicolon token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref error_ref matched_ref;
+        };
+        #if i32_eq (matched_ref .> get) 1i32 {
+            item_ref .> set FelisItem {
+                kind = encode_felis_item_kind FelisItemKind::item_bind_builtin 0i32,
+                is_public = 0i32,
+                name_value = alias_value_ref .> get,
+                name_start = alias_start_ref .> get,
+                name_end = alias_end_ref .> get,
+                path_start = builtin_start_ref .> get,
+                path_end = builtin_end_ref .> get,
+                builtin_name_value = builtin_value_ref .> get,
+                type_start = 0i32,
+                type_end = 0i32,
+                effect_start = 0i32,
+                effect_end = 0i32,
+                body_start = 0i32,
+                body_end = 0i32,
+                start = item_start,
+                end = previous_token_end token_end_ref attempt_cursor_ref
+            };
+        };
+    };
+    parser_commit_attempt cursor_ref attempt_cursor_ref matched_ref;
+    ()
+}
+
+#proc parse_fn_like_item : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> (cursor_ref : &^ i32) -> (keyword_kind : FelisKeywordKind) -> (item_kind : FelisItemKind) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (item_ref : &^ FelisItem) -> () {
+    #let attempt_cursor_ref : i32 = 0i32;
+    #letref #excl attempt_cursor_ref : &^ i32 #borrow attempt_cursor_ref;
+    parser_begin_attempt cursor_ref attempt_cursor_ref;
+    #let item_start : i32 = current_token_start token_start_ref attempt_cursor_ref;
+    require_token_keyword_kind token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref keyword_kind error_ref matched_ref;
+    #if i32_eq (matched_ref .> get) 1i32 {
+        #let name_value_ref : i32 = 0i32;
+        #let name_start_ref : i32 = 0i32;
+        #let name_end_ref : i32 = 0i32;
+        #letref #excl name_value_ref : &^ i32 #borrow name_value_ref;
+        #letref #excl name_start_ref : &^ i32 #borrow name_start_ref;
+        #letref #excl name_end_ref : &^ i32 #borrow name_end_ref;
+        require_identifier_span token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref error_ref matched_ref name_value_ref name_start_ref name_end_ref;
+        #if i32_eq (matched_ref .> get) 1i32 {
+            require_token_punct_kind token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref FelisPunctKind::punct_colon error_ref matched_ref;
+        };
+        #let type_start : i32 = current_token_start token_start_ref attempt_cursor_ref;
+        #if i32_eq (matched_ref .> get) 1i32 {
+            skip_until_keyword token_tag_ref token_value_ref token_count_ref attempt_cursor_ref FelisKeywordKind::keyword_with;
+        };
+        #let type_end : i32 = current_token_start token_start_ref attempt_cursor_ref;
+        #if i32_eq (matched_ref .> get) 1i32 {
+            require_token_keyword_kind token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref FelisKeywordKind::keyword_with error_ref matched_ref;
+        };
+        #let effect_start : i32 = current_token_start token_start_ref attempt_cursor_ref;
+        #if i32_eq (matched_ref .> get) 1i32 {
+            skip_until_punct token_tag_ref token_value_ref token_count_ref attempt_cursor_ref FelisPunctKind::punct_left_brace;
+        };
+        #let effect_end : i32 = current_token_start token_start_ref attempt_cursor_ref;
+        #if i32_eq (matched_ref .> get) 1i32 {
+            require_token_punct_kind token_tag_ref token_value_ref token_start_ref token_end_ref attempt_cursor_ref FelisPunctKind::punct_left_brace error_ref matched_ref;
+        };
+        #let body_start : i32 = current_token_start token_start_ref attempt_cursor_ref;
+        #if i32_eq (matched_ref .> get) 1i32 {
+            skip_balanced_brace_body token_tag_ref token_value_ref token_count_ref attempt_cursor_ref;
+        };
+        #let body_end : i32 = previous_token_end token_end_ref attempt_cursor_ref;
+        #if i32_eq (matched_ref .> get) 1i32 {
+            item_ref .> set FelisItem {
+                kind = encode_felis_item_kind item_kind 0i32,
+                is_public = 0i32,
+                name_value = name_value_ref .> get,
+                name_start = name_start_ref .> get,
+                name_end = name_end_ref .> get,
+                path_start = 0i32,
+                path_end = 0i32,
+                builtin_name_value = 0i32,
+                type_start = type_start,
+                type_end = type_end,
+                effect_start = effect_start,
+                effect_end = effect_end,
+                body_start = body_start,
+                body_end = body_end,
+                start = item_start,
+                end = body_end
+            };
+        };
+    };
+    parser_commit_attempt cursor_ref attempt_cursor_ref matched_ref;
+    ()
+}
+
+#pub #proc parse_felis_item : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (item_ref : &^ FelisItem) -> () {
+    item_ref .> set FelisItem {
+        kind = encode_felis_item_kind FelisItemKind::item_unknown 0i32,
+        is_public = 0i32,
+        name_value = 0i32,
+        name_start = 0i32,
+        name_end = 0i32,
+        path_start = 0i32,
+        path_end = 0i32,
+        builtin_name_value = 0i32,
+        type_start = 0i32,
+        type_end = 0i32,
+        effect_start = 0i32,
+        effect_end = 0i32,
+        body_start = 0i32,
+        body_end = 0i32,
+        start = 0i32,
+        end = 0i32
+    };
+    matched_ref .> set 0i32;
+    #let first_error : FelisParserError = error_ref .> get;
+    parse_simple_named_item token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref FelisKeywordKind::keyword_entrypoint FelisItemKind::item_entrypoint 0i32 error_ref matched_ref item_ref;
+    #if i32_eq (matched_ref .> get) 0i32 {
+        error_ref .> set first_error;
+        parse_simple_named_item token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref FelisKeywordKind::keyword_use FelisItemKind::item_use 1i32 error_ref matched_ref item_ref;
+    };
+    #if i32_eq (matched_ref .> get) 0i32 {
+        error_ref .> set first_error;
+        parse_simple_named_item token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref FelisKeywordKind::keyword_mod FelisItemKind::item_mod 0i32 error_ref matched_ref item_ref;
+    };
+    #if i32_eq (matched_ref .> get) 0i32 {
+        error_ref .> set first_error;
+        parse_bind_builtin_item token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref error_ref matched_ref item_ref;
+    };
+    #if i32_eq (matched_ref .> get) 0i32 {
+        error_ref .> set first_error;
+        parse_fn_like_item token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref cursor_ref FelisKeywordKind::keyword_fn FelisItemKind::item_fn error_ref matched_ref item_ref;
+    };
+    #if i32_eq (matched_ref .> get) 0i32 {
+        error_ref .> set first_error;
+        parse_fn_like_item token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref cursor_ref FelisKeywordKind::keyword_proc FelisItemKind::item_proc error_ref matched_ref item_ref;
+    };
+    #if i32_eq (matched_ref .> get) 0i32 {
+        error_ref .> set first_error;
+        mark_expected_item token_start_ref token_end_ref cursor_ref error_ref;
+    };
+    ()
+}

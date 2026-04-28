@@ -1,0 +1,97 @@
+#use std_core::primitive::array::DynArray;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::string::String;
+#use #package::lexer::parse_felis_source_tokens_with_status;
+#use #package::parser::FelisParserError;
+#use #package::parser::at_end;
+#use #package::parser::check_no_trailing_tokens;
+#use #package::parser::require_end_of_file;
+#use #package::syntax::item::FelisItem;
+#use #package::syntax::item::FelisItems;
+#use #package::syntax::item::parse_felis_item;
+
+#pub #type FelisSourceFile : Type[0] {
+    source_file : FelisItems -> FelisSourceFile,
+}
+
+#proc append_reversed_items : (items : FelisItems) -> (tail : FelisItems) -> (result_ref : &^ FelisItems) -> () {
+    #match items {
+        FelisItems::no_items => {
+            result_ref .> set tail;
+            ()
+        },
+        FelisItems::cons_item item rest => {
+            #let next_tail : FelisItems = FelisItems::cons_item item tail;
+            append_reversed_items rest next_tail result_ref;
+            ()
+        },
+    }
+}
+
+#pub #proc parse_felis_source_file : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (source_file_ref : &^ FelisSourceFile) -> () {
+    #let reversed_items_ref : FelisItems = FelisItems::no_items;
+    #let item_ref : FelisItem = FelisItem {
+        kind = 0i32,
+        is_public = 0i32,
+        name_value = 0i32,
+        name_start = 0i32,
+        name_end = 0i32,
+        path_start = 0i32,
+        path_end = 0i32,
+        builtin_name_value = 0i32,
+        type_start = 0i32,
+        type_end = 0i32,
+        effect_start = 0i32,
+        effect_end = 0i32,
+        body_start = 0i32,
+        body_end = 0i32,
+        start = 0i32,
+        end = 0i32
+    };
+    #let eof_ref : i32 = 0i32;
+    #let item_matched_ref : i32 = 0i32;
+    #letref #excl reversed_items_ref : &^ FelisItems #borrow reversed_items_ref;
+    #letref #excl item_ref : &^ FelisItem #borrow item_ref;
+    #letref #excl eof_ref : &^ i32 #borrow eof_ref;
+    #letref #excl item_matched_ref : &^ i32 #borrow item_matched_ref;
+    matched_ref .> set 1i32;
+    #loop {
+        at_end token_tag_ref token_count_ref cursor_ref eof_ref;
+        #if i32_eq (eof_ref .> get) 1i32 {
+            #break;
+        };
+        parse_felis_item token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref cursor_ref error_ref item_matched_ref item_ref;
+        #if i32_eq (item_matched_ref .> get) 0i32 {
+            matched_ref .> set 0i32;
+            #break;
+        };
+        reversed_items_ref .> set (FelisItems::cons_item (item_ref .> get) (reversed_items_ref .> get));
+    };
+    #let items_ref : FelisItems = FelisItems::no_items;
+    #letref #excl items_ref : &^ FelisItems #borrow items_ref;
+    append_reversed_items (reversed_items_ref .> get) FelisItems::no_items items_ref;
+    source_file_ref .> set (FelisSourceFile::source_file (items_ref .> get));
+    ()
+}
+
+#pub #proc parse_complete_felis_source_file : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (source_file_ref : &^ FelisSourceFile) -> () {
+    parse_felis_source_file token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref cursor_ref error_ref matched_ref source_file_ref;
+    #if i32_eq (matched_ref .> get) 1i32 {
+        require_end_of_file token_tag_ref token_start_ref token_end_ref cursor_ref error_ref matched_ref;
+    };
+    #if i32_eq (matched_ref .> get) 1i32 {
+        check_no_trailing_tokens token_tag_ref token_count_ref token_start_ref token_end_ref cursor_ref error_ref;
+    };
+    ()
+}
+
+#pub #proc parse_felis_source_file_from_source : (source : String) -> (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (token_count_ref : &^ i32) -> (lexer_status_ref : &^ i32) -> (lexer_error_start_ref : &^ i32) -> (lexer_error_end_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (source_file_ref : &^ FelisSourceFile) -> () {
+    matched_ref .> set 0i32;
+    parse_felis_source_tokens_with_status source token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref lexer_status_ref lexer_error_start_ref lexer_error_end_ref;
+    #if i32_eq (lexer_status_ref .> get) 0i32 {
+        #let cursor_ref : i32 = 0i32;
+        #letref #excl cursor_ref : &^ i32 #borrow cursor_ref;
+        parse_complete_felis_source_file token_tag_ref token_value_ref token_start_ref token_end_ref token_count_ref cursor_ref error_ref matched_ref source_file_ref;
+    };
+    ()
+}

@@ -14,6 +14,10 @@
 #pub #use #package::syntax::FelisStmt;
 #pub #use #package::syntax::FelisStmts;
 #pub #use #package::syntax::FelisProgram;
+#pub #use #package::syntax::FelisItem;
+#pub #use #package::syntax::FelisItemKind;
+#pub #use #package::syntax::FelisItems;
+#pub #use #package::syntax::FelisSourceFile;
 #pub #use #package::syntax::encode_felis_token_kind;
 #pub #use #package::syntax::decode_felis_token_kind;
 #pub #use #package::syntax::encode_felis_keyword_kind;
@@ -21,6 +25,11 @@
 #pub #use #package::syntax::encode_felis_punct_kind;
 #pub #use #package::syntax::decode_felis_punct_kind;
 #pub #use #package::syntax::encode_parsed_felis_stmt_kind;
+#pub #use #package::syntax::encode_felis_item_kind;
+#pub #use #package::syntax::parse_felis_item;
+#pub #use #package::syntax::parse_felis_source_file;
+#pub #use #package::syntax::parse_complete_felis_source_file;
+#pub #use #package::syntax::parse_felis_source_file_from_source;
 #pub #use #package::lexer::parse_felis_source_tokens;
 #pub #use #package::lexer::parse_felis_source_tokens_with_status;
 #pub #use #package::parser::current_token_kind;

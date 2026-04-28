@@ -24,3 +24,12 @@
 #pub #use #package::syntax::term::encode_felis_punct_kind;
 #pub #use #package::syntax::term::encode_felis_token_kind;
 #pub #use #package::syntax::term::encode_parsed_felis_stmt_kind;
+#pub #use #package::syntax::item::FelisItem;
+#pub #use #package::syntax::item::FelisItemKind;
+#pub #use #package::syntax::item::FelisItems;
+#pub #use #package::syntax::item::encode_felis_item_kind;
+#pub #use #package::syntax::item::parse_felis_item;
+#pub #use #package::syntax::source_file::FelisSourceFile;
+#pub #use #package::syntax::source_file::parse_complete_felis_source_file;
+#pub #use #package::syntax::source_file::parse_felis_source_file_from_source;
+#pub #use #package::syntax::source_file::parse_felis_source_file;
