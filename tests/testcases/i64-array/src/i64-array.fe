@@ -1,0 +1,16 @@
+#use std_core::io::IO;
+#use std_core::primitive::i64::i64;
+#use std_core::primitive::i64::i64_add;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let array_ref : &^ Array i64 3i32 <- IO::array_new i64 3i32;
+    array_ref .> set 0i32 10i64;
+    array_ref .> set 1i32 20i64;
+    array_ref .> set 2i32 12i64;
+    #let first_sum : i64 = i64_add (array_ref .> get 0i32) (array_ref .> get 1i32);
+    #let code : i64 = i64_add first_sum (array_ref .> get 2i32);
+    #let _ : () <- IO::exit code;
+    ()
+}

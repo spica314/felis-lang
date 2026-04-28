@@ -6,7 +6,7 @@ use crate::cli::{default_output_path, select_binary_from_package};
 use crate::codegen::build_linux_x86_64_program_executable;
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
-    I32Expr, LoweredProgram, OpenPath, Operation, U8Expr,
+    I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, U8Expr,
 };
 use crate::lowering::lower_package_to_program;
 
@@ -132,6 +132,37 @@ fn lowers_i32_ops_fixture_to_runtime_expression_tree() {
                 Box::new(I32Expr::Literal(3)),
             )),
             Box::new(I32Expr::Literal(80)),
+        )))]
+    );
+    assert!(program.data.is_empty());
+    assert!(program.arrays.is_empty());
+}
+
+#[test]
+fn lowers_i64_ops_fixture_to_runtime_expression_tree() {
+    let root = repo_root().join("tests/testcases/i64-ops");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![Operation::Exit(ExitCodeExpr::I64(I64Expr::Mod(
+            Box::new(I64Expr::Div(
+                Box::new(I64Expr::Mul(
+                    Box::new(I64Expr::Sub(
+                        Box::new(I64Expr::Add(
+                            Box::new(I64Expr::Literal(3)),
+                            Box::new(I64Expr::Literal(7)),
+                        )),
+                        Box::new(I64Expr::Literal(4)),
+                    )),
+                    Box::new(I64Expr::Literal(61)),
+                )),
+                Box::new(I64Expr::Literal(3)),
+            )),
+            Box::new(I64Expr::Literal(80)),
         )))]
     );
     assert!(program.data.is_empty());
@@ -1438,6 +1469,7 @@ fn builds_elf_image_with_exit_syscall() {
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,
+        i64_slots: 0,
         requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)
@@ -1465,6 +1497,7 @@ fn builds_elf_image_with_write_and_implicit_exit() {
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,
+        i64_slots: 0,
         requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)
@@ -1510,6 +1543,7 @@ fn builds_elf_image_with_runtime_i32_ops() {
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,
+        i64_slots: 0,
         requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)

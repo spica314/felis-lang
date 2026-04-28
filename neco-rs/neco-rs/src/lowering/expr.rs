@@ -1,13 +1,16 @@
 use neco_rs_parser::Term;
 
 use crate::effect::{Value, resolve_value};
-use crate::ir::{ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, I32Expr, U8Expr};
+use crate::ir::{
+    ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, I32Expr, I64Expr, U8Expr,
+};
 use crate::{Error, Result};
 
 use super::LoweringState;
 use super::typecheck::{
-    is_i32_suffix_term, is_u8_suffix_term, parse_bare_i32_literal, parse_bare_u8_literal,
-    parse_suffixed_i32_literal, parse_suffixed_u8_literal,
+    is_i32_suffix_term, is_i64_suffix_term, is_u8_suffix_term, parse_bare_i32_literal,
+    parse_bare_i64_literal, parse_bare_u8_literal, parse_suffixed_i32_literal,
+    parse_suffixed_i64_literal, parse_suffixed_u8_literal,
 };
 
 pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Expr> {
@@ -64,6 +67,54 @@ fn lower_i32_method_call(term: &Term, state: &LoweringState) -> Result<I32Expr> 
         },
         _ => Err(Error::Unsupported(format!(
             "unsupported `i32` expression in entrypoint body: {term:?}"
+        ))),
+    }
+}
+
+pub(crate) fn lower_i64_expr(term: &Term, state: &LoweringState) -> Result<I64Expr> {
+    match term {
+        Term::Group(inner) => lower_i64_expr(inner, state),
+        Term::IntegerLiteral(literal) => parse_suffixed_i64_literal(literal),
+        Term::MethodCall { .. } => lower_i64_method_call(term, state),
+        Term::Path(_) | Term::FieldAccess { .. } => {
+            match resolve_value(term, &state.environment)? {
+                Value::I64(expr) => Ok(expr),
+                other => Err(Error::Unsupported(format!(
+                    "expected an `i64` value, got {other:?}"
+                ))),
+            }
+        }
+        Term::Application { callee, arguments } => {
+            if let Some(expr) = lower_i64_literal_application(callee, arguments)? {
+                return Ok(expr);
+            }
+            if let Some(expr) = lower_i64_reference_get_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
+            if let Some(expr) = lower_i64_array_get_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
+            lower_i64_primitive_call(callee, arguments, state)
+        }
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `i64` expression in entrypoint body: {term:?}"
+        ))),
+    }
+}
+
+fn lower_i64_method_call(term: &Term, state: &LoweringState) -> Result<I64Expr> {
+    let Term::MethodCall { receiver, method } = term else {
+        unreachable!();
+    };
+    match method.as_str() {
+        "get" => match resolve_value(receiver.as_ref(), &state.environment)? {
+            Value::I64Reference(slot) => Ok(I64Expr::Local(slot)),
+            other => Err(Error::Unsupported(format!(
+                "`get` expects an `i64` reference, got {other:?}"
+            ))),
+        },
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `i64` expression in entrypoint body: {term:?}"
         ))),
     }
 }
@@ -131,6 +182,13 @@ pub(super) fn lower_condition_expr(term: &Term, state: &LoweringState) -> Result
             rhs: lower_i32_expr(rhs, state)?,
         });
     }
+    if let Some(kind) = i64_comparison_kind(primitive) {
+        return Ok(ConditionExpr::I64 {
+            kind,
+            lhs: lower_i64_expr(lhs, state)?,
+            rhs: lower_i64_expr(rhs, state)?,
+        });
+    }
     if let Some(kind) = u8_comparison_kind(primitive) {
         return Ok(ConditionExpr::U8 {
             kind,
@@ -157,6 +215,19 @@ fn lower_i32_literal_application(callee: &Term, arguments: &[Term]) -> Result<Op
     Ok(Some(parse_bare_i32_literal(literal)?))
 }
 
+fn lower_i64_literal_application(callee: &Term, arguments: &[Term]) -> Result<Option<I64Expr>> {
+    let [suffix] = arguments else {
+        return Ok(None);
+    };
+    let Term::IntegerLiteral(literal) = callee else {
+        return Ok(None);
+    };
+    if !is_i64_suffix_term(suffix) {
+        return Ok(None);
+    }
+    Ok(Some(parse_bare_i64_literal(literal)?))
+}
+
 fn lower_u8_literal_application(callee: &Term, arguments: &[Term]) -> Result<Option<U8Expr>> {
     let [suffix] = arguments else {
         return Ok(None);
@@ -177,6 +248,17 @@ fn i32_comparison_kind(name: &str) -> Option<ComparisonKind> {
         "i32_lt" => Some(ComparisonKind::Lt),
         "i32_gte" => Some(ComparisonKind::Gte),
         "i32_gt" => Some(ComparisonKind::Gt),
+        _ => None,
+    }
+}
+
+fn i64_comparison_kind(name: &str) -> Option<ComparisonKind> {
+    match name {
+        "i64_eq" => Some(ComparisonKind::Eq),
+        "i64_lte" => Some(ComparisonKind::Lte),
+        "i64_lt" => Some(ComparisonKind::Lt),
+        "i64_gte" => Some(ComparisonKind::Gte),
+        "i64_gt" => Some(ComparisonKind::Gt),
         _ => None,
     }
 }
@@ -236,6 +318,64 @@ fn lower_i32_primitive_call(
         "i32_mod" => Ok(I32Expr::Mod(lhs, rhs)),
         _ => Err(Error::Unsupported(format!(
             "unsupported `i32` primitive call `{}`",
+            segments.join("::")
+        ))),
+    }
+}
+
+fn lower_i64_primitive_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<I64Expr> {
+    let Term::Path(path) = callee else {
+        return Err(Error::Unsupported(
+            "unsupported `i64` callee in entrypoint body".to_string(),
+        ));
+    };
+
+    let segments: Vec<_> = path
+        .segments
+        .iter()
+        .map(|segment| segment.name.as_str())
+        .collect();
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let primitive = segments.last().copied().unwrap_or_default();
+    if primitive == "i64_from_i32" {
+        let [value] = normalized.as_slice() else {
+            return Err(Error::Unsupported(format!(
+                "`{}` must receive exactly one argument",
+                segments.join("::")
+            )));
+        };
+        return Ok(I64Expr::FromI32(Box::new(lower_i32_expr(value, state)?)));
+    }
+    if primitive == "i64_from_u8" {
+        let [value] = normalized.as_slice() else {
+            return Err(Error::Unsupported(format!(
+                "`{}` must receive exactly one argument",
+                segments.join("::")
+            )));
+        };
+        return Ok(I64Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
+    }
+    let [lhs, rhs] = normalized.as_slice() else {
+        return Err(Error::Unsupported(format!(
+            "`{}` must receive exactly two arguments",
+            segments.join("::")
+        )));
+    };
+    let lhs = Box::new(lower_i64_expr(lhs, state)?);
+    let rhs = Box::new(lower_i64_expr(rhs, state)?);
+
+    match primitive {
+        "i64_add" => Ok(I64Expr::Add(lhs, rhs)),
+        "i64_sub" => Ok(I64Expr::Sub(lhs, rhs)),
+        "i64_mul" => Ok(I64Expr::Mul(lhs, rhs)),
+        "i64_div" => Ok(I64Expr::Div(lhs, rhs)),
+        "i64_mod" => Ok(I64Expr::Mod(lhs, rhs)),
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `i64` primitive call `{}`",
             segments.join("::")
         ))),
     }
@@ -320,6 +460,44 @@ fn lower_array_get_call(
     }))
 }
 
+fn lower_i64_array_get_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<I64Expr>> {
+    let Term::MethodCall { receiver, method } = callee else {
+        return Ok(None);
+    };
+    if method != "get" {
+        return Ok(None);
+    }
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [index] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`get` must receive exactly one index argument".to_string(),
+        ));
+    };
+
+    let array_slot = match resolve_value(receiver.as_ref(), &state.environment)? {
+        Value::Array {
+            slot,
+            element_type: ArrayElementType::I64,
+            ..
+        } => slot,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`get` expects an `i64` array reference, got {other:?}"
+            )));
+        }
+    };
+
+    Ok(Some(I64Expr::ArrayGet {
+        array_slot,
+        index: Box::new(lower_i32_expr(index, state)?),
+    }))
+}
+
 fn lower_i32_reference_get_call(
     callee: &Term,
     arguments: &[Term],
@@ -334,6 +512,24 @@ fn lower_i32_reference_get_call(
 
     match resolve_value(receiver.as_ref(), &state.environment)? {
         Value::I32Reference(slot) => Ok(Some(I32Expr::Local(slot))),
+        _ => Ok(None),
+    }
+}
+
+fn lower_i64_reference_get_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<I64Expr>> {
+    let Term::MethodCall { receiver, method } = callee else {
+        return Ok(None);
+    };
+    if method != "get" || !arguments.is_empty() {
+        return Ok(None);
+    }
+
+    match resolve_value(receiver.as_ref(), &state.environment)? {
+        Value::I64Reference(slot) => Ok(Some(I64Expr::Local(slot))),
         _ => Ok(None),
     }
 }
@@ -415,6 +611,7 @@ pub(crate) fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Ter
         if index + 1 < arguments.len()
             && matches!(arguments[index], Term::IntegerLiteral(_))
             && (is_i32_suffix_term(&arguments[index + 1])
+                || is_i64_suffix_term(&arguments[index + 1])
                 || is_u8_suffix_term(&arguments[index + 1]))
         {
             normalized.push(Term::Application {

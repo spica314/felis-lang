@@ -1,0 +1,27 @@
+#bind_builtin "i64" #as i64;
+#bind_builtin "i64_add" #as i64_add;
+#bind_builtin "i64_sub" #as i64_sub;
+#bind_builtin "i64_mul" #as i64_mul;
+#bind_builtin "i64_div" #as i64_div;
+#bind_builtin "i64_mod" #as i64_mod;
+#bind_builtin "i64_eq" #as i64_eq;
+#bind_builtin "i64_lte" #as i64_lte;
+#bind_builtin "i64_lt" #as i64_lt;
+#bind_builtin "i64_gte" #as i64_gte;
+#bind_builtin "i64_gt" #as i64_gt;
+#bind_builtin "i64_from_i32" #as i64_from_i32;
+#bind_builtin "i64_from_u8" #as i64_from_u8;
+
+#pub #use i64;
+#pub #use i64_add;
+#pub #use i64_sub;
+#pub #use i64_mul;
+#pub #use i64_div;
+#pub #use i64_mod;
+#pub #use i64_eq;
+#pub #use i64_lte;
+#pub #use i64_lt;
+#pub #use i64_gte;
+#pub #use i64_gt;
+#pub #use i64_from_i32;
+#pub #use i64_from_u8;

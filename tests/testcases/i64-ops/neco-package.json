@@ -1,0 +1,4 @@
+{
+    "name": "i64-ops",
+    "felis-bin-entrypoints": ["src/i64-ops.fe"]
+}

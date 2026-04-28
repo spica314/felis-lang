@@ -1,0 +1,4 @@
+{
+    "name": "i64-reference-annotation",
+    "felis-bin-entrypoints": ["src/i64-reference-annotation.fe"]
+}

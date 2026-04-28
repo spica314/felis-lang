@@ -1,3 +1,4 @@
 #pub #mod array;
 #pub #mod i32;
+#pub #mod i64;
 #pub #mod u8;

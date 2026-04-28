@@ -5,6 +5,7 @@ pub(crate) struct LoweredProgram {
     pub(crate) arrays: Vec<ArrayAllocation>,
     pub(crate) heap_slots: usize,
     pub(crate) i32_slots: usize,
+    pub(crate) i64_slots: usize,
     pub(crate) requires_argv: bool,
 }
 
@@ -34,6 +35,23 @@ pub(crate) enum I32Expr {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum I64Expr {
+    Literal(i64),
+    Local(usize),
+    FromI32(Box<I32Expr>),
+    FromU8(Box<U8Expr>),
+    Add(Box<I64Expr>, Box<I64Expr>),
+    Sub(Box<I64Expr>, Box<I64Expr>),
+    Mul(Box<I64Expr>, Box<I64Expr>),
+    Div(Box<I64Expr>, Box<I64Expr>),
+    Mod(Box<I64Expr>, Box<I64Expr>),
+    ArrayGet {
+        array_slot: usize,
+        index: Box<I32Expr>,
+    },
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ComparisonKind {
     Eq,
@@ -49,6 +67,11 @@ pub(crate) enum ConditionExpr {
         kind: ComparisonKind,
         lhs: I32Expr,
         rhs: I32Expr,
+    },
+    I64 {
+        kind: ComparisonKind,
+        lhs: I64Expr,
+        rhs: I64Expr,
     },
     U8 {
         kind: ComparisonKind,
@@ -82,12 +105,14 @@ pub(crate) enum U8Expr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ExitCodeExpr {
     I32(I32Expr),
+    I64(I64Expr),
     U8(U8Expr),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ArrayElementType {
     I32,
+    I64,
     U8,
 }
 
@@ -111,6 +136,10 @@ pub(crate) enum Operation {
         slot: usize,
         value: I32Expr,
     },
+    StoreI64 {
+        slot: usize,
+        value: I64Expr,
+    },
     Mmap {
         len: I32Expr,
         result_slot: usize,
@@ -119,6 +148,11 @@ pub(crate) enum Operation {
         heap_slot: usize,
         byte_offset: i32,
         value: I32Expr,
+    },
+    HeapStoreI64 {
+        heap_slot: usize,
+        byte_offset: i32,
+        value: I64Expr,
     },
     HeapStorePtr {
         heap_slot: usize,
@@ -154,6 +188,11 @@ pub(crate) enum Operation {
         array_slot: usize,
         index: I32Expr,
         value: I32Expr,
+    },
+    ArraySetI64 {
+        array_slot: usize,
+        index: I32Expr,
+        value: I64Expr,
     },
     ArraySetU8 {
         array_slot: usize,

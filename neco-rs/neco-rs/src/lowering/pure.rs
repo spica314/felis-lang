@@ -60,6 +60,9 @@ pub(super) fn lower_pure_value(
             if let Ok(expr) = super::lower_i32_expr(term, state) {
                 return Ok(Value::I32(expr));
             }
+            if let Ok(expr) = super::lower_i64_expr(term, state) {
+                return Ok(Value::I64(expr));
+            }
             if let Ok(expr) = super::lower_u8_expr(term, state) {
                 return Ok(Value::U8(expr));
             }
@@ -233,6 +236,7 @@ fn lower_rc_struct_allocation(
 fn rc_struct_field_size(value: &Value) -> Result<i32> {
     match value {
         Value::I32(_) => Ok(4),
+        Value::I64(_) => Ok(8),
         Value::Constructor(ConstructorValue {
             heap_slot: Some(_), ..
         })
@@ -240,7 +244,7 @@ fn rc_struct_field_size(value: &Value) -> Result<i32> {
             heap_slot: Some(_), ..
         }) => Ok(8),
         _ => Err(Error::Unsupported(
-            "`struct(rc)` currently supports only `i32` and nested rc payload fields".to_string(),
+            "`struct(rc)` currently supports only integer and nested rc payload fields".to_string(),
         )),
     }
 }
@@ -254,6 +258,14 @@ fn lower_rc_struct_field_store(
     match value {
         Value::I32(value) => {
             program.operations.push(Operation::HeapStoreI32 {
+                heap_slot,
+                byte_offset,
+                value: value.clone(),
+            });
+            Ok(())
+        }
+        Value::I64(value) => {
+            program.operations.push(Operation::HeapStoreI64 {
                 heap_slot,
                 byte_offset,
                 value: value.clone(),
@@ -276,7 +288,7 @@ fn lower_rc_struct_field_store(
             Ok(())
         }
         _ => Err(Error::Unsupported(
-            "`struct(rc)` currently supports only `i32` and nested rc payload fields".to_string(),
+            "`struct(rc)` currently supports only integer and nested rc payload fields".to_string(),
         )),
     }
 }
@@ -424,6 +436,7 @@ fn lower_constructor_application(
             .iter()
             .map(|field| match field {
                 Value::I32(_) => Ok(4),
+                Value::I64(_) => Ok(8),
                 Value::Constructor(ConstructorValue {
                     heap_slot: Some(_), ..
                 }) => Ok(8),
@@ -431,7 +444,7 @@ fn lower_constructor_application(
                     heap_slot: None, ..
                 }) => Ok(0),
                 _ => Err(Error::Unsupported(
-                    "`type(rc)` currently supports only `i32`, nested `type(rc)`, and compile-time constructor payload fields"
+                    "`type(rc)` currently supports only integer, nested `type(rc)`, and compile-time constructor payload fields"
                         .to_string(),
                 )),
             })
@@ -463,6 +476,14 @@ fn lower_constructor_application(
                     });
                     byte_offset += 4;
                 }
+                Value::I64(value) => {
+                    program.operations.push(Operation::HeapStoreI64 {
+                        heap_slot,
+                        byte_offset,
+                        value: value.clone(),
+                    });
+                    byte_offset += 8;
+                }
                 Value::Constructor(ConstructorValue {
                     heap_slot: Some(source_heap_slot),
                     ..
@@ -479,7 +500,7 @@ fn lower_constructor_application(
                 }) => {}
                 _ => {
                     return Err(Error::Unsupported(
-                        "`type(rc)` currently supports only `i32`, nested `type(rc)`, and compile-time constructor payload fields"
+                        "`type(rc)` currently supports only integer, nested `type(rc)`, and compile-time constructor payload fields"
                             .to_string(),
                     ));
                 }
@@ -630,6 +651,7 @@ pub(super) fn lower_procedure_call_statement(
 
     state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
     state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
+    state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
 
     Ok(Some(terminated))
 }
@@ -663,6 +685,7 @@ pub(super) fn lower_procedure_call_value(
 
     state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
     state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
+    state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
 
     Ok(Some(value))
 }

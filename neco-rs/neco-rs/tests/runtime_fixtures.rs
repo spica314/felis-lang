@@ -190,6 +190,27 @@ fn compiles_and_runs_i32_ops_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_i64_ops_fixture() {
+    let root = repo_root().join("tests/testcases/i64-ops");
+    let status = run_fixture_status(&root, "i64-ops");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_i64_reference_annotation_fixture() {
+    let root = repo_root().join("tests/testcases/i64-reference-annotation");
+    let status = run_fixture_status(&root, "i64-reference-annotation");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_i64_array_fixture() {
+    let root = repo_root().join("tests/testcases/i64-array");
+    let status = run_fixture_status(&root, "i64-array");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_u8_ops_fixture() {
     let root = repo_root().join("tests/testcases/u8-ops");
     let status = run_fixture_status(&root, "u8-ops");

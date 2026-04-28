@@ -4,7 +4,9 @@ use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::ir::{
     ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, LoweredProgram, OpenPath, Operation,
 };
-use crate::lowering::{LoweringState, lower_i32_expr, lower_u8_expr, validate_value_against_type};
+use crate::lowering::{
+    LoweringState, lower_i32_expr, lower_i64_expr, lower_u8_expr, validate_value_against_type,
+};
 use crate::{Error, Result};
 
 pub(crate) fn lower_io_reference(
@@ -326,7 +328,9 @@ fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {
     while index < arguments.len() {
         if index + 1 < arguments.len()
             && matches!(arguments[index], Term::IntegerLiteral(_))
-            && (is_i32_suffix(&arguments[index + 1]) || is_u8_suffix(&arguments[index + 1]))
+            && (is_i32_suffix(&arguments[index + 1])
+                || is_i64_suffix(&arguments[index + 1])
+                || is_u8_suffix(&arguments[index + 1]))
         {
             normalized.push(Term::Application {
                 callee: Box::new(arguments[index].clone()),
@@ -345,18 +349,22 @@ fn parse_exit_code_arguments(arguments: &[Term], state: &LoweringState) -> Resul
     match arguments {
         [value] => lower_i32_expr(value, state)
             .map(ExitCodeExpr::I32)
+            .or_else(|_| lower_i64_expr(value, state).map(ExitCodeExpr::I64))
             .or_else(|_| lower_u8_expr(value, state).map(ExitCodeExpr::U8)),
-        [value, suffix] if is_i32_suffix(suffix) || is_u8_suffix(suffix) => {
+        [value, suffix]
+            if is_i32_suffix(suffix) || is_i64_suffix(suffix) || is_u8_suffix(suffix) =>
+        {
             let term = Term::Application {
                 callee: Box::new(value.clone()),
                 arguments: vec![suffix.clone()],
             };
             lower_i32_expr(&term, state)
                 .map(ExitCodeExpr::I32)
+                .or_else(|_| lower_i64_expr(&term, state).map(ExitCodeExpr::I64))
                 .or_else(|_| lower_u8_expr(&term, state).map(ExitCodeExpr::U8))
         }
         _ => Err(Error::Unsupported(
-            "`IO::exit` must receive a single `i32` or `u8` expression".to_string(),
+            "`IO::exit` must receive a single `i32`, `i64`, or `u8` expression".to_string(),
         )),
     }
 }
@@ -384,10 +392,11 @@ fn parse_array_new_arguments(
     };
     let element_type = match segment.name.as_str() {
         "i32" => ArrayElementType::I32,
+        "i64" => ArrayElementType::I64,
         "u8" => ArrayElementType::U8,
         _ => {
             return Err(Error::Unsupported(format!(
-                "`IO::{builtin_name}` currently supports only `i32` and `u8` arrays"
+                "`IO::{builtin_name}` currently supports only `i32`, `i64`, and `u8` arrays"
             )));
         }
     };
@@ -418,6 +427,13 @@ fn parse_arg_arguments(
 fn is_i32_suffix(term: &Term) -> bool {
     match term {
         Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i32",
+        _ => false,
+    }
+}
+
+fn is_i64_suffix(term: &Term) -> bool {
+    match term {
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i64",
         _ => false,
     }
 }

@@ -1,0 +1,4 @@
+{
+    "name": "i64-array",
+    "felis-bin-entrypoints": ["src/i64-array.fe"]
+}

@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use neco_rs_parser::{BindingPattern, PathExpression, Term};
 
 use crate::ir::{
-    ArrayElementType, ArrayKind, ConstructorValue, I32Expr, LoweredProgram, StructValue, U8Expr,
+    ArrayElementType, ArrayKind, ConstructorValue, I32Expr, I64Expr, LoweredProgram, StructValue,
+    U8Expr,
 };
 use crate::lowering::LoweringState;
 use crate::{Error, Result};
@@ -20,6 +21,8 @@ pub(crate) enum Value {
     RuntimeArg(I32Expr),
     I32(I32Expr),
     I32Reference(usize),
+    I64(I64Expr),
+    I64Reference(usize),
     U8(U8Expr),
     Array {
         slot: usize,

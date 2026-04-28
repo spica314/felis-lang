@@ -28,13 +28,16 @@ use pure::{
 };
 pub(crate) use typecheck::validate_value_against_type;
 
-pub(crate) use expr::{lower_i32_expr, lower_u8_expr, normalize_numeric_literal_arguments};
+pub(crate) use expr::{
+    lower_i32_expr, lower_i64_expr, lower_u8_expr, normalize_numeric_literal_arguments,
+};
 
 #[derive(Clone)]
 pub(crate) struct LoweringState {
     pub(crate) environment: HashMap<String, Value>,
     pub(crate) next_array_slot: usize,
     pub(crate) next_i32_slot: usize,
+    pub(crate) next_i64_slot: usize,
     functions: HashMap<String, PureFunction>,
     procedures: HashMap<String, Procedure>,
     constructors: HashMap<String, ConstructorSignature>,
@@ -48,6 +51,7 @@ impl LoweringState {
             environment: HashMap::new(),
             next_array_slot: 0,
             next_i32_slot: 0,
+            next_i64_slot: 0,
             functions: HashMap::new(),
             procedures: HashMap::new(),
             constructors: HashMap::new(),
@@ -81,6 +85,12 @@ impl LoweringState {
     pub(crate) fn allocate_i32_slot(&mut self) -> usize {
         let slot = self.next_i32_slot;
         self.next_i32_slot += 1;
+        slot
+    }
+
+    pub(crate) fn allocate_i64_slot(&mut self) -> usize {
+        let slot = self.next_i64_slot;
+        self.next_i64_slot += 1;
         slot
     }
 }
@@ -128,6 +138,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,
+        i64_slots: 0,
         requires_argv: false,
     };
     let mut state = LoweringState::new();
@@ -156,6 +167,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     }
 
     program.i32_slots = state.next_i32_slot;
+    program.i64_slots = state.next_i64_slot;
 
     Ok(program)
 }
@@ -363,6 +375,7 @@ pub(super) fn lower_statement(
                 arrays: std::mem::take(&mut program.arrays),
                 heap_slots: program.heap_slots,
                 i32_slots: program.i32_slots,
+                i64_slots: program.i64_slots,
                 requires_argv: program.requires_argv,
             };
             for statement in &loop_stmt.body.statements {
@@ -377,6 +390,7 @@ pub(super) fn lower_statement(
             program.requires_argv = loop_program.requires_argv;
             state.next_array_slot = state.next_array_slot.max(loop_state.next_array_slot);
             state.next_i32_slot = state.next_i32_slot.max(loop_state.next_i32_slot);
+            state.next_i64_slot = state.next_i64_slot.max(loop_state.next_i64_slot);
             program.operations.push(Operation::Loop {
                 body_operations: loop_program.operations,
             });
@@ -420,6 +434,7 @@ fn lower_if_statement(
         arrays: std::mem::take(&mut program.arrays),
         heap_slots: program.heap_slots,
         i32_slots: program.i32_slots,
+        i64_slots: program.i64_slots,
         requires_argv: program.requires_argv,
     };
     for statement in &if_stmt.then_block.statements {
@@ -432,6 +447,7 @@ fn lower_if_statement(
     let mut else_operations = Vec::new();
     let mut next_array_slot = then_state.next_array_slot;
     let mut next_i32_slot = then_state.next_i32_slot;
+    let mut next_i64_slot = then_state.next_i64_slot;
 
     if let Some(else_branch) = &if_stmt.else_branch {
         let mut else_state = state.child_scope();
@@ -441,6 +457,7 @@ fn lower_if_statement(
             arrays: then_program.arrays,
             heap_slots: then_program.heap_slots,
             i32_slots: then_program.i32_slots,
+            i64_slots: then_program.i64_slots,
             requires_argv: then_program.requires_argv,
         };
         match else_branch {
@@ -464,6 +481,7 @@ fn lower_if_statement(
         program.requires_argv = else_program.requires_argv;
         next_array_slot = next_array_slot.max(else_state.next_array_slot);
         next_i32_slot = next_i32_slot.max(else_state.next_i32_slot);
+        next_i64_slot = next_i64_slot.max(else_state.next_i64_slot);
     } else {
         program.data = then_program.data;
         program.arrays = then_program.arrays;
@@ -472,6 +490,7 @@ fn lower_if_statement(
     }
     state.next_array_slot = next_array_slot;
     state.next_i32_slot = next_i32_slot;
+    state.next_i64_slot = next_i64_slot;
     program.operations.push(Operation::If {
         condition,
         then_operations,
@@ -513,6 +532,13 @@ fn lower_letref_borrow_statement(
                 .operations
                 .push(Operation::StoreI32 { slot, value: expr });
             Value::I32Reference(slot)
+        }
+        Value::I64(expr) => {
+            let slot = state.allocate_i64_slot();
+            program
+                .operations
+                .push(Operation::StoreI64 { slot, value: expr });
+            Value::I64Reference(slot)
         }
         other => other,
     };
@@ -590,6 +616,18 @@ fn lower_expression_statement(
                 value: lower_i32_expr(value, state)?,
             });
         }
+        Value::I64Reference(slot) => {
+            let normalized = normalize_numeric_literal_arguments(arguments);
+            let [value] = normalized.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`set` must receive exactly one argument for `i64` references".to_string(),
+                ));
+            };
+            program.operations.push(Operation::StoreI64 {
+                slot,
+                value: lower_i64_expr(value, state)?,
+            });
+        }
         Value::Array {
             slot,
             element_type: ArrayElementType::I32,
@@ -605,6 +643,23 @@ fn lower_expression_statement(
                 array_slot: slot,
                 index: lower_i32_expr(index, state)?,
                 value: lower_i32_expr(value, state)?,
+            });
+        }
+        Value::Array {
+            slot,
+            element_type: ArrayElementType::I64,
+            ..
+        } => {
+            let normalized = normalize_numeric_literal_arguments(arguments);
+            let [index, value] = normalized.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`set` must receive exactly two arguments for arrays".to_string(),
+                ));
+            };
+            program.operations.push(Operation::ArraySetI64 {
+                array_slot: slot,
+                index: lower_i32_expr(index, state)?,
+                value: lower_i64_expr(value, state)?,
             });
         }
         Value::Array {
@@ -626,7 +681,7 @@ fn lower_expression_statement(
         }
         other => {
             return Err(Error::Unsupported(format!(
-                "`set` expects an `i32` reference or array reference, got {other:?}"
+                "`set` expects an integer reference or array reference, got {other:?}"
             )));
         }
     }
@@ -644,6 +699,7 @@ fn lower_effectful_block(
         if terminated {
             state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
             state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
+            state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
             return Ok(true);
         }
     }
@@ -652,6 +708,7 @@ fn lower_effectful_block(
     }
     state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
     state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
+    state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
     Ok(false)
 }
 
@@ -670,6 +727,7 @@ fn lower_match_expression_statement(
             lower_expression_statement(arm.result.as_ref(), &mut scoped_state, program)?;
             state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
             state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
+            state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
             return Ok(());
         }
     }

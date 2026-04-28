@@ -1,0 +1,17 @@
+#use std_core::io::IO;
+#use std_core::primitive::i64::i64;
+#use std_core::primitive::i64::i64_add;
+
+#entrypoint main;
+
+#fn add1 : (value_ref : & i64) -> i64 {
+    i64_add (value_ref .> get) 1i64
+}
+
+#fn main : () #with IO {
+    #let value_ref : i64 = 41i64;
+    #letref value_ref : & i64 #borrow value_ref;
+    #let r : i64 = add1 value_ref;
+    #let _ : () <- IO::exit r;
+    ()
+}

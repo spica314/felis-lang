@@ -2,7 +2,7 @@ use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
 
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
-    I32Expr, LoweredProgram, OpenPath, Operation, U8Expr,
+    I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, U8Expr,
 };
 
 const DATA_VIRTUAL_ADDRESS: u64 = 0x410000;
@@ -111,6 +111,12 @@ fn emit_operations(
                 code.extend_from_slice(&[0x89, 0x85]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
             }
+            Operation::StoreI64 { slot, value } => {
+                emit_i64_expr_to_rax(value, code, program);
+                let slot_offset = i64_slot_offset(program, *slot);
+                code.extend_from_slice(&[0x48, 0x89, 0x85]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+            }
             Operation::Mmap { len, result_slot } => {
                 code.extend_from_slice(&[0x31, 0xff]);
                 emit_i32_expr_to_eax(len, code, program);
@@ -136,6 +142,19 @@ fn emit_operations(
                 code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
                 code.extend_from_slice(&[0x89, 0x93]);
+                code.extend_from_slice(&byte_offset.to_le_bytes());
+            }
+            Operation::HeapStoreI64 {
+                heap_slot,
+                byte_offset,
+                value,
+            } => {
+                emit_i64_expr_to_rax(value, code, program);
+                code.extend_from_slice(&[0x48, 0x89, 0xc2]);
+                let slot_offset = heap_slot_offset(*heap_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+                code.extend_from_slice(&[0x48, 0x89, 0x93]);
                 code.extend_from_slice(&byte_offset.to_le_bytes());
             }
             Operation::HeapStorePtr {
@@ -297,6 +316,11 @@ fn emit_operations(
                 index,
                 value,
             } => emit_i32_array_set(*array_slot, index, value, code, program),
+            Operation::ArraySetI64 {
+                array_slot,
+                index,
+                value,
+            } => emit_i64_array_set(*array_slot, index, value, code, program),
             Operation::ArraySetU8 {
                 array_slot,
                 index,
@@ -374,6 +398,15 @@ fn emit_condition_false_jump(
             code.extend_from_slice(&[0x39, 0xc8]);
             emit_jcc_false(*kind, false, code);
         }
+        ConditionExpr::I64 { kind, lhs, rhs } => {
+            emit_i64_expr_to_rax(lhs, code, program);
+            code.push(0x50);
+            emit_i64_expr_to_rax(rhs, code, program);
+            code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+            code.push(0x58);
+            code.extend_from_slice(&[0x48, 0x39, 0xc8]);
+            emit_jcc_false(*kind, false, code);
+        }
         ConditionExpr::U8 { kind, lhs, rhs } => {
             emit_u8_expr_to_eax(lhs, code, program);
             code.push(0x50);
@@ -407,6 +440,7 @@ fn false_jump_opcode(kind: ComparisonKind, unsigned: bool) -> u8 {
 fn emit_exit_code_expr_to_eax(expr: &ExitCodeExpr, code: &mut Vec<u8>, program: &LoweredProgram) {
     match expr {
         ExitCodeExpr::I32(expr) => emit_i32_expr_to_eax(expr, code, program),
+        ExitCodeExpr::I64(expr) => emit_i64_expr_to_rax(expr, code, program),
         ExitCodeExpr::U8(expr) => emit_u8_expr_to_eax(expr, code, program),
     }
 }
@@ -468,6 +502,73 @@ fn emit_i32_div_mod_expr(
     code.extend_from_slice(&[0xf7, 0xf9]);
     if modulo {
         code.extend_from_slice(&[0x89, 0xd0]);
+    }
+}
+
+fn emit_i64_expr_to_rax(expr: &I64Expr, code: &mut Vec<u8>, program: &LoweredProgram) {
+    match expr {
+        I64Expr::Literal(value) => {
+            code.extend_from_slice(&[0x48, 0xb8]);
+            code.extend_from_slice(&value.to_le_bytes());
+        }
+        I64Expr::Local(slot) => {
+            let slot_offset = i64_slot_offset(program, *slot);
+            code.extend_from_slice(&[0x48, 0x8b, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
+        }
+        I64Expr::FromI32(value) => {
+            emit_i32_expr_to_eax(value, code, program);
+            code.extend_from_slice(&[0x48, 0x98]);
+        }
+        I64Expr::FromU8(value) => emit_u8_expr_to_eax(value, code, program),
+        I64Expr::Add(lhs, rhs) => {
+            emit_i64_binary_expr(lhs, rhs, code, program, &[0x48, 0x01, 0xc8])
+        }
+        I64Expr::Sub(lhs, rhs) => {
+            emit_i64_binary_expr(lhs, rhs, code, program, &[0x48, 0x29, 0xc8])
+        }
+        I64Expr::Mul(lhs, rhs) => {
+            emit_i64_binary_expr(lhs, rhs, code, program, &[0x48, 0x0f, 0xaf, 0xc1])
+        }
+        I64Expr::Div(lhs, rhs) => emit_i64_div_mod_expr(lhs, rhs, code, program, false),
+        I64Expr::Mod(lhs, rhs) => emit_i64_div_mod_expr(lhs, rhs, code, program, true),
+        I64Expr::ArrayGet { array_slot, index } => {
+            emit_i64_array_get(*array_slot, index, code, program)
+        }
+    }
+}
+
+fn emit_i64_binary_expr(
+    lhs: &I64Expr,
+    rhs: &I64Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+    opcode: &[u8],
+) {
+    emit_i64_expr_to_rax(lhs, code, program);
+    code.push(0x50);
+    emit_i64_expr_to_rax(rhs, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    code.push(0x58);
+    code.extend_from_slice(opcode);
+}
+
+fn emit_i64_div_mod_expr(
+    lhs: &I64Expr,
+    rhs: &I64Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+    modulo: bool,
+) {
+    emit_i64_expr_to_rax(lhs, code, program);
+    code.push(0x50);
+    emit_i64_expr_to_rax(rhs, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    code.push(0x58);
+    code.extend_from_slice(&[0x48, 0x99]);
+    code.extend_from_slice(&[0x48, 0xf7, 0xf9]);
+    if modulo {
+        code.extend_from_slice(&[0x48, 0x89, 0xd0]);
     }
 }
 
@@ -594,8 +695,9 @@ fn stack_frame_size(program: &LoweredProgram) -> usize {
     let array_descriptor_bytes: usize = program.arrays.iter().map(array_descriptor_size).sum();
     let pointer_bytes = array_descriptor_bytes + program.heap_slots * 8;
     let i32_slot_bytes = program.i32_slots * 4;
+    let i64_slot_bytes = program.i64_slots * 8;
     let array_bytes: usize = program.arrays.iter().map(array_storage_size).sum();
-    pointer_bytes + i32_slot_bytes + array_bytes
+    pointer_bytes + i32_slot_bytes + i64_slot_bytes + array_bytes
 }
 
 fn heap_slot_offset(slot: usize) -> i32 {
@@ -633,7 +735,8 @@ fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
         .sum();
     let pointer_bytes = (program.heap_slots * 8) as i32 + descriptor_bytes;
     let i32_slot_bytes = (program.i32_slots * 4) as i32;
-    let mut offset = pointer_bytes + i32_slot_bytes;
+    let i64_slot_bytes = (program.i64_slots * 8) as i32;
+    let mut offset = pointer_bytes + i32_slot_bytes + i64_slot_bytes;
     for array in &program.arrays {
         offset += array_storage_size(array) as i32;
         if array.slot == slot {
@@ -655,6 +758,17 @@ fn i32_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
         .sum();
     let pointer_bytes = (program.heap_slots * 8) as i32 + descriptor_bytes;
     -(pointer_bytes + 4 * (slot as i32 + 1))
+}
+
+fn i64_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
+    let descriptor_bytes: i32 = program
+        .arrays
+        .iter()
+        .map(|array| array_descriptor_size(array) as i32)
+        .sum();
+    let pointer_bytes = (program.heap_slots * 8) as i32 + descriptor_bytes;
+    let i32_slot_bytes = (program.i32_slots * 4) as i32;
+    -(pointer_bytes + i32_slot_bytes + 8 * (slot as i32 + 1))
 }
 
 fn emit_array_initializers(program: &LoweredProgram, code: &mut Vec<u8>) {
@@ -688,6 +802,7 @@ fn array_descriptor_size(array: &ArrayAllocation) -> usize {
 fn array_storage_size(array: &ArrayAllocation) -> usize {
     let element_size = match array.element_type {
         ArrayElementType::I32 => 4,
+        ArrayElementType::I64 => 8,
         ArrayElementType::U8 => 1,
     };
     array.len * element_size
@@ -719,6 +834,26 @@ fn emit_i32_array_set(
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());
     code.extend_from_slice(&[0x89, 0x14, 0x0b]);
+}
+
+fn emit_i64_array_set(
+    array_slot: usize,
+    index: &I32Expr,
+    value: &I64Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    emit_i32_expr_to_eax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x03]);
+    code.push(0x51);
+    emit_i64_expr_to_rax(value, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc2]);
+    code.push(0x59);
+    let slot_offset = array_slot_offset(program, array_slot);
+    code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
+    code.extend_from_slice(&slot_offset.to_le_bytes());
+    code.extend_from_slice(&[0x48, 0x89, 0x14, 0x0b]);
 }
 
 fn emit_array_len(array_slot: usize, code: &mut Vec<u8>, program: &LoweredProgram) {
@@ -759,6 +894,21 @@ fn emit_array_get(
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());
     code.extend_from_slice(&[0x8b, 0x04, 0x0b]);
+}
+
+fn emit_i64_array_get(
+    array_slot: usize,
+    index: &I32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    emit_i32_expr_to_eax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x63, 0xc8]);
+    code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x03]);
+    let slot_offset = array_slot_offset(program, array_slot);
+    code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
+    code.extend_from_slice(&slot_offset.to_le_bytes());
+    code.extend_from_slice(&[0x48, 0x8b, 0x04, 0x0b]);
 }
 
 fn emit_u8_array_get(

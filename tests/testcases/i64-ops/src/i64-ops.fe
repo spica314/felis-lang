@@ -1,0 +1,25 @@
+#use std_core::io::IO;
+#use std_core::primitive::i64::i64;
+#use std_core::primitive::i64::i64_add;
+#use std_core::primitive::i64::i64_sub;
+#use std_core::primitive::i64::i64_mul;
+#use std_core::primitive::i64::i64_div;
+#use std_core::primitive::i64::i64_mod;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let a : i64 = 3i64;
+    #let b : i64 = 7i64;
+    #let c : i64 = 4i64;
+    #let d : i64 = 61i64;
+    #let e : i64 = 3i64;
+    #let f : i64 = 80i64;
+    #let x1 : i64 = i64_add a b;
+    #let x2 : i64 = i64_sub x1 c;
+    #let x3 : i64 = i64_mul x2 d;
+    #let x4 : i64 = i64_div x3 e;
+    #let x5 : i64 = i64_mod x4 f;
+    #let _ : () <- IO::exit x5;
+    ()
+}

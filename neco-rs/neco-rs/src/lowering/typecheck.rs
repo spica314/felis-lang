@@ -1,7 +1,7 @@
 use neco_rs_parser::{ArrowParameter, Term};
 
 use crate::effect::Value;
-use crate::ir::{ArrayElementType, ArrayKind, I32Expr, LoweredProgram, U8Expr};
+use crate::ir::{ArrayElementType, ArrayKind, I32Expr, I64Expr, LoweredProgram, U8Expr};
 use crate::{Error, Result};
 
 pub(crate) fn validate_value_against_type(
@@ -85,6 +85,7 @@ pub(crate) fn validate_value_against_type(
             }
             match segment.name.as_str() {
                 "i32" if matches!(value, Value::I32(_)) => Ok(()),
+                "i64" if matches!(value, Value::I64(_)) => Ok(()),
                 "u8" if matches!(value, Value::U8(_)) => Ok(()),
                 "FileDescriptor" if matches!(value, Value::FileDescriptor(_)) => Ok(()),
                 "String" if matches!(value, Value::ByteString(_)) => Ok(()),
@@ -182,6 +183,7 @@ fn validate_reference_value_against_type(
         {
             match path.segments[0].name.as_str() {
                 "i32" if matches!(value, Value::I32Reference(_)) => Ok(()),
+                "i64" if matches!(value, Value::I64Reference(_)) => Ok(()),
                 type_name => match value {
                     Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
                     Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
@@ -302,9 +304,10 @@ fn parse_array_element_type(term: &Term, type_name: &str) -> Result<ArrayElement
         {
             match path.segments[0].name.as_str() {
                 "i32" => Ok(ArrayElementType::I32),
+                "i64" => Ok(ArrayElementType::I64),
                 "u8" => Ok(ArrayElementType::U8),
                 _ => Err(Error::Unsupported(format!(
-                    "`{type_name}` element type must be `i32` or `u8`"
+                    "`{type_name}` element type must be `i32`, `i64`, or `u8`"
                 ))),
             }
         }
@@ -365,10 +368,29 @@ pub(super) fn parse_bare_u8_literal(literal: &str) -> Result<U8Expr> {
     Ok(U8Expr::Literal(parse_u8_digits(literal, literal)?))
 }
 
+pub(super) fn parse_suffixed_i64_literal(literal: &str) -> Result<I64Expr> {
+    let digits = literal.strip_suffix("i64").ok_or_else(|| {
+        Error::Unsupported("integer literal must use the `i64` suffix".to_string())
+    })?;
+    Ok(I64Expr::Literal(parse_i64_digits(digits, literal)?))
+}
+
+pub(super) fn parse_bare_i64_literal(literal: &str) -> Result<I64Expr> {
+    Ok(I64Expr::Literal(parse_i64_digits(literal, literal)?))
+}
+
 fn parse_i32_digits(digits: &str, original: &str) -> Result<i32> {
     parse_prefixed_i32_digits(digits).map_err(|_| {
         Error::Unsupported(format!(
             "integer literal `{original}` could not be parsed as i32"
+        ))
+    })
+}
+
+fn parse_i64_digits(digits: &str, original: &str) -> Result<i64> {
+    parse_prefixed_i64_digits(digits).map_err(|_| {
+        Error::Unsupported(format!(
+            "integer literal `{original}` could not be parsed as i64"
         ))
     })
 }
@@ -389,6 +411,17 @@ fn parse_prefixed_i32_digits(digits: &str) -> std::result::Result<i32, std::num:
         i32::from_str_radix(hex, 16)
     } else {
         digits.parse::<i32>()
+    }
+}
+
+fn parse_prefixed_i64_digits(digits: &str) -> std::result::Result<i64, std::num::ParseIntError> {
+    if let Some(hex) = digits
+        .strip_prefix("0x")
+        .or_else(|| digits.strip_prefix("0X"))
+    {
+        i64::from_str_radix(hex, 16)
+    } else {
+        digits.parse::<i64>()
     }
 }
 
@@ -488,6 +521,13 @@ fn render_reference_term(referent: &Term, exclusive: bool) -> String {
 pub(super) fn is_i32_suffix_term(term: &Term) -> bool {
     match term {
         Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i32",
+        _ => false,
+    }
+}
+
+pub(super) fn is_i64_suffix_term(term: &Term) -> bool {
+    match term {
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].name == "i64",
         _ => false,
     }
 }

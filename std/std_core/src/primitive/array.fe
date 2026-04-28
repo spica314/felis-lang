@@ -21,6 +21,12 @@
     }
 }
 
+#fn dyn_array_raw_i64 : (array : DynArray i64) -> RawArray i64 {
+    #match array {
+        DynArray::dyn_array raw_array _ _ => raw_array,
+    }
+}
+
 #fn dyn_array_capacity_u8 : (array : DynArray u8) -> i32 {
     #match array {
         DynArray::dyn_array _ capacity _ => capacity,
@@ -28,6 +34,12 @@
 }
 
 #fn dyn_array_capacity_i32 : (array : DynArray i32) -> i32 {
+    #match array {
+        DynArray::dyn_array _ capacity _ => capacity,
+    }
+}
+
+#fn dyn_array_capacity_i64 : (array : DynArray i64) -> i32 {
     #match array {
         DynArray::dyn_array _ capacity _ => capacity,
     }
@@ -45,6 +57,12 @@
     }
 }
 
+#fn dyn_array_len_i64 : (array : DynArray i64) -> i32 {
+    #match array {
+        DynArray::dyn_array _ _ len => len,
+    }
+}
+
 #fn dyn_array_get_u8 : (array : DynArray u8) -> (index : i32) -> u8 {
     #let raw_array : RawArray u8 = dyn_array_raw_u8 array;
     raw_array .> get index
@@ -52,6 +70,11 @@
 
 #fn dyn_array_get_i32 : (array : DynArray i32) -> (index : i32) -> i32 {
     #let raw_array : RawArray i32 = dyn_array_raw_i32 array;
+    raw_array .> get index
+}
+
+#fn dyn_array_get_i64 : (array : DynArray i64) -> (index : i32) -> i64 {
+    #let raw_array : RawArray i64 = dyn_array_raw_i64 array;
     raw_array .> get index
 }
 
@@ -63,6 +86,12 @@
 
 #proc dyn_array_set_i32 : (array : DynArray i32) -> (index : i32) -> (value : i32) -> () {
     #let raw_array : RawArray i32 = dyn_array_raw_i32 array;
+    raw_array .> set index value;
+    ()
+}
+
+#proc dyn_array_set_i64 : (array : DynArray i64) -> (index : i32) -> (value : i64) -> () {
+    #let raw_array : RawArray i64 = dyn_array_raw_i64 array;
     raw_array .> set index value;
     ()
 }
@@ -119,14 +148,19 @@
 #pub #use DynArray;
 #pub #use dyn_array_raw_u8;
 #pub #use dyn_array_raw_i32;
+#pub #use dyn_array_raw_i64;
 #pub #use dyn_array_capacity_u8;
 #pub #use dyn_array_capacity_i32;
+#pub #use dyn_array_capacity_i64;
 #pub #use dyn_array_len_u8;
 #pub #use dyn_array_len_i32;
+#pub #use dyn_array_len_i64;
 #pub #use dyn_array_get_u8;
 #pub #use dyn_array_get_i32;
+#pub #use dyn_array_get_i64;
 #pub #use dyn_array_set_u8;
 #pub #use dyn_array_set_i32;
+#pub #use dyn_array_set_i64;
 #pub #use append_u8;
 #pub #use append_nul_terminated_u8;
 #pub #use append_dyn_nul_terminated_u8;
