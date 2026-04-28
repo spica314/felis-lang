@@ -38,12 +38,102 @@
 #use #package::lexer::mark_ident_part;
 #use #package::lexer::mark_ident_start;
 
+#pub #type FelisParserExpectedKind : Type[0] {
+    expected_none : FelisParserExpectedKind,
+    expected_token : FelisParserExpectedKind,
+    expected_keyword : FelisParserExpectedKind,
+    expected_punct : FelisParserExpectedKind,
+    expected_identifier : FelisParserExpectedKind,
+    expected_end_of_file : FelisParserExpectedKind,
+    expected_no_trailing_token : FelisParserExpectedKind,
+    expected_syntax_node : FelisParserExpectedKind,
+}
+
+#pub #struct FelisParserError : Type[0] {
+    status : i32,
+    expected_kind : i32,
+    expected_code : i32,
+    start : i32,
+    end : i32,
+}
+
+#pub #fn encode_felis_parser_expected_kind : (kind : FelisParserExpectedKind) -> (unknown_code : i32) -> i32 {
+    #match kind {
+        FelisParserExpectedKind::expected_none => 0i32,
+        FelisParserExpectedKind::expected_token => 1i32,
+        FelisParserExpectedKind::expected_keyword => 2i32,
+        FelisParserExpectedKind::expected_punct => 3i32,
+        FelisParserExpectedKind::expected_identifier => 4i32,
+        FelisParserExpectedKind::expected_end_of_file => 5i32,
+        FelisParserExpectedKind::expected_no_trailing_token => 6i32,
+        FelisParserExpectedKind::expected_syntax_node => 7i32,
+    }
+}
+
 #proc mark_felis_parse_error : (status : i32) -> (start : i32) -> (end : i32) -> (status_ref : &^ i32) -> (error_start_ref : &^ i32) -> (error_end_ref : &^ i32) -> () {
     #if i32_eq (status_ref .> get) 0i32 {
         status_ref .> set status;
         error_start_ref .> set start;
         error_end_ref .> set end;
     };
+    ()
+}
+
+#pub #proc init_felis_parser_error : (error_ref : &^ FelisParserError) -> () {
+    error_ref .> set FelisParserError {
+        status = 0i32,
+        expected_kind = encode_felis_parser_expected_kind FelisParserExpectedKind::expected_none 0i32,
+        expected_code = 0i32,
+        start = 0i32,
+        end = 0i32
+    };
+    ()
+}
+
+#pub #proc mark_felis_parser_error : (expected_kind : FelisParserExpectedKind) -> (expected_code : i32) -> (start : i32) -> (end : i32) -> (error_ref : &^ FelisParserError) -> () {
+    #let current_error : FelisParserError = error_ref .> get;
+    #if i32_eq current_error.status 0i32 {
+        error_ref .> set FelisParserError {
+            status = 1i32,
+            expected_kind = encode_felis_parser_expected_kind expected_kind 0i32,
+            expected_code = expected_code,
+            start = start,
+            end = end
+        };
+    };
+    ()
+}
+
+#pub #proc mark_felis_parser_error_from_status_refs : (expected_kind : FelisParserExpectedKind) -> (expected_code : i32) -> (start : i32) -> (end : i32) -> (status_ref : &^ i32) -> (error_start_ref : &^ i32) -> (error_end_ref : &^ i32) -> (expected_kind_ref : &^ i32) -> (expected_code_ref : &^ i32) -> () {
+    #if i32_eq (status_ref .> get) 0i32 {
+        status_ref .> set 1i32;
+        error_start_ref .> set start;
+        error_end_ref .> set end;
+        expected_kind_ref .> set (encode_felis_parser_expected_kind expected_kind 0i32);
+        expected_code_ref .> set expected_code;
+    };
+    ()
+}
+
+#pub #proc parser_begin_attempt : (cursor_ref : &^ i32) -> (attempt_cursor_ref : &^ i32) -> () {
+    attempt_cursor_ref .> set (cursor_ref .> get);
+    ()
+}
+
+#pub #proc parser_commit_attempt : (cursor_ref : &^ i32) -> (attempt_cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> () {
+    #if i32_eq (matched_ref .> get) 1i32 {
+        cursor_ref .> set (attempt_cursor_ref .> get);
+    };
+    ()
+}
+
+#pub #proc parser_rewind_attempt : (cursor_ref : &^ i32) -> (attempt_cursor_ref : &^ i32) -> () {
+    attempt_cursor_ref .> set (cursor_ref .> get);
+    ()
+}
+
+#pub #proc parser_rollback_attempt : (cursor_ref : &^ i32) -> (attempt_cursor_ref : &^ i32) -> () {
+    cursor_ref .> set (attempt_cursor_ref .> get);
     ()
 }
 
@@ -101,6 +191,14 @@
     ()
 }
 
+#pub #proc require_token_kind : (token_tag_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (expected_kind : FelisTokenKind) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> () {
+    parse_token_kind token_tag_ref cursor_ref expected_kind matched_ref;
+    #if i32_eq (matched_ref .> get) 0i32 {
+        mark_felis_parser_error FelisParserExpectedKind::expected_token (encode_felis_token_kind expected_kind 0i32) (current_token_start token_start_ref cursor_ref) (current_token_end token_end_ref cursor_ref) error_ref;
+    };
+    ()
+}
+
 #pub #proc current_keyword_kind : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (kind_ref : &^ FelisKeywordKind) -> () {
     kind_ref .> set FelisKeywordKind::keyword_unknown;
     #let token_keyword_kind : FelisTokenKind = FelisTokenKind::token_keyword;
@@ -125,6 +223,14 @@
             matched_ref .> set 1i32;
             cursor_ref .> set (i32_add (cursor_ref .> get) 1i32);
         };
+    };
+    ()
+}
+
+#pub #proc require_token_keyword_kind : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (expected_kind : FelisKeywordKind) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> () {
+    parse_token_keyword_kind token_tag_ref token_value_ref cursor_ref expected_kind matched_ref;
+    #if i32_eq (matched_ref .> get) 0i32 {
+        mark_felis_parser_error FelisParserExpectedKind::expected_keyword (encode_felis_keyword_kind expected_kind 0i32) (current_token_start token_start_ref cursor_ref) (current_token_end token_end_ref cursor_ref) error_ref;
     };
     ()
 }
@@ -177,6 +283,14 @@
     ()
 }
 
+#pub #proc require_token_punct_kind : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (expected_kind : FelisPunctKind) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> () {
+    parse_token_punct_kind token_tag_ref token_value_ref cursor_ref expected_kind matched_ref;
+    #if i32_eq (matched_ref .> get) 0i32 {
+        mark_felis_parser_error FelisParserExpectedKind::expected_punct (encode_felis_punct_kind expected_kind 0i32) (current_token_start token_start_ref cursor_ref) (current_token_end token_end_ref cursor_ref) error_ref;
+    };
+    ()
+}
+
 #pub #proc parse_token_identifier : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (matched_ref : &^ i32) -> (value_ref : &^ i32) -> (start_ref : &^ i32) -> (end_ref : &^ i32) -> () {
     #let token_ident_kind : FelisTokenKind = FelisTokenKind::token_ident;
     parse_token_kind token_tag_ref cursor_ref token_ident_kind matched_ref;
@@ -185,6 +299,14 @@
         value_ref .> set (dyn_array_get_i32 token_value_ref token_index);
         start_ref .> set (dyn_array_get_i32 token_start_ref token_index);
         end_ref .> set (dyn_array_get_i32 token_end_ref token_index);
+    };
+    ()
+}
+
+#pub #proc require_token_identifier : (token_tag_ref : DynArray i32) -> (token_value_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> (value_ref : &^ i32) -> (start_ref : &^ i32) -> (end_ref : &^ i32) -> () {
+    parse_token_identifier token_tag_ref token_value_ref token_start_ref token_end_ref cursor_ref matched_ref value_ref start_ref end_ref;
+    #if i32_eq (matched_ref .> get) 0i32 {
+        mark_felis_parser_error FelisParserExpectedKind::expected_identifier 0i32 (current_token_start token_start_ref cursor_ref) (current_token_end token_end_ref cursor_ref) error_ref;
     };
     ()
 }
@@ -231,6 +353,24 @@
         value_ref .> set (dyn_array_get_i32 token_value_ref token_index);
         start_ref .> set (dyn_array_get_i32 token_start_ref token_index);
         end_ref .> set (dyn_array_get_i32 token_end_ref token_index);
+    };
+    ()
+}
+
+#pub #proc require_end_of_file : (token_tag_ref : DynArray i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> (matched_ref : &^ i32) -> () {
+    parse_token_kind token_tag_ref cursor_ref FelisTokenKind::token_eof matched_ref;
+    #if i32_eq (matched_ref .> get) 0i32 {
+        mark_felis_parser_error FelisParserExpectedKind::expected_end_of_file 0i32 (current_token_start token_start_ref cursor_ref) (current_token_end token_end_ref cursor_ref) error_ref;
+    };
+    ()
+}
+
+#pub #proc check_no_trailing_tokens : (token_tag_ref : DynArray i32) -> (token_count_ref : &^ i32) -> (token_start_ref : DynArray i32) -> (token_end_ref : DynArray i32) -> (cursor_ref : &^ i32) -> (error_ref : &^ FelisParserError) -> () {
+    #let matched_ref : i32 = 0i32;
+    #letref #excl matched_ref : &^ i32 #borrow matched_ref;
+    at_end token_tag_ref token_count_ref cursor_ref matched_ref;
+    #if i32_eq (matched_ref .> get) 0i32 {
+        mark_felis_parser_error FelisParserExpectedKind::expected_no_trailing_token 0i32 (current_token_start token_start_ref cursor_ref) (current_token_end token_end_ref cursor_ref) error_ref;
     };
     ()
 }
