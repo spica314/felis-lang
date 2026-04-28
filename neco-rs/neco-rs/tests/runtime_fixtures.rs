@@ -3,10 +3,11 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 static FIXTURE_EXEC_LOCK: Mutex<()> = Mutex::new(());
+static NECO_FELIS_BINARY: OnceLock<PathBuf> = OnceLock::new();
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -27,6 +28,16 @@ fn compile_fixture(root: &Path, name: &str) -> PathBuf {
     compile_path_to_elf(root, &output).expect("compile fixture");
 
     output
+}
+
+fn neco_felis_binary() -> &'static Path {
+    NECO_FELIS_BINARY
+        .get_or_init(|| {
+            let _guard = FIXTURE_EXEC_LOCK.lock().expect("fixture exec lock");
+            let root = repo_root().join("neco-felis");
+            compile_fixture(&root, "neco-felis")
+        })
+        .as_path()
 }
 
 fn runtime_temp_dir(name: &str) -> PathBuf {
@@ -134,16 +145,21 @@ fn run_fixture_with_input(root: &Path, name: &str, stdin: &[u8]) -> Output {
 }
 
 fn run_neco_felis_fixture(input_root: &Path, temp_name: &str) -> (Output, Vec<u8>, Output) {
-    let root = repo_root().join("neco-felis");
     let temp_dir = runtime_temp_dir(temp_name);
 
-    let (binary, child) = compile_and_spawn_fixture(&root, "neco-felis", |command| {
+    let binary = neco_felis_binary();
+    let child = {
+        let _guard = FIXTURE_EXEC_LOCK.lock().expect("fixture exec lock");
+        let mut command = runtime_test_runner(binary);
         command
             .current_dir(&temp_dir)
             .arg(input_root)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-    });
+        command
+            .spawn()
+            .unwrap_or_else(|error| panic!("run neco-felis fixture binary: {error}"))
+    };
     let run = child
         .wait_with_output()
         .expect("collect neco-felis fixture output");
@@ -161,7 +177,6 @@ fn run_neco_felis_fixture(input_root: &Path, temp_name: &str) -> (Output, Vec<u8
         .wait_with_output()
         .expect("collect emitted a.out output");
 
-    cleanup_fixture_binary(&binary);
     fs::remove_dir_all(&temp_dir).expect("cleanup runtime temp dir");
 
     (run, emitted_bytes, emitted_run)
