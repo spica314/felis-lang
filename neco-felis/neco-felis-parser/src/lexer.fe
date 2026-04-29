@@ -1,2 +1,6 @@
 #mod scan;
 #mod token;
+
+#pub #use Token;
+#pub #use Tokens;
+#pub #use lex;

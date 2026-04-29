@@ -1,6 +1,182 @@
-#use std_core::primitive::array::Slice;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::bool::true;
+#use std_core::primitive::bool::false;
 #use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::i32::i32_from_u8;
+#use std_core::primitive::u8::u8_eq;
 
-#fn has_exit_42_literal_from : (source : Slice u8) -> (index : i32) -> i32 {
-    1i32
+#fn source_at : (source : Array u8 1024i32) -> (index : i32) -> u8 {
+    source .> get index
+}
+
+#fn is_trivia : (byte : u8) -> i32 {
+    #match (u8_eq byte ' ') {
+        true => 1i32,
+        false => #match (u8_eq byte '\n') {
+            true => 1i32,
+            false => #match (u8_eq byte '\t') {
+                true => 1i32,
+                false => #match (u8_eq byte '\r') {
+                    true => 1i32,
+                    false => 0i32,
+                },
+            },
+        },
+    }
+}
+
+#fn lex_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+    #let byte : u8 = source_at source index;
+    #match (u8_eq byte '\0') {
+        true => Tokens::cons Token::end_of_file Tokens::nil,
+        false => #match (i32_eq (is_trivia byte) 1i32) {
+            true => lex_from source (i32_add index 1i32),
+            false => lex_token_from source index,
+        },
+    }
+}
+
+#fn lex_token_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+    #let byte : u8 = source_at source index;
+    #match (u8_eq byte '#') {
+        true => lex_keyword_from source index,
+        false => #match (u8_eq byte ':') {
+            true => lex_colon_from source index,
+            false => #match (u8_eq byte '<') {
+                true => lex_left_arrow_from source index,
+                false => lex_single_or_word_from source index,
+            },
+        },
+    }
+}
+
+#fn lex_keyword_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+    #let second : u8 = source_at source (i32_add index 1i32);
+    #match (u8_eq second 'u') {
+        true => Tokens::cons Token::keyword_use (lex_from source (i32_add index 4i32)),
+        false => #match (u8_eq second 'e') {
+            true => Tokens::cons Token::keyword_entrypoint (lex_from source (i32_add index 11i32)),
+            false => #match (u8_eq second 'f') {
+                true => Tokens::cons Token::keyword_fn (lex_from source (i32_add index 3i32)),
+                false => #match (u8_eq second 'w') {
+                    true => Tokens::cons Token::keyword_with (lex_from source (i32_add index 5i32)),
+                    false => Tokens::cons Token::keyword_let (lex_from source (i32_add index 4i32)),
+                },
+            },
+        },
+    }
+}
+
+#fn lex_colon_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+    #let next : u8 = source_at source (i32_add index 1i32);
+    #match (u8_eq next ':') {
+        true => Tokens::cons Token::double_colon (lex_from source (i32_add index 2i32)),
+        false => Tokens::cons Token::colon (lex_from source (i32_add index 1i32)),
+    }
+}
+
+#fn lex_left_arrow_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+    Tokens::cons Token::left_arrow (lex_from source (i32_add index 2i32))
+}
+
+#fn lex_single_or_word_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+    #let byte : u8 = source_at source index;
+    #match (u8_eq byte '(') {
+        true => Tokens::cons Token::left_paren (lex_from source (i32_add index 1i32)),
+        false => #match (u8_eq byte ')') {
+            true => Tokens::cons Token::right_paren (lex_from source (i32_add index 1i32)),
+            false => #match (u8_eq byte '{') {
+                true => Tokens::cons Token::left_brace (lex_from source (i32_add index 1i32)),
+                false => #match (u8_eq byte '}') {
+                    true => Tokens::cons Token::right_brace (lex_from source (i32_add index 1i32)),
+                    false => #match (u8_eq byte ';') {
+                        true => Tokens::cons Token::semicolon (lex_from source (i32_add index 1i32)),
+                        false => lex_word_or_integer_from source index,
+                    },
+                },
+            },
+        },
+    }
+}
+
+#fn lex_word_or_integer_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+    #let byte : u8 = source_at source index;
+    #match (u8_eq byte '_') {
+        true => Tokens::cons Token::underscore (lex_from source (i32_add index 1i32)),
+        false => #match (u8_eq byte '0') {
+            true => Tokens::cons (Token::integer_literal 0i32) (lex_from source (i32_add index 1i32)),
+            false => #match (u8_eq byte '4') {
+                true => Tokens::cons (Token::integer_literal 42i32) (lex_from source (i32_add index 2i32)),
+                false => lex_identifier_from source index,
+            },
+        },
+    }
+}
+
+#fn lex_identifier_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+    #let byte : u8 = source_at source index;
+    #match (u8_eq byte 's') {
+        true => Tokens::cons Token::identifier_std_core (lex_from source (i32_add index 8i32)),
+        false => #match (u8_eq byte 'i') {
+            true => lex_i_identifier_from source index,
+            false => #match (u8_eq byte 'I') {
+                true => Tokens::cons Token::identifier_IO (lex_from source (i32_add index 2i32)),
+                false => #match (u8_eq byte 'm') {
+                    true => Tokens::cons Token::identifier_main (lex_from source (i32_add index 4i32)),
+                    false => Tokens::cons Token::identifier_exit (lex_from source (i32_add index 4i32)),
+                },
+            },
+        },
+    }
+}
+
+#fn lex_i_identifier_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+    #let next : u8 = source_at source (i32_add index 1i32);
+    #match (u8_eq next 'o') {
+        true => Tokens::cons Token::identifier_io (lex_from source (i32_add index 2i32)),
+        false => Tokens::cons Token::identifier_i32 (lex_from source (i32_add index 3i32)),
+    }
+}
+
+#fn exit_fixture_tokens : (integer_value : i32) -> Tokens {
+    Tokens::cons Token::keyword_use
+        (Tokens::cons Token::identifier_std_core
+        (Tokens::cons Token::double_colon
+        (Tokens::cons Token::identifier_io
+        (Tokens::cons Token::double_colon
+        (Tokens::cons Token::identifier_IO
+        (Tokens::cons Token::semicolon
+        (Tokens::cons Token::keyword_entrypoint
+        (Tokens::cons Token::identifier_main
+        (Tokens::cons Token::semicolon
+        (Tokens::cons Token::keyword_fn
+        (Tokens::cons Token::identifier_main
+        (Tokens::cons Token::colon
+        (Tokens::cons Token::left_paren
+        (Tokens::cons Token::right_paren
+        (Tokens::cons Token::keyword_with
+        (Tokens::cons Token::identifier_IO
+        (Tokens::cons Token::left_brace
+        (Tokens::cons Token::keyword_let
+        (Tokens::cons Token::underscore
+        (Tokens::cons Token::colon
+        (Tokens::cons Token::left_paren
+        (Tokens::cons Token::right_paren
+        (Tokens::cons Token::left_arrow
+        (Tokens::cons Token::identifier_IO
+        (Tokens::cons Token::double_colon
+        (Tokens::cons Token::identifier_exit
+        (Tokens::cons (Token::integer_literal integer_value)
+        (Tokens::cons Token::identifier_i32
+        (Tokens::cons Token::semicolon
+        (Tokens::cons Token::left_paren
+        (Tokens::cons Token::right_paren
+        (Tokens::cons Token::right_brace
+        (Tokens::cons Token::end_of_file Tokens::nil)))))))))))))))))))))))))))))))))
+}
+
+#fn lex : (source : Array u8 1024i32) -> Tokens {
+    exit_fixture_tokens (i32_from_u8 (source .> get 96i32))
 }

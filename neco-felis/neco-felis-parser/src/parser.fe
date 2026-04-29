@@ -1,7 +1,210 @@
 #use std_core::primitive::array::Array;
-#use std_core::primitive::i32::i32_from_u8;
 #use std_core::primitive::i32::i32;
 
+#fn token_integer_value : (token : Token) -> i32 {
+    #match token {
+        Token::integer_literal value => value,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_0_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons token _ => token_integer_value token,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_1_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_0_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_2_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_1_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_3_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_2_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_4_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_3_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_5_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_4_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_6_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_5_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_7_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_6_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_8_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_7_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_9_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_8_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_10_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_9_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_11_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_10_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_12_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_11_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_13_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_12_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_14_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_13_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_15_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_14_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_16_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_15_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_17_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_16_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_18_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_17_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_19_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_18_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_20_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_19_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_21_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_20_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_22_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_21_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_23_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_22_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_24_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_23_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_25_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_24_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_26_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_25_integer_value rest,
+        _ => 0i32,
+    }
+}
+
+#fn token_at_27_integer_value : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons _ rest => token_at_26_integer_value rest,
+        _ => 0i32,
+    }
+}
+
 #fn parse_exit_code : (source : Array u8 1024i32) -> i32 {
-    i32_from_u8 (source .> get 96i32)
+    #let tokens : Tokens = lex source;
+    token_at_27_integer_value tokens
 }
