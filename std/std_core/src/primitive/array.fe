@@ -32,21 +32,24 @@
     slice .> get (i64_from_i32 index)
 }
 
+#proc dyn_array_set : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> (value : t) -> () {
+    #let slice : Slice t = dyn_array_slice t array;
+    slice .> set (i64_from_i32 index) value;
+    ()
+}
+
 #proc dyn_array_set_u8 : (array : DynArray u8) -> (index : i32) -> (byte : u8) -> () {
-    #let slice : Slice u8 = dyn_array_slice u8 array;
-    slice .> set (i64_from_i32 index) byte;
+    dyn_array_set u8 array index byte;
     ()
 }
 
 #proc dyn_array_set_i32 : (array : DynArray i32) -> (index : i32) -> (value : i32) -> () {
-    #let slice : Slice i32 = dyn_array_slice i32 array;
-    slice .> set (i64_from_i32 index) value;
+    dyn_array_set i32 array index value;
     ()
 }
 
 #proc dyn_array_set_i64 : (array : DynArray i64) -> (index : i32) -> (value : i64) -> () {
-    #let slice : Slice i64 = dyn_array_slice i64 array;
-    slice .> set (i64_from_i32 index) value;
+    dyn_array_set i64 array index value;
     ()
 }
 
@@ -104,6 +107,7 @@
 #pub #use dyn_array_capacity;
 #pub #use dyn_array_len;
 #pub #use dyn_array_get;
+#pub #use dyn_array_set;
 #pub #use dyn_array_set_u8;
 #pub #use dyn_array_set_i32;
 #pub #use dyn_array_set_i64;

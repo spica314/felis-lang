@@ -4,7 +4,7 @@
 #use std_core::primitive::array::dyn_array_get;
 #use std_core::primitive::array::dyn_array_len;
 #use std_core::primitive::array::dyn_array_slice;
-#use std_core::primitive::array::dyn_array_set_u8;
+#use std_core::primitive::array::dyn_array_set;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::i32::i32_gte;
@@ -79,7 +79,7 @@
 }
 
 #proc string_set_u8 : (string : String) -> (index : i32) -> (byte : u8) -> () {
-    dyn_array_set_u8 (string_as_dyn_array string) index byte;
+    dyn_array_set u8 (string_as_dyn_array string) index byte;
     ()
 }
 

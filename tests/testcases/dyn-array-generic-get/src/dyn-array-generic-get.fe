@@ -2,21 +2,27 @@
 #use std_core::primitive::array::DynArray;
 #use std_core::primitive::array::Slice;
 #use std_core::primitive::array::dyn_array_get;
+#use std_core::primitive::array::dyn_array_set;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_from_u8;
 
 #entrypoint main;
 
+#proc write_first : (t : Type[0]) -> (array : DynArray t) -> (value : t) -> () {
+    dyn_array_set t array 0i32 value;
+    ()
+}
+
 #fn main : () #with IO {
     #let bytes_ref : &^ Slice u8 <- IO::slice_new u8 4i32;
-    bytes_ref .> set 0i32 1u8;
     #let bytes : DynArray u8 = DynArray::dyn_array u8 bytes_ref 1i64;
+    write_first u8 bytes 1u8;
     #let byte : u8 = dyn_array_get u8 bytes 0i32;
 
     #let numbers_ref : &^ Slice i32 <- IO::slice_new i32 4i32;
-    numbers_ref .> set 0i32 41i32;
     #let numbers : DynArray i32 = DynArray::dyn_array i32 numbers_ref 1i64;
+    write_first i32 numbers 41i32;
     #let number : i32 = dyn_array_get i32 numbers 0i32;
 
     #let value : i32 = i32_add (i32_from_u8 byte) number;

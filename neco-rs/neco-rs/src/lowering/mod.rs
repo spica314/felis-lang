@@ -24,7 +24,7 @@ use declarations::{
 use expr::lower_condition_expr;
 use pure::{
     lower_procedure_call_statement, lower_procedure_call_value, lower_pure_block_value,
-    lower_pure_value, pattern_match_bindings,
+    lower_pure_value, pattern_match_bindings, substitute_type_bindings,
 };
 pub(crate) use typecheck::validate_value_against_type;
 
@@ -507,9 +507,20 @@ fn lower_let_equals_statement(
         Some(value) => value,
         None => lower_pure_value(value_term, state, program)?,
     };
-    validate_value_against_type(&value, ty, program)?;
+    let ty = substitute_type_bindings(ty, &type_bindings_from_environment(&state.environment));
+    validate_value_against_type(&value, &ty, program)?;
     bind_pattern(binder, value, &mut state.environment);
     Ok(())
+}
+
+fn type_bindings_from_environment(environment: &HashMap<String, Value>) -> HashMap<String, Term> {
+    environment
+        .iter()
+        .filter_map(|(name, value)| match value {
+            Value::Type(ty) => Some((name.clone(), ty.clone())),
+            _ => None,
+        })
+        .collect()
 }
 
 fn lower_letref_borrow_statement(

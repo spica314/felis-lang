@@ -670,7 +670,7 @@ fn resolve_type_argument(term: &Term, state: &LoweringState) -> Term {
     }
 }
 
-fn substitute_type_bindings(term: &Term, type_bindings: &HashMap<String, Term>) -> Term {
+pub(super) fn substitute_type_bindings(term: &Term, type_bindings: &HashMap<String, Term>) -> Term {
     match term {
         Term::Path(path)
             if path.token_keyword_package.is_none()
@@ -793,7 +793,7 @@ pub(super) fn lower_procedure_call_statement(
         return Ok(None);
     };
 
-    let mut scoped_state =
+    let (mut scoped_state, _type_bindings) =
         bind_procedure_arguments(&procedure.parameters, &normalized_arguments, state, program)?;
 
     let terminated = lower_procedure_body_statements(&procedure.body, &mut scoped_state, program)?;
@@ -814,7 +814,7 @@ pub(super) fn lower_procedure_call_value(
         return Ok(None);
     };
 
-    let mut scoped_state =
+    let (mut scoped_state, type_bindings) =
         bind_procedure_arguments(&procedure.parameters, &normalized_arguments, state, program)?;
 
     let terminated = lower_procedure_body_statements(&procedure.body, &mut scoped_state, program)?;
@@ -830,7 +830,8 @@ pub(super) fn lower_procedure_call_value(
         )));
     };
     let value = lower_pure_value(tail, &scoped_state, program)?;
-    validate_value_against_type(&value, &procedure.result_ty, program)?;
+    let result_ty = substitute_type_bindings(&procedure.result_ty, &type_bindings);
+    validate_value_against_type(&value, &result_ty, program)?;
 
     state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
     state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
@@ -877,16 +878,25 @@ fn bind_procedure_arguments(
     normalized_arguments: &[Term],
     state: &mut LoweringState,
     program: &mut LoweredProgram,
-) -> Result<LoweringState> {
+) -> Result<(LoweringState, HashMap<String, Term>)> {
     let mut scoped_state = state.child_scope();
+    let mut type_bindings = HashMap::new();
     for (parameter, argument) in parameters.iter().zip(normalized_arguments.iter()) {
-        let value = lower_pure_value(argument, state, program)?;
-        validate_value_against_type(&value, &parameter.ty, program)?;
+        let parameter_ty = substitute_type_bindings(&parameter.ty, &type_bindings);
+        let value = if is_type_universe_annotation(&parameter_ty) {
+            Value::Type(resolve_type_argument(argument, state))
+        } else {
+            lower_pure_value(argument, state, program)?
+        };
+        validate_value_against_type(&value, &parameter_ty, program)?;
+        if let Value::Type(ty) = &value {
+            type_bindings.insert(parameter.name.clone(), ty.clone());
+        }
         scoped_state
             .environment
             .insert(parameter.name.clone(), value);
     }
-    Ok(scoped_state)
+    Ok((scoped_state, type_bindings))
 }
 
 fn lower_procedure_body_statements(
