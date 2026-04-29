@@ -29,19 +29,7 @@
     i32_from_i64 ((dyn_array_slice i64 array) .> len)
 }
 
-#fn dyn_array_len_u8 : (array : DynArray u8) -> i32 {
-    #match array {
-        DynArray::dyn_array _ _ len => i32_from_i64 len,
-    }
-}
-
-#fn dyn_array_len_i32 : (array : DynArray i32) -> i32 {
-    #match array {
-        DynArray::dyn_array _ _ len => i32_from_i64 len,
-    }
-}
-
-#fn dyn_array_len_i64 : (array : DynArray i64) -> i32 {
+#fn dyn_array_len : (t : Type[0]) -> (array : DynArray t) -> i32 {
     #match array {
         DynArray::dyn_array _ _ len => i32_from_i64 len,
     }
@@ -134,9 +122,7 @@
 #pub #use dyn_array_capacity_u8;
 #pub #use dyn_array_capacity_i32;
 #pub #use dyn_array_capacity_i64;
-#pub #use dyn_array_len_u8;
-#pub #use dyn_array_len_i32;
-#pub #use dyn_array_len_i64;
+#pub #use dyn_array_len;
 #pub #use dyn_array_get_u8;
 #pub #use dyn_array_get_i32;
 #pub #use dyn_array_get_i64;
