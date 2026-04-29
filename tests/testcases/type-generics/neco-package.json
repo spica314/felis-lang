@@ -2,6 +2,8 @@
     "name": "type-generics",
     "felis-bin-entrypoints": [
         "src/type-generics-some.fe",
-        "src/type-generics-none.fe"
+        "src/type-generics-none.fe",
+        "src/type-generics-ok.fe",
+        "src/type-generics-err.fe"
     ]
 }
