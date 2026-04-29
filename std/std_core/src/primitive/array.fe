@@ -38,21 +38,6 @@
     ()
 }
 
-#proc dyn_array_set_u8 : (array : DynArray u8) -> (index : i32) -> (byte : u8) -> () {
-    dyn_array_set u8 array index byte;
-    ()
-}
-
-#proc dyn_array_set_i32 : (array : DynArray i32) -> (index : i32) -> (value : i32) -> () {
-    dyn_array_set i32 array index value;
-    ()
-}
-
-#proc dyn_array_set_i64 : (array : DynArray i64) -> (index : i32) -> (value : i64) -> () {
-    dyn_array_set i64 array index value;
-    ()
-}
-
 #proc append_u8 : (dest_ref : &^ Slice u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () {
     dest_ref .> set (dest_index_ref .> get) byte;
     dest_index_ref .> set (i32_add (dest_index_ref .> get) 1i32);
@@ -108,9 +93,6 @@
 #pub #use dyn_array_len;
 #pub #use dyn_array_get;
 #pub #use dyn_array_set;
-#pub #use dyn_array_set_u8;
-#pub #use dyn_array_set_i32;
-#pub #use dyn_array_set_i64;
 #pub #use append_u8;
 #pub #use append_nul_terminated_u8;
 #pub #use append_dyn_nul_terminated_u8;
