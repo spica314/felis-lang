@@ -1,0 +1,7 @@
+#use std_core::primitive::i32::i32;
+
+#type Term : Type[0] {
+    unit : Term,
+    integer_literal : i32 -> Term,
+    path : Term,
+}

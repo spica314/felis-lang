@@ -1,0 +1,8 @@
+{
+    "workspace": {
+        "members": [
+            "neco-felis-parser",
+            "neco-felis-bin"
+        ]
+    }
+}

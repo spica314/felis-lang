@@ -1,0 +1,7 @@
+#use std_core::primitive::i32::i32;
+
+#type Item : Type[0] {
+    entrypoint : Item,
+    function : i32 -> Item,
+    use_decl : Item,
+}

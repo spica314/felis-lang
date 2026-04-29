@@ -1,0 +1,6 @@
+#use std_core::primitive::i32::i32;
+
+#type ParseStatus : Type[0] {
+    ok : ParseStatus,
+    error : i32 -> ParseStatus,
+}

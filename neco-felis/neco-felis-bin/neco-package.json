@@ -1,0 +1,9 @@
+{
+    "name": "neco-felis-bin",
+    "dependencies": {
+        "neco-felis-parser": {
+            "workspace": true
+        }
+    },
+    "felis-bin-entrypoints": ["src/main.fe"]
+}

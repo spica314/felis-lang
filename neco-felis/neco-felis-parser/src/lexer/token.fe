@@ -1,0 +1,10 @@
+#use std_core::primitive::u8::u8;
+
+#type Token : Type[0] {
+    keyword_entrypoint : Token,
+    keyword_fn : Token,
+    keyword_let : Token,
+    keyword_use : Token,
+    keyword_with : Token,
+    integer_literal : u8 -> Token,
+}

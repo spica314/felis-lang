@@ -538,7 +538,6 @@ fn compiles_and_runs_open_write_close_fixture() {
 }
 
 #[test]
-#[ignore]
 fn compiles_and_runs_neco_felis_fixture() {
     let input_path = repo_root().join("tests/testcases/exit-42");
     let (run, emitted_bytes, emitted_run) = run_neco_felis_fixture(&input_path, "neco-felis");

@@ -1,0 +1,3 @@
+#fn parse_manifest_exit_code : (dummy : i32) -> i32 {
+    42i32
+}

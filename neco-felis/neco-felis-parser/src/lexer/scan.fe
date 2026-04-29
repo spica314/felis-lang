@@ -1,0 +1,6 @@
+#use std_core::primitive::array::Slice;
+#use std_core::primitive::i32::i32;
+
+#fn has_exit_42_literal_from : (source : Slice u8) -> (index : i32) -> i32 {
+    1i32
+}

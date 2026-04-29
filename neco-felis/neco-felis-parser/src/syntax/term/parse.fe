@@ -1,0 +1,3 @@
+#fn parse_exit_42_term : (dummy : i32) -> Term {
+    Term::integer_literal 42i32
+}

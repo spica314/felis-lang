@@ -1,0 +1,9 @@
+#use std_core::primitive::i32::i32;
+
+#struct ParsedRoot : Type[0] {
+    exit_code : i32,
+}
+
+#fn parse_root_exit_42 : (dummy : i32) -> ParsedRoot {
+    ParsedRoot { exit_code = 42i32 }
+}
