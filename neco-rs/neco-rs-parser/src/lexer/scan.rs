@@ -375,10 +375,21 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>> {
             }
             continue;
         }
-        if chars[i].is_ascii_digit() {
+        if chars[i].is_ascii_digit()
+            || (chars[i] == '-' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit())
+        {
             i += 1;
             c += 1;
-            if chars[start_i] == '0' && i < chars.len() && matches!(chars[i], 'x' | 'X') {
+            if chars[start_i] == '-' {
+                i += 1;
+                c += 1;
+            }
+            let digit_start = if chars[start_i] == '-' {
+                start_i + 1
+            } else {
+                start_i
+            };
+            if chars[digit_start] == '0' && i < chars.len() && matches!(chars[i], 'x' | 'X') {
                 i += 1;
                 c += 1;
                 while i < chars.len() && chars[i].is_ascii_hexdigit() {

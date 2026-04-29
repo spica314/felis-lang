@@ -1,0 +1,16 @@
+#use std_core::io::IO;
+#use std_core::primitive::i64::i64;
+#use std_core::primitive::i64::i64_add;
+#use std_core::primitive::i64::i64_eq;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let minus_one : i64 = -1i64;
+    #let forty_two : i64 = i64_add 43i64 minus_one;
+    #if i64_eq forty_two 42i64 {
+        #let _ : () <- IO::exit 42i32;
+    };
+    #let _ : () <- IO::exit 1i32;
+    ()
+}

@@ -1,0 +1,4 @@
+{
+    "name": "negative-i64-literal",
+    "felis-bin-entrypoints": ["src/negative-i64-literal.fe"]
+}

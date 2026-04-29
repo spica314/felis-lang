@@ -273,6 +273,13 @@ fn compiles_and_runs_i64_ops_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_negative_i64_literal_fixture() {
+    let root = repo_root().join("tests/testcases/negative-i64-literal");
+    let status = run_fixture_status(&root, "negative-i64-literal");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_i64_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/i64-reference-annotation");
     let status = run_fixture_status(&root, "i64-reference-annotation");
