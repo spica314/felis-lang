@@ -536,7 +536,13 @@ fn lower_dyn_array_get_i32_call(
     arguments: &[Term],
     state: &LoweringState,
 ) -> Result<Option<I32Expr>> {
-    let Some((array, index)) = dyn_array_get_call_parts(callee, arguments, "dyn_array_get_i32")?
+    let Some((array, index)) = dyn_array_get_call_parts(
+        callee,
+        arguments,
+        "dyn_array_get_i32",
+        ArrayElementType::I32,
+        state,
+    )?
     else {
         return Ok(None);
     };
@@ -552,7 +558,13 @@ fn lower_dyn_array_get_i64_call(
     arguments: &[Term],
     state: &LoweringState,
 ) -> Result<Option<I64Expr>> {
-    let Some((array, index)) = dyn_array_get_call_parts(callee, arguments, "dyn_array_get_i64")?
+    let Some((array, index)) = dyn_array_get_call_parts(
+        callee,
+        arguments,
+        "dyn_array_get_i64",
+        ArrayElementType::I64,
+        state,
+    )?
     else {
         return Ok(None);
     };
@@ -568,7 +580,13 @@ fn lower_dyn_array_get_u8_call(
     arguments: &[Term],
     state: &LoweringState,
 ) -> Result<Option<U8Expr>> {
-    let Some((array, index)) = dyn_array_get_call_parts(callee, arguments, "dyn_array_get_u8")?
+    let Some((array, index)) = dyn_array_get_call_parts(
+        callee,
+        arguments,
+        "dyn_array_get_u8",
+        ArrayElementType::U8,
+        state,
+    )?
     else {
         return Ok(None);
     };
@@ -583,23 +601,63 @@ fn dyn_array_get_call_parts<'a>(
     callee: &'a Term,
     arguments: &'a [Term],
     expected_name: &str,
+    expected_element_type: ArrayElementType,
+    state: &LoweringState,
 ) -> Result<Option<(&'a Term, &'a Term)>> {
     let Term::Path(path) = callee else {
         return Ok(None);
     };
-    if path.token_keyword_package.is_some()
-        || path.segments.len() != 1
-        || path.segments[0].lexeme != expected_name
-    {
+    if path.token_keyword_package.is_some() || path.segments.len() != 1 {
         return Ok(None);
     }
     let normalized = normalize_numeric_literal_arguments(arguments);
-    if normalized.len() != 2 {
+    if path.segments[0].lexeme == expected_name {
+        if normalized.len() != 2 {
+            return Err(Error::Unsupported(format!(
+                "`{expected_name}` must receive exactly two arguments"
+            )));
+        }
+        return Ok(Some((&arguments[0], &arguments[1])));
+    }
+    if path.segments[0].lexeme != "dyn_array_get" {
+        return Ok(None);
+    }
+    if normalized.len() != 3 {
         return Err(Error::Unsupported(format!(
-            "`{expected_name}` must receive exactly two arguments"
+            "`dyn_array_get` must receive exactly three arguments"
         )));
     }
-    Ok(Some((&arguments[0], &arguments[1])))
+    if !type_argument_matches(&arguments[0], expected_element_type, state) {
+        return Ok(None);
+    }
+    Ok(Some((&arguments[1], &arguments[2])))
+}
+
+fn type_argument_matches(
+    term: &Term,
+    expected_element_type: ArrayElementType,
+    state: &LoweringState,
+) -> bool {
+    let Term::Path(path) = term else {
+        return false;
+    };
+    if path.token_keyword_package.is_some() || path.segments.len() != 1 {
+        return false;
+    }
+    let type_name = match state.environment.get(&path.segments[0].lexeme) {
+        Some(Value::Type(Term::Path(bound_path)))
+            if bound_path.token_keyword_package.is_none() && bound_path.segments.len() == 1 =>
+        {
+            bound_path.segments[0].lexeme.as_str()
+        }
+        _ => path.segments[0].lexeme.as_str(),
+    };
+    matches!(
+        (type_name, expected_element_type),
+        ("i32", ArrayElementType::I32)
+            | ("i64", ArrayElementType::I64)
+            | ("u8", ArrayElementType::U8)
+    )
 }
 
 fn dyn_array_slot(

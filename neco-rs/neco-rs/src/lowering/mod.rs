@@ -339,19 +339,29 @@ pub(super) fn lower_statement(
                 )?;
                 Ok(false)
             }
-            LetOperator::LeftArrow => lower_effect(
-                &let_stmt.binder,
-                let_stmt.ty.as_ref(),
-                let_stmt.value.as_ref(),
-                state,
-                program,
-            ),
+            LetOperator::LeftArrow => {
+                let ty = substitute_type_bindings(
+                    let_stmt.ty.as_ref(),
+                    &type_bindings_from_environment(&state.environment),
+                );
+                lower_effect(
+                    &let_stmt.binder,
+                    &ty,
+                    let_stmt.value.as_ref(),
+                    state,
+                    program,
+                )
+            }
         },
         Statement::LetRef(letref_stmt) => {
+            let ty = substitute_type_bindings(
+                letref_stmt.ty.as_ref(),
+                &type_bindings_from_environment(&state.environment),
+            );
             lower_letref_borrow_statement(
                 &letref_stmt.reference,
                 letref_stmt.exclusive,
-                letref_stmt.ty.as_ref(),
+                &ty,
                 letref_stmt.source.as_ref(),
                 state,
                 program,

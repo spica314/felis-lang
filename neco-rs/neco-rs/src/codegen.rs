@@ -131,6 +131,46 @@ fn emit_operations(
                 code.extend_from_slice(&[0x48, 0x89, 0x85]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
             }
+            Operation::ArrayAllocDynamic { array_slot, len } => {
+                let element_size = array_element_size(array_allocation(program, *array_slot));
+                code.extend_from_slice(&[0x31, 0xff]);
+                emit_i32_expr_to_eax(len, code, program);
+                if element_size != 1 {
+                    code.extend_from_slice(&[0x6b, 0xc0, element_size as u8]);
+                }
+                code.extend_from_slice(&[0x89, 0xc6]);
+                code.extend_from_slice(&[0xba, 0x03, 0x00, 0x00, 0x00]);
+                code.extend_from_slice(&[0x41, 0xba, 0x22, 0x00, 0x00, 0x00]);
+                code.extend_from_slice(&[0x41, 0xb8, 0xff, 0xff, 0xff, 0xff]);
+                code.extend_from_slice(&[0x45, 0x31, 0xc9]);
+                code.extend_from_slice(&[0xb8, 0x09, 0x00, 0x00, 0x00]);
+                code.extend_from_slice(&[0x0f, 0x05]);
+                let slot_offset = array_slot_offset(program, *array_slot);
+                code.extend_from_slice(&[0x48, 0x89, 0x85]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+                emit_i32_expr_to_eax(len, code, program);
+                let len_offset = array_len_offset(program, *array_slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&len_offset.to_le_bytes());
+            }
+            Operation::ArrayReplace {
+                dest_slot,
+                source_slot,
+            } => {
+                let source_offset = array_slot_offset(program, *source_slot);
+                let dest_offset = array_slot_offset(program, *dest_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0x85]);
+                code.extend_from_slice(&source_offset.to_le_bytes());
+                code.extend_from_slice(&[0x48, 0x89, 0x85]);
+                code.extend_from_slice(&dest_offset.to_le_bytes());
+
+                let source_len_offset = array_len_offset(program, *source_slot);
+                let dest_len_offset = array_len_offset(program, *dest_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0x85]);
+                code.extend_from_slice(&source_len_offset.to_le_bytes());
+                code.extend_from_slice(&[0x48, 0x89, 0x85]);
+                code.extend_from_slice(&dest_len_offset.to_le_bytes());
+            }
             Operation::HeapStoreI32 {
                 heap_slot,
                 byte_offset,
@@ -799,12 +839,16 @@ fn array_descriptor_size(array: &ArrayAllocation) -> usize {
 }
 
 fn array_storage_size(array: &ArrayAllocation) -> usize {
-    let element_size = match array.element_type {
+    let element_size = array_element_size(array);
+    array.len * element_size
+}
+
+fn array_element_size(array: &ArrayAllocation) -> usize {
+    match array.element_type {
         ArrayElementType::I32 => 4,
         ArrayElementType::I64 => 8,
         ArrayElementType::U8 => 1,
-    };
-    array.len * element_size
+    }
 }
 
 fn array_allocation(program: &LoweredProgram, slot: usize) -> &ArrayAllocation {

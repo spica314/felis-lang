@@ -797,6 +797,12 @@ pub(super) fn lower_procedure_call_statement(
         bind_procedure_arguments(&procedure.parameters, &normalized_arguments, state, program)?;
 
     let terminated = lower_procedure_body_statements(&procedure.body, &mut scoped_state, program)?;
+    propagate_reference_arguments(
+        &procedure.parameters,
+        &normalized_arguments,
+        &scoped_state,
+        state,
+    );
 
     state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
     state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
@@ -832,6 +838,12 @@ pub(super) fn lower_procedure_call_value(
     let value = lower_pure_value(tail, &scoped_state, program)?;
     let result_ty = substitute_type_bindings(&procedure.result_ty, &type_bindings);
     validate_value_against_type(&value, &result_ty, program)?;
+    propagate_reference_arguments(
+        &procedure.parameters,
+        &normalized_arguments,
+        &scoped_state,
+        state,
+    );
 
     state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
     state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
@@ -897,6 +909,41 @@ fn bind_procedure_arguments(
             .insert(parameter.name.clone(), value);
     }
     Ok((scoped_state, type_bindings))
+}
+
+fn propagate_reference_arguments(
+    parameters: &[ProcedureParameter],
+    normalized_arguments: &[Term],
+    scoped_state: &LoweringState,
+    caller_state: &mut LoweringState,
+) {
+    for (parameter, argument) in parameters.iter().zip(normalized_arguments.iter()) {
+        if !matches!(parameter.ty, Term::Reference { .. }) {
+            continue;
+        }
+        let Some(argument_name) = simple_local_name(argument) else {
+            continue;
+        };
+        let Some(value) = scoped_state.environment.get(&parameter.name).cloned() else {
+            continue;
+        };
+        if matches!(value, Value::Constructor(_) | Value::Struct(_)) {
+            caller_state
+                .environment
+                .insert(argument_name.to_string(), value);
+        }
+    }
+}
+
+fn simple_local_name(term: &Term) -> Option<&str> {
+    let Term::Path(path) = term else {
+        return None;
+    };
+    if path.token_keyword_package.is_none() && path.segments.len() == 1 {
+        Some(path.segments[0].lexeme.as_str())
+    } else {
+        None
+    }
 }
 
 fn lower_procedure_body_statements(

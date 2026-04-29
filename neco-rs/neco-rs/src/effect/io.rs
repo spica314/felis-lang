@@ -120,6 +120,20 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(false))
         }
+        ["IO", "slice_replace"] => {
+            let (dest_slot, source_slot) = match parse_slice_replace_arguments(arguments, state) {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            program.operations.push(Operation::ArrayReplace {
+                dest_slot,
+                source_slot,
+            });
+            if let Err(error) = bind_checked_pattern(binder, Value::Unit, ty, state, program) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
         ["IO", "exit"] => {
             let exit_code = match parse_exit_code_arguments(arguments, state) {
                 Ok(value) => value,
@@ -132,16 +146,24 @@ pub(crate) fn lower_io_call(
             Some(Ok(true))
         }
         ["IO", "array_new"] | ["IO", "slice_new"] => {
-            let (element_type, length) = match parse_array_new_arguments(path[1], arguments) {
-                Ok(value) => value,
-                Err(err) => return Some(Err(err)),
-            };
+            let (element_type, length, static_length) =
+                match parse_array_new_arguments(path[1], arguments, state) {
+                    Ok(value) => value,
+                    Err(err) => return Some(Err(err)),
+                };
             let kind = match path[1] {
                 "array_new" => ArrayKind::Fixed,
                 "slice_new" => ArrayKind::Dynamic,
                 _ => unreachable!(),
             };
-            let array_slot = state.allocate_array(element_type, kind, length, program);
+            let array_slot =
+                state.allocate_array(element_type, kind, static_length.unwrap_or(0), program);
+            if static_length.is_none() {
+                program.operations.push(Operation::ArrayAllocDynamic {
+                    array_slot,
+                    len: length,
+                });
+            }
             if let Err(error) = bind_checked_pattern(
                 binder,
                 Value::Array {
@@ -268,6 +290,40 @@ fn parse_read_arguments(
     Ok((fd, array_slot, len, result_slot))
 }
 
+fn parse_slice_replace_arguments(
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<(usize, usize)> {
+    let normalized = normalize_i32_literal_arguments(arguments);
+    let [element_type, dest, source] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::slice_replace` must receive an element type and two slices".to_string(),
+        ));
+    };
+    let element_type = parse_array_element_type(element_type, "slice_replace", state)?;
+    let dest_slot = parse_dynamic_array_slot(dest, element_type, state, "slice_replace")?;
+    let source_slot = parse_dynamic_array_slot(source, element_type, state, "slice_replace")?;
+    Ok((dest_slot, source_slot))
+}
+
+fn parse_dynamic_array_slot(
+    term: &Term,
+    element_type: ArrayElementType,
+    state: &LoweringState,
+    builtin_name: &str,
+) -> Result<usize> {
+    match resolve_value(term, &state.environment)? {
+        Value::Array {
+            slot,
+            element_type: actual_element_type,
+            kind: ArrayKind::Dynamic,
+        } if actual_element_type == element_type => Ok(slot),
+        other => Err(Error::Unsupported(format!(
+            "`IO::{builtin_name}` expects matching dynamic slices, got {other:?}"
+        ))),
+    }
+}
+
 fn parse_open_arguments(
     arguments: &[Term],
     state: &mut LoweringState,
@@ -371,7 +427,8 @@ fn parse_exit_code_arguments(arguments: &[Term], state: &LoweringState) -> Resul
 fn parse_array_new_arguments(
     builtin_name: &str,
     arguments: &[Term],
-) -> Result<(ArrayElementType, usize)> {
+    state: &LoweringState,
+) -> Result<(ArrayElementType, I32Expr, Option<usize>)> {
     let normalized = normalize_i32_literal_arguments(arguments);
     let [element_type, length] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
@@ -379,7 +436,29 @@ fn parse_array_new_arguments(
         )));
     };
 
-    let Term::Path(path) = element_type else {
+    let element_type = parse_array_element_type(element_type, builtin_name, state)?;
+
+    let static_length = match parse_i32_literal_term(length, builtin_name) {
+        Ok(length) => Some(usize::try_from(length).map_err(|_| {
+            Error::Unsupported(format!("`IO::{builtin_name}` length must be non-negative"))
+        })?),
+        Err(_) if builtin_name == "slice_new" => None,
+        Err(error) => return Err(error),
+    };
+    let length = lower_i32_expr(length, state).map_err(|_| {
+        Error::Unsupported(format!(
+            "`IO::{builtin_name}` length must be an i32 expression"
+        ))
+    })?;
+    Ok((element_type, length, static_length))
+}
+
+fn parse_array_element_type(
+    term: &Term,
+    builtin_name: &str,
+    state: &LoweringState,
+) -> Result<ArrayElementType> {
+    let Term::Path(path) = term else {
         return Err(Error::Unsupported(format!(
             "`IO::{builtin_name}` element type must be a simple path"
         )));
@@ -389,22 +468,22 @@ fn parse_array_new_arguments(
             "`IO::{builtin_name}` element type must be a simple path"
         )));
     };
-    let element_type = match segment.lexeme.as_str() {
-        "i32" => ArrayElementType::I32,
-        "i64" => ArrayElementType::I64,
-        "u8" => ArrayElementType::U8,
-        _ => {
-            return Err(Error::Unsupported(format!(
-                "`IO::{builtin_name}` currently supports only `i32`, `i64`, and `u8` arrays"
-            )));
+    let type_name = match state.environment.get(&segment.lexeme) {
+        Some(Value::Type(Term::Path(bound_path)))
+            if bound_path.token_keyword_package.is_none() && bound_path.segments.len() == 1 =>
+        {
+            bound_path.segments[0].lexeme.as_str()
         }
+        _ => segment.lexeme.as_str(),
     };
-
-    let length = parse_i32_literal_term(length, builtin_name)?;
-    let length = usize::try_from(length).map_err(|_| {
-        Error::Unsupported(format!("`IO::{builtin_name}` length must be non-negative"))
-    })?;
-    Ok((element_type, length))
+    match type_name {
+        "i32" => Ok(ArrayElementType::I32),
+        "i64" => Ok(ArrayElementType::I64),
+        "u8" => Ok(ArrayElementType::U8),
+        _ => Err(Error::Unsupported(format!(
+            "`IO::{builtin_name}` currently supports only `i32`, `i64`, and `u8` arrays"
+        ))),
+    }
 }
 
 fn parse_arg_arguments(

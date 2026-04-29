@@ -149,6 +149,14 @@ pub(crate) enum Operation {
         len: I32Expr,
         result_slot: usize,
     },
+    ArrayAllocDynamic {
+        array_slot: usize,
+        len: I32Expr,
+    },
+    ArrayReplace {
+        dest_slot: usize,
+        source_slot: usize,
+    },
     HeapStoreI32 {
         heap_slot: usize,
         byte_offset: i32,

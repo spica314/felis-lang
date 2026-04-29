@@ -225,6 +225,29 @@ fn validate_reference_value_against_type(
                 },
             }
         }
+        Term::Application { callee, .. } => {
+            let Term::Path(path) = callee.as_ref() else {
+                return Err(Error::Unsupported(format!(
+                    "unsupported reference type `{}`",
+                    render_reference_term(referent, false)
+                )));
+            };
+            if path.token_keyword_package.is_some() || path.segments.len() != 1 {
+                return Err(Error::Unsupported(format!(
+                    "unsupported reference type `{}`",
+                    render_reference_term(referent, false)
+                )));
+            }
+            let type_name = path.segments[0].lexeme.as_str();
+            match value {
+                Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
+                Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
+                _ => Err(Error::Unsupported(format!(
+                    "expected a value of type `{}` but got {value:?}",
+                    render_reference_term(referent, false)
+                ))),
+            }
+        }
         _ => Err(Error::Unsupported(format!(
             "unsupported reference type `{}`",
             render_reference_term(referent, false)

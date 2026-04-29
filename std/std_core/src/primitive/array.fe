@@ -1,6 +1,7 @@
+#use std_core::io::IO;
 #use std_core::primitive::i32::i32_add;
-#use std_core::primitive::i32::i32_from_i64;
 #use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_mul;
 #use std_core::primitive::i64::i64_from_i32;
 #use std_core::primitive::u8::u8_eq;
 
@@ -18,7 +19,8 @@
 }
 
 #fn dyn_array_capacity : (t : Type[0]) -> (array : DynArray t) -> i32 {
-    i32_from_i64 ((dyn_array_slice t array) .> len)
+    #let slice : Slice t = dyn_array_slice t array;
+    slice .> len
 }
 
 #fn dyn_array_len : (t : Type[0]) -> (array : DynArray t) -> i32 {
@@ -35,6 +37,44 @@
 #proc dyn_array_set : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> (value : t) -> () {
     #let slice : Slice t = dyn_array_slice t array;
     slice .> set (i64_from_i32 index) value;
+    ()
+}
+
+#proc dyn_array_copy_into : (t : Type[0]) -> (source : DynArray t) -> (dest_ref : &^ Slice t) -> () {
+    #let index_ref : i32 = 0i32;
+    #let len : i32 = dyn_array_len t source;
+    #letref #excl index_ref : &^ i32 #borrow index_ref;
+    #loop {
+        #if i32_gte (index_ref .> get) len {
+            #break;
+        };
+        dest_ref .> set (index_ref .> get) (dyn_array_get t source (index_ref .> get));
+        index_ref .> set (i32_add (index_ref .> get) 1i32);
+    };
+    ()
+}
+
+#proc dyn_array_grow : (t : Type[0]) -> (array_ref : &^ DynArray t) -> () #with IO {
+    #let array : DynArray t = array_ref .> get;
+    #let capacity : i32 = dyn_array_capacity t array;
+    #let next_capacity : i32 = i32_mul capacity 2i32;
+    #let slice_ref : Slice t = dyn_array_slice t array;
+    #let next_slice_ref : &^ Slice t <- IO::slice_new t next_capacity;
+    dyn_array_copy_into t array next_slice_ref;
+    #let _ : () <- IO::slice_replace t slice_ref next_slice_ref;
+    ()
+}
+
+#proc dyn_array_push : (t : Type[0]) -> (array_ref : &^ DynArray t) -> (value : t) -> () #with IO {
+    #let array : DynArray t = array_ref .> get;
+    #let len : i32 = dyn_array_len t array;
+    #let capacity : i32 = dyn_array_capacity t array;
+    #if i32_gte len capacity {
+        dyn_array_grow t array_ref;
+    };
+    #let grown_array : DynArray t = array_ref .> get;
+    dyn_array_set t grown_array len value;
+    array_ref .> set (DynArray::dyn_array t (dyn_array_slice t grown_array) (i64_from_i32 (i32_add len 1i32)));
     ()
 }
 
@@ -93,6 +133,7 @@
 #pub #use dyn_array_len;
 #pub #use dyn_array_get;
 #pub #use dyn_array_set;
+#pub #use dyn_array_push;
 #pub #use append_u8;
 #pub #use append_nul_terminated_u8;
 #pub #use append_dyn_nul_terminated_u8;
