@@ -1,6 +1,6 @@
 #use std_core::primitive::array::DynArray;
 #use std_core::primitive::array::Slice;
-#use std_core::primitive::array::dyn_array_capacity_u8;
+#use std_core::primitive::array::dyn_array_capacity;
 #use std_core::primitive::array::dyn_array_get_u8;
 #use std_core::primitive::array::dyn_array_len;
 #use std_core::primitive::array::dyn_array_slice;
@@ -71,7 +71,7 @@
 }
 
 #fn string_capacity : (string : String) -> i32 {
-    dyn_array_capacity_u8 (string_as_dyn_array string)
+    dyn_array_capacity u8 (string_as_dyn_array string)
 }
 
 #fn string_get_u8 : (string : String) -> (index : i32) -> u8 {
