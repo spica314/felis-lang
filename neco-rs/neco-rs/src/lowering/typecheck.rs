@@ -91,7 +91,7 @@ pub(crate) fn validate_value_against_type(
                 )))
             }
         }
-        Term::Path(path) if !path.token_keyword_package.is_some() && path.segments.len() == 1 => {
+        Term::Path(path) if path.token_keyword_package.is_none() && path.segments.len() == 1 => {
             let segment = &path.segments[0];
             match segment.lexeme.as_str() {
                 "i32" if matches!(value, Value::I32(_)) => Ok(()),
@@ -120,7 +120,7 @@ pub(super) fn is_type_universe_annotation(ty: &Term) -> bool {
     let Term::Path(path) = callee.as_ref() else {
         return false;
     };
-    !path.token_keyword_package.is_some()
+    path.token_keyword_package.is_none()
         && path.segments.len() == 1
         && path.segments[0].lexeme == "Type"
         && arguments.len() == 1
@@ -211,7 +211,7 @@ fn validate_reference_value_against_type(
     }
 
     match referent {
-        Term::Path(path) if !path.token_keyword_package.is_some() && path.segments.len() == 1 => {
+        Term::Path(path) if path.token_keyword_package.is_none() && path.segments.len() == 1 => {
             match path.segments[0].lexeme.as_str() {
                 "i32" if matches!(value, Value::I32Reference(_)) => Ok(()),
                 "i64" if matches!(value, Value::I64Reference(_)) => Ok(()),
@@ -315,7 +315,7 @@ fn parse_slice_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
 
 fn parse_array_element_type(term: &Term, type_name: &str) -> Result<ArrayElementType> {
     match term {
-        Term::Path(path) if !path.token_keyword_package.is_some() && path.segments.len() == 1 => {
+        Term::Path(path) if path.token_keyword_package.is_none() && path.segments.len() == 1 => {
             match path.segments[0].lexeme.as_str() {
                 "i32" => Ok(ArrayElementType::I32),
                 "i64" => Ok(ArrayElementType::I64),

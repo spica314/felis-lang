@@ -114,7 +114,7 @@ fn lower_path_value(
     state: &LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<Value> {
-    if !path.token_keyword_package.is_some() && path.segments.len() == 1 {
+    if path.token_keyword_package.is_none() && path.segments.len() == 1 {
         let name = path.segments[0].lexeme.as_str();
         if let Some(value) = state.environment.get(name) {
             return Ok(value.clone());

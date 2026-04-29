@@ -609,7 +609,8 @@ fn dyn_array_slot(
 ) -> Result<usize> {
     match resolve_value(term, &state.environment)? {
         Value::Constructor(constructor)
-            if constructor.type_name == "DynArray" && constructor.constructor_name == "dyn_array" =>
+            if constructor.type_name == "DynArray"
+                && constructor.constructor_name == "dyn_array" =>
         {
             let Some(Value::Array {
                 slot,

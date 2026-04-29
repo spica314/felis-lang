@@ -600,27 +600,27 @@ fn lower_expression_statement(
         )));
     }
 
-    if let Some(name) = single_segment_path_name(receiver.as_ref()) {
-        if matches!(
+    if let Some(name) = single_segment_path_name(receiver.as_ref())
+        && matches!(
             state.environment.get(name),
             Some(Value::Struct(_) | Value::Constructor(_))
-        ) {
-            let [value] = arguments.as_slice() else {
-                return Err(Error::Unsupported(
-                    "`set` must receive exactly one argument for struct references".to_string(),
-                ));
-            };
-            let lowered_value = lower_pure_value(value, state, program)?;
-            match lowered_value {
-                Value::Struct(_) | Value::Constructor(_) => {
-                    state.environment.insert(name.to_string(), lowered_value);
-                    return Ok(());
-                }
-                other => {
-                    return Err(Error::Unsupported(format!(
-                        "`set` expected a struct value, got {other:?}"
-                    )));
-                }
+        )
+    {
+        let [value] = arguments.as_slice() else {
+            return Err(Error::Unsupported(
+                "`set` must receive exactly one argument for struct references".to_string(),
+            ));
+        };
+        let lowered_value = lower_pure_value(value, state, program)?;
+        match lowered_value {
+            Value::Struct(_) | Value::Constructor(_) => {
+                state.environment.insert(name.to_string(), lowered_value);
+                return Ok(());
+            }
+            other => {
+                return Err(Error::Unsupported(format!(
+                    "`set` expected a struct value, got {other:?}"
+                )));
             }
         }
     }

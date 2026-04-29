@@ -214,7 +214,7 @@ fn constructor_parameters(
         }
         _ => return None,
     };
-    if !path.token_keyword_package.is_some()
+    if path.token_keyword_package.is_none()
         && path.segments.len() == 1
         && path.segments[0].lexeme == type_name.name
     {
