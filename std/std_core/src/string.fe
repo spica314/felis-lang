@@ -3,7 +3,7 @@
 #use std_core::primitive::array::dyn_array_capacity_u8;
 #use std_core::primitive::array::dyn_array_get_u8;
 #use std_core::primitive::array::dyn_array_len_u8;
-#use std_core::primitive::array::dyn_array_slice_u8;
+#use std_core::primitive::array::dyn_array_slice;
 #use std_core::primitive::array::dyn_array_set_u8;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_eq;
@@ -27,7 +27,7 @@
 
 #fn string_with_len : (string : String) -> (len : i32) -> String {
     #let array : DynArray u8 = string_as_dyn_array string;
-    String::string (DynArray::dyn_array u8 (dyn_array_slice_u8 array) (i64_from_i32 len))
+    String::string (DynArray::dyn_array u8 (dyn_array_slice u8 array) (i64_from_i32 len))
 }
 
 #proc string_copy_from_dyn_array_range_into : (source : DynArray u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
@@ -63,7 +63,7 @@
 }
 
 #fn string_as_slice : (string : String) -> Slice u8 {
-    dyn_array_slice_u8 (string_as_dyn_array string)
+    dyn_array_slice u8 (string_as_dyn_array string)
 }
 
 #fn string_len : (string : String) -> i32 {
