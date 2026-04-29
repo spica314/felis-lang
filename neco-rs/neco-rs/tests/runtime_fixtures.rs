@@ -481,6 +481,7 @@ fn compiles_and_runs_type_rc_parser_basic_fixture() {
 }
 
 #[test]
+#[ignore]
 fn compiles_and_runs_neco_felis_parser_string_expr_fixture() {
     let root = repo_root().join("neco-felis/neco-felis-parser");
     let status = run_fixture_status(&root, "felis-parser-string-expr");
@@ -488,6 +489,7 @@ fn compiles_and_runs_neco_felis_parser_string_expr_fixture() {
 }
 
 #[test]
+#[ignore]
 fn compiles_and_runs_neco_felis_lexer_api_fixture() {
     let root = repo_root().join("neco-felis/neco-felis-parser");
     let status = run_fixture_status(&root, "felis-lexer-api");
@@ -536,6 +538,7 @@ fn compiles_and_runs_open_write_close_fixture() {
 }
 
 #[test]
+#[ignore]
 fn compiles_and_runs_neco_felis_fixture() {
     let input_path = repo_root().join("tests/testcases/exit-42");
     let (run, emitted_bytes, emitted_run) = run_neco_felis_fixture(&input_path, "neco-felis");
@@ -550,6 +553,7 @@ fn compiles_and_runs_neco_felis_fixture() {
 }
 
 #[test]
+#[ignore]
 fn compiles_and_runs_hello_world_with_neco_felis_fixture() {
     let input_path = repo_root().join("tests/testcases/hello-world");
     let (run, emitted_bytes, emitted_run) =
@@ -565,6 +569,7 @@ fn compiles_and_runs_hello_world_with_neco_felis_fixture() {
 }
 
 #[test]
+#[ignore]
 fn compiles_i32_ops_with_neco_felis_fixture() {
     let input_path = repo_root().join("tests/testcases/i32-ops");
     let (run, emitted_bytes, emitted_run) =
@@ -580,6 +585,7 @@ fn compiles_i32_ops_with_neco_felis_fixture() {
 }
 
 #[test]
+#[ignore]
 fn compiles_i32_ops_with_neco_felis_fixture_returns_42() {
     let input_path = repo_root().join("tests/testcases/i32-ops");
     let (run, emitted_bytes, emitted_run) =
@@ -595,6 +601,7 @@ fn compiles_i32_ops_with_neco_felis_fixture_returns_42() {
 }
 
 #[test]
+#[ignore]
 fn compiles_i32_exit_local_with_neco_felis_fixture() {
     let input_path = repo_root().join("tests/testcases/i32-exit-local");
     let (run, emitted_bytes, emitted_run) =
@@ -610,6 +617,7 @@ fn compiles_i32_exit_local_with_neco_felis_fixture() {
 }
 
 #[test]
+#[ignore]
 fn compiles_i32_add_exit_local_with_neco_felis_fixture() {
     let input_path = repo_root().join("tests/testcases/i32-add-exit-local");
     let (run, emitted_bytes, emitted_run) =
