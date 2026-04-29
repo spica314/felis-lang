@@ -8,8 +8,8 @@
 
 #fn result_code : (value : Result i32 i32) -> i32 {
     #match value {
-        Result::ok x => x,
-        Result::err _ => 0i32,
+        Result::ok _ _ x => x,
+        Result::err _ _ _ => 0i32,
     }
 }
 

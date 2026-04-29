@@ -8,8 +8,8 @@
 
 #fn option_code : (value : Option i32) -> i32 {
     #match value {
-        Option::some _ => 0i32,
-        Option::none => 42i32,
+        Option::some _ _ => 0i32,
+        Option::none _ => 42i32,
     }
 }
 

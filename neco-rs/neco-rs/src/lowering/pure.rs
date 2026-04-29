@@ -406,16 +406,34 @@ fn pattern_match_bindings_with_mode(
 
             if actual.type_name != expected.type_name
                 || actual.constructor_name != expected.constructor_name
-                || actual.fields.len() != subpatterns.len()
             {
                 return Ok(None);
             }
 
             let mut bindings = HashMap::new();
-            for (index, (subpattern, field)) in
-                subpatterns.iter().zip(actual.fields.iter()).enumerate()
-            {
-                let _ = (index, actual.heap_slot);
+            let mut subpattern_iter = subpatterns.iter();
+            let mut field_iter = actual.fields.iter();
+            for parameter in &expected.parameters {
+                if is_type_universe_annotation(&parameter.ty) {
+                    let Some(subpattern) = subpattern_iter.next() else {
+                        return Ok(None);
+                    };
+                    if !matches!(subpattern, Pattern::Wildcard) {
+                        return Err(Error::Unsupported(
+                            "constructor type parameters in match patterns currently support only `_`"
+                                .to_string(),
+                        ));
+                    }
+                    continue;
+                }
+
+                let Some(subpattern) = subpattern_iter.next() else {
+                    return Ok(None);
+                };
+                let Some(field) = field_iter.next() else {
+                    return Ok(None);
+                };
+                let _ = actual.heap_slot;
                 let field_value: Value = field.clone();
                 let Some(sub_bindings) = pattern_match_bindings_with_mode(
                     subpattern,
@@ -427,6 +445,9 @@ fn pattern_match_bindings_with_mode(
                     return Ok(None);
                 };
                 bindings.extend(sub_bindings);
+            }
+            if subpattern_iter.next().is_some() || field_iter.next().is_some() {
+                return Ok(None);
             }
             Ok(Some(bindings))
         }
