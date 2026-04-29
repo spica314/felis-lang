@@ -27,18 +27,8 @@
     }
 }
 
-#fn dyn_array_get_u8 : (array : DynArray u8) -> (index : i32) -> u8 {
-    #let slice : Slice u8 = dyn_array_slice u8 array;
-    slice .> get (i64_from_i32 index)
-}
-
-#fn dyn_array_get_i32 : (array : DynArray i32) -> (index : i32) -> i32 {
-    #let slice : Slice i32 = dyn_array_slice i32 array;
-    slice .> get (i64_from_i32 index)
-}
-
-#fn dyn_array_get_i64 : (array : DynArray i64) -> (index : i32) -> i64 {
-    #let slice : Slice i64 = dyn_array_slice i64 array;
+#fn dyn_array_get : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> t {
+    #let slice : Slice t = dyn_array_slice t array;
     slice .> get (i64_from_i32 index)
 }
 
@@ -113,9 +103,7 @@
 #pub #use dyn_array_slice;
 #pub #use dyn_array_capacity;
 #pub #use dyn_array_len;
-#pub #use dyn_array_get_u8;
-#pub #use dyn_array_get_i32;
-#pub #use dyn_array_get_i64;
+#pub #use dyn_array_get;
 #pub #use dyn_array_set_u8;
 #pub #use dyn_array_set_i32;
 #pub #use dyn_array_set_i64;

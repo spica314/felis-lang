@@ -484,7 +484,7 @@ fn lower_constructor_application(
     for (parameter, argument) in signature.parameters.iter().zip(normalized_arguments.iter()) {
         let parameter_ty = substitute_type_bindings(&parameter.ty, &type_bindings);
         let value = if is_type_universe_annotation(&parameter_ty) {
-            Value::Type(argument.clone())
+            Value::Type(resolve_type_argument(argument, state))
         } else {
             lower_pure_value(argument, state, program)?
         };
@@ -638,7 +638,7 @@ fn lower_pure_function_call(
     for (parameter, argument) in function.parameters.iter().zip(normalized_arguments.iter()) {
         let parameter_ty = substitute_type_bindings(&parameter.ty, &type_bindings);
         let value = if is_type_universe_annotation(&parameter_ty) {
-            Value::Type(argument.clone())
+            Value::Type(resolve_type_argument(argument, state))
         } else {
             lower_pure_value(argument, state, program)?
         };
@@ -655,6 +655,19 @@ fn lower_pure_function_call(
     let result_ty = substitute_type_bindings(&function.result_ty, &type_bindings);
     validate_value_against_type(&value, &result_ty, program)?;
     Ok(Some(value))
+}
+
+fn resolve_type_argument(term: &Term, state: &LoweringState) -> Term {
+    let Term::Path(path) = term else {
+        return term.clone();
+    };
+    if path.token_keyword_package.is_some() || path.segments.len() != 1 {
+        return term.clone();
+    }
+    match state.environment.get(&path.segments[0].lexeme) {
+        Some(Value::Type(bound)) => bound.clone(),
+        _ => term.clone(),
+    }
 }
 
 fn substitute_type_bindings(term: &Term, type_bindings: &HashMap<String, Term>) -> Term {

@@ -210,6 +210,13 @@ fn compiles_and_runs_function_generics_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_dyn_array_generic_get_fixture() {
+    let root = repo_root().join("tests/testcases/dyn-array-generic-get");
+    let status = run_fixture_status(&root, "dyn-array-generic-get");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_type_generics_some_fixture() {
     let root = repo_root().join("tests/testcases/type-generics");
     let status = run_fixture_status(&root, "type-generics-some");
