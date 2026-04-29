@@ -1,0 +1,14 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+
+#entrypoint main;
+
+#fn id : (t : Type[0]) -> (value : t) -> t {
+    value
+}
+
+#fn main : () #with IO {
+    #let value : i32 = id i32 42i32;
+    #let _ : () <- IO::exit value;
+    ()
+}

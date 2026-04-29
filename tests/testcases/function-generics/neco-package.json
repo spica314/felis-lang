@@ -1,0 +1,4 @@
+{
+    "name": "function-generics",
+    "felis-bin-entrypoints": ["src/function-generics.fe"]
+}
