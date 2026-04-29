@@ -146,20 +146,33 @@ fn run_fixture_with_input(root: &Path, name: &str, stdin: &[u8]) -> Output {
 
 fn run_neco_felis_fixture(input_root: &Path, temp_name: &str) -> (Output, Vec<u8>, Output) {
     let temp_dir = runtime_temp_dir(temp_name);
+    let fixture_name = input_root
+        .file_name()
+        .and_then(|name| name.to_str())
+        .expect("fixture input root name");
+    let source = fs::read(input_root.join("src").join(format!("{fixture_name}.fe")))
+        .expect("read neco-felis fixture source");
 
     let binary = neco_felis_binary();
-    let child = {
+    let mut child = {
         let _guard = FIXTURE_EXEC_LOCK.lock().expect("fixture exec lock");
         let mut command = runtime_test_runner(binary);
         command
             .current_dir(&temp_dir)
             .arg(input_root)
+            .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         command
             .spawn()
             .unwrap_or_else(|error| panic!("run neco-felis fixture binary: {error}"))
     };
+    child
+        .stdin
+        .as_mut()
+        .expect("child stdin")
+        .write_all(&source)
+        .expect("write neco-felis fixture source");
     let run = child
         .wait_with_output()
         .expect("collect neco-felis fixture output");
@@ -222,6 +235,13 @@ fn compiles_and_runs_bool_basic_fixture() {
     let root = repo_root().join("tests/testcases/bool-basic");
     let status = run_fixture_status(&root, "bool-basic");
     assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_exit_0_fixture() {
+    let root = repo_root().join("tests/testcases/exit-0");
+    let status = run_fixture_status(&root, "exit-0");
+    assert_eq!(status.code(), Some(0));
 }
 
 #[test]
@@ -547,6 +567,21 @@ fn compiles_and_runs_neco_felis_fixture() {
     assert!(run.stderr.is_empty());
     assert_eq!(&emitted_bytes[0..4], b"\x7FELF");
     assert_eq!(emitted_run.status.code(), Some(42));
+    assert!(emitted_run.stdout.is_empty());
+    assert!(emitted_run.stderr.is_empty());
+}
+
+#[test]
+fn compiles_and_runs_exit_0_with_neco_felis_fixture() {
+    let input_path = repo_root().join("tests/testcases/exit-0");
+    let (run, emitted_bytes, emitted_run) =
+        run_neco_felis_fixture(&input_path, "neco-felis-exit-0");
+
+    assert_eq!(run.status.code(), Some(0));
+    assert!(run.stdout.is_empty());
+    assert!(run.stderr.is_empty());
+    assert_eq!(&emitted_bytes[0..4], b"\x7FELF");
+    assert_eq!(emitted_run.status.code(), Some(0));
     assert!(emitted_run.stdout.is_empty());
     assert!(emitted_run.stderr.is_empty());
 }

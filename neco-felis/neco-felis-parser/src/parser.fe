@@ -1,6 +1,7 @@
-#use std_core::primitive::array::Slice;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::i32::i32_from_u8;
 #use std_core::primitive::i32::i32;
 
-#fn parse_exit_code : (source : Slice u8) -> i32 {
-    42i32
+#fn parse_exit_code : (source : Array u8 1024i32) -> i32 {
+    i32_from_u8 (source .> get 96i32)
 }
