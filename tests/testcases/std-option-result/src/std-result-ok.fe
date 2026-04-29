@@ -1,0 +1,18 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::result::Result;
+
+#fn result_code : (value : Result i32 i32) -> i32 {
+    #match value {
+        Result::ok _ _ x => x,
+        Result::err _ _ _ => 0i32,
+    }
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let code : i32 = result_code (Result::ok i32 i32 42i32);
+    #let _ : () <- IO::exit code;
+    ()
+}

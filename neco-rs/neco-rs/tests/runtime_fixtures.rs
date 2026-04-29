@@ -238,6 +238,34 @@ fn compiles_and_runs_type_generics_err_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_std_option_some_fixture() {
+    let root = repo_root().join("tests/testcases/std-option-result");
+    let status = run_fixture_status(&root, "std-option-some");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_std_option_none_fixture() {
+    let root = repo_root().join("tests/testcases/std-option-result");
+    let status = run_fixture_status(&root, "std-option-none");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_std_result_ok_fixture() {
+    let root = repo_root().join("tests/testcases/std-option-result");
+    let status = run_fixture_status(&root, "std-result-ok");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_std_result_err_fixture() {
+    let root = repo_root().join("tests/testcases/std-option-result");
+    let status = run_fixture_status(&root, "std-result-err");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_i64_ops_fixture() {
     let root = repo_root().join("tests/testcases/i64-ops");
     let status = run_fixture_status(&root, "i64-ops");

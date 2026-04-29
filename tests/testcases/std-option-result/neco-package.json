@@ -1,0 +1,9 @@
+{
+    "name": "std-option-result",
+    "felis-bin-entrypoints": [
+        "src/std-option-some.fe",
+        "src/std-option-none.fe",
+        "src/std-result-ok.fe",
+        "src/std-result-err.fe"
+    ]
+}

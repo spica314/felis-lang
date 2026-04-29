@@ -1,22 +1,22 @@
 #use std_core::io::IO;
 #use std_core::primitive::i32::i32;
 
-#type Result : (t : Type[0]) -> (e : Type[0]) -> Type[0] {
-    ok : (t : Type[0]) -> (e : Type[0]) -> t -> Result t e,
-    err : (t : Type[0]) -> (e : Type[0]) -> e -> Result t e,
+#type LocalResult : (t : Type[0]) -> (e : Type[0]) -> Type[0] {
+    ok : (t : Type[0]) -> (e : Type[0]) -> t -> LocalResult t e,
+    err : (t : Type[0]) -> (e : Type[0]) -> e -> LocalResult t e,
 }
 
-#fn result_code : (value : Result i32 i32) -> i32 {
+#fn result_code : (value : LocalResult i32 i32) -> i32 {
     #match value {
-        Result::ok _ _ _ => 0i32,
-        Result::err _ _ x => x,
+        LocalResult::ok _ _ _ => 0i32,
+        LocalResult::err _ _ x => x,
     }
 }
 
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let code : i32 = result_code (Result::err i32 i32 42i32);
+    #let code : i32 = result_code (LocalResult::err i32 i32 42i32);
     #let _ : () <- IO::exit code;
     ()
 }

@@ -1,0 +1,4 @@
+#pub #type Result : (t : Type[0]) -> (e : Type[0]) -> Type[0] {
+    ok : (t : Type[0]) -> (e : Type[0]) -> t -> Result t e,
+    err : (t : Type[0]) -> (e : Type[0]) -> e -> Result t e,
+}

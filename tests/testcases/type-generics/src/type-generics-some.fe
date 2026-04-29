@@ -1,22 +1,22 @@
 #use std_core::io::IO;
 #use std_core::primitive::i32::i32;
 
-#type Option : (t : Type[0]) -> Type[0] {
-    some : (t : Type[0]) -> t -> Option t,
-    none : (t : Type[0]) -> Option t,
+#type LocalOption : (t : Type[0]) -> Type[0] {
+    some : (t : Type[0]) -> t -> LocalOption t,
+    none : (t : Type[0]) -> LocalOption t,
 }
 
-#fn option_code : (value : Option i32) -> i32 {
+#fn option_code : (value : LocalOption i32) -> i32 {
     #match value {
-        Option::some _ x => x,
-        Option::none _ => 0i32,
+        LocalOption::some _ x => x,
+        LocalOption::none _ => 0i32,
     }
 }
 
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let code : i32 = option_code (Option::some i32 42i32);
+    #let code : i32 = option_code (LocalOption::some i32 42i32);
     #let _ : () <- IO::exit code;
     ()
 }

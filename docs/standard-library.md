@@ -10,7 +10,7 @@ The standard library is now split into two workspace packages:
 - [`std/std_core/`](../std/std_core/)
 - [`std/std_math/`](../std/std_math/)
 
-`std_core` exposes `primitive` and `io`.
+`std_core` exposes `primitive`, `io`, `string`, `option`, and `result`.
 
 `std_math` exposes `math`.
 
@@ -56,6 +56,20 @@ The `hello-world` testcase shows this binding being imported as
 `std_core::io::IO` and used in a function declaration with `#with IO`. In this
 context, `#with` attaches an Algebraic Effects `Effect` to the function
 declaration.
+
+## Option And Result
+
+[`std/std_core/src/option.fe`](../std/std_core/src/option.fe) defines a public
+generic `Option` type with the public constructors:
+
+- `some`
+- `none`
+
+[`std/std_core/src/result.fe`](../std/std_core/src/result.fe) defines a public
+generic `Result` type with the public constructors:
+
+- `ok`
+- `err`
 
 ## Mathematics Modules
 

@@ -1,0 +1,4 @@
+#pub #type Option : (t : Type[0]) -> Type[0] {
+    some : (t : Type[0]) -> t -> Option t,
+    none : (t : Type[0]) -> Option t,
+}
