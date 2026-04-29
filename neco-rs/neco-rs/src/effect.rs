@@ -14,6 +14,7 @@ use crate::{Error, Result};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Value {
     Unit,
+    Type(Term),
     Constructor(ConstructorValue),
     Struct(StructValue),
     FileDescriptor(I32Expr),

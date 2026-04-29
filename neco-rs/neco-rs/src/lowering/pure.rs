@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use neco_rs_parser::{Block, MatchExpression, PathExpression, Pattern, Statement, Term};
+use neco_rs_parser::{
+    ArrowParameter, ArrowTerm, Block, ForallTerm, MatchExpression, PathExpression, Pattern,
+    Statement, Term, TypedBinder,
+};
 
 use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::ir::{
@@ -10,7 +13,9 @@ use crate::ir::{
 use crate::{Error, Result};
 
 use super::declarations::{ConstructorSignature, Procedure, ProcedureParameter, constructor_key};
-use super::typecheck::{nul_terminated_bytes, validate_value_against_type};
+use super::typecheck::{
+    is_type_universe_annotation, nul_terminated_bytes, validate_value_against_type,
+};
 use super::{
     LoweringState, allocate_heap_slot, lower_statement, normalize_numeric_literal_arguments,
 };
@@ -576,7 +581,7 @@ fn lower_pure_function_call(
     }
 
     let name = path.segments[0].lexeme.as_str();
-    let Some(function) = state.functions.get(name) else {
+    let Some(function) = state.functions.get(name).cloned() else {
         return Ok(None);
     };
     if state.environment.contains_key(name) {
@@ -591,17 +596,74 @@ fn lower_pure_function_call(
     }
 
     let mut scoped_state = state.child_scope();
+    let mut type_bindings = HashMap::new();
     for (parameter, argument) in function.parameters.iter().zip(normalized_arguments.iter()) {
-        let value = lower_pure_value(argument, state, program)?;
-        validate_value_against_type(&value, &parameter.ty, program)?;
+        let parameter_ty = substitute_type_bindings(&parameter.ty, &type_bindings);
+        let value = if is_type_universe_annotation(&parameter_ty) {
+            Value::Type(argument.clone())
+        } else {
+            lower_pure_value(argument, state, program)?
+        };
+        validate_value_against_type(&value, &parameter_ty, program)?;
+        if let Value::Type(ty) = &value {
+            type_bindings.insert(parameter.name.clone(), ty.clone());
+        }
         scoped_state
             .environment
             .insert(parameter.name.clone(), value);
     }
 
     let value = lower_pure_block_value(&function.body, &scoped_state, program)?;
-    validate_value_against_type(&value, &function.result_ty, program)?;
+    let result_ty = substitute_type_bindings(&function.result_ty, &type_bindings);
+    validate_value_against_type(&value, &result_ty, program)?;
     Ok(Some(value))
+}
+
+fn substitute_type_bindings(term: &Term, type_bindings: &HashMap<String, Term>) -> Term {
+    match term {
+        Term::Path(path)
+            if path.token_keyword_package.is_none()
+                && path.segments.len() == 1
+                && type_bindings.contains_key(&path.segments[0].lexeme) =>
+        {
+            type_bindings[&path.segments[0].lexeme].clone()
+        }
+        Term::Group(inner) => Term::Group(Box::new(substitute_type_bindings(inner, type_bindings))),
+        Term::Application { callee, arguments } => Term::Application {
+            callee: Box::new(substitute_type_bindings(callee, type_bindings)),
+            arguments: arguments
+                .iter()
+                .map(|argument| substitute_type_bindings(argument, type_bindings))
+                .collect(),
+        },
+        Term::Reference {
+            referent,
+            exclusive,
+        } => Term::Reference {
+            referent: Box::new(substitute_type_bindings(referent, type_bindings)),
+            exclusive: *exclusive,
+        },
+        Term::Arrow(arrow) => Term::Arrow(ArrowTerm {
+            parameter: match &arrow.parameter {
+                ArrowParameter::Binder(binder) => ArrowParameter::Binder(TypedBinder {
+                    name: binder.name.clone(),
+                    ty: Box::new(substitute_type_bindings(&binder.ty, type_bindings)),
+                }),
+                ArrowParameter::Domain(domain) => ArrowParameter::Domain(Box::new(
+                    substitute_type_bindings(domain, type_bindings),
+                )),
+            },
+            result: Box::new(substitute_type_bindings(&arrow.result, type_bindings)),
+        }),
+        Term::Forall(forall) => Term::Forall(ForallTerm {
+            binder: TypedBinder {
+                name: forall.binder.name.clone(),
+                ty: Box::new(substitute_type_bindings(&forall.binder.ty, type_bindings)),
+            },
+            body: Box::new(substitute_type_bindings(&forall.body, type_bindings)),
+        }),
+        _ => term.clone(),
+    }
 }
 
 pub(super) fn lower_pure_block_value(

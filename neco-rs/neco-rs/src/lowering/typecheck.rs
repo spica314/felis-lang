@@ -9,6 +9,19 @@ pub(crate) fn validate_value_against_type(
     ty: &Term,
     program: &LoweredProgram,
 ) -> Result<()> {
+    if is_type_universe_annotation(ty) {
+        return match value {
+            Value::Type(term) if is_type_argument(term) => Ok(()),
+            Value::Type(term) => Err(Error::Unsupported(format!(
+                "expected a type argument but got `{}`",
+                render_term(term)
+            ))),
+            _ => Err(Error::Unsupported(format!(
+                "expected a type argument but got {value:?}"
+            ))),
+        };
+    }
+
     if let Some(element_type) = parse_slice_type_annotation(ty)? {
         return match value {
             Value::StaticSlice { .. } if element_type == ArrayElementType::U8 => Ok(()),
@@ -98,6 +111,31 @@ pub(crate) fn validate_value_against_type(
         }
         _ => Ok(()),
     }
+}
+
+pub(super) fn is_type_universe_annotation(ty: &Term) -> bool {
+    let Term::Application { callee, arguments } = ty else {
+        return false;
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return false;
+    };
+    !path.token_keyword_package.is_some()
+        && path.segments.len() == 1
+        && path.segments[0].lexeme == "Type"
+        && arguments.len() == 1
+        && matches!(arguments[0], Term::IntegerLiteral(_))
+}
+
+fn is_type_argument(term: &Term) -> bool {
+    matches!(
+        term,
+        Term::Unit
+            | Term::Path(_)
+            | Term::Application { .. }
+            | Term::Reference { .. }
+            | Term::Arrow(_)
+    )
 }
 
 fn validate_reference_value_against_type(
