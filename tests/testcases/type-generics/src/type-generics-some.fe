@@ -1,0 +1,22 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+
+#type Option : (t : Type[0]) -> Type[0] {
+    some : (t : Type[0]) -> t -> Option t,
+    none : (t : Type[0]) -> Option t,
+}
+
+#fn option_code : (value : Option i32) -> i32 {
+    #match value {
+        Option::some x => x,
+        Option::none => 0i32,
+    }
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let code : i32 = option_code (Option::some i32 42i32);
+    #let _ : () <- IO::exit code;
+    ()
+}

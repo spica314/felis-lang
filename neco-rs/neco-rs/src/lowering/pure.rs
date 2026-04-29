@@ -130,10 +130,12 @@ fn lower_path_value(
     }
 
     let signature = lower_constructor_value(path, &state.constructors)?;
-    if signature.arity != 0 {
+    if !signature.parameters.is_empty() {
         return Err(Error::Unsupported(format!(
             "constructor `{}::{}` requires {} arguments",
-            signature.type_name, signature.constructor_name, signature.arity
+            signature.type_name,
+            signature.constructor_name,
+            signature.parameters.len()
         )));
     }
     if signature.is_rc {
@@ -447,16 +449,31 @@ fn lower_constructor_application(
     };
 
     let normalized_arguments = normalize_numeric_literal_arguments(arguments);
-    if signature.arity != normalized_arguments.len() {
+    if signature.parameters.len() != normalized_arguments.len() {
         return Err(Error::Unsupported(format!(
             "constructor `{}::{}` must receive exactly {} arguments",
-            signature.type_name, signature.constructor_name, signature.arity
+            signature.type_name,
+            signature.constructor_name,
+            signature.parameters.len()
         )));
     }
 
     let mut fields = Vec::with_capacity(normalized_arguments.len());
-    for argument in &normalized_arguments {
-        fields.push(lower_pure_value(argument, state, program)?);
+    let mut type_bindings = HashMap::new();
+    for (parameter, argument) in signature.parameters.iter().zip(normalized_arguments.iter()) {
+        let parameter_ty = substitute_type_bindings(&parameter.ty, &type_bindings);
+        let value = if is_type_universe_annotation(&parameter_ty) {
+            Value::Type(argument.clone())
+        } else {
+            lower_pure_value(argument, state, program)?
+        };
+        validate_value_against_type(&value, &parameter_ty, program)?;
+        if let (Some(name), Value::Type(ty)) = (&parameter.name, &value) {
+            type_bindings.insert(name.clone(), ty.clone());
+        }
+        if !matches!(value, Value::Type(_)) {
+            fields.push(value);
+        }
     }
 
     if signature.is_rc {

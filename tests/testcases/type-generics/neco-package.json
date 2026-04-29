@@ -1,0 +1,7 @@
+{
+    "name": "type-generics",
+    "felis-bin-entrypoints": [
+        "src/type-generics-some.fe",
+        "src/type-generics-none.fe"
+    ]
+}

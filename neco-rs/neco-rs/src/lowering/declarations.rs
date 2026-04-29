@@ -37,9 +37,15 @@ pub(super) struct ProcedureParameter {
 pub(super) struct ConstructorSignature {
     pub(super) type_name: String,
     pub(super) constructor_name: String,
-    pub(super) arity: usize,
+    pub(super) parameters: Vec<ConstructorParameter>,
     pub(super) is_rc: bool,
     pub(super) tag: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct ConstructorParameter {
+    pub(super) name: Option<String>,
+    pub(super) ty: Term,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,7 +121,7 @@ pub(super) fn collect_constructors(
             };
 
             for (tag, constructor) in type_decl.constructors.iter().enumerate() {
-                let Some(arity) = constructor_arity(constructor, &type_decl.name) else {
+                let Some(parameters) = constructor_parameters(constructor, &type_decl.name) else {
                     continue;
                 };
 
@@ -123,7 +129,7 @@ pub(super) fn collect_constructors(
                 let value = ConstructorSignature {
                     type_name: type_decl.name.name.clone(),
                     constructor_name: constructor.name.name.clone(),
-                    arity,
+                    parameters,
                     is_rc: type_decl.modifier.as_deref() == Some("rc"),
                     tag: tag as i32,
                 };
@@ -181,14 +187,20 @@ fn struct_signature_from_decl(struct_decl: &StructDeclaration) -> StructSignatur
     }
 }
 
-fn constructor_arity(
+fn constructor_parameters(
     constructor: &ConstructorDeclaration,
     type_name: &DeclaredName,
-) -> Option<usize> {
-    let mut arity = 0usize;
+) -> Option<Vec<ConstructorParameter>> {
+    let mut parameters = Vec::new();
     let mut current = &constructor.ty;
     while let Term::Arrow(arrow) = current {
-        arity += 1;
+        let (name, ty) = match &arrow.parameter {
+            ArrowParameter::Binder(binder) => {
+                (Some(binder.name.clone()), binder.ty.as_ref().clone())
+            }
+            ArrowParameter::Domain(domain) => (None, domain.as_ref().clone()),
+        };
+        parameters.push(ConstructorParameter { name, ty });
         current = arrow.result.as_ref();
     }
 
@@ -206,7 +218,7 @@ fn constructor_arity(
         && path.segments.len() == 1
         && path.segments[0].lexeme == type_name.name
     {
-        Some(arity)
+        Some(parameters)
     } else {
         None
     }
