@@ -21,13 +21,13 @@
 }
 
 #fn string_from_slice_parts : (slice : Slice u8) -> (capacity : i32) -> (len : i32) -> String {
-    #let array : DynArray u8 = DynArray::dyn_array slice (i64_from_i32 len);
+    #let array : DynArray u8 = DynArray::dyn_array u8 slice (i64_from_i32 len);
     String::string array
 }
 
 #fn string_with_len : (string : String) -> (len : i32) -> String {
     #let array : DynArray u8 = string_as_dyn_array string;
-    String::string (DynArray::dyn_array (dyn_array_slice_u8 array) (i64_from_i32 len))
+    String::string (DynArray::dyn_array u8 (dyn_array_slice_u8 array) (i64_from_i32 len))
 }
 
 #proc string_copy_from_dyn_array_range_into : (source : DynArray u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
