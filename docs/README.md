@@ -2,6 +2,10 @@
 
 This directory contains project documentation.
 
+## User Guide
+
+- The Felis Programming Language: [`docs/the-felis-programming-language/`](./the-felis-programming-language/)
+
 ## Design Notes
 
 - Language design rationale: [`docs/language-design.md`](./language-design.md)
