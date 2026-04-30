@@ -1,0 +1,33 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#type(rc) List : Type[0] {
+    nil : List,
+    cons : i32 -> List -> List,
+}
+
+#fn head_value : (head_ref : & i32) -> i32 {
+    head_ref .> get
+}
+
+#fn list_sum_ref : (list_ref : & List) -> i32 {
+    #match list_ref {
+        List::nil => 0i32,
+        List::cons head tail => {
+            #let head_code : i32 = head_value head;
+            #let tail_sum : i32 = list_sum_ref tail;
+            i32_add head_code tail_sum
+        }
+    }
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let list : List = List::cons 20i32 (List::cons 22i32 List::nil);
+    #letref list_ref : & List #borrow list;
+    #let code : i32 = list_sum_ref list_ref;
+    #let _ : () <- IO::exit code;
+    ()
+}

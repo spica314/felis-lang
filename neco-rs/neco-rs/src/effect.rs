@@ -15,6 +15,10 @@ use crate::{Error, Result};
 pub(crate) enum Value {
     Unit,
     Type(Term),
+    Reference {
+        value: Box<Value>,
+        exclusive: bool,
+    },
     Constructor(ConstructorValue),
     Struct(StructValue),
     FileDescriptor(I32Expr),

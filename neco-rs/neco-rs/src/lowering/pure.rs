@@ -105,6 +105,7 @@ fn lower_reference_get_value(term: &Term, state: &LoweringState) -> Result<Optio
     Ok(Some(match value {
         Value::I32Reference(slot) => Value::I32(I32Expr::Local(slot)),
         Value::I64Reference(slot) => Value::I64(I64Expr::Local(slot)),
+        Value::Reference { value, .. } => *value,
         other => other,
     }))
 }
@@ -379,7 +380,11 @@ pub(super) fn pattern_match_bindings(
     value: &Value,
     constructors: &HashMap<String, ConstructorSignature>,
 ) -> Result<Option<HashMap<String, Value>>> {
-    pattern_match_bindings_with_mode(pattern, value, constructors, false)
+    let (value, bind_as_reference, exclusive) = match value {
+        Value::Reference { value, exclusive } => (value.as_ref(), true, *exclusive),
+        _ => (value, false, false),
+    };
+    pattern_match_bindings_with_mode(pattern, value, constructors, bind_as_reference, exclusive)
 }
 
 fn pattern_match_bindings_with_mode(
@@ -387,15 +392,23 @@ fn pattern_match_bindings_with_mode(
     value: &Value,
     constructors: &HashMap<String, ConstructorSignature>,
     bind_as_reference: bool,
+    exclusive: bool,
 ) -> Result<Option<HashMap<String, Value>>> {
     match pattern {
         Pattern::Wildcard => Ok(Some(HashMap::new())),
         Pattern::Bind(name) => {
             let mut bindings = HashMap::new();
-            if bind_as_reference {
-                let _ = bind_as_reference;
-            }
-            bindings.insert(name.clone(), value.clone());
+            bindings.insert(
+                name.clone(),
+                if bind_as_reference {
+                    Value::Reference {
+                        value: Box::new(value.clone()),
+                        exclusive,
+                    }
+                } else {
+                    value.clone()
+                },
+            );
             Ok(Some(bindings))
         }
         Pattern::Constructor { path, subpatterns } => {
@@ -439,7 +452,8 @@ fn pattern_match_bindings_with_mode(
                     subpattern,
                     &field_value,
                     constructors,
-                    expected.is_rc,
+                    bind_as_reference,
+                    exclusive,
                 )?
                 else {
                     return Ok(None);
@@ -646,6 +660,7 @@ fn lower_pure_function_call(
         if let Value::Type(ty) = &value {
             type_bindings.insert(parameter.name.clone(), ty.clone());
         }
+        let value = wrap_reference_parameter(value, &parameter_ty);
         scoped_state
             .environment
             .insert(parameter.name.clone(), value);
@@ -667,6 +682,30 @@ fn resolve_type_argument(term: &Term, state: &LoweringState) -> Term {
     match state.environment.get(&path.segments[0].lexeme) {
         Some(Value::Type(bound)) => bound.clone(),
         _ => term.clone(),
+    }
+}
+
+fn wrap_reference_parameter(value: Value, ty: &Term) -> Value {
+    let Term::Reference { exclusive, .. } = ty else {
+        return value;
+    };
+    match value {
+        Value::I32Reference(_)
+        | Value::I64Reference(_)
+        | Value::Reference { .. }
+        | Value::StaticSlice { .. }
+        | Value::RuntimeArg(_)
+        | Value::Array { .. }
+        | Value::Constructor(ConstructorValue {
+            heap_slot: None, ..
+        })
+        | Value::Struct(StructValue {
+            heap_slot: None, ..
+        }) => value,
+        value => Value::Reference {
+            value: Box::new(value),
+            exclusive: *exclusive,
+        },
     }
 }
 
@@ -904,6 +943,7 @@ fn bind_procedure_arguments(
         if let Value::Type(ty) = &value {
             type_bindings.insert(parameter.name.clone(), ty.clone());
         }
+        let value = wrap_reference_parameter(value, &parameter_ty);
         scoped_state
             .environment
             .insert(parameter.name.clone(), value);

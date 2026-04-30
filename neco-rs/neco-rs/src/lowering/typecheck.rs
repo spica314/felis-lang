@@ -9,6 +9,13 @@ pub(crate) fn validate_value_against_type(
     ty: &Term,
     program: &LoweredProgram,
 ) -> Result<()> {
+    if matches!(value, Value::Reference { .. }) && !matches!(ty, Term::Reference { .. }) {
+        return Err(Error::Unsupported(format!(
+            "expected a value of type `{}` but got {value:?}",
+            render_term(ty)
+        )));
+    }
+
     if is_type_universe_annotation(ty) {
         return match value {
             Value::Type(term) if is_type_argument(term) => Ok(()),
@@ -143,6 +150,10 @@ fn validate_reference_value_against_type(
     referent: &Term,
     program: &LoweredProgram,
 ) -> Result<()> {
+    if let Value::Reference { value, .. } = value {
+        return validate_value_against_type(value, referent, program);
+    }
+
     if let Some(element_type) = parse_slice_type_annotation(referent)? {
         return match value {
             Value::StaticSlice { .. } if element_type == ArrayElementType::U8 => Ok(()),

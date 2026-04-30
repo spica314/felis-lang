@@ -519,8 +519,33 @@ fn lower_let_equals_statement(
     };
     let ty = substitute_type_bindings(ty, &type_bindings_from_environment(&state.environment));
     validate_value_against_type(&value, &ty, program)?;
+    let value = wrap_reference_value(value, &ty);
     bind_pattern(binder, value, &mut state.environment);
     Ok(())
+}
+
+fn wrap_reference_value(value: Value, ty: &Term) -> Value {
+    let Term::Reference { exclusive, .. } = ty else {
+        return value;
+    };
+    match value {
+        Value::I32Reference(_)
+        | Value::I64Reference(_)
+        | Value::Reference { .. }
+        | Value::StaticSlice { .. }
+        | Value::RuntimeArg(_)
+        | Value::Array { .. }
+        | Value::Constructor(crate::ir::ConstructorValue {
+            heap_slot: None, ..
+        })
+        | Value::Struct(crate::ir::StructValue {
+            heap_slot: None, ..
+        }) => value,
+        value => Value::Reference {
+            value: Box::new(value),
+            exclusive: *exclusive,
+        },
+    }
 }
 
 fn type_bindings_from_environment(environment: &HashMap<String, Value>) -> HashMap<String, Term> {
@@ -561,6 +586,7 @@ fn lower_letref_borrow_statement(
         other => other,
     };
     validate_value_against_type(&reference_value, ty, program)?;
+    let reference_value = wrap_reference_value(reference_value, ty);
     state
         .environment
         .insert(reference.to_string(), reference_value);
