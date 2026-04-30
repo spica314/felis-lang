@@ -68,6 +68,9 @@ pub(crate) enum ComparisonKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ConditionExpr {
     Literal(bool),
+    And(Box<ConditionExpr>, Box<ConditionExpr>),
+    Or(Box<ConditionExpr>, Box<ConditionExpr>),
+    Not(Box<ConditionExpr>),
     I32 {
         kind: ComparisonKind,
         lhs: I32Expr,

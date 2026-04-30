@@ -310,10 +310,7 @@ fn emit_operations(
                 then_operations,
                 else_operations,
             } => {
-                emit_condition_false_jump(condition, code, program);
-                let false_patch_at = code.len();
-                code.extend_from_slice(&0i32.to_le_bytes());
-                let then_start = code.len();
+                let false_patch_ats = emit_condition_false_jumps(condition, code, program);
                 emit_operations(
                     then_operations,
                     code,
@@ -325,9 +322,7 @@ fn emit_operations(
                 );
                 if else_operations.is_empty() {
                     let end = code.len();
-                    let false_jump_len = (end - then_start) as i32;
-                    code[false_patch_at..false_patch_at + 4]
-                        .copy_from_slice(&false_jump_len.to_le_bytes());
+                    patch_jumps_to(&false_patch_ats, end, code);
                 } else {
                     code.extend_from_slice(&[0xe9]);
                     let end_patch_at = code.len();
@@ -343,9 +338,7 @@ fn emit_operations(
                         continue_patches.as_deref_mut(),
                     );
                     let end = code.len();
-                    let false_jump_len = (else_start - then_start) as i32;
-                    code[false_patch_at..false_patch_at + 4]
-                        .copy_from_slice(&false_jump_len.to_le_bytes());
+                    patch_jumps_to(&false_patch_ats, else_start, code);
                     let end_jump_len = (end - else_start) as i32;
                     code[end_patch_at..end_patch_at + 4]
                         .copy_from_slice(&end_jump_len.to_le_bytes());
@@ -423,19 +416,29 @@ fn emit_operations(
     }
 }
 
-fn emit_condition_false_jump(
+fn emit_condition_false_jumps(
     condition: &ConditionExpr,
     code: &mut Vec<u8>,
     program: &LoweredProgram,
-) {
+) -> Vec<usize> {
     match condition {
-        ConditionExpr::Literal(true) => {
-            code.extend_from_slice(&[0x39, 0xc0]);
-            emit_jcc_false(ComparisonKind::Eq, false, code);
-        }
+        ConditionExpr::Literal(true) => Vec::new(),
         ConditionExpr::Literal(false) => {
             code.push(0xe9);
+            vec![emit_jump_placeholder(code)]
         }
+        ConditionExpr::And(lhs, rhs) => {
+            let mut patches = emit_condition_false_jumps(lhs, code, program);
+            patches.extend(emit_condition_false_jumps(rhs, code, program));
+            patches
+        }
+        ConditionExpr::Or(lhs, rhs) => {
+            let true_patches = emit_condition_true_jumps(lhs, code, program);
+            let false_patches = emit_condition_false_jumps(rhs, code, program);
+            patch_jumps_to_current(&true_patches, code);
+            false_patches
+        }
+        ConditionExpr::Not(inner) => emit_condition_true_jumps(inner, code, program),
         ConditionExpr::I32 { kind, lhs, rhs } => {
             emit_i32_expr_to_eax(lhs, code, program);
             code.push(0x50);
@@ -444,6 +447,7 @@ fn emit_condition_false_jump(
             code.push(0x58);
             code.extend_from_slice(&[0x39, 0xc8]);
             emit_jcc_false(*kind, false, code);
+            vec![emit_jump_placeholder(code)]
         }
         ConditionExpr::I64 { kind, lhs, rhs } => {
             emit_i64_expr_to_rax(lhs, code, program);
@@ -453,6 +457,7 @@ fn emit_condition_false_jump(
             code.push(0x58);
             code.extend_from_slice(&[0x48, 0x39, 0xc8]);
             emit_jcc_false(*kind, false, code);
+            vec![emit_jump_placeholder(code)]
         }
         ConditionExpr::U8 { kind, lhs, rhs } => {
             emit_u8_expr_to_eax(lhs, code, program);
@@ -462,12 +467,90 @@ fn emit_condition_false_jump(
             code.push(0x58);
             code.extend_from_slice(&[0x39, 0xc8]);
             emit_jcc_false(*kind, true, code);
+            vec![emit_jump_placeholder(code)]
         }
+    }
+}
+
+fn emit_condition_true_jumps(
+    condition: &ConditionExpr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) -> Vec<usize> {
+    match condition {
+        ConditionExpr::Literal(true) => {
+            code.push(0xe9);
+            vec![emit_jump_placeholder(code)]
+        }
+        ConditionExpr::Literal(false) => Vec::new(),
+        ConditionExpr::And(lhs, rhs) => {
+            let false_patches = emit_condition_false_jumps(lhs, code, program);
+            let true_patches = emit_condition_true_jumps(rhs, code, program);
+            patch_jumps_to_current(&false_patches, code);
+            true_patches
+        }
+        ConditionExpr::Or(lhs, rhs) => {
+            let mut patches = emit_condition_true_jumps(lhs, code, program);
+            patches.extend(emit_condition_true_jumps(rhs, code, program));
+            patches
+        }
+        ConditionExpr::Not(inner) => emit_condition_false_jumps(inner, code, program),
+        ConditionExpr::I32 { kind, lhs, rhs } => {
+            emit_i32_expr_to_eax(lhs, code, program);
+            code.push(0x50);
+            emit_i32_expr_to_eax(rhs, code, program);
+            code.extend_from_slice(&[0x89, 0xc1]);
+            code.push(0x58);
+            code.extend_from_slice(&[0x39, 0xc8]);
+            emit_jcc_true(*kind, false, code);
+            vec![emit_jump_placeholder(code)]
+        }
+        ConditionExpr::I64 { kind, lhs, rhs } => {
+            emit_i64_expr_to_rax(lhs, code, program);
+            code.push(0x50);
+            emit_i64_expr_to_rax(rhs, code, program);
+            code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+            code.push(0x58);
+            code.extend_from_slice(&[0x48, 0x39, 0xc8]);
+            emit_jcc_true(*kind, false, code);
+            vec![emit_jump_placeholder(code)]
+        }
+        ConditionExpr::U8 { kind, lhs, rhs } => {
+            emit_u8_expr_to_eax(lhs, code, program);
+            code.push(0x50);
+            emit_u8_expr_to_eax(rhs, code, program);
+            code.extend_from_slice(&[0x89, 0xc1]);
+            code.push(0x58);
+            code.extend_from_slice(&[0x39, 0xc8]);
+            emit_jcc_true(*kind, true, code);
+            vec![emit_jump_placeholder(code)]
+        }
+    }
+}
+
+fn emit_jump_placeholder(code: &mut Vec<u8>) -> usize {
+    let patch_at = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    patch_at
+}
+
+fn patch_jumps_to_current(patch_ats: &[usize], code: &mut [u8]) {
+    patch_jumps_to(patch_ats, code.len(), code);
+}
+
+fn patch_jumps_to(patch_ats: &[usize], target: usize, code: &mut [u8]) {
+    for patch_at in patch_ats {
+        let jump_len = target as i32 - (*patch_at as i32 + 4);
+        code[*patch_at..*patch_at + 4].copy_from_slice(&jump_len.to_le_bytes());
     }
 }
 
 fn emit_jcc_false(kind: ComparisonKind, unsigned: bool, code: &mut Vec<u8>) {
     code.extend_from_slice(&[0x0f, false_jump_opcode(kind, unsigned)]);
+}
+
+fn emit_jcc_true(kind: ComparisonKind, unsigned: bool, code: &mut Vec<u8>) {
+    code.extend_from_slice(&[0x0f, true_jump_opcode(kind, unsigned)]);
 }
 
 fn false_jump_opcode(kind: ComparisonKind, unsigned: bool) -> u8 {
@@ -481,6 +564,20 @@ fn false_jump_opcode(kind: ComparisonKind, unsigned: bool) -> u8 {
         (ComparisonKind::Lt, true) => 0x83,
         (ComparisonKind::Gte, true) => 0x82,
         (ComparisonKind::Gt, true) => 0x86,
+    }
+}
+
+fn true_jump_opcode(kind: ComparisonKind, unsigned: bool) -> u8 {
+    match (kind, unsigned) {
+        (ComparisonKind::Eq, _) => 0x84,
+        (ComparisonKind::Lte, false) => 0x8e,
+        (ComparisonKind::Lt, false) => 0x8c,
+        (ComparisonKind::Gte, false) => 0x8d,
+        (ComparisonKind::Gt, false) => 0x8f,
+        (ComparisonKind::Lte, true) => 0x86,
+        (ComparisonKind::Lt, true) => 0x82,
+        (ComparisonKind::Gte, true) => 0x83,
+        (ComparisonKind::Gt, true) => 0x87,
     }
 }
 

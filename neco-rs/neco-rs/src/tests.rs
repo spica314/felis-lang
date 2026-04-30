@@ -217,14 +217,35 @@ fn lowers_bool_basic_fixture_to_runtime_conditions() {
                 else_operations: vec![],
             },
             Operation::If {
-                condition: ConditionExpr::Literal(true),
+                condition: ConditionExpr::And(
+                    Box::new(ConditionExpr::Or(
+                        Box::new(ConditionExpr::Literal(false)),
+                        Box::new(ConditionExpr::And(
+                            Box::new(ConditionExpr::Literal(true)),
+                            Box::new(ConditionExpr::I32 {
+                                kind: ComparisonKind::Eq,
+                                lhs: I32Expr::Literal(7),
+                                rhs: I32Expr::Literal(7),
+                            }),
+                        )),
+                    )),
+                    Box::new(ConditionExpr::Not(Box::new(ConditionExpr::Literal(false)))),
+                ),
                 then_operations: vec![Operation::If {
-                    condition: ConditionExpr::I32 {
-                        kind: ComparisonKind::Eq,
-                        lhs: I32Expr::Literal(7),
-                        rhs: I32Expr::Literal(7),
-                    },
-                    then_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))],
+                    condition: ConditionExpr::Or(
+                        Box::new(ConditionExpr::Literal(false)),
+                        Box::new(ConditionExpr::Not(Box::new(ConditionExpr::Literal(false)))),
+                    ),
+                    then_operations: vec![Operation::If {
+                        condition: ConditionExpr::Not(Box::new(ConditionExpr::And(
+                            Box::new(ConditionExpr::Literal(true)),
+                            Box::new(ConditionExpr::Literal(false)),
+                        ))),
+                        then_operations: vec![Operation::Exit(ExitCodeExpr::I32(
+                            I32Expr::Literal(42),
+                        ))],
+                        else_operations: vec![],
+                    }],
                     else_operations: vec![],
                 }],
                 else_operations: vec![],

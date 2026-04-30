@@ -197,7 +197,7 @@ pub(crate) fn lower_bool_expr(term: &Term, state: &LoweringState) -> Result<Cond
             ))),
             Err(_) => lower_bool_builtin_path(term),
         },
-        Term::Application { .. } => lower_comparison_expr(term, state),
+        Term::Application { .. } => lower_bool_application_expr(term, state),
         _ => Err(Error::Unsupported(format!(
             "unsupported `bool` expression in entrypoint body: {term:?}"
         ))),
@@ -224,22 +224,15 @@ fn lower_bool_builtin_path(term: &Term) -> Result<ConditionExpr> {
     }
 }
 
-fn lower_comparison_expr(term: &Term, state: &LoweringState) -> Result<ConditionExpr> {
+fn lower_bool_application_expr(term: &Term, state: &LoweringState) -> Result<ConditionExpr> {
     let Term::Application { callee, arguments } = term else {
         return Err(Error::Unsupported(
-            "`bool` expression must be a comparison call".to_string(),
+            "`bool` expression must be a primitive or comparison call".to_string(),
         ));
     };
     let Term::Path(path) = callee.as_ref() else {
         return Err(Error::Unsupported(
-            "`bool` comparison must use a path callee".to_string(),
-        ));
-    };
-
-    let normalized = normalize_numeric_literal_arguments(arguments);
-    let [lhs, rhs] = normalized.as_slice() else {
-        return Err(Error::Unsupported(
-            "`bool` comparison must receive exactly two arguments".to_string(),
+            "`bool` expression must use a path callee".to_string(),
         ));
     };
 
@@ -248,6 +241,67 @@ fn lower_comparison_expr(term: &Term, state: &LoweringState) -> Result<Condition
         .last()
         .map(|segment| segment.lexeme.as_str())
         .unwrap_or_default();
+
+    if let Some(condition) = lower_bool_primitive_call(primitive, arguments, state)? {
+        return Ok(condition);
+    }
+
+    lower_comparison_expr(primitive, arguments, state)
+}
+
+fn lower_bool_primitive_call(
+    primitive: &str,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<ConditionExpr>> {
+    match primitive {
+        "bool_and" => {
+            let [lhs, rhs] = arguments else {
+                return Err(Error::Unsupported(
+                    "`bool_and` must receive exactly two arguments".to_string(),
+                ));
+            };
+            Ok(Some(ConditionExpr::And(
+                Box::new(lower_bool_expr(lhs, state)?),
+                Box::new(lower_bool_expr(rhs, state)?),
+            )))
+        }
+        "bool_or" => {
+            let [lhs, rhs] = arguments else {
+                return Err(Error::Unsupported(
+                    "`bool_or` must receive exactly two arguments".to_string(),
+                ));
+            };
+            Ok(Some(ConditionExpr::Or(
+                Box::new(lower_bool_expr(lhs, state)?),
+                Box::new(lower_bool_expr(rhs, state)?),
+            )))
+        }
+        "bool_not" => {
+            let [value] = arguments else {
+                return Err(Error::Unsupported(
+                    "`bool_not` must receive exactly one argument".to_string(),
+                ));
+            };
+            Ok(Some(ConditionExpr::Not(Box::new(lower_bool_expr(
+                value, state,
+            )?))))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn lower_comparison_expr(
+    primitive: &str,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<ConditionExpr> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [lhs, rhs] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`bool` comparison must receive exactly two arguments".to_string(),
+        ));
+    };
 
     if let Some(kind) = i32_comparison_kind(primitive) {
         return Ok(ConditionExpr::I32 {

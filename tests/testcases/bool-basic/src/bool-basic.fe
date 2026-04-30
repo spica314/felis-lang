@@ -2,6 +2,9 @@
 #use std_core::primitive::bool::bool;
 #use std_core::primitive::bool::true;
 #use std_core::primitive::bool::false;
+#use std_core::primitive::bool::bool_and;
+#use std_core::primitive::bool::bool_or;
+#use std_core::primitive::bool::bool_not;
 #use std_core::primitive::i32::i32_eq;
 
 #entrypoint main;
@@ -9,12 +12,17 @@
 #fn main : () #with IO {
     #let literal_true : bool = true;
     #let comparison_true : bool = i32_eq 7i32 7i32;
+    #let and_true : bool = bool_and literal_true comparison_true;
+    #let or_true : bool = bool_or false and_true;
+    #let not_false : bool = bool_not false;
     #if false {
         #let _ : () <- IO::exit 1i32;
     };
-    #if literal_true {
-        #if comparison_true {
-            #let _ : () <- IO::exit 42i32;
+    #if bool_and or_true not_false {
+        #if bool_or false (bool_not false) {
+            #if bool_not (bool_and true false) {
+                #let _ : () <- IO::exit 42i32;
+            };
         };
     };
     #let _ : () <- IO::exit 2i32;

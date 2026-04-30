@@ -1,3 +1,13 @@
 #bind_builtin "bool" #as bool;
 #bind_builtin "true" #as true;
 #bind_builtin "false" #as false;
+#bind_builtin "bool_and" #as bool_and;
+#bind_builtin "bool_or" #as bool_or;
+#bind_builtin "bool_not" #as bool_not;
+
+#pub #use bool;
+#pub #use true;
+#pub #use false;
+#pub #use bool_and;
+#pub #use bool_or;
+#pub #use bool_not;
