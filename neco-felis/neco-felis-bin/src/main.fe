@@ -2,6 +2,7 @@
 #use std_core::io::FileDescriptor;
 #use std_core::primitive::array::Array;
 #use std_core::primitive::array::Slice;
+#use std_core::primitive::bool::bool_not;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::u8::u8;
@@ -145,10 +146,10 @@
     bytes_ref .> set 123i32 0x00u8;
     bytes_ref .> set 124i32 0x00u8;
     bytes_ref .> set 125i32 0xbfu8;
-    #if i32_eq code 48i32 {
-        bytes_ref .> set 126i32 0u8;
-    } #else {
+    #if bool_not (i32_eq code 48i32) {
         bytes_ref .> set 126i32 42u8;
+    } #else {
+        bytes_ref .> set 126i32 0u8;
     };
     bytes_ref .> set 127i32 0x00u8;
     bytes_ref .> set 128i32 0x00u8;

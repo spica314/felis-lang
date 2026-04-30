@@ -1,9 +1,11 @@
 #use std_core::primitive::array::Array;
+#use std_core::primitive::bool::bool;
 #use std_core::primitive::bool::true;
 #use std_core::primitive::bool::false;
+#use std_core::primitive::bool::bool_and;
+#use std_core::primitive::bool::bool_or;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
-#use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::i32::i32_from_u8;
 #use std_core::primitive::u8::u8_eq;
 
@@ -11,27 +13,21 @@
     source .> get index
 }
 
-#fn is_trivia : (byte : u8) -> i32 {
-    #match (u8_eq byte ' ') {
-        true => 1i32,
-        false => #match (u8_eq byte '\n') {
-            true => 1i32,
-            false => #match (u8_eq byte '\t') {
-                true => 1i32,
-                false => #match (u8_eq byte '\r') {
-                    true => 1i32,
-                    false => 0i32,
-                },
-            },
-        },
-    }
+#fn is_trivia : (byte : u8) -> bool {
+    bool_or
+        (u8_eq byte ' ')
+        (bool_or
+            (u8_eq byte '\n')
+            (bool_or
+                (u8_eq byte '\t')
+                (u8_eq byte '\r')))
 }
 
 #fn lex_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
     #let byte : u8 = source_at source index;
     #match (u8_eq byte '\0') {
         true => Tokens::cons Token::end_of_file Tokens::nil,
-        false => #match (i32_eq (is_trivia byte) 1i32) {
+        false => #match (is_trivia byte) {
             true => lex_from source (i32_add index 1i32),
             false => lex_token_from source index,
         },
@@ -103,11 +99,12 @@
 
 #fn lex_word_or_integer_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
     #let byte : u8 = source_at source index;
+    #let next : u8 = source_at source (i32_add index 1i32);
     #match (u8_eq byte '_') {
         true => Tokens::cons Token::underscore (lex_from source (i32_add index 1i32)),
         false => #match (u8_eq byte '0') {
             true => Tokens::cons (Token::integer_literal 0i32) (lex_from source (i32_add index 1i32)),
-            false => #match (u8_eq byte '4') {
+            false => #match (bool_and (u8_eq byte '4') (u8_eq next '2')) {
                 true => Tokens::cons (Token::integer_literal 42i32) (lex_from source (i32_add index 2i32)),
                 false => lex_identifier_from source index,
             },
