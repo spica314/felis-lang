@@ -1,4 +1,0 @@
-{
-    "name": "dyn-array-len",
-    "felis-bin-entrypoints": ["src/dyn-array-len.fe"]
-}

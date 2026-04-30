@@ -1,0 +1,4 @@
+{
+    "name": "slice-len",
+    "felis-bin-entrypoints": ["src/slice-len.fe"]
+}

@@ -525,8 +525,8 @@ fn lowers_dyn_array_u8_helpers_fixture_to_runtime_array_operations() {
 }
 
 #[test]
-fn lowers_dyn_array_len_fixture_to_runtime_array_len() {
-    let root = repo_root().join("tests/testcases/dyn-array-len");
+fn lowers_slice_len_fixture_to_runtime_array_len() {
+    let root = repo_root().join("tests/testcases/slice-len");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
         panic!("expected package root");
     };
