@@ -1,0 +1,22 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#struct Span : Type[0] {
+    start : i32,
+    end : i32,
+}
+
+#fn span_ref_code : (span_ref : & Span) -> i32 {
+    i32_add span_ref.start span_ref.end
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let span : Span = Span { start = 20i32, end = 22i32 };
+    #letref span_ref : & Span #borrow span;
+    #let code : i32 = span_ref_code span_ref;
+    #let _ : () <- IO::exit code;
+    ()
+}

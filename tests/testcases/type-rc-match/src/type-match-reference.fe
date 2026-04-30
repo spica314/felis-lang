@@ -1,0 +1,24 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+
+#type Token : Type[0] {
+    empty : Token,
+    number : i32 -> Token,
+}
+
+#fn token_ref_code : (token_ref : & Token) -> i32 {
+    #match token_ref {
+        Token::empty => 1i32,
+        Token::number value_ref => value_ref .> get,
+    }
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let token : Token = Token::number 42i32;
+    #letref token_ref : & Token #borrow token;
+    #let code : i32 = token_ref_code token_ref;
+    #let _ : () <- IO::exit code;
+    ()
+}

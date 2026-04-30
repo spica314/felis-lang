@@ -534,13 +534,7 @@ fn wrap_reference_value(value: Value, ty: &Term) -> Value {
         | Value::Reference { .. }
         | Value::StaticSlice { .. }
         | Value::RuntimeArg(_)
-        | Value::Array { .. }
-        | Value::Constructor(crate::ir::ConstructorValue {
-            heap_slot: None, ..
-        })
-        | Value::Struct(crate::ir::StructValue {
-            heap_slot: None, ..
-        }) => value,
+        | Value::Array { .. } => value,
         value => Value::Reference {
             value: Box::new(value),
             exclusive: *exclusive,
@@ -648,27 +642,64 @@ fn lower_expression_statement(
     }
 
     if let Some(name) = single_segment_path_name(receiver.as_ref())
+        && let Some(current_value) = state.environment.get(name).cloned()
         && matches!(
-            state.environment.get(name),
-            Some(Value::Struct(_) | Value::Constructor(_))
+            current_value,
+            Value::Struct(_)
+                | Value::Constructor(_)
+                | Value::Reference {
+                    value: _,
+                    exclusive: true
+                }
         )
     {
-        let [value] = arguments.as_slice() else {
+        let normalized = normalize_numeric_literal_arguments(arguments);
+        let [value] = normalized.as_slice() else {
             return Err(Error::Unsupported(
-                "`set` must receive exactly one argument for struct references".to_string(),
+                "`set` must receive exactly one argument for value references".to_string(),
             ));
         };
-        let lowered_value = lower_pure_value(value, state, program)?;
-        match lowered_value {
+        match current_value {
             Value::Struct(_) | Value::Constructor(_) => {
-                state.environment.insert(name.to_string(), lowered_value);
+                let lowered_value = lower_pure_value(value, state, program)?;
+                match lowered_value {
+                    Value::Struct(_) | Value::Constructor(_) => {
+                        state.environment.insert(name.to_string(), lowered_value);
+                        return Ok(());
+                    }
+                    other => {
+                        return Err(Error::Unsupported(format!(
+                            "`set` expected a struct or constructor value, got {other:?}"
+                        )));
+                    }
+                }
+            }
+            Value::Reference {
+                value: referent,
+                exclusive,
+            } => {
+                let lowered_value = match referent.as_ref() {
+                    Value::I32(_) => Value::I32(lower_i32_expr(value, state)?),
+                    Value::I64(_) => Value::I64(lower_i64_expr(value, state)?),
+                    Value::Constructor(_) | Value::Struct(_) => {
+                        lower_pure_value(value, state, program)?
+                    }
+                    other => {
+                        return Err(Error::Unsupported(format!(
+                            "`set` does not support this reference target: {other:?}"
+                        )));
+                    }
+                };
+                state.environment.insert(
+                    name.to_string(),
+                    Value::Reference {
+                        value: Box::new(lowered_value),
+                        exclusive,
+                    },
+                );
                 return Ok(());
             }
-            other => {
-                return Err(Error::Unsupported(format!(
-                    "`set` expected a struct value, got {other:?}"
-                )));
-            }
+            _ => {}
         }
     }
 

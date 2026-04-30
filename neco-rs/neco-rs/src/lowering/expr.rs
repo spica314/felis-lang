@@ -54,6 +54,12 @@ fn lower_i32_method_call(term: &Term, state: &LoweringState) -> Result<I32Expr> 
     match method.as_str() {
         "get" => match resolve_value(receiver.as_ref(), &state.environment)? {
             Value::I32Reference(slot) => Ok(I32Expr::Local(slot)),
+            Value::Reference { value, .. } => match value.as_ref() {
+                Value::I32(expr) => Ok(expr.clone()),
+                other => Err(Error::Unsupported(format!(
+                    "`get` expects an `i32` reference, got {other:?}"
+                ))),
+            },
             other => Err(Error::Unsupported(format!(
                 "`get` expects an `i32` reference, got {other:?}"
             ))),
@@ -116,6 +122,12 @@ fn lower_i64_method_call(term: &Term, state: &LoweringState) -> Result<I64Expr> 
     match method.as_str() {
         "get" => match resolve_value(receiver.as_ref(), &state.environment)? {
             Value::I64Reference(slot) => Ok(I64Expr::Local(slot)),
+            Value::Reference { value, .. } => match value.as_ref() {
+                Value::I64(expr) => Ok(expr.clone()),
+                other => Err(Error::Unsupported(format!(
+                    "`get` expects an `i64` reference, got {other:?}"
+                ))),
+            },
             other => Err(Error::Unsupported(format!(
                 "`get` expects an `i64` reference, got {other:?}"
             ))),

@@ -695,13 +695,7 @@ fn wrap_reference_parameter(value: Value, ty: &Term) -> Value {
         | Value::Reference { .. }
         | Value::StaticSlice { .. }
         | Value::RuntimeArg(_)
-        | Value::Array { .. }
-        | Value::Constructor(ConstructorValue {
-            heap_slot: None, ..
-        })
-        | Value::Struct(StructValue {
-            heap_slot: None, ..
-        }) => value,
+        | Value::Array { .. } => value,
         value => Value::Reference {
             value: Box::new(value),
             exclusive: *exclusive,
@@ -967,10 +961,28 @@ fn propagate_reference_arguments(
         let Some(value) = scoped_state.environment.get(&parameter.name).cloned() else {
             continue;
         };
-        if matches!(value, Value::Constructor(_) | Value::Struct(_)) {
-            caller_state
-                .environment
-                .insert(argument_name.to_string(), value);
+        match value {
+            Value::Constructor(_) | Value::Struct(_) => {
+                caller_state
+                    .environment
+                    .insert(argument_name.to_string(), value);
+            }
+            Value::Reference { value, exclusive }
+                if matches!(value.as_ref(), Value::Constructor(_) | Value::Struct(_)) =>
+            {
+                let propagated = if matches!(
+                    caller_state.environment.get(argument_name),
+                    Some(Value::Reference { .. })
+                ) {
+                    Value::Reference { value, exclusive }
+                } else {
+                    *value
+                };
+                caller_state
+                    .environment
+                    .insert(argument_name.to_string(), propagated);
+            }
+            _ => {}
         }
     }
 }

@@ -1092,6 +1092,32 @@ fn lowers_type_rc_match_reference_fixture_to_runtime_exit() {
 }
 
 #[test]
+fn lowers_type_rc_match_mut_reference_fixture_to_runtime_exit() {
+    let root = repo_root().join("tests/testcases/type-rc-match");
+    let package = selected_fixture_package(&root, "type-rc-match-mut-reference");
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::StoreI32 {
+                slot: 0,
+                value: I32Expr::Literal(0),
+            },
+            Operation::StoreI32 {
+                slot: 0,
+                value: I32Expr::Literal(42),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(0))),
+        ]
+    );
+    assert!(program.arrays.is_empty());
+    assert!(program.data.is_empty());
+    assert_eq!(program.i32_slots, 1);
+    assert_eq!(program.heap_slots, 0);
+}
+
+#[test]
 fn lowers_if_else_true_fixture_to_program() {
     let root = repo_root().join("tests/testcases/if");
     let source_path = root.join("src/if-else-true.fe");

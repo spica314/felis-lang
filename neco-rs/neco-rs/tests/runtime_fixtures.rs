@@ -522,6 +522,34 @@ fn compiles_and_runs_struct_rc_field_access_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_struct_reference_fixture() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let status = run_fixture_status(&root, "struct-reference");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_struct_mut_reference_fixture() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let status = run_fixture_status(&root, "struct-mut-reference");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_struct_rc_reference_fixture() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let status = run_fixture_status(&root, "struct-rc-reference");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_struct_rc_mut_reference_fixture() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let status = run_fixture_status(&root, "struct-rc-mut-reference");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_enum_match_payload_single_fixture() {
     let root = repo_root().join("tests/testcases/enum-match-payload");
     let status = run_fixture_status(&root, "enum-match-payload-single");
@@ -557,6 +585,13 @@ fn compiles_and_runs_type_rc_match_single_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_type_match_reference_fixture() {
+    let root = repo_root().join("tests/testcases/type-rc-match");
+    let status = run_fixture_status(&root, "type-match-reference");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_type_rc_match_pair_fixture() {
     let root = repo_root().join("tests/testcases/type-rc-match");
     let status = run_fixture_status(&root, "type-rc-match-pair");
@@ -574,6 +609,20 @@ fn compiles_and_runs_type_rc_match_list_fixture() {
 fn compiles_and_runs_type_rc_match_reference_fixture() {
     let root = repo_root().join("tests/testcases/type-rc-match");
     let status = run_fixture_status(&root, "type-rc-match-reference");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_type_rc_match_mut_reference_fixture() {
+    let root = repo_root().join("tests/testcases/type-rc-match");
+    let status = run_fixture_status(&root, "type-rc-match-mut-reference");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_type_rc_match_mut_rc_reference_fixture() {
+    let root = repo_root().join("tests/testcases/type-rc-match");
+    let status = run_fixture_status(&root, "type-rc-match-mut-rc-reference");
     assert_eq!(status.code(), Some(42));
 }
 

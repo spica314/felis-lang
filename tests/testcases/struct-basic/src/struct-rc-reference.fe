@@ -1,0 +1,22 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#struct(rc) Point : Type[0] {
+    x : i32,
+    y : i32,
+}
+
+#fn point_ref_code : (point_ref : & Point) -> i32 {
+    i32_add point_ref.x point_ref.y
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let point : Point = Point { x = 20i32, y = 22i32 };
+    #letref point_ref : & Point #borrow point;
+    #let code : i32 = point_ref_code point_ref;
+    #let _ : () <- IO::exit code;
+    ()
+}

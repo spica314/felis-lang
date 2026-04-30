@@ -102,10 +102,21 @@ pub(crate) fn resolve_value(term: &Term, environment: &HashMap<String, Value>) -
         Term::Group(inner) => return resolve_value(inner, environment),
         Term::FieldAccess { receiver, field } => {
             let value = resolve_value(receiver, environment)?;
-            let Value::Struct(struct_value) = value else {
-                return Err(Error::Unsupported(format!(
-                    "`.{field}` expects a struct value, got {value:?}"
-                )));
+            let struct_value = match value {
+                Value::Struct(struct_value) => struct_value,
+                Value::Reference { value, .. } => match *value {
+                    Value::Struct(struct_value) => struct_value,
+                    other => {
+                        return Err(Error::Unsupported(format!(
+                            "`.{field}` expects a struct value, got {other:?}"
+                        )));
+                    }
+                },
+                other => {
+                    return Err(Error::Unsupported(format!(
+                        "`.{field}` expects a struct value, got {other:?}"
+                    )));
+                }
             };
             return struct_value
                 .fields
