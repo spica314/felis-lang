@@ -856,6 +856,13 @@ fn compiles_and_runs_if_else_if_fallback_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_if_bool_function_condition_fixture() {
+    let root = repo_root().join("tests/testcases/if");
+    let status = run_fixture_status(&root, "if-bool-function-condition");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_loop_fixture() {
     let root = repo_root().join("tests/testcases/loop");
     let status = run_fixture_status(&root, "loop");

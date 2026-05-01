@@ -6,6 +6,7 @@
         "src/if-else-true.fe",
         "src/if-else-false.fe",
         "src/if-else-if-true.fe",
-        "src/if-else-if-fallback.fe"
+        "src/if-else-if-fallback.fe",
+        "src/if-bool-function-condition.fe"
     ]
 }

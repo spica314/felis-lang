@@ -432,7 +432,7 @@ fn lower_if_statement(
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<bool> {
-    let condition = lower_condition_expr(if_stmt.condition.as_ref(), state)?;
+    let condition = lower_condition_expr(if_stmt.condition.as_ref(), state, program)?;
     let mut then_state = state.child_scope();
     let mut then_operations = Vec::new();
     let mut then_program = LoweredProgram {

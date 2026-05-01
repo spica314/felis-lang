@@ -2,11 +2,13 @@ use neco_rs_parser::Term;
 
 use crate::effect::{Value, resolve_value};
 use crate::ir::{
-    ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, I32Expr, I64Expr, U8Expr,
+    ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, I32Expr, I64Expr, LoweredProgram,
+    U8Expr,
 };
 use crate::{Error, Result};
 
 use super::LoweringState;
+use super::pure::lower_pure_value;
 use super::typecheck::{
     is_i32_suffix_term, is_i64_suffix_term, is_u8_suffix_term, parse_bare_i32_literal,
     parse_bare_i64_literal, parse_bare_u8_literal, parse_suffixed_i32_literal,
@@ -182,9 +184,104 @@ pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr
     }
 }
 
-pub(super) fn lower_condition_expr(term: &Term, state: &LoweringState) -> Result<ConditionExpr> {
-    lower_bool_expr(term, state)
-        .map_err(|_| Error::Unsupported("`#if` condition must be a `bool` expression".to_string()))
+pub(super) fn lower_condition_expr(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<ConditionExpr> {
+    lower_condition_bool_expr(term, state, program)
+}
+
+fn lower_condition_bool_expr(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<ConditionExpr> {
+    if let Ok(condition) = lower_condition_bool_expr_inner(term, state, program) {
+        return Ok(condition);
+    }
+
+    match lower_pure_value(term, state, program) {
+        Ok(Value::Bool(condition)) => Ok(condition),
+        Ok(other) => Err(Error::Unsupported(format!(
+            "`#if` condition must be a `bool` expression, got {other:?}"
+        ))),
+        Err(_) => Err(Error::Unsupported(
+            "`#if` condition must be a `bool` expression".to_string(),
+        )),
+    }
+}
+
+fn lower_condition_bool_expr_inner(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<ConditionExpr> {
+    match term {
+        Term::Group(inner) => lower_condition_bool_expr(inner, state, program),
+        Term::Path(_) | Term::FieldAccess { .. } => lower_bool_expr(term, state),
+        Term::Application { .. } => lower_condition_bool_application_expr(term, state, program),
+        _ => lower_bool_expr(term, state),
+    }
+}
+
+fn lower_condition_bool_application_expr(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<ConditionExpr> {
+    let Term::Application { callee, arguments } = term else {
+        return Err(Error::Unsupported(
+            "`bool` expression must be a primitive or comparison call".to_string(),
+        ));
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Err(Error::Unsupported(
+            "`bool` expression must use a path callee".to_string(),
+        ));
+    };
+
+    let primitive = path
+        .segments
+        .last()
+        .map(|segment| segment.lexeme.as_str())
+        .unwrap_or_default();
+
+    match primitive {
+        "bool_and" => {
+            let [lhs, rhs] = arguments.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`bool_and` must receive exactly two arguments".to_string(),
+                ));
+            };
+            Ok(ConditionExpr::And(
+                Box::new(lower_condition_bool_expr(lhs, state, program)?),
+                Box::new(lower_condition_bool_expr(rhs, state, program)?),
+            ))
+        }
+        "bool_or" => {
+            let [lhs, rhs] = arguments.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`bool_or` must receive exactly two arguments".to_string(),
+                ));
+            };
+            Ok(ConditionExpr::Or(
+                Box::new(lower_condition_bool_expr(lhs, state, program)?),
+                Box::new(lower_condition_bool_expr(rhs, state, program)?),
+            ))
+        }
+        "bool_not" => {
+            let [value] = arguments.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`bool_not` must receive exactly one argument".to_string(),
+                ));
+            };
+            Ok(ConditionExpr::Not(Box::new(lower_condition_bool_expr(
+                value, state, program,
+            )?)))
+        }
+        _ => lower_comparison_expr(primitive, arguments, state),
+    }
 }
 
 pub(crate) fn lower_bool_expr(term: &Term, state: &LoweringState) -> Result<ConditionExpr> {

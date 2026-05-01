@@ -1,0 +1,20 @@
+#use std_core::io::IO;
+#use std_core::primitive::bool::bool;
+#use std_core::primitive::bool::bool_and;
+#use std_core::primitive::bool::true;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_eq;
+
+#entrypoint main;
+
+#fn is_answer : (value : i32) -> bool {
+    i32_eq value 42i32
+}
+
+#fn main : () #with IO {
+    #if bool_and (is_answer 42i32) true {
+        #let _ : () <- IO::exit 42i32;
+    };
+    #let _ : () <- IO::exit 1i32;
+    ()
+}
