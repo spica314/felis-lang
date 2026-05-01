@@ -35,7 +35,7 @@ pub(super) fn lower_pure_value(
         Term::StringLiteral(literal) => {
             let data_index = intern_data(program, nul_terminated_bytes(literal));
             let len = i32::try_from(literal.len()).map_err(|_| {
-                Error::Unsupported("string literal is too long for `Slice u8` length".to_string())
+                Error::Unsupported("string literal is too long for `ArrayVL u8` length".to_string())
             })?;
             Ok(Value::StaticSlice { data_index, len })
         }

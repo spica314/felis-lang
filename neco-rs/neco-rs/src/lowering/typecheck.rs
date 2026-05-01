@@ -331,7 +331,7 @@ fn parse_slice_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
     let Some(type_name) = path.segments.last().map(|segment| segment.lexeme.as_str()) else {
         return Ok(None);
     };
-    if type_name != "Slice" {
+    if type_name != "ArrayVL" {
         return Ok(None);
     }
     if path.token_keyword_package.is_some() {

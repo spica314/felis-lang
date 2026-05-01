@@ -1,11 +1,11 @@
 #use std_core::io::IO;
-#use std_core::primitive::array::Slice;
+#use std_core::primitive::array::ArrayVL;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
 
 #entrypoint main;
 
-#fn sum3 : (array_ref : &^ Slice i32) -> i32 {
+#fn sum3 : (array_ref : &^ ArrayVL i32) -> i32 {
     #let a0 : i32 = array_ref .> get 0i32;
     #let a1 : i32 = array_ref .> get 1i32;
     #let a2 : i32 = array_ref .> get 2i32;
@@ -14,11 +14,12 @@
 }
 
 #fn main : () #with IO {
-    #let array_ref : &^ Slice i32 <- IO::slice_new i32 4i32;
-    array_ref .> set 0i32 7i32;
-    array_ref .> set 1i32 14i32;
-    array_ref .> set 2i32 21i32;
-    #let r : i32 = sum3 array_ref;
+    #let arrayvl : ArrayVL i32 <- IO::arrayvl_new i32 4i32;
+    #letref #excl arrayvl_ref : &^ ArrayVL i32 #borrow arrayvl;
+    arrayvl_ref .> set 0i32 7i32;
+    arrayvl_ref .> set 1i32 14i32;
+    arrayvl_ref .> set 2i32 21i32;
+    #let r : i32 = sum3 arrayvl_ref;
     #let _ : () <- IO::exit r;
     ()
 }

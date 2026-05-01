@@ -1,9 +1,0 @@
-#use std_core::io::IO;
-#entrypoint main;
-
-#fn main : () #with IO {
-    #let array_ref : &^ Slice u8 <- IO::slice_new u8 42i32;
-    #let len : i32 = array_ref .> len;
-    #let _ : () <- IO::exit len;
-    ()
-}

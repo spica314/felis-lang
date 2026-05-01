@@ -1,6 +1,6 @@
 #use std_core::io::IO;
 #use std_core::primitive::array::DynArray;
-#use std_core::primitive::array::Slice;
+#use std_core::primitive::array::ArrayVL;
 #use std_core::primitive::array::dyn_array_capacity;
 #use std_core::primitive::array::dyn_array_get;
 #use std_core::primitive::array::dyn_array_len;
@@ -13,18 +13,21 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let bytes_slice_ref : &^ Slice u8 <- IO::slice_new u8 1i32;
-    #let bytes_ref : DynArray u8 = DynArray::dyn_array u8 bytes_slice_ref 0i64;
+    #let bytes_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 1i32;
+    #letref #excl bytes_arrayvl_ref : &^ ArrayVL u8 #borrow bytes_arrayvl;
+    #let bytes_ref : DynArray u8 = DynArray::dyn_array u8 bytes_arrayvl 0i64;
     dyn_array_push u8 bytes_ref 1u8;
     dyn_array_push u8 bytes_ref 2u8;
 
-    #let numbers_slice_ref : &^ Slice i32 <- IO::slice_new i32 1i32;
-    #let numbers_ref : DynArray i32 = DynArray::dyn_array i32 numbers_slice_ref 0i64;
+    #let numbers_arrayvl : ArrayVL i32 <- IO::arrayvl_new i32 1i32;
+    #letref #excl numbers_arrayvl_ref : &^ ArrayVL i32 #borrow numbers_arrayvl;
+    #let numbers_ref : DynArray i32 = DynArray::dyn_array i32 numbers_arrayvl 0i64;
     dyn_array_push i32 numbers_ref 3i32;
     dyn_array_push i32 numbers_ref 4i32;
 
-    #let longs_slice_ref : &^ Slice i64 <- IO::slice_new i64 1i32;
-    #let longs_ref : DynArray i64 = DynArray::dyn_array i64 longs_slice_ref 0i64;
+    #let longs_arrayvl : ArrayVL i64 <- IO::arrayvl_new i64 1i32;
+    #letref #excl longs_arrayvl_ref : &^ ArrayVL i64 #borrow longs_arrayvl;
+    #let longs_ref : DynArray i64 = DynArray::dyn_array i64 longs_arrayvl 0i64;
     dyn_array_push i64 longs_ref 9i64;
     dyn_array_push i64 longs_ref 11i64;
 

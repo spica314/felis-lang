@@ -120,8 +120,8 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(false))
         }
-        ["IO", "slice_replace"] => {
-            let (dest_slot, source_slot) = match parse_slice_replace_arguments(arguments, state) {
+        ["IO", "arrayvl_replace"] => {
+            let (dest_slot, source_slot) = match parse_arrayvl_replace_arguments(arguments, state) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
@@ -145,15 +145,21 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(true))
         }
-        ["IO", "array_new"] | ["IO", "slice_new"] => {
+        ["IO", "array_new"] | ["IO", "arrayvl_new"] => {
             let (element_type, length, static_length) =
                 match parse_array_new_arguments(path[1], arguments, state) {
                     Ok(value) => value,
                     Err(err) => return Some(Err(err)),
                 };
+            if path[1] == "arrayvl_new" && matches!(ty, Term::Reference { .. }) {
+                return Some(Err(Error::Unsupported(
+                    "`IO::arrayvl_new` returns an `ArrayVL T` value; use `#let` for the value, then `#letref #excl` to borrow it"
+                        .to_string(),
+                )));
+            }
             let kind = match path[1] {
                 "array_new" => ArrayKind::Fixed,
-                "slice_new" => ArrayKind::Dynamic,
+                "arrayvl_new" => ArrayKind::Dynamic,
                 _ => unreachable!(),
             };
             let array_slot =
@@ -211,7 +217,7 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [fd_term, bytes_term, len_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::write` must receive a file descriptor, a `Slice u8`, and a length".to_string(),
+            "`IO::write` must receive a file descriptor, an `ArrayVL u8`, and a length".to_string(),
         ));
     };
 
@@ -244,7 +250,7 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
             len,
         }),
         other => Err(Error::Unsupported(format!(
-            "`IO::write` expects a `Slice u8` or `u8` array as its second argument, got {other:?}"
+            "`IO::write` expects an `ArrayVL u8` or `u8` array as its second argument, got {other:?}"
         ))),
     }
 }
@@ -290,19 +296,20 @@ fn parse_read_arguments(
     Ok((fd, array_slot, len, result_slot))
 }
 
-fn parse_slice_replace_arguments(
+fn parse_arrayvl_replace_arguments(
     arguments: &[Term],
     state: &LoweringState,
 ) -> Result<(usize, usize)> {
     let normalized = normalize_i32_literal_arguments(arguments);
     let [element_type, dest, source] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::slice_replace` must receive an element type and two slices".to_string(),
+            "`IO::arrayvl_replace` must receive an element type and two `ArrayVL` values"
+                .to_string(),
         ));
     };
-    let element_type = parse_array_element_type(element_type, "slice_replace", state)?;
-    let dest_slot = parse_dynamic_array_slot(dest, element_type, state, "slice_replace")?;
-    let source_slot = parse_dynamic_array_slot(source, element_type, state, "slice_replace")?;
+    let element_type = parse_array_element_type(element_type, "arrayvl_replace", state)?;
+    let dest_slot = parse_dynamic_array_slot(dest, element_type, state, "arrayvl_replace")?;
+    let source_slot = parse_dynamic_array_slot(source, element_type, state, "arrayvl_replace")?;
     Ok((dest_slot, source_slot))
 }
 
@@ -319,7 +326,7 @@ fn parse_dynamic_array_slot(
             kind: ArrayKind::Dynamic,
         } if actual_element_type == element_type => Ok(slot),
         other => Err(Error::Unsupported(format!(
-            "`IO::{builtin_name}` expects matching dynamic slices, got {other:?}"
+            "`IO::{builtin_name}` expects matching dynamic `ArrayVL` values, got {other:?}"
         ))),
     }
 }
@@ -331,7 +338,7 @@ fn parse_open_arguments(
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [path_term, flags_term, mode_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::open` must receive a `Slice u8` path, flags, and mode".to_string(),
+            "`IO::open` must receive an `ArrayVL u8` path, flags, and mode".to_string(),
         ));
     };
 
@@ -345,7 +352,7 @@ fn parse_open_arguments(
         } => OpenPath::Array(slot),
         other => {
             return Err(Error::Unsupported(format!(
-                "`IO::open` expects a `Slice u8` path, `u8` array, or CLI argument as its first argument, got {other:?}"
+                "`IO::open` expects an `ArrayVL u8` path, `u8` array, or CLI argument as its first argument, got {other:?}"
             )));
         }
     };
@@ -442,7 +449,7 @@ fn parse_array_new_arguments(
         Ok(length) => Some(usize::try_from(length).map_err(|_| {
             Error::Unsupported(format!("`IO::{builtin_name}` length must be non-negative"))
         })?),
-        Err(_) if builtin_name == "slice_new" => None,
+        Err(_) if builtin_name == "arrayvl_new" => None,
         Err(error) => return Err(error),
     };
     let length = lower_i32_expr(length, state).map_err(|_| {

@@ -6,21 +6,21 @@
 #use std_core::primitive::u8::u8_eq;
 
 #bind_builtin "Array" #as Array;
-#bind_builtin "Slice" #as Slice;
+#bind_builtin "ArrayVL" #as ArrayVL;
 
 #type DynArray : (t : Type[0]) -> Type[0] {
-    dyn_array : (t : Type[0]) -> Slice t -> i64 -> DynArray t,
+    dyn_array : (t : Type[0]) -> ArrayVL t -> i64 -> DynArray t,
 }
 
-#fn dyn_array_slice : (t : Type[0]) -> (array : DynArray t) -> Slice t {
+#fn dyn_array_arrayvl : (t : Type[0]) -> (array : DynArray t) -> ArrayVL t {
     #match array {
-        DynArray::dyn_array _ slice _ => slice,
+        DynArray::dyn_array _ arrayvl _ => arrayvl,
     }
 }
 
 #fn dyn_array_capacity : (t : Type[0]) -> (array : DynArray t) -> i32 {
-    #let slice : Slice t = dyn_array_slice t array;
-    slice .> len
+    #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
+    arrayvl .> len
 }
 
 #fn dyn_array_len : (t : Type[0]) -> (array : DynArray t) -> i32 {
@@ -30,17 +30,17 @@
 }
 
 #fn dyn_array_get : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> t {
-    #let slice : Slice t = dyn_array_slice t array;
-    slice .> get (i64_from_i32 index)
+    #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
+    arrayvl .> get (i64_from_i32 index)
 }
 
 #proc dyn_array_set : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> (value : t) -> () {
-    #let slice : Slice t = dyn_array_slice t array;
-    slice .> set (i64_from_i32 index) value;
+    #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
+    arrayvl .> set (i64_from_i32 index) value;
     ()
 }
 
-#proc dyn_array_copy_into : (t : Type[0]) -> (source : DynArray t) -> (dest_ref : &^ Slice t) -> () {
+#proc dyn_array_copy_into : (t : Type[0]) -> (source : DynArray t) -> (dest_ref : &^ ArrayVL t) -> () {
     #let index_ref : i32 = 0i32;
     #let len : i32 = dyn_array_len t source;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
@@ -58,10 +58,11 @@
     #let array : DynArray t = array_ref .> get;
     #let capacity : i32 = dyn_array_capacity t array;
     #let next_capacity : i32 = i32_mul capacity 2i32;
-    #let slice_ref : Slice t = dyn_array_slice t array;
-    #let next_slice_ref : &^ Slice t <- IO::slice_new t next_capacity;
-    dyn_array_copy_into t array next_slice_ref;
-    #let _ : () <- IO::slice_replace t slice_ref next_slice_ref;
+    #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
+    #let next_arrayvl : ArrayVL t <- IO::arrayvl_new t next_capacity;
+    #letref #excl next_arrayvl_ref : &^ ArrayVL t #borrow next_arrayvl;
+    dyn_array_copy_into t array next_arrayvl_ref;
+    #let _ : () <- IO::arrayvl_replace t arrayvl next_arrayvl;
     ()
 }
 
@@ -74,17 +75,17 @@
     };
     #let grown_array : DynArray t = array_ref .> get;
     dyn_array_set t grown_array len value;
-    array_ref .> set (DynArray::dyn_array t (dyn_array_slice t grown_array) (i64_from_i32 (i32_add len 1i32)));
+    array_ref .> set (DynArray::dyn_array t (dyn_array_arrayvl t grown_array) (i64_from_i32 (i32_add len 1i32)));
     ()
 }
 
-#proc append_u8 : (dest_ref : &^ Slice u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () {
+#proc append_u8 : (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () {
     dest_ref .> set (dest_index_ref .> get) byte;
     dest_index_ref .> set (i32_add (dest_index_ref .> get) 1i32);
     ()
 }
 
-#proc append_nul_terminated_u8 : (source_ref : & Array u8) -> (dest_ref : &^ Slice u8) -> (dest_index_ref : &^ i32) -> () {
+#proc append_nul_terminated_u8 : (source_ref : & Array u8) -> (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> () {
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     #loop {
@@ -98,7 +99,7 @@
     ()
 }
 
-#proc append_dyn_nul_terminated_u8 : (source_ref : & Slice u8) -> (dest_ref : &^ Slice u8) -> (dest_index_ref : &^ i32) -> () {
+#proc append_dyn_nul_terminated_u8 : (source_ref : & ArrayVL u8) -> (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> () {
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     #loop {
@@ -112,7 +113,7 @@
     ()
 }
 
-#proc fill_u8 : (dest_ref : &^ Slice u8) -> (byte : u8) -> () {
+#proc fill_u8 : (dest_ref : &^ ArrayVL u8) -> (byte : u8) -> () {
     #let index_ref : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
     #loop {
@@ -126,9 +127,9 @@
 }
 
 #pub #use Array;
-#pub #use Slice;
+#pub #use ArrayVL;
 #pub #use DynArray;
-#pub #use dyn_array_slice;
+#pub #use dyn_array_arrayvl;
 #pub #use dyn_array_capacity;
 #pub #use dyn_array_len;
 #pub #use dyn_array_get;

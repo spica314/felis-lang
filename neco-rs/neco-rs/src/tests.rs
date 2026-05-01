@@ -546,8 +546,8 @@ fn lowers_dyn_array_u8_helpers_fixture_to_runtime_array_operations() {
 }
 
 #[test]
-fn lowers_slice_len_fixture_to_runtime_array_len() {
-    let root = repo_root().join("tests/testcases/slice-len");
+fn lowers_arrayvl_len_fixture_to_runtime_array_len() {
+    let root = repo_root().join("tests/testcases/arrayvl-len");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
         panic!("expected package root");
     };
@@ -567,6 +567,44 @@ fn lowers_slice_len_fixture_to_runtime_array_len() {
         vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::ArrayLen {
             array_slot: 0,
         }))]
+    );
+}
+
+#[test]
+fn rejects_direct_arrayvl_new_into_arrayvl_reference() {
+    let source_path = PathBuf::from("src/main.fe");
+    let source = r#"
+#use std_core::io::IO;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let array_ref : &^ ArrayVL u8 <- IO::arrayvl_new u8 42i32;
+    ()
+}
+"#;
+    let (tokens, syntax) = neco_rs_parser::parse_source(source).expect("parse source");
+    let package = ParsedPackage {
+        root_dir: PathBuf::from("."),
+        manifest_path: PathBuf::from("neco-package.json"),
+        manifest: neco_rs_parser::PackageManifest {
+            name: "direct-arrayvl-new-reference".to_string(),
+            dependencies: Vec::new(),
+            felis_lib_entrypoint: None,
+            felis_bin_entrypoints: vec![source_path.clone()],
+        },
+        source_files: vec![neco_rs_parser::ParsedSourceFile {
+            path: source_path,
+            role: neco_rs_parser::SourceFileRole::BinaryEntrypoint,
+            tokens,
+            syntax: syntax.expect("source file syntax"),
+        }],
+    };
+
+    let error = lower_package_to_program(&package).expect_err("lowering must reject old form");
+    assert!(
+        error
+            .to_string()
+            .contains("`IO::arrayvl_new` returns an `ArrayVL T` value")
     );
 }
 

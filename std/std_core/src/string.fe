@@ -1,9 +1,9 @@
 #use std_core::primitive::array::DynArray;
-#use std_core::primitive::array::Slice;
+#use std_core::primitive::array::ArrayVL;
 #use std_core::primitive::array::dyn_array_capacity;
 #use std_core::primitive::array::dyn_array_get;
 #use std_core::primitive::array::dyn_array_len;
-#use std_core::primitive::array::dyn_array_slice;
+#use std_core::primitive::array::dyn_array_arrayvl;
 #use std_core::primitive::array::dyn_array_set;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_eq;
@@ -20,14 +20,14 @@
     String::string array
 }
 
-#fn string_from_slice_parts : (slice : Slice u8) -> (capacity : i32) -> (len : i32) -> String {
-    #let array : DynArray u8 = DynArray::dyn_array u8 slice (i64_from_i32 len);
+#fn string_from_arrayvl_parts : (arrayvl : ArrayVL u8) -> (capacity : i32) -> (len : i32) -> String {
+    #let array : DynArray u8 = DynArray::dyn_array u8 arrayvl (i64_from_i32 len);
     String::string array
 }
 
 #fn string_with_len : (string : String) -> (len : i32) -> String {
     #let array : DynArray u8 = string_as_dyn_array string;
-    String::string (DynArray::dyn_array u8 (dyn_array_slice u8 array) (i64_from_i32 len))
+    String::string (DynArray::dyn_array u8 (dyn_array_arrayvl u8 array) (i64_from_i32 len))
 }
 
 #proc string_copy_from_dyn_array_range_into : (source : DynArray u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
@@ -62,8 +62,8 @@
     }
 }
 
-#fn string_as_slice : (string : String) -> Slice u8 {
-    dyn_array_slice u8 (string_as_dyn_array string)
+#fn string_as_arrayvl : (string : String) -> ArrayVL u8 {
+    dyn_array_arrayvl u8 (string_as_dyn_array string)
 }
 
 #fn string_len : (string : String) -> i32 {
@@ -142,13 +142,13 @@
 
 #pub #use String;
 #pub #use string_from_dyn_array;
-#pub #use string_from_slice_parts;
+#pub #use string_from_arrayvl_parts;
 #pub #use string_with_len;
 #pub #use string_copy_from_dyn_array_range_into;
 #pub #use string_copy_from_string_range_into;
 #pub #use string_copy_from_string_range;
 #pub #use string_as_dyn_array;
-#pub #use string_as_slice;
+#pub #use string_as_arrayvl;
 #pub #use string_len;
 #pub #use string_capacity;
 #pub #use string_get_u8;

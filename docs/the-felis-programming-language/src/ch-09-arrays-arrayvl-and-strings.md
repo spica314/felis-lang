@@ -1,4 +1,4 @@
-# Arrays, Slices, and Strings
+# Arrays, ArrayVL, and Strings
 
 ## Array
 
@@ -21,19 +21,20 @@ Array references can be used as function parameters.
 }
 ```
 
-## Slice
+## ArrayVL
 
-`Slice T` represents a runtime-sized region. Allocate one with `IO::slice_new`.
+`ArrayVL T` represents a runtime-sized region. Allocate one with `IO::arrayvl_new`.
 
 ```felis
-#let slice_ref : &^ Slice u8 <- IO::slice_new u8 42i32;
-#let len : i32 = slice_ref .> len;
+#let arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 42i32;
+#letref #excl arrayvl_ref : &^ ArrayVL u8 #borrow arrayvl;
+#let len : i32 = arrayvl_ref .> len;
 ```
 
-String literals can be used as `Slice u8`.
+String literals can be used as `ArrayVL u8`.
 
 ```felis
-#let path : Slice u8 = "message.txt";
+#let path : ArrayVL u8 = "message.txt";
 ```
 
 ## DynArray
@@ -46,8 +47,9 @@ String literals can be used as `Slice u8`.
 #use std_core::primitive::array::dyn_array_len;
 #use std_core::primitive::array::dyn_array_push;
 
-#let bytes_slice_ref : &^ Slice u8 <- IO::slice_new u8 1i32;
-#let bytes : DynArray u8 = DynArray::dyn_array u8 bytes_slice_ref 0i64;
+#let bytes_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 1i32;
+#letref #excl bytes_arrayvl_ref : &^ ArrayVL u8 #borrow bytes_arrayvl;
+#let bytes : DynArray u8 = DynArray::dyn_array u8 bytes_arrayvl 0i64;
 dyn_array_push u8 bytes 1u8;
 dyn_array_push u8 bytes 2u8;
 #let first : u8 = dyn_array_get u8 bytes 0i32;
@@ -71,11 +73,12 @@ Use `dyn_array_capacity` to read the current capacity.
 #let len : i32 = string_len string;
 ```
 
-Use `string_from_slice_parts` to create a string from existing slice storage. Use `string_with_len` to create a length-bounded string view.
+Use `string_from_arrayvl_parts` to create a string from existing `ArrayVL` storage. Use `string_with_len` to create a length-bounded string view.
 
 ```felis
-#let slice_ref : &^ Slice u8 <- IO::slice_new u8 4i32;
-#let empty : String = string_from_slice_parts slice_ref 4i32 0i32;
+#let arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 4i32;
+#letref #excl arrayvl_ref : &^ ArrayVL u8 #borrow arrayvl;
+#let empty : String = string_from_arrayvl_parts arrayvl 4i32 0i32;
 #let name_len : i32 = 0i32;
 #letref #excl name_len_ref : &^ i32 #borrow name_len;
 string_push_u8_unchecked empty name_len_ref 'f';

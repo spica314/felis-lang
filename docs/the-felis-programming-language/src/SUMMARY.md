@@ -8,6 +8,6 @@
 - [Control Flow](./ch-06-control-flow.md)
 - [Structs and Algebraic Data Types](./ch-07-structs-and-types.md)
 - [References and Mutability](./ch-08-references-and-mutability.md)
-- [Arrays, Slices, and Strings](./ch-09-arrays-slices-and-strings.md)
+- [Arrays, ArrayVL, and Strings](./ch-09-arrays-arrayvl-and-strings.md)
 - [Generics](./ch-10-generics.md)
 - [Modules and Workspaces](./ch-11-modules-and-workspaces.md)

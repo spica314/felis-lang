@@ -8,7 +8,7 @@
 #use std_core::string::mark_string_span_eq;
 #use std_core::string::string_copy_from_dyn_array_range_into;
 #use std_core::string::string_from_dyn_array;
-#use std_core::string::string_from_slice_parts;
+#use std_core::string::string_from_arrayvl_parts;
 #use std_core::string::string_get_u8;
 #use std_core::string::string_len;
 #use std_core::string::string_push_u8_unchecked;
@@ -18,32 +18,36 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let slice_ref : &^ Slice u8 <- IO::slice_new u8 8i32;
-    slice_ref .> set 0i32 40u8;
-    slice_ref .> set 1i32 2u8;
-    #let array : DynArray u8 = DynArray::dyn_array u8 slice_ref 2i64;
+    #let arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 8i32;
+    #letref #excl arrayvl_ref : &^ ArrayVL u8 #borrow arrayvl;
+    arrayvl_ref .> set 0i32 40u8;
+    arrayvl_ref .> set 1i32 2u8;
+    #let array : DynArray u8 = DynArray::dyn_array u8 arrayvl 2i64;
     #let string : String = string_from_dyn_array array;
     #let first : u8 = string_get_u8 string 0i32;
     #let len : i32 = string_len string;
     #let first_code : i32 = i32_from_u8 first;
     #let code : i32 = i32_add first_code len;
 
-    #let source_slice_ref : &^ Slice u8 <- IO::slice_new u8 7i32;
-    source_slice_ref .> set 0i32 'l';
-    source_slice_ref .> set 1i32 'e';
-    source_slice_ref .> set 2i32 't';
-    source_slice_ref .> set 3i32 ' ';
-    source_slice_ref .> set 4i32 'f';
-    source_slice_ref .> set 5i32 'o';
-    source_slice_ref .> set 6i32 'o';
-    #let source : DynArray u8 = DynArray::dyn_array u8 source_slice_ref 7i64;
-    #let copied_slice_ref : &^ Slice u8 <- IO::slice_new u8 3i32;
-    #let copied_dest : String = string_from_slice_parts copied_slice_ref 3i32 0i32;
+    #let source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 7i32;
+    #letref #excl source_arrayvl_ref : &^ ArrayVL u8 #borrow source_arrayvl;
+    source_arrayvl_ref .> set 0i32 'l';
+    source_arrayvl_ref .> set 1i32 'e';
+    source_arrayvl_ref .> set 2i32 't';
+    source_arrayvl_ref .> set 3i32 ' ';
+    source_arrayvl_ref .> set 4i32 'f';
+    source_arrayvl_ref .> set 5i32 'o';
+    source_arrayvl_ref .> set 6i32 'o';
+    #let source : DynArray u8 = DynArray::dyn_array u8 source_arrayvl 7i64;
+    #let copied_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 3i32;
+    #letref #excl copied_arrayvl_ref : &^ ArrayVL u8 #borrow copied_arrayvl;
+    #let copied_dest : String = string_from_arrayvl_parts copied_arrayvl 3i32 0i32;
     string_copy_from_dyn_array_range_into source 4i32 7i32 copied_dest;
     #let copied_name : String = string_with_len copied_dest 3i32;
 
-    #let name_slice_ref : &^ Slice u8 <- IO::slice_new u8 4i32;
-    #let empty_name : String = string_from_slice_parts name_slice_ref 4i32 0i32;
+    #let name_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 4i32;
+    #letref #excl name_arrayvl_ref : &^ ArrayVL u8 #borrow name_arrayvl;
+    #let empty_name : String = string_from_arrayvl_parts name_arrayvl 4i32 0i32;
     #let name_len_ref : i32 = 0i32;
     #letref #excl name_len_ref : &^ i32 #borrow name_len_ref;
     string_push_u8_unchecked empty_name name_len_ref 'f';

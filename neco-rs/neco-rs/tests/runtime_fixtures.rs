@@ -399,9 +399,9 @@ fn compiles_and_runs_dyn_array_u8_helpers_fixture() {
 }
 
 #[test]
-fn compiles_and_runs_slice_len_fixture() {
-    let root = repo_root().join("tests/testcases/slice-len");
-    let status = run_fixture_status(&root, "slice-len");
+fn compiles_and_runs_arrayvl_len_fixture() {
+    let root = repo_root().join("tests/testcases/arrayvl-len");
+    let status = run_fixture_status(&root, "arrayvl-len");
     assert_eq!(status.code(), Some(42));
 }
 

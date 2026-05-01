@@ -47,7 +47,7 @@ Functions that use IO are annotated with `#with IO`.
 
 #fn main : () #with IO {
     #let stdout : FileDescriptor <- IO::stdout;
-    #let message : Slice u8 = "Hello\n";
+    #let message : ArrayVL u8 = "Hello\n";
     #let _ : () <- IO::write stdout message 6i32;
     ()
 }
@@ -67,7 +67,7 @@ File descriptors are obtained from `IO::stdin`, `IO::stdout`, and `IO::open`.
 #let fd : FileDescriptor <- IO::open "message.txt" 0i32 0i32;
 ```
 
-To read from a file or standard input, allocate an `Array u8` or `Slice u8` buffer and pass it to `IO::read`. The returned value is the number of bytes read.
+To read from a file or standard input, allocate an `Array u8` or `ArrayVL u8` buffer and pass it to `IO::read`. The returned value is the number of bytes read.
 
 ```felis
 #let bytes_ref : &^ Array u8 1000i32 <- IO::array_new u8 1000i32;
@@ -78,19 +78,20 @@ To read from a file or standard input, allocate an `Array u8` or `Slice u8` buff
 Close files with `IO::close`.
 
 ```felis
-#let path : Slice u8 = "message.txt";
+#let path : ArrayVL u8 = "message.txt";
 #let fd : FileDescriptor <- IO::open path 0i32 0i32;
-#let bytes_ref : &^ Slice u8 <- IO::slice_new u8 128i32;
-#let len : i32 <- IO::read fd bytes_ref 128i32;
+#let bytes_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 128i32;
+#letref #excl bytes_arrayvl_ref : &^ ArrayVL u8 #borrow bytes_arrayvl;
+#let len : i32 <- IO::read fd bytes_arrayvl_ref 128i32;
 #let _ : () <- IO::close fd;
 ```
 
 File-writing code can pass open flags and a mode to `IO::open`. For example, `577i32` and `420i32` are passed as the flags and mode below.
 
 ```felis
-#let path : Slice u8 = "created.txt";
+#let path : ArrayVL u8 = "created.txt";
 #let fd : FileDescriptor <- IO::open path 577i32 420i32;
-#let message : Slice u8 = "open/write/close fixture\n";
+#let message : ArrayVL u8 = "open/write/close fixture\n";
 #let _ : () <- IO::write fd message 25i32;
 #let _ : () <- IO::close fd;
 ```

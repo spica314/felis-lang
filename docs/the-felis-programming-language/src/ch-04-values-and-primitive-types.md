@@ -1,6 +1,6 @@
 # Values and Primitive Types
 
-Felis provides primitive types such as `i32`, `i64`, `u8`, `bool`, `()`, `Array`, and `Slice`.
+Felis provides primitive types such as `i32`, `i64`, `u8`, `bool`, `()`, `Array`, and `ArrayVL`.
 
 ## Integers
 
@@ -109,8 +109,8 @@ Character literals can be used as `u8` values.
 #let c : u8 = 'f';
 ```
 
-String literals are used as `Slice u8`.
+String literals are used as `ArrayVL u8`.
 
 ```felis
-#let message : Slice u8 = "Hello, world!\n";
+#let message : ArrayVL u8 = "Hello, world!\n";
 ```

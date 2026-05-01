@@ -1,0 +1,4 @@
+{
+    "name": "arrayvl-len",
+    "felis-bin-entrypoints": ["src/arrayvl-len.fe"]
+}
