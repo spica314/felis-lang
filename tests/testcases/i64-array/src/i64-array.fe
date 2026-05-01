@@ -5,7 +5,7 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let array_ref : &^ Array i64 3i32 <- IO::array_new i64 3i32;
+    #let array_ref : Array i64 3i32 <- IO::array_new i64 3i32;
     array_ref .> set 0i64 10i64;
     array_ref .> set 1i64 20i64;
     array_ref .> set 2i64 12i64;

@@ -162,7 +162,7 @@
 #proc write_exit_elf : (code : i32) -> () #with IO {
     #let path_ref : ArrayVL u8 = "a.out";
     #let fd : FileDescriptor <- IO::open path_ref 577i32 493i32;
-    #let bytes_ref : &^ Array u8 132i32 <- IO::array_new u8 132i32;
+    #let bytes_ref : Array u8 132i32 <- IO::array_new u8 132i32;
     set_elf_header bytes_ref;
     set_program_header bytes_ref;
     set_exit_code bytes_ref code;
@@ -173,7 +173,7 @@
 
 #fn main : () #with IO {
     #let stdin : FileDescriptor <- IO::stdin;
-    #let source_ref : &^ Array u8 1024i32 <- IO::array_new u8 1024i32;
+    #let source_ref : Array u8 1024i32 <- IO::array_new u8 1024i32;
     #let _ : i32 <- IO::read stdin source_ref 1024i32;
     #let parsed : ParsedSourceFile = parse_source source_ref;
     write_exit_elf parsed.exit_code;

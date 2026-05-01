@@ -70,7 +70,7 @@ File descriptors are obtained from `IO::stdin`, `IO::stdout`, and `IO::open`.
 To read from a file or standard input, allocate an `Array u8` or `ArrayVL u8` buffer and pass it to `IO::read`. The returned value is the number of bytes read.
 
 ```felis
-#let bytes_ref : &^ Array u8 1000i32 <- IO::array_new u8 1000i32;
+#let bytes_ref : Array u8 1000i32 <- IO::array_new u8 1000i32;
 #let len : i32 <- IO::read stdin bytes_ref 1000i32;
 #let _ : () <- IO::write stdout bytes_ref len;
 ```

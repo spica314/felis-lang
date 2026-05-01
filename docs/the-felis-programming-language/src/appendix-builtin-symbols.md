@@ -96,7 +96,7 @@ All `IO` operations must be used in a function or procedure annotated with `#wit
 | `IO::open` | `(path : Array u8 n or ArrayVL u8) -> (flags : i32) -> (mode : i32) -> FileDescriptor`; opens a path and returns a descriptor. |
 | `IO::close` | `(fd : FileDescriptor) -> ()`; closes a descriptor. |
 | `IO::exit` | `(code : i32 or i64 or u8) -> ()`; terminates the process with the given exit code. |
-| `IO::array_new` | `(t : Type[0]) -> (len : i32) -> &^ Array t len`; allocates a fixed-size array. |
+| `IO::array_new` | `(t : Type[0]) -> (len : i32) -> Array t len`; allocates a fixed-size array. |
 | `IO::arrayvl_new` | `(t : Type[0]) -> (len : i32) -> ArrayVL t`; allocates a runtime-sized array value. |
 | `IO::arrayvl_replace` | `(t : Type[0]) -> (dest : ArrayVL t) -> (source : ArrayVL t) -> ()`; replaces the backing storage of a dynamic array. |
 | `IO::arg` | `(index : i32) -> & Array u8`; returns a command-line argument as a byte array reference. |

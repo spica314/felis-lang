@@ -609,6 +609,44 @@ fn rejects_direct_arrayvl_new_into_arrayvl_reference() {
 }
 
 #[test]
+fn rejects_direct_array_new_into_array_reference() {
+    let source_path = PathBuf::from("src/main.fe");
+    let source = r#"
+#use std_core::io::IO;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let array_ref : &^ Array i32 4i32 <- IO::array_new i32 4i32;
+    ()
+}
+"#;
+    let (tokens, syntax) = neco_rs_parser::parse_source(source).expect("parse source");
+    let package = ParsedPackage {
+        root_dir: PathBuf::from("."),
+        manifest_path: PathBuf::from("neco-package.json"),
+        manifest: neco_rs_parser::PackageManifest {
+            name: "direct-array-new-reference".to_string(),
+            dependencies: Vec::new(),
+            felis_lib_entrypoint: None,
+            felis_bin_entrypoints: vec![source_path.clone()],
+        },
+        source_files: vec![neco_rs_parser::ParsedSourceFile {
+            path: source_path,
+            role: neco_rs_parser::SourceFileRole::BinaryEntrypoint,
+            tokens,
+            syntax: syntax.expect("source file syntax"),
+        }],
+    };
+
+    let error = lower_package_to_program(&package).expect_err("lowering must reject old form");
+    assert!(
+        error
+            .to_string()
+            .contains("`IO::array_new` returns an `Array T len` value")
+    );
+}
+
+#[test]
 fn lowers_i32_reference_annotation_fixture_to_runtime_expression_tree() {
     let root = repo_root().join("tests/testcases/i32-reference-annotation");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

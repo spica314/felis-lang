@@ -2,10 +2,10 @@
 
 ## Array
 
-Fixed-size arrays are written as `Array T N`. Examples that allocate arrays through IO receive a mutable reference, such as `&^ Array T N`.
+Fixed-size arrays are written as `Array T N`. Examples that allocate arrays through IO now return the array value, which can then be used as an `&^ Array T N` by borrowing.
 
 ```felis
-#let array_ref : &^ Array i32 4i32 <- IO::array_new i32 4i32;
+#let array_ref : Array i32 4i32 <- IO::array_new i32 4i32;
 array_ref .> set 0i32 7i32;
 array_ref .> set 1i32 14i32;
 #let first : i32 = array_ref .> get 0i32;

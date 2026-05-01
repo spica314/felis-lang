@@ -151,10 +151,15 @@ pub(crate) fn lower_io_call(
                     Ok(value) => value,
                     Err(err) => return Some(Err(err)),
                 };
-            if path[1] == "arrayvl_new" && matches!(ty, Term::Reference { .. }) {
-                return Some(Err(Error::Unsupported(
-                    "`IO::arrayvl_new` returns an `ArrayVL T` value; use `#let` for the value, then `#letref #excl` to borrow it"
-                        .to_string(),
+            if matches!(path[1], "array_new" | "arrayvl_new") && matches!(ty, Term::Reference { .. }) {
+                let expected = if path[1] == "array_new" {
+                    "Array T len"
+                } else {
+                    "ArrayVL T"
+                };
+                return Some(Err(Error::Unsupported(format!(
+                    "`IO::{}` returns an `{}` value; use `#let` for the value, then `#letref #excl` to borrow it",
+                    path[1], expected
                 )));
             }
             let kind = match path[1] {
