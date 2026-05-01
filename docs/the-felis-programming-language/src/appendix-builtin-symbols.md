@@ -1,0 +1,102 @@
+# Appendix: Builtin Symbols
+
+Builtin symbols are compiler-provided values that the standard library exposes with `#bind_builtin`.
+Import them through `std_core` modules instead of relying on implicit names.
+
+## Types, Values, and Effects
+
+| Symbol | Type | Description |
+| --- | --- | --- |
+| `i32` | `Type[0]` | Signed 32-bit integer type used by integer literals with the `i32` suffix. |
+| `i64` | `Type[0]` | Signed 64-bit integer type used by integer literals with the `i64` suffix. |
+| `u8` | `Type[0]` | Unsigned 8-bit integer type used by byte values and character literals. |
+| `bool` | `Type[0]` | Boolean type used by `#if` and comparison results. |
+| `true` | `bool` | Boolean true value. |
+| `false` | `bool` | Boolean false value. |
+| `Array` | `(t : Type[0]) -> (len : i32) -> Type[0]` | Fixed-size array type constructor; the length must be a constant `i32` literal. |
+| `ArrayVL` | `(t : Type[0]) -> Type[0]` | Runtime-sized array value type constructor. |
+| `IO` | effect | Effect marker used by functions that perform builtin IO operations. |
+| `FileDescriptor` | `Type[0]` | File descriptor value type returned by IO descriptor operations. |
+
+## `i32` Functions
+
+| Symbol | Description |
+| --- | --- |
+| `i32_add` | `(lhs : i32) -> (rhs : i32) -> i32`; returns `lhs + rhs`. |
+| `i32_sub` | `(lhs : i32) -> (rhs : i32) -> i32`; returns `lhs - rhs`. |
+| `i32_mul` | `(lhs : i32) -> (rhs : i32) -> i32`; returns `lhs * rhs`. |
+| `i32_div` | `(lhs : i32) -> (rhs : i32) -> i32`; returns integer division of `lhs` by `rhs`. |
+| `i32_mod` | `(lhs : i32) -> (rhs : i32) -> i32`; returns the remainder of `lhs / rhs`. |
+| `i32_eq` | `(lhs : i32) -> (rhs : i32) -> bool`; returns whether the two values are equal. |
+| `i32_lte` | `(lhs : i32) -> (rhs : i32) -> bool`; returns whether `lhs <= rhs`. |
+| `i32_lt` | `(lhs : i32) -> (rhs : i32) -> bool`; returns whether `lhs < rhs`. |
+| `i32_gte` | `(lhs : i32) -> (rhs : i32) -> bool`; returns whether `lhs >= rhs`. |
+| `i32_gt` | `(lhs : i32) -> (rhs : i32) -> bool`; returns whether `lhs > rhs`. |
+| `i32_from_u8` | `(value : u8) -> i32`; converts a `u8` value to `i32`. |
+| `i32_from_i64` | `(value : i64) -> i32`; converts an `i64` value to `i32`. |
+
+## `i64` Functions
+
+| Symbol | Description |
+| --- | --- |
+| `i64_add` | `(lhs : i64) -> (rhs : i64) -> i64`; returns `lhs + rhs`. |
+| `i64_sub` | `(lhs : i64) -> (rhs : i64) -> i64`; returns `lhs - rhs`. |
+| `i64_mul` | `(lhs : i64) -> (rhs : i64) -> i64`; returns `lhs * rhs`. |
+| `i64_div` | `(lhs : i64) -> (rhs : i64) -> i64`; returns integer division of `lhs` by `rhs`. |
+| `i64_mod` | `(lhs : i64) -> (rhs : i64) -> i64`; returns the remainder of `lhs / rhs`. |
+| `i64_eq` | `(lhs : i64) -> (rhs : i64) -> bool`; returns whether the two values are equal. |
+| `i64_lte` | `(lhs : i64) -> (rhs : i64) -> bool`; returns whether `lhs <= rhs`. |
+| `i64_lt` | `(lhs : i64) -> (rhs : i64) -> bool`; returns whether `lhs < rhs`. |
+| `i64_gte` | `(lhs : i64) -> (rhs : i64) -> bool`; returns whether `lhs >= rhs`. |
+| `i64_gt` | `(lhs : i64) -> (rhs : i64) -> bool`; returns whether `lhs > rhs`. |
+| `i64_from_i32` | `(value : i32) -> i64`; converts an `i32` value to `i64`. |
+| `i64_from_u8` | `(value : u8) -> i64`; converts a `u8` value to `i64`. |
+
+## `u8` Functions
+
+| Symbol | Description |
+| --- | --- |
+| `u8_add` | `(lhs : u8) -> (rhs : u8) -> u8`; returns `lhs + rhs`. |
+| `u8_sub` | `(lhs : u8) -> (rhs : u8) -> u8`; returns `lhs - rhs`. |
+| `u8_mul` | `(lhs : u8) -> (rhs : u8) -> u8`; returns `lhs * rhs`. |
+| `u8_div` | `(lhs : u8) -> (rhs : u8) -> u8`; returns integer division of `lhs` by `rhs`. |
+| `u8_mod` | `(lhs : u8) -> (rhs : u8) -> u8`; returns the remainder of `lhs / rhs`. |
+| `u8_eq` | `(lhs : u8) -> (rhs : u8) -> bool`; returns whether the two values are equal. |
+| `u8_lte` | `(lhs : u8) -> (rhs : u8) -> bool`; returns whether `lhs <= rhs`. |
+| `u8_lt` | `(lhs : u8) -> (rhs : u8) -> bool`; returns whether `lhs < rhs`. |
+| `u8_gte` | `(lhs : u8) -> (rhs : u8) -> bool`; returns whether `lhs >= rhs`. |
+| `u8_gt` | `(lhs : u8) -> (rhs : u8) -> bool`; returns whether `lhs > rhs`. |
+
+## `bool` Functions
+
+| Symbol | Description |
+| --- | --- |
+| `bool_and` | `(lhs : bool) -> (rhs : bool) -> bool`; returns logical conjunction. |
+| `bool_or` | `(lhs : bool) -> (rhs : bool) -> bool`; returns logical disjunction. |
+| `bool_not` | `(value : bool) -> bool`; returns logical negation. |
+
+## Array Operations
+
+| Symbol | Description |
+| --- | --- |
+| `.> get` | `(index : i32) -> t`; reads one element from an `Array t n` or `ArrayVL t`. |
+| `.> set` | `(index : i32) -> (value : t) -> ()`; writes one element through an exclusive array reference. |
+| `.> len` | `i32`; returns the runtime length of an `ArrayVL t`. |
+
+## `IO` Operations
+
+All `IO` operations must be used in a function or procedure annotated with `#with IO`.
+
+| Symbol | Description |
+| --- | --- |
+| `IO::stdin` | `FileDescriptor`; returns the standard input descriptor. |
+| `IO::stdout` | `FileDescriptor`; returns the standard output descriptor. |
+| `IO::read` | `(fd : FileDescriptor) -> (buffer : Array u8 n or ArrayVL u8) -> (len : i32) -> i32`; reads bytes and returns the byte count. |
+| `IO::write` | `(fd : FileDescriptor) -> (bytes : Array u8 n or ArrayVL u8) -> (len : i32) -> ()`; writes bytes to a descriptor. |
+| `IO::open` | `(path : Array u8 n or ArrayVL u8) -> (flags : i32) -> (mode : i32) -> FileDescriptor`; opens a path and returns a descriptor. |
+| `IO::close` | `(fd : FileDescriptor) -> ()`; closes a descriptor. |
+| `IO::exit` | `(code : i32 or i64 or u8) -> ()`; terminates the process with the given exit code. |
+| `IO::array_new` | `(t : Type[0]) -> (len : i32) -> &^ Array t len`; allocates a fixed-size array. |
+| `IO::arrayvl_new` | `(t : Type[0]) -> (len : i32) -> ArrayVL t`; allocates a runtime-sized array value. |
+| `IO::arrayvl_replace` | `(t : Type[0]) -> (dest : ArrayVL t) -> (source : ArrayVL t) -> ()`; replaces the backing storage of a dynamic array. |
+| `IO::arg` | `(index : i32) -> & Array u8`; returns a command-line argument as a byte array reference. |
