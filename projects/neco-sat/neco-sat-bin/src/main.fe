@@ -1,0 +1,319 @@
+#use std_core::io::FileDescriptor;
+#use std_core::io::IO;
+#use std_core::primitive::bool::bool_and;
+#use std_core::primitive::bool::bool_or;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_div;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::i32::i32_from_u8;
+#use std_core::primitive::i32::i32_gt;
+#use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_lt;
+#use std_core::primitive::i32::i32_mod;
+#use std_core::primitive::i32::i32_mul;
+#use std_core::primitive::i32::i32_sub;
+#use std_core::primitive::u8::u8_eq;
+#use std_core::primitive::u8::u8_gte;
+#use std_core::primitive::u8::u8_lte;
+
+#entrypoint main;
+
+#fn literal_satisfied_flag : (assignments_ref : &^ Array i32 12i32) -> (lit_var : i32) -> (lit_negated : i32) -> i32 {
+    #let assigned : i32 = assignments_ref .> get lit_var;
+    i32_mod (i32_add assigned lit_negated) 2i32
+}
+
+#proc skip_line : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> () {
+    #loop {
+        #if i32_gte (index_ref .> get) len {
+            #break;
+        };
+        #let byte : u8 = bytes_ref .> get (index_ref .> get);
+        index_ref .> set (i32_add (index_ref .> get) 1i32);
+        #if u8_eq byte '\n' {
+            #break;
+        };
+    };
+    ()
+}
+
+#proc skip_spaces : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> () {
+    #let done : i32 = 0i32;
+    #letref #excl done : &^ i32 #borrow done;
+    #loop {
+        #if i32_gte (index_ref .> get) len {
+            #break;
+        };
+        #let byte : u8 = bytes_ref .> get (index_ref .> get);
+        #if bool_or (bool_or (u8_eq byte ' ') (u8_eq byte '\t')) (u8_eq byte '\r') {
+            index_ref .> set (i32_add (index_ref .> get) 1i32);
+        } #else {
+            done .> set 1i32;
+        };
+        #if i32_eq (done .> get) 1i32 {
+            #break;
+        };
+    };
+    ()
+}
+
+#proc parse_header : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> (ok_ref : &^ i32) -> () {
+    ok_ref .> set 0i32;
+    #loop {
+        #if i32_gte (index_ref .> get) len {
+            #break;
+        };
+        skip_spaces bytes_ref len index_ref;
+        #if i32_gte (index_ref .> get) len {
+            #break;
+        };
+        #let byte : u8 = bytes_ref .> get (index_ref .> get);
+        #if u8_eq byte 'c' {
+            skip_line bytes_ref len index_ref;
+        } #else #if u8_eq byte '\n' {
+            index_ref .> set (i32_add (index_ref .> get) 1i32);
+        } #else #if u8_eq byte 'p' {
+            ok_ref .> set 1i32;
+            skip_line bytes_ref len index_ref;
+            #break;
+        } #else {
+            skip_line bytes_ref len index_ref;
+        };
+    };
+    ()
+}
+
+#proc parse_clause_literals : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (var_count_ref : &^ i32) -> (clause_count_ref : &^ i32) -> (literal_count_ref : &^ i32) -> (ok_ref : &^ i32) -> () {
+    clause_starts_ref .> set 0i32 0i32;
+    #let value : i32 = 0i32;
+    #letref #excl value : &^ i32 #borrow value;
+    #let sign : i32 = 0i32;
+    #letref #excl sign : &^ i32 #borrow sign;
+    #let in_number : i32 = 0i32;
+    #letref #excl in_number : &^ i32 #borrow in_number;
+    #loop {
+        #if i32_gte (index_ref .> get) len {
+            #break;
+        };
+        skip_spaces bytes_ref len index_ref;
+        #if i32_gte (index_ref .> get) len {
+            #break;
+        };
+        #let byte : u8 = bytes_ref .> get (index_ref .> get);
+        #if u8_eq byte 'c' {
+            skip_line bytes_ref len index_ref;
+        } #else #if u8_eq byte '\n' {
+            index_ref .> set (i32_add (index_ref .> get) 1i32);
+        } #else {
+            sign .> set 0i32;
+            value .> set 0i32;
+            in_number .> set 0i32;
+            #if i32_eq (i32_from_u8 byte) 45i32 {
+                sign .> set 1i32;
+                index_ref .> set (i32_add (index_ref .> get) 1i32);
+            };
+            #loop {
+                #if i32_gte (index_ref .> get) len {
+                    #break;
+                };
+                #let digit : u8 = bytes_ref .> get (index_ref .> get);
+                #if bool_and (u8_gte digit '0') (u8_lte digit '9') {
+                    in_number .> set 1i32;
+                    value .> set (i32_add (i32_mul (value .> get) 10i32) (i32_sub (i32_from_u8 digit) 48i32));
+                    index_ref .> set (i32_add (index_ref .> get) 1i32);
+                } #else {
+                    #break;
+                };
+            };
+            #if i32_eq (in_number .> get) 0i32 {
+                index_ref .> set (i32_add (index_ref .> get) 1i32);
+            } #else #if i32_eq (value .> get) 0i32 {
+                #if i32_gte (clause_count_ref .> get) 256i32 {
+                    ok_ref .> set 0i32;
+                    #break;
+                };
+                clause_ends_ref .> set (clause_count_ref .> get) (literal_count_ref .> get);
+                clause_count_ref .> set (i32_add (clause_count_ref .> get) 1i32);
+                #if i32_lt (clause_count_ref .> get) 256i32 {
+                    clause_starts_ref .> set (clause_count_ref .> get) (literal_count_ref .> get);
+                };
+            } #else {
+                #if i32_gt (value .> get) 12i32 {
+                    ok_ref .> set 0i32;
+                    #break;
+                };
+                #if i32_gte (literal_count_ref .> get) 2048i32 {
+                    ok_ref .> set 0i32;
+                    #break;
+                };
+                #if i32_gt (value .> get) (var_count_ref .> get) {
+                    var_count_ref .> set (value .> get);
+                };
+                lit_vars_ref .> set (literal_count_ref .> get) (i32_sub (value .> get) 1i32);
+                lit_negated_ref .> set (literal_count_ref .> get) (sign .> get);
+                literal_count_ref .> set (i32_add (literal_count_ref .> get) 1i32);
+            };
+        };
+    };
+    ()
+}
+
+#proc clause_satisfied_flag : (assignments_ref : &^ Array i32 12i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (clause_index : i32) -> (result_ref : &^ i32) -> () {
+    result_ref .> set 0i32;
+    #let literal_index : i32 = clause_starts_ref .> get clause_index;
+    #letref #excl literal_index : &^ i32 #borrow literal_index;
+    #let literal_end : i32 = clause_ends_ref .> get clause_index;
+    #loop {
+        #if i32_gte (literal_index .> get) literal_end {
+            #break;
+        };
+        #let lit_var : i32 = lit_vars_ref .> get (literal_index .> get);
+        #let lit_negated : i32 = lit_negated_ref .> get (literal_index .> get);
+        #let lit_sat : i32 = literal_satisfied_flag assignments_ref lit_var lit_negated;
+        #if i32_eq lit_sat 1i32 {
+            result_ref .> set 1i32;
+            #break;
+        };
+        literal_index .> set (i32_add (literal_index .> get) 1i32);
+    };
+    ()
+}
+
+#proc formula_satisfied_flag : (assignments_ref : &^ Array i32 12i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (clause_count : i32) -> (result_ref : &^ i32) -> () {
+    result_ref .> set 1i32;
+    #let clause_index : i32 = 0i32;
+    #letref #excl clause_index : &^ i32 #borrow clause_index;
+    #let clause_sat : i32 = 0i32;
+    #letref #excl clause_sat : &^ i32 #borrow clause_sat;
+    #loop {
+        #if i32_gte (clause_index .> get) clause_count {
+            #break;
+        };
+        clause_satisfied_flag assignments_ref lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref (clause_index .> get) clause_sat;
+        #if i32_eq (clause_sat .> get) 0i32 {
+            result_ref .> set 0i32;
+            #break;
+        };
+        clause_index .> set (i32_add (clause_index .> get) 1i32);
+    };
+    ()
+}
+
+#proc assign_from_mask : (assignments_ref : &^ Array i32 12i32) -> (var_count : i32) -> (mask : i32) -> () {
+    #let index : i32 = 0i32;
+    #letref #excl index : &^ i32 #borrow index;
+    #let remaining : i32 = mask;
+    #letref #excl remaining : &^ i32 #borrow remaining;
+    #loop {
+        #if i32_gte (index .> get) var_count {
+            #break;
+        };
+        assignments_ref .> set (index .> get) (i32_mod (remaining .> get) 2i32);
+        remaining .> set (i32_div (remaining .> get) 2i32);
+        index .> set (i32_add (index .> get) 1i32);
+    };
+    ()
+}
+
+#proc pow2 : (value : i32) -> (result_ref : &^ i32) -> () {
+    result_ref .> set 1i32;
+    #let index : i32 = 0i32;
+    #letref #excl index : &^ i32 #borrow index;
+    #loop {
+        #if i32_gte (index .> get) value {
+            #break;
+        };
+        result_ref .> set (i32_mul (result_ref .> get) 2i32);
+        index .> set (i32_add (index .> get) 1i32);
+    };
+    ()
+}
+
+#proc solve : (assignments_ref : &^ Array i32 12i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (var_count : i32) -> (clause_count : i32) -> (found_ref : &^ i32) -> () {
+    #let max_mask : i32 = 0i32;
+    #letref #excl max_mask : &^ i32 #borrow max_mask;
+    pow2 var_count max_mask;
+    #let mask : i32 = 0i32;
+    #letref #excl mask : &^ i32 #borrow mask;
+    #let formula_sat : i32 = 0i32;
+    #letref #excl formula_sat : &^ i32 #borrow formula_sat;
+    #loop {
+        #if i32_gte (mask .> get) (max_mask .> get) {
+            #break;
+        };
+        assign_from_mask assignments_ref var_count (mask .> get);
+        formula_satisfied_flag assignments_ref lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref clause_count formula_sat;
+        #if i32_eq (formula_sat .> get) 1i32 {
+            found_ref .> set 1i32;
+            #break;
+        };
+        mask .> set (i32_add (mask .> get) 1i32);
+    };
+    ()
+}
+
+#proc main : () #with IO {
+    #let stdin : FileDescriptor <- IO::stdin;
+    #let stdout : FileDescriptor <- IO::stdout;
+    #let input_ref : &^ Array u8 10000i32 <- IO::array_new u8 10000i32;
+    #let len : i32 <- IO::read stdin input_ref 10000i32;
+    #let sat_ref : &^ Array u8 4i32 <- IO::array_new u8 4i32;
+    sat_ref .> set 0i32 'S';
+    sat_ref .> set 1i32 'A';
+    sat_ref .> set 2i32 'T';
+    sat_ref .> set 3i32 '\n';
+    #let unsat_ref : &^ Array u8 6i32 <- IO::array_new u8 6i32;
+    unsat_ref .> set 0i32 'U';
+    unsat_ref .> set 1i32 'N';
+    unsat_ref .> set 2i32 'S';
+    unsat_ref .> set 3i32 'A';
+    unsat_ref .> set 4i32 'T';
+    unsat_ref .> set 5i32 '\n';
+    #let error_ref : &^ Array u8 6i32 <- IO::array_new u8 6i32;
+    error_ref .> set 0i32 'E';
+    error_ref .> set 1i32 'R';
+    error_ref .> set 2i32 'R';
+    error_ref .> set 3i32 'O';
+    error_ref .> set 4i32 'R';
+    error_ref .> set 5i32 '\n';
+
+    #let assignments_ref : &^ Array i32 12i32 <- IO::array_new i32 12i32;
+    #let lit_vars_ref : &^ Array i32 2048i32 <- IO::array_new i32 2048i32;
+    #let lit_negated_ref : &^ Array i32 2048i32 <- IO::array_new i32 2048i32;
+    #let clause_starts_ref : &^ Array i32 256i32 <- IO::array_new i32 256i32;
+    #let clause_ends_ref : &^ Array i32 256i32 <- IO::array_new i32 256i32;
+
+    #let index : i32 = 0i32;
+    #letref #excl index : &^ i32 #borrow index;
+    #let var_count : i32 = 0i32;
+    #letref #excl var_count : &^ i32 #borrow var_count;
+    #let clause_count : i32 = 0i32;
+    #letref #excl clause_count : &^ i32 #borrow clause_count;
+    #let literal_count : i32 = 0i32;
+    #letref #excl literal_count : &^ i32 #borrow literal_count;
+    #let ok : i32 = 1i32;
+    #letref #excl ok : &^ i32 #borrow ok;
+
+    parse_header input_ref len index ok;
+    #if i32_eq (ok .> get) 1i32 {
+        parse_clause_literals input_ref len index lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref var_count clause_count literal_count ok;
+    };
+
+    #if i32_eq (ok .> get) 0i32 {
+        #let _ : () <- IO::write stdout error_ref 6i32;
+        #let _ : () <- IO::exit 2i32;
+    };
+
+    #let found : i32 = 0i32;
+    #letref #excl found : &^ i32 #borrow found;
+    solve assignments_ref lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref (var_count .> get) (clause_count .> get) found;
+
+    #if i32_eq (found .> get) 1i32 {
+        #let _ : () <- IO::write stdout sat_ref 4i32;
+        #let _ : () <- IO::exit 10i32;
+    } #else {
+        #let _ : () <- IO::write stdout unsat_ref 6i32;
+        #let _ : () <- IO::exit 20i32;
+    };
+    ()
+}
