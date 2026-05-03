@@ -260,33 +260,23 @@
 #proc main : () #with IO {
     #let stdin : FileDescriptor <- IO::stdin;
     #let stdout : FileDescriptor <- IO::stdout;
-    #let input_ref : &^ Array u8 10000i32 <- IO::array_new u8 10000i32;
+    #let input : Array u8 10000i32 <- IO::array_new u8 10000i32;
+    #letref #excl input_ref : &^ Array u8 10000i32 #borrow input;
     #let len : i32 <- IO::read stdin input_ref 10000i32;
-    #let sat_ref : &^ Array u8 4i32 <- IO::array_new u8 4i32;
-    array_set sat_ref 0i32 'S';
-    array_set sat_ref 1i32 'A';
-    array_set sat_ref 2i32 'T';
-    array_set sat_ref 3i32 '\n';
-    #let unsat_ref : &^ Array u8 6i32 <- IO::array_new u8 6i32;
-    array_set unsat_ref 0i32 'U';
-    array_set unsat_ref 1i32 'N';
-    array_set unsat_ref 2i32 'S';
-    array_set unsat_ref 3i32 'A';
-    array_set unsat_ref 4i32 'T';
-    array_set unsat_ref 5i32 '\n';
-    #let error_ref : &^ Array u8 6i32 <- IO::array_new u8 6i32;
-    array_set error_ref 0i32 'E';
-    array_set error_ref 1i32 'R';
-    array_set error_ref 2i32 'R';
-    array_set error_ref 3i32 'O';
-    array_set error_ref 4i32 'R';
-    array_set error_ref 5i32 '\n';
+    #let sat_ref : & ArrayVL u8 = "SAT\n";
+    #let unsat_ref : & ArrayVL u8 = "UNSAT\n";
+    #let error_ref : & ArrayVL u8 = "ERROR\n";
 
-    #let assignments_ref : &^ Array i32 12i32 <- IO::array_new i32 12i32;
-    #let lit_vars_ref : &^ Array i32 2048i32 <- IO::array_new i32 2048i32;
-    #let lit_negated_ref : &^ Array i32 2048i32 <- IO::array_new i32 2048i32;
-    #let clause_starts_ref : &^ Array i32 256i32 <- IO::array_new i32 256i32;
-    #let clause_ends_ref : &^ Array i32 256i32 <- IO::array_new i32 256i32;
+    #let assignments : Array i32 12i32 <- IO::array_new i32 12i32;
+    #letref #excl assignments_ref : &^ Array i32 12i32 #borrow assignments;
+    #let lit_vars : Array i32 2048i32 <- IO::array_new i32 2048i32;
+    #letref #excl lit_vars_ref : &^ Array i32 2048i32 #borrow lit_vars;
+    #let lit_negated : Array i32 2048i32 <- IO::array_new i32 2048i32;
+    #letref #excl lit_negated_ref : &^ Array i32 2048i32 #borrow lit_negated;
+    #let clause_starts : Array i32 256i32 <- IO::array_new i32 256i32;
+    #letref #excl clause_starts_ref : &^ Array i32 256i32 #borrow clause_starts;
+    #let clause_ends : Array i32 256i32 <- IO::array_new i32 256i32;
+    #letref #excl clause_ends_ref : &^ Array i32 256i32 #borrow clause_ends;
 
     #let index : i32 = 0i32;
     #letref #excl index : &^ i32 #borrow index;
