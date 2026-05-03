@@ -34,7 +34,7 @@ Array references can be used as function parameters.
 String literals can be used as `& ArrayVL u8`.
 
 ```felis
-#let path : & ArrayVL u8 = "message.txt";
+#let bytes : & ArrayVL u8 = "message.txt";
 ```
 
 ## DynArray

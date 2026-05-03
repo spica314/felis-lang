@@ -6,7 +6,7 @@ use crate::cli::{default_output_path, select_binary_from_package};
 use crate::codegen::build_linux_x86_64_program_executable;
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
-    I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, U8Expr,
+    I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, PathBufSource, U8Expr,
 };
 use crate::lowering::lower_package_to_program;
 
@@ -143,6 +143,135 @@ fn rejects_string_literal_as_arrayvl_value() {
             .to_string()
             .contains("expected a value of type `ArrayVL u8`")
     );
+}
+
+#[test]
+fn rejects_string_literal_as_open_path() {
+    let source_path = PathBuf::from("src/main.fe");
+    let source = r#"
+#use std_core::io::IO;
+#use std_core::io::FileDescriptor;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let fd : FileDescriptor <- IO::open "message.txt" 0i32 0i32;
+    ()
+}
+"#;
+    let (tokens, syntax) = neco_rs_parser::parse_source(source).expect("parse source");
+    let package = ParsedPackage {
+        root_dir: PathBuf::from("."),
+        manifest_path: PathBuf::from("neco-package.json"),
+        manifest: neco_rs_parser::PackageManifest {
+            name: "open-string-path".to_string(),
+            dependencies: Vec::new(),
+            felis_lib_entrypoint: None,
+            felis_bin_entrypoints: vec![source_path.clone()],
+        },
+        source_files: vec![neco_rs_parser::ParsedSourceFile {
+            path: source_path,
+            role: neco_rs_parser::SourceFileRole::BinaryEntrypoint,
+            tokens,
+            syntax: syntax.expect("source file syntax"),
+        }],
+    };
+
+    let error = lower_package_to_program(&package).expect_err("lowering must reject string path");
+    assert!(error.to_string().contains("`IO::open` expects a `PathBuf`"));
+}
+
+#[test]
+fn rejects_arrayvl_as_open_path() {
+    let source_path = PathBuf::from("src/main.fe");
+    let source = r#"
+#use std_core::io::IO;
+#use std_core::io::FileDescriptor;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let path : & ArrayVL u8 = "message.txt";
+    #let fd : FileDescriptor <- IO::open path 0i32 0i32;
+    ()
+}
+"#;
+    let (tokens, syntax) = neco_rs_parser::parse_source(source).expect("parse source");
+    let package = ParsedPackage {
+        root_dir: PathBuf::from("."),
+        manifest_path: PathBuf::from("neco-package.json"),
+        manifest: neco_rs_parser::PackageManifest {
+            name: "open-arrayvl-path".to_string(),
+            dependencies: Vec::new(),
+            felis_lib_entrypoint: None,
+            felis_bin_entrypoints: vec![source_path.clone()],
+        },
+        source_files: vec![neco_rs_parser::ParsedSourceFile {
+            path: source_path,
+            role: neco_rs_parser::SourceFileRole::BinaryEntrypoint,
+            tokens,
+            syntax: syntax.expect("source file syntax"),
+        }],
+    };
+
+    let error = lower_package_to_program(&package).expect_err("lowering must reject ArrayVL path");
+    assert!(error.to_string().contains("`IO::open` expects a `PathBuf`"));
+}
+
+#[test]
+fn lowers_pathbuf_pop_to_runtime_operation() {
+    let source_path = PathBuf::from("src/main.fe");
+    let source = r#"
+#use std_core::io::IO;
+#use std_core::path::PathBuf;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let path : PathBuf <- IO::pathbuf_new 64i32;
+    #letref #excl path_ref : &^ PathBuf #borrow path;
+    #let _ : () <- IO::pathbuf_push path_ref "dir/message.txt";
+    #let _ : () <- IO::pathbuf_pop path_ref;
+    ()
+}
+"#;
+    let (tokens, syntax) = neco_rs_parser::parse_source(source).expect("parse source");
+    let package = ParsedPackage {
+        root_dir: PathBuf::from("."),
+        manifest_path: PathBuf::from("neco-package.json"),
+        manifest: neco_rs_parser::PackageManifest {
+            name: "pathbuf-pop".to_string(),
+            dependencies: Vec::new(),
+            felis_lib_entrypoint: None,
+            felis_bin_entrypoints: vec![source_path.clone()],
+        },
+        source_files: vec![neco_rs_parser::ParsedSourceFile {
+            path: source_path,
+            role: neco_rs_parser::SourceFileRole::BinaryEntrypoint,
+            tokens,
+            syntax: syntax.expect("source file syntax"),
+        }],
+    };
+
+    let program = lower_package_to_program(&package).expect("lower pathbuf pop");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::ArrayAllocDynamic {
+                array_slot: 0,
+                len: I32Expr::Literal(64),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I64Expr::Literal(0),
+                value: U8Expr::Literal(0),
+            },
+            Operation::PathBufPush {
+                path_slot: 0,
+                source: PathBufSource::StaticData(0),
+            },
+            Operation::PathBufPop { path_slot: 0 },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
+        ]
+    );
+    assert_eq!(program.data, vec![b"dir/message.txt\0".to_vec()]);
 }
 
 #[test]
@@ -1505,25 +1634,46 @@ fn lowers_open_read_close_fixture_to_runtime_io_operations() {
     let program = lower_package_to_program(&package).expect("lower fixture");
     assert_eq!(
         program.arrays,
-        vec![ArrayAllocation {
-            slot: 0,
-            len: 128,
-            element_type: ArrayElementType::U8,
-            kind: ArrayKind::Dynamic,
-        }]
+        vec![
+            ArrayAllocation {
+                slot: 0,
+                len: 0,
+                element_type: ArrayElementType::U8,
+                kind: ArrayKind::Dynamic,
+            },
+            ArrayAllocation {
+                slot: 1,
+                len: 128,
+                element_type: ArrayElementType::U8,
+                kind: ArrayKind::Dynamic,
+            },
+        ]
     );
     assert_eq!(
         program.operations,
         vec![
+            Operation::ArrayAllocDynamic {
+                array_slot: 0,
+                len: I32Expr::Literal(32),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I64Expr::Literal(0),
+                value: U8Expr::Literal(0),
+            },
+            Operation::PathBufPush {
+                path_slot: 0,
+                source: PathBufSource::StaticData(0),
+            },
             Operation::Open {
-                path: OpenPath::StaticData(0),
+                path: OpenPath::PathBuf(0),
                 flags: I32Expr::Literal(0),
                 mode: I32Expr::Literal(0),
                 result_slot: 0,
             },
             Operation::Read {
                 fd: I32Expr::Local(0),
-                array_slot: 0,
+                array_slot: 1,
                 len: I32Expr::Literal(128),
                 result_slot: 1,
             },
@@ -1532,7 +1682,7 @@ fn lowers_open_read_close_fixture_to_runtime_io_operations() {
             },
             Operation::WriteArray {
                 fd: I32Expr::Literal(1),
-                array_slot: 0,
+                array_slot: 1,
                 len: I32Expr::Local(1),
             },
             Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
@@ -1550,12 +1700,33 @@ fn lowers_open_write_close_fixture_to_runtime_io_operations() {
     };
 
     let program = lower_package_to_program(&package).expect("lower fixture");
-    assert!(program.arrays.is_empty());
+    assert_eq!(
+        program.arrays,
+        vec![ArrayAllocation {
+            slot: 0,
+            len: 0,
+            element_type: ArrayElementType::U8,
+            kind: ArrayKind::Dynamic,
+        }]
+    );
     assert_eq!(
         program.operations,
         vec![
+            Operation::ArrayAllocDynamic {
+                array_slot: 0,
+                len: I32Expr::Literal(32),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I64Expr::Literal(0),
+                value: U8Expr::Literal(0),
+            },
+            Operation::PathBufPush {
+                path_slot: 0,
+                source: PathBufSource::StaticData(0),
+            },
             Operation::Open {
-                path: OpenPath::StaticData(0),
+                path: OpenPath::PathBuf(0),
                 flags: I32Expr::Literal(577),
                 mode: I32Expr::Literal(420),
                 result_slot: 0,
@@ -1592,15 +1763,28 @@ fn lowers_cli_args_fixture_to_runtime_io_operations() {
     assert_eq!(
         program.operations,
         vec![
+            Operation::ArrayAllocDynamic {
+                array_slot: 0,
+                len: I32Expr::Literal(256),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 0,
+                index: I64Expr::Literal(0),
+                value: U8Expr::Literal(0),
+            },
+            Operation::PathBufPush {
+                path_slot: 0,
+                source: PathBufSource::RuntimeArg(I32Expr::Literal(1)),
+            },
             Operation::Open {
-                path: OpenPath::RuntimeArg(I32Expr::Literal(1)),
+                path: OpenPath::PathBuf(0),
                 flags: I32Expr::Literal(0),
                 mode: I32Expr::Literal(0),
                 result_slot: 0,
             },
             Operation::Read {
                 fd: I32Expr::Local(0),
-                array_slot: 0,
+                array_slot: 1,
                 len: I32Expr::Literal(64),
                 result_slot: 1,
             },
@@ -1609,7 +1793,7 @@ fn lowers_cli_args_fixture_to_runtime_io_operations() {
             },
             Operation::WriteArray {
                 fd: I32Expr::Literal(1),
-                array_slot: 0,
+                array_slot: 1,
                 len: I32Expr::Local(1),
             },
             Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
@@ -1627,12 +1811,20 @@ fn lowers_cli_args_fixture_to_runtime_io_operations() {
     assert!(program.data.is_empty());
     assert_eq!(
         program.arrays,
-        vec![ArrayAllocation {
-            slot: 0,
-            len: 64,
-            element_type: ArrayElementType::U8,
-            kind: ArrayKind::Fixed,
-        }]
+        vec![
+            ArrayAllocation {
+                slot: 0,
+                len: 0,
+                element_type: ArrayElementType::U8,
+                kind: ArrayKind::Dynamic,
+            },
+            ArrayAllocation {
+                slot: 1,
+                len: 64,
+                element_type: ArrayElementType::U8,
+                kind: ArrayKind::Fixed,
+            },
+        ]
     );
     assert_eq!(program.i32_slots, 2);
     assert!(program.requires_argv);
@@ -1657,6 +1849,12 @@ fn lowers_open_array_path_fixture_to_runtime_io_operations() {
             },
             ArrayAllocation {
                 slot: 1,
+                len: 0,
+                element_type: ArrayElementType::U8,
+                kind: ArrayKind::Dynamic,
+            },
+            ArrayAllocation {
+                slot: 2,
                 len: 128,
                 element_type: ArrayElementType::U8,
                 kind: ArrayKind::Fixed,
@@ -1726,15 +1924,28 @@ fn lowers_open_array_path_fixture_to_runtime_io_operations() {
                 index: I64Expr::Literal(11),
                 value: U8Expr::Literal(0x00),
             },
+            Operation::ArrayAllocDynamic {
+                array_slot: 1,
+                len: I32Expr::Literal(32),
+            },
+            Operation::ArraySetU8 {
+                array_slot: 1,
+                index: I64Expr::Literal(0),
+                value: U8Expr::Literal(0),
+            },
+            Operation::PathBufPush {
+                path_slot: 1,
+                source: PathBufSource::Array(0),
+            },
             Operation::Open {
-                path: OpenPath::Array(0),
+                path: OpenPath::PathBuf(1),
                 flags: I32Expr::Literal(0),
                 mode: I32Expr::Literal(0),
                 result_slot: 0,
             },
             Operation::Read {
                 fd: I32Expr::Local(0),
-                array_slot: 1,
+                array_slot: 2,
                 len: I32Expr::Literal(128),
                 result_slot: 1,
             },
@@ -1743,7 +1954,7 @@ fn lowers_open_array_path_fixture_to_runtime_io_operations() {
             },
             Operation::WriteArray {
                 fd: I32Expr::Literal(1),
-                array_slot: 1,
+                array_slot: 2,
                 len: I32Expr::Local(1),
             },
             Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),

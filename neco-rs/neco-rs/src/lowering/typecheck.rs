@@ -105,6 +105,7 @@ pub(crate) fn validate_value_against_type(
                 "u8" if matches!(value, Value::U8(_)) => Ok(()),
                 "bool" if matches!(value, Value::Bool(_)) => Ok(()),
                 "FileDescriptor" if matches!(value, Value::FileDescriptor(_)) => Ok(()),
+                "PathBuf" if matches!(value, Value::PathBuf { .. }) => Ok(()),
                 type_name => match value {
                     Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
                     Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
@@ -225,6 +226,7 @@ fn validate_reference_value_against_type(
             match path.segments[0].lexeme.as_str() {
                 "i32" if matches!(value, Value::I32Reference(_)) => Ok(()),
                 "i64" if matches!(value, Value::I64Reference(_)) => Ok(()),
+                "PathBuf" if matches!(value, Value::PathBuf { .. }) => Ok(()),
                 type_name => match value {
                     Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
                     Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),

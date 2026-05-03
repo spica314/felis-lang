@@ -27,6 +27,9 @@ pub(crate) enum Value {
         len: i32,
     },
     RuntimeArg(I32Expr),
+    PathBuf {
+        slot: usize,
+    },
     I32(I32Expr),
     I32Reference(usize),
     I64(I64Expr),

@@ -1,5 +1,6 @@
 #use std_core::io::IO;
 #use std_core::io::FileDescriptor;
+#use std_core::path::PathBuf;
 #use std_core::primitive::array::Array;
 #use std_core::primitive::array::ArrayVL;
 #use std_core::primitive::bool::bool_not;
@@ -160,7 +161,9 @@
 }
 
 #proc write_exit_elf : (code : i32) -> () #with IO {
-    #let path_ref : & ArrayVL u8 = "a.out";
+    #let path : PathBuf <- IO::pathbuf_new 16i32;
+    #letref #excl path_ref : &^ PathBuf #borrow path;
+    #let _ : () <- IO::pathbuf_push path_ref "a.out";
     #let fd : FileDescriptor <- IO::open path_ref 577i32 493i32;
     #let bytes_ref : Array u8 132i32 <- IO::array_new u8 132i32;
     set_elf_header bytes_ref;

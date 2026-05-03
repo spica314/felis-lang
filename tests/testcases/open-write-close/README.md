@@ -2,7 +2,7 @@
 
 This example follows the Linux syscall shape:
 
-- `IO::open path_bytes flags mode` returns a file descriptor.
+- `IO::open path flags mode` returns a file descriptor from a `PathBuf`.
 - `IO::close fd` closes that file descriptor.
 
 The program opens `created.txt` with `O_WRONLY | O_CREAT | O_TRUNC`,

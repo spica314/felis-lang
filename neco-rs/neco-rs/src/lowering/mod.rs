@@ -534,6 +534,7 @@ fn wrap_reference_value(value: Value, ty: &Term) -> Value {
         | Value::Reference { .. }
         | Value::StaticSlice { .. }
         | Value::RuntimeArg(_)
+        | Value::PathBuf { .. }
         | Value::Array { .. } => value,
         value => Value::Reference {
             value: Box::new(value),

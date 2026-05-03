@@ -51,11 +51,22 @@ The `io` branch exposes the builtin `IO` effect as an ordinary public symbol.
 [`std/std_core/src/io.fe`](../std/std_core/src/io.fe) currently re-exports:
 
 - `IO`
+- `FileDescriptor`
 
 The `hello-world` testcase shows this binding being imported as
 `std_core::io::IO` and used in a function declaration with `#with IO`. In this
 context, `#with` attaches an Algebraic Effects `Effect` to the function
 declaration.
+
+## Path Module
+
+[`std/std_core/src/path.fe`](../std/std_core/src/path.fe) exposes the builtin
+`PathBuf` type and helper procedures for NUL-terminated path buffers:
+
+- `PathBuf`
+- `pathbuf_new`
+- `pathbuf_push`
+- `pathbuf_pop`
 
 ## Option And Result
 

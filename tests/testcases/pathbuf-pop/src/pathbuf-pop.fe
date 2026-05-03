@@ -1,18 +1,20 @@
 #use std_core::io::IO;
 #use std_core::io::FileDescriptor;
 #use std_core::path::PathBuf;
+
 #entrypoint main;
 
 #fn main : () #with IO {
     #let stdout : FileDescriptor <- IO::stdout;
-    #let path : PathBuf <- IO::pathbuf_new 32i32;
+    #let path : PathBuf <- IO::pathbuf_new 64i32;
     #letref #excl path_ref : &^ PathBuf #borrow path;
+    #let _ : () <- IO::pathbuf_push path_ref "discard.txt";
+    #let _ : () <- IO::pathbuf_pop path_ref;
     #let _ : () <- IO::pathbuf_push path_ref "message.txt";
     #let fd : FileDescriptor <- IO::open path_ref 0i32 0i32;
-    #let bytes_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 128i32;
-    #letref #excl bytes_arrayvl_ref : &^ ArrayVL u8 #borrow bytes_arrayvl;
-    #let len : i32 <- IO::read fd bytes_arrayvl_ref 128i32;
+    #let bytes_ref : Array u8 128i32 <- IO::array_new u8 128i32;
+    #let len : i32 <- IO::read fd bytes_ref 128i32;
     #let _ : () <- IO::close fd;
-    #let _ : () <- IO::write stdout bytes_arrayvl_ref len;
+    #let _ : () <- IO::write stdout bytes_ref len;
     ()
 }

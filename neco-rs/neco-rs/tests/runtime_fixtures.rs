@@ -691,6 +691,15 @@ fn compiles_and_runs_open_array_path_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_pathbuf_pop_fixture() {
+    let root = repo_root().join("tests/testcases/pathbuf-pop");
+    let run = run_fixture_output_in_dir(&root, "pathbuf-pop", &root);
+    assert_eq!(run.status.code(), Some(0));
+    assert_eq!(run.stdout, b"pathbuf/pop fixture\n");
+    assert!(run.stderr.is_empty());
+}
+
+#[test]
 fn compiles_and_runs_open_write_close_fixture() {
     let root = repo_root().join("tests/testcases/open-write-close");
     let temp_dir = runtime_temp_dir("open-write-close");

@@ -1,5 +1,6 @@
 #pub #mod primitive;
 #pub #mod io;
 #pub #mod string;
+#pub #mod path;
 #pub #mod option;
 #pub #mod result;

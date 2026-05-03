@@ -1,0 +1,4 @@
+{
+    "name": "pathbuf-pop",
+    "felis-bin-entrypoints": ["src/pathbuf-pop.fe"]
+}

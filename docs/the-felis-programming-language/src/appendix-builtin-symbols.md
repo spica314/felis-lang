@@ -17,6 +17,7 @@ Import them through `std_core` modules instead of relying on implicit names.
 | `ArrayVL` | `(t : Type[0]) -> Type[0]` | Runtime-sized array value type constructor. |
 | `IO` | effect | Effect marker used by functions that perform builtin IO operations. |
 | `FileDescriptor` | `Type[0]` | File descriptor value type returned by IO descriptor operations. |
+| `PathBuf` | `Type[0]` | Mutable NUL-terminated file path buffer. |
 
 ## `i32` Functions
 
@@ -93,10 +94,13 @@ All `IO` operations must be used in a function or procedure annotated with `#wit
 | `IO::stdout` | `FileDescriptor`; returns the standard output descriptor. |
 | `IO::read` | `(fd : FileDescriptor) -> (buffer : Array u8 n or ArrayVL u8) -> (len : i32) -> i32`; reads bytes and returns the byte count. |
 | `IO::write` | `(fd : FileDescriptor) -> (bytes : Array u8 n or ArrayVL u8) -> (len : i32) -> ()`; writes bytes to a descriptor. |
-| `IO::open` | `(path : Array u8 n or ArrayVL u8) -> (flags : i32) -> (mode : i32) -> FileDescriptor`; opens a path and returns a descriptor. |
+| `IO::open` | `(path : & PathBuf) -> (flags : i32) -> (mode : i32) -> FileDescriptor`; opens a path and returns a descriptor. |
 | `IO::close` | `(fd : FileDescriptor) -> ()`; closes a descriptor. |
 | `IO::exit` | `(code : i32 or i64 or u8) -> ()`; terminates the process with the given exit code. |
 | `IO::array_new` | `(t : Type[0]) -> (len : i32) -> Array t len`; allocates a fixed-size array. |
 | `IO::arrayvl_new` | `(t : Type[0]) -> (len : i32) -> ArrayVL t`; allocates a runtime-sized array value. |
 | `IO::arrayvl_replace` | `(t : Type[0]) -> (dest : ArrayVL t) -> (source : ArrayVL t) -> ()`; replaces the backing storage of a dynamic array. |
+| `IO::pathbuf_new` | `(capacity : i32) -> PathBuf`; allocates an empty NUL-terminated path buffer. |
+| `IO::pathbuf_push` | `(path : &^ PathBuf) -> (source : & ArrayVL u8) -> ()`; appends NUL-terminated bytes while preserving the trailing NUL. |
+| `IO::pathbuf_pop` | `(path : &^ PathBuf) -> ()`; removes the last path component while preserving the trailing NUL. |
 | `IO::arg` | `(index : i32) -> & Array u8`; returns a command-line argument as a byte array reference. |

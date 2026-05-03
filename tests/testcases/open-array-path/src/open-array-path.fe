@@ -1,5 +1,6 @@
 #use std_core::io::IO;
 #use std_core::io::FileDescriptor;
+#use std_core::path::PathBuf;
 #use std_core::primitive::u8::u8;
 
 #entrypoint main;
@@ -19,7 +20,10 @@
     path_ref .> set 9i32 0x78u8;
     path_ref .> set 10i32 0x74u8;
     path_ref .> set 11i32 0x00u8;
-    #let fd : FileDescriptor <- IO::open path_ref 0i32 0i32;
+    #let path : PathBuf <- IO::pathbuf_new 32i32;
+    #letref #excl buf_ref : &^ PathBuf #borrow path;
+    #let _ : () <- IO::pathbuf_push buf_ref path_ref;
+    #let fd : FileDescriptor <- IO::open buf_ref 0i32 0i32;
     #let bytes_ref : Array u8 128i32 <- IO::array_new u8 128i32;
     #let len : i32 <- IO::read fd bytes_ref 128i32;
     #let _ : () <- IO::close fd;

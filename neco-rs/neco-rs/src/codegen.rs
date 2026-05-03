@@ -2,7 +2,7 @@ use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
 
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
-    I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, U8Expr,
+    I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, PathBufSource, U8Expr,
 };
 
 const DATA_VIRTUAL_ADDRESS: u64 = 0x410000;
@@ -219,21 +219,7 @@ fn emit_operations(
                 result_slot,
             } => {
                 match path {
-                    OpenPath::StaticData(path_data_index) => {
-                        code.extend_from_slice(&[0x48, 0xbf]);
-                        code.extend_from_slice(&addresses[*path_data_index].to_le_bytes());
-                    }
-                    OpenPath::RuntimeArg(arg_index) => {
-                        emit_runtime_arg_ptr_to_rax(
-                            arg_index,
-                            code,
-                            program,
-                            argv_global_address
-                                .expect("runtime arg path requires argv global storage"),
-                        );
-                        code.extend_from_slice(&[0x48, 0x89, 0xc7]);
-                    }
-                    OpenPath::Array(array_slot) => {
+                    OpenPath::PathBuf(array_slot) => {
                         let slot_offset = array_slot_offset(program, *array_slot);
                         code.extend_from_slice(&[0x48, 0x8b, 0xbd]);
                         code.extend_from_slice(&slot_offset.to_le_bytes());
@@ -249,6 +235,10 @@ fn emit_operations(
                 code.extend_from_slice(&[0x89, 0x85]);
                 code.extend_from_slice(&result_offset.to_le_bytes());
             }
+            Operation::PathBufPush { path_slot, source } => {
+                emit_pathbuf_push(*path_slot, source, code, program, addresses)
+            }
+            Operation::PathBufPop { path_slot } => emit_pathbuf_pop(*path_slot, code, program),
             Operation::Close { fd } => {
                 emit_i32_expr_to_eax(fd, code, program);
                 code.extend_from_slice(&[0x89, 0xc7]);
@@ -1025,6 +1015,115 @@ fn emit_u8_array_set(
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());
     code.extend_from_slice(&[0x88, 0x14, 0x0b]);
+}
+
+fn emit_pathbuf_push(
+    path_slot: usize,
+    source: &PathBufSource,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+    addresses: &[u64],
+) {
+    let path_offset = array_slot_offset(program, path_slot);
+    code.extend_from_slice(&[0x48, 0x8b, 0xbd]);
+    code.extend_from_slice(&path_offset.to_le_bytes());
+
+    let find_nul_start = code.len();
+    code.extend_from_slice(&[0x80, 0x3f, 0x00]);
+    code.extend_from_slice(&[0x0f, 0x84]);
+    let found_nul_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    code.extend_from_slice(&[0x48, 0xff, 0xc7]);
+    code.push(0xe9);
+    let find_back_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    let found_nul = code.len();
+    let find_forward_len = found_nul as i32 - (found_nul_patch + 4) as i32;
+    code[found_nul_patch..found_nul_patch + 4].copy_from_slice(&find_forward_len.to_le_bytes());
+    let find_back_len = find_nul_start as i32 - (find_back_patch + 4) as i32;
+    code[find_back_patch..find_back_patch + 4].copy_from_slice(&find_back_len.to_le_bytes());
+
+    match source {
+        PathBufSource::StaticData(data_index) => {
+            code.extend_from_slice(&[0x48, 0xbe]);
+            code.extend_from_slice(&addresses[*data_index].to_le_bytes());
+        }
+        PathBufSource::RuntimeArg(arg_index) => {
+            emit_runtime_arg_ptr_to_rax(arg_index, code, program, ARGV_GLOBAL_ADDRESS);
+            code.extend_from_slice(&[0x48, 0x89, 0xc6]);
+        }
+        PathBufSource::Array(array_slot) => {
+            let source_offset = array_slot_offset(program, *array_slot);
+            code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
+            code.extend_from_slice(&source_offset.to_le_bytes());
+        }
+    }
+
+    let copy_start = code.len();
+    code.extend_from_slice(&[0x8a, 0x06]);
+    code.extend_from_slice(&[0x88, 0x07]);
+    code.extend_from_slice(&[0x3c, 0x00]);
+    code.extend_from_slice(&[0x0f, 0x84]);
+    let copy_done_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    code.extend_from_slice(&[0x48, 0xff, 0xc6]);
+    code.extend_from_slice(&[0x48, 0xff, 0xc7]);
+    code.push(0xe9);
+    let copy_back_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    let copy_done = code.len();
+    let copy_forward_len = copy_done as i32 - (copy_done_patch + 4) as i32;
+    code[copy_done_patch..copy_done_patch + 4].copy_from_slice(&copy_forward_len.to_le_bytes());
+    let copy_back_len = copy_start as i32 - (copy_back_patch + 4) as i32;
+    code[copy_back_patch..copy_back_patch + 4].copy_from_slice(&copy_back_len.to_le_bytes());
+}
+
+fn emit_pathbuf_pop(path_slot: usize, code: &mut Vec<u8>, program: &LoweredProgram) {
+    let path_offset = array_slot_offset(program, path_slot);
+    code.extend_from_slice(&[0x48, 0x8b, 0xbd]);
+    code.extend_from_slice(&path_offset.to_le_bytes());
+    code.extend_from_slice(&[0x48, 0x89, 0xfb]);
+    code.extend_from_slice(&[0x48, 0x31, 0xc9]);
+
+    let scan_start = code.len();
+    code.extend_from_slice(&[0x80, 0x3f, 0x00]);
+    code.extend_from_slice(&[0x0f, 0x84]);
+    let scan_done_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    code.extend_from_slice(&[0x80, 0x3f, b'/']);
+    code.extend_from_slice(&[0x0f, 0x85]);
+    let not_slash_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    code.extend_from_slice(&[0x48, 0x89, 0xf9]);
+    let not_slash = code.len();
+    let not_slash_len = not_slash as i32 - (not_slash_patch + 4) as i32;
+    code[not_slash_patch..not_slash_patch + 4].copy_from_slice(&not_slash_len.to_le_bytes());
+    code.extend_from_slice(&[0x48, 0xff, 0xc7]);
+    code.push(0xe9);
+    let scan_back_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+
+    let scan_done = code.len();
+    let scan_done_len = scan_done as i32 - (scan_done_patch + 4) as i32;
+    code[scan_done_patch..scan_done_patch + 4].copy_from_slice(&scan_done_len.to_le_bytes());
+    let scan_back_len = scan_start as i32 - (scan_back_patch + 4) as i32;
+    code[scan_back_patch..scan_back_patch + 4].copy_from_slice(&scan_back_len.to_le_bytes());
+
+    code.extend_from_slice(&[0x48, 0x85, 0xc9]);
+    code.extend_from_slice(&[0x0f, 0x85]);
+    let has_slash_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    code.extend_from_slice(&[0xc6, 0x03, 0x00]);
+    code.push(0xe9);
+    let done_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    let has_slash = code.len();
+    let has_slash_len = has_slash as i32 - (has_slash_patch + 4) as i32;
+    code[has_slash_patch..has_slash_patch + 4].copy_from_slice(&has_slash_len.to_le_bytes());
+    code.extend_from_slice(&[0xc6, 0x01, 0x00]);
+    let done = code.len();
+    let done_len = done as i32 - (done_patch + 4) as i32;
+    code[done_patch..done_patch + 4].copy_from_slice(&done_len.to_le_bytes());
 }
 
 fn emit_array_get(

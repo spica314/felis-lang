@@ -11,6 +11,11 @@ pub(crate) struct LoweredProgram {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum OpenPath {
+    PathBuf(usize),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PathBufSource {
     StaticData(usize),
     RuntimeArg(I32Expr),
     Array(usize),
@@ -180,6 +185,13 @@ pub(crate) enum Operation {
         flags: I32Expr,
         mode: I32Expr,
         result_slot: usize,
+    },
+    PathBufPush {
+        path_slot: usize,
+        source: PathBufSource,
+    },
+    PathBufPop {
+        path_slot: usize,
     },
     Close {
         fd: I32Expr,

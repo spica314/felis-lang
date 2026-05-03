@@ -2,7 +2,8 @@ use neco_rs_parser::{BindingPattern, Term};
 
 use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::ir::{
-    ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, LoweredProgram, OpenPath, Operation,
+    ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, I64Expr, LoweredProgram, OpenPath,
+    Operation, PathBufSource, U8Expr, intern_data,
 };
 use crate::lowering::{
     LoweringState, lower_i32_expr, lower_i64_expr, lower_u8_expr, validate_value_against_type,
@@ -94,6 +95,57 @@ pub(crate) fn lower_io_call(
                 state,
                 program,
             ) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
+        ["IO", "pathbuf_new"] => {
+            let (capacity, array_slot) =
+                match parse_pathbuf_new_arguments(arguments, state, program) {
+                    Ok(value) => value,
+                    Err(err) => return Some(Err(err)),
+                };
+            program.operations.push(Operation::ArrayAllocDynamic {
+                array_slot,
+                len: capacity,
+            });
+            program.operations.push(Operation::ArraySetU8 {
+                array_slot,
+                index: I64Expr::Literal(0),
+                value: U8Expr::Literal(0),
+            });
+            if let Err(error) = bind_checked_pattern(
+                binder,
+                Value::PathBuf { slot: array_slot },
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
+        ["IO", "pathbuf_push"] => {
+            let (path_slot, source) = match parse_pathbuf_push_arguments(arguments, state, program)
+            {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            program
+                .operations
+                .push(Operation::PathBufPush { path_slot, source });
+            if let Err(error) = bind_checked_pattern(binder, Value::Unit, ty, state, program) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
+        ["IO", "pathbuf_pop"] => {
+            let path_slot = match parse_pathbuf_pop_arguments(arguments, state) {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            program.operations.push(Operation::PathBufPop { path_slot });
+            if let Err(error) = bind_checked_pattern(binder, Value::Unit, ty, state, program) {
                 return Some(Err(error));
             }
             Some(Ok(false))
@@ -345,22 +397,22 @@ fn parse_open_arguments(
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [path_term, flags_term, mode_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::open` must receive an `ArrayVL u8` path, flags, and mode".to_string(),
+            "`IO::open` must receive a `PathBuf`, flags, and mode".to_string(),
         ));
     };
 
-    let path = match resolve_value(path_term, &state.environment)? {
-        Value::StaticSlice { data_index, .. } => OpenPath::StaticData(data_index),
-        Value::RuntimeArg(arg_index) => OpenPath::RuntimeArg(arg_index),
-        Value::Array {
-            slot,
-            element_type: ArrayElementType::U8,
-            ..
-        } => OpenPath::Array(slot),
-        other => {
-            return Err(Error::Unsupported(format!(
-                "`IO::open` expects an `ArrayVL u8` path, `u8` array, or CLI argument as its first argument, got {other:?}"
-            )));
+    let path = if matches!(path_term, Term::StringLiteral(_)) {
+        return Err(Error::Unsupported(
+            "`IO::open` expects a `PathBuf` as its first argument".to_string(),
+        ));
+    } else {
+        match resolve_value(path_term, &state.environment)? {
+            Value::PathBuf { slot } => OpenPath::PathBuf(slot),
+            other => {
+                return Err(Error::Unsupported(format!(
+                    "`IO::open` expects a `PathBuf` as its first argument, got {other:?}"
+                )));
+            }
         }
     };
 
@@ -373,6 +425,78 @@ fn parse_open_arguments(
 
     let result_slot = state.allocate_i32_slot();
     Ok((path, flags, mode, result_slot))
+}
+
+fn parse_pathbuf_new_arguments(
+    arguments: &[Term],
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<(I32Expr, usize)> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [capacity_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::pathbuf_new` must receive an `i32` capacity".to_string(),
+        ));
+    };
+    let capacity = lower_i32_expr(capacity_term, state).map_err(|_| {
+        Error::Unsupported("`IO::pathbuf_new` expects an `i32` capacity".to_string())
+    })?;
+    let array_slot = state.allocate_array(ArrayElementType::U8, ArrayKind::Dynamic, 0, program);
+    Ok((capacity, array_slot))
+}
+
+fn parse_pathbuf_push_arguments(
+    arguments: &[Term],
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<(usize, PathBufSource)> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [path_term, source_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::pathbuf_push` must receive a `PathBuf` and an `ArrayVL u8` source".to_string(),
+        ));
+    };
+    let path_slot = parse_pathbuf_slot(path_term, state, "pathbuf_push")?;
+    let source = if let Term::StringLiteral(literal) = source_term {
+        let mut bytes = literal.as_bytes().to_vec();
+        bytes.push(0);
+        PathBufSource::StaticData(intern_data(program, bytes))
+    } else {
+        match resolve_value(source_term, &state.environment)? {
+            Value::StaticSlice { data_index, .. } => PathBufSource::StaticData(data_index),
+            Value::RuntimeArg(arg_index) => PathBufSource::RuntimeArg(arg_index),
+            Value::Array {
+                slot,
+                element_type: ArrayElementType::U8,
+                ..
+            } => PathBufSource::Array(slot),
+            other => {
+                return Err(Error::Unsupported(format!(
+                    "`IO::pathbuf_push` expects a nul-terminated `u8` source, got {other:?}"
+                )));
+            }
+        }
+    };
+    Ok((path_slot, source))
+}
+
+fn parse_pathbuf_pop_arguments(arguments: &[Term], state: &LoweringState) -> Result<usize> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [path_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::pathbuf_pop` must receive a `PathBuf`".to_string(),
+        ));
+    };
+    parse_pathbuf_slot(path_term, state, "pathbuf_pop")
+}
+
+fn parse_pathbuf_slot(term: &Term, state: &LoweringState, builtin_name: &str) -> Result<usize> {
+    match resolve_value(term, &state.environment)? {
+        Value::PathBuf { slot } => Ok(slot),
+        other => Err(Error::Unsupported(format!(
+            "`IO::{builtin_name}` expects a `PathBuf`, got {other:?}"
+        ))),
+    }
 }
 
 fn parse_close_arguments(arguments: &[Term], state: &LoweringState) -> Result<I32Expr> {
