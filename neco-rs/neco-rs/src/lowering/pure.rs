@@ -57,6 +57,9 @@ pub(super) fn lower_pure_value(
             {
                 return Ok(value);
             }
+            if let Some(value) = lower_i32_primitive_value(term, state, program)? {
+                return Ok(value);
+            }
             if let Some(value) = lower_pure_function_call(term, state, program)? {
                 return Ok(value);
             }
@@ -80,6 +83,61 @@ pub(super) fn lower_pure_value(
         Term::Path(path) => lower_path_value(path, state, program),
         _ => Err(Error::Unsupported(format!(
             "unsupported pure expression in entrypoint body: {term:?}"
+        ))),
+    }
+}
+
+fn lower_i32_primitive_value(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Option<Value>> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(None);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(None);
+    };
+    let primitive = path
+        .segments
+        .last()
+        .map(|segment| segment.lexeme.as_str())
+        .unwrap_or_default();
+    if !matches!(
+        primitive,
+        "i32_add" | "i32_sub" | "i32_mul" | "i32_div" | "i32_mod"
+    ) {
+        return Ok(None);
+    }
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [lhs, rhs] = normalized.as_slice() else {
+        return Err(Error::Unsupported(format!(
+            "`{primitive}` must receive exactly two arguments"
+        )));
+    };
+    let lhs = Box::new(lower_pure_i32_argument(lhs, state, program)?);
+    let rhs = Box::new(lower_pure_i32_argument(rhs, state, program)?);
+
+    Ok(Some(Value::I32(match primitive {
+        "i32_add" => I32Expr::Add(lhs, rhs),
+        "i32_sub" => I32Expr::Sub(lhs, rhs),
+        "i32_mul" => I32Expr::Mul(lhs, rhs),
+        "i32_div" => I32Expr::Div(lhs, rhs),
+        "i32_mod" => I32Expr::Mod(lhs, rhs),
+        _ => unreachable!("checked above"),
+    })))
+}
+
+fn lower_pure_i32_argument(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<I32Expr> {
+    match lower_pure_value(term, state, program)? {
+        Value::I32(expr) => Ok(expr),
+        other => Err(Error::Unsupported(format!(
+            "expected an `i32` value, got {other:?}"
         ))),
     }
 }

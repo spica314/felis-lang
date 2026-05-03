@@ -1,0 +1,15 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#entrypoint main;
+
+#fn value : (base : i32) -> i32 {
+    40i32
+}
+
+#fn main : () #with IO {
+    #let code : i32 = i32_add (value 0i32) 2i32;
+    #let _ : () <- IO::exit code;
+    ()
+}
