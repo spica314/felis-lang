@@ -1,4 +1,5 @@
 #use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_get;
 #use std_core::primitive::bool::bool;
 #use std_core::primitive::bool::true;
 #use std_core::primitive::bool::false;
@@ -10,7 +11,7 @@
 #use std_core::primitive::u8::u8_eq;
 
 #fn source_at : (source : Array u8 1024i32) -> (index : i32) -> u8 {
-    source .> get index
+    array_get source index
 }
 
 #fn is_trivia : (byte : u8) -> bool {
@@ -175,5 +176,5 @@
 }
 
 #fn lex : (source : Array u8 1024i32) -> Tokens {
-    exit_fixture_tokens (i32_from_u8 (source .> get 96i32))
+    exit_fixture_tokens (i32_from_u8 (array_get source 96i32))
 }

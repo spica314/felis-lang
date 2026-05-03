@@ -1,4 +1,6 @@
 #use std_core::io::IO;
+#use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::array::array_get;
 #use std_core::primitive::i32::i32_from_u8;
 #use std_core::primitive::u8::u8;
 
@@ -16,7 +18,7 @@
 
 #fn main : () #with IO {
     #let bytes_ref : & ArrayVL u8 = message_bytes (Message::text "A");
-    #let code : i32 = i32_from_u8 (bytes_ref .> get 0i32);
+    #let code : i32 = i32_from_u8 (array_get bytes_ref 0i32);
     #let _ : () <- IO::exit code;
     ()
 }

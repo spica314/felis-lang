@@ -1,4 +1,7 @@
 #use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_get;
+#use std_core::primitive::array::array_set;
 #use std_core::primitive::i64::i64;
 #use std_core::primitive::i64::i64_add;
 
@@ -6,11 +9,11 @@
 
 #fn main : () #with IO {
     #let array_ref : Array i64 3i32 <- IO::array_new i64 3i32;
-    array_ref .> set 0i64 10i64;
-    array_ref .> set 1i64 20i64;
-    array_ref .> set 2i64 12i64;
-    #let first_sum : i64 = i64_add (array_ref .> get 0i64) (array_ref .> get 1i64);
-    #let code : i64 = i64_add first_sum (array_ref .> get 2i64);
+    array_set array_ref 0i64 10i64;
+    array_set array_ref 1i64 20i64;
+    array_set array_ref 2i64 12i64;
+    #let first_sum : i64 = i64_add (array_get array_ref 0i64) (array_get array_ref 1i64);
+    #let code : i64 = i64_add first_sum (array_get array_ref 2i64);
     #let _ : () <- IO::exit code;
     ()
 }

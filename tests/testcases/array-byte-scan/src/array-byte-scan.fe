@@ -1,6 +1,9 @@
 #use std_core::primitive::reference::ref_get;
 #use std_core::primitive::reference::ref_set;
 #use std_core::io::IO;
+#use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::array::array_get;
+#use std_core::primitive::array::array_len;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_gte;
@@ -12,7 +15,7 @@
         #if i32_gte ((ref_get i32 offset_ref)) len {
             #break;
         };
-        #if u8_eq (bytes_ref .> get ((ref_get i32 offset_ref))) target {
+        #if u8_eq (array_get bytes_ref ((ref_get i32 offset_ref))) target {
             #break;
         };
         ref_set i32 offset_ref (i32_add ((ref_get i32 offset_ref)) 1i32);
@@ -26,7 +29,7 @@
     #let bytes_ref : & ArrayVL u8 = "abc:42";
     #let offset_ref : i32 = 0i32;
     #letref #excl offset_ref : &^ i32 #borrow offset_ref;
-    find_byte_offset bytes_ref ':' (bytes_ref .> len) offset_ref;
+    find_byte_offset bytes_ref ':' (array_len bytes_ref) offset_ref;
     #let code : i32 = i32_add ((ref_get i32 offset_ref)) 39i32;
     #let _ : () <- IO::exit code;
     ()

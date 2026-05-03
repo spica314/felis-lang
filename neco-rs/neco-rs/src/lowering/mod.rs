@@ -632,12 +632,9 @@ fn lower_expression_statement(
         return Ok(());
     }
 
-    let Term::Application { callee, arguments } = term else {
-        return Err(Error::Unsupported(format!(
-            "unsupported expression statement in entrypoint body: {term:?}"
-        )));
-    };
-    lower_array_set_statement(callee.as_ref(), arguments, state, program)
+    Err(Error::Unsupported(format!(
+        "unsupported expression statement in entrypoint body: {term:?}"
+    )))
 }
 
 fn lower_array_set_builtin_statement(
@@ -732,26 +729,23 @@ fn lower_array_set_statement(
 }
 
 fn array_set_call_parts(callee: &Term, arguments: &[Term]) -> Result<Option<(Term, Vec<Term>)>> {
-    match callee {
-        Term::MethodCall { receiver, method } if method == "set" => {
-            let normalized = normalize_numeric_literal_arguments(arguments);
-            Ok(Some((receiver.as_ref().clone(), normalized)))
-        }
-        Term::Path(path)
-            if path.token_keyword_package.is_none()
-                && path.segments.len() == 1
-                && path.segments[0].lexeme == "array_set" =>
-        {
-            let normalized = normalize_numeric_literal_arguments(arguments);
-            let [receiver, index, value] = normalized.as_slice() else {
-                return Err(Error::Unsupported(
-                    "`array_set` must receive exactly an array, an index, and a value".to_string(),
-                ));
-            };
-            Ok(Some((receiver.clone(), vec![index.clone(), value.clone()])))
-        }
-        _ => Ok(None),
+    let Term::Path(path) = callee else {
+        return Ok(None);
+    };
+    if path.token_keyword_package.is_some()
+        || path.segments.len() != 1
+        || path.segments[0].lexeme != "array_set"
+    {
+        return Ok(None);
     }
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [receiver, index, value] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`array_set` must receive exactly an array, an index, and a value".to_string(),
+        ));
+    };
+    Ok(Some((receiver.clone(), vec![index.clone(), value.clone()])))
 }
 
 fn lower_reference_set_builtin_statement(

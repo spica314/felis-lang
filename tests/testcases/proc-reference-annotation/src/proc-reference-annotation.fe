@@ -2,6 +2,8 @@
 #use std_core::primitive::reference::ref_set;
 #use std_core::io::IO;
 #use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_get;
+#use std_core::primitive::array::array_set;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
 
@@ -9,13 +11,13 @@
 
 #proc fill_refs : (value_ref : &^ i32) -> (array_ref : &^ Array i32 2i32) -> () {
     ref_set i32 value_ref 40i32;
-    array_ref .> set 0i32 1i32;
-    array_ref .> set 1i32 2i32;
+    array_set array_ref 0i32 1i32;
+    array_set array_ref 1i32 2i32;
     ()
 }
 
 #fn sum_refs : (value_ref : & i32) -> (array_ref : &^ Array i32 2i32) -> i32 {
-    i32_add ((ref_get i32 value_ref)) (i32_add (array_ref .> get 0i32) (array_ref .> get 1i32))
+    i32_add ((ref_get i32 value_ref)) (i32_add (array_get array_ref 0i32) (array_get array_ref 1i32))
 }
 
 #fn main : () #with IO {

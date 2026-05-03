@@ -123,8 +123,84 @@ fn rejects_reference_method_set() {
     assert!(
         error
             .to_string()
-            .contains("`set` expects an array reference")
+            .contains("unsupported expression statement")
     );
+}
+
+#[test]
+fn rejects_array_method_get() {
+    let package = parse_inline_binary_package(
+        "array-method-get",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let array_ref : Array i32 1i32 <- IO::array_new i32 1i32;
+    #let code : i32 = array_ref .> get 0i32;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject array `.> get`");
+    assert!(error.to_string().contains("unsupported pure expression"));
+}
+
+#[test]
+fn rejects_array_method_set() {
+    let package = parse_inline_binary_package(
+        "array-method-set",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let array_ref : Array i32 1i32 <- IO::array_new i32 1i32;
+    array_ref .> set 0i32 42i32;
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject array `.> set`");
+    assert!(
+        error
+            .to_string()
+            .contains("unsupported expression statement")
+    );
+}
+
+#[test]
+fn rejects_array_method_len() {
+    let package = parse_inline_binary_package(
+        "array-method-len",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let arrayvl : ArrayVL i32 <- IO::arrayvl_new i32 1i32;
+    #letref #excl arrayvl_ref : &^ ArrayVL i32 #borrow arrayvl;
+    #let code : i32 = arrayvl_ref .> len;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject array `.> len`");
+    assert!(error.to_string().contains("unsupported pure expression"));
 }
 
 #[test]

@@ -1,5 +1,7 @@
 #use std_core::io::IO;
 #use std_core::io::FileDescriptor;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_set;
 #use std_core::primitive::u8::u8;
 
 #entrypoint main;
@@ -7,8 +9,8 @@
 #fn main : () #with IO {
     #let stdout : FileDescriptor <- IO::stdout;
     #let bytes_ref : Array u8 0x2i32 <- IO::array_new u8 0x2i32;
-    bytes_ref .> set 0x0i32 0x41u8;
-    bytes_ref .> set 0x1i32 0xau8;
+    array_set bytes_ref 0x0i32 0x41u8;
+    array_set bytes_ref 0x1i32 0xau8;
     #let _ : () <- IO::write stdout bytes_ref 0x2i32;
     ()
 }

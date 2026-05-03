@@ -1,5 +1,7 @@
 #use std_core::io::IO;
 #use std_core::io::FileDescriptor;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_set;
 #use std_core::primitive::u8::u8;
 
 #entrypoint main;
@@ -7,19 +9,19 @@
 #fn main : () #with IO {
     #let stdout : FileDescriptor <- IO::stdout;
     #let bytes_ref : Array u8 13i32 <- IO::array_new u8 13i32;
-    bytes_ref .> set 0i32 'h';
-    bytes_ref .> set 1i32 'e';
-    bytes_ref .> set 2i32 'l';
-    bytes_ref .> set 3i32 'l';
-    bytes_ref .> set 4i32 'o';
-    bytes_ref .> set 5i32 ',';
-    bytes_ref .> set 6i32 ' ';
-    bytes_ref .> set 7i32 'w';
-    bytes_ref .> set 8i32 'o';
-    bytes_ref .> set 9i32 'r';
-    bytes_ref .> set 10i32 'l';
-    bytes_ref .> set 11i32 'd';
-    bytes_ref .> set 12i32 '\n';
+    array_set bytes_ref 0i32 'h';
+    array_set bytes_ref 1i32 'e';
+    array_set bytes_ref 2i32 'l';
+    array_set bytes_ref 3i32 'l';
+    array_set bytes_ref 4i32 'o';
+    array_set bytes_ref 5i32 ',';
+    array_set bytes_ref 6i32 ' ';
+    array_set bytes_ref 7i32 'w';
+    array_set bytes_ref 8i32 'o';
+    array_set bytes_ref 9i32 'r';
+    array_set bytes_ref 10i32 'l';
+    array_set bytes_ref 11i32 'd';
+    array_set bytes_ref 12i32 '\n';
     #let _ : () <- IO::write stdout bytes_ref 13i32;
     ()
 }

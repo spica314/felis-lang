@@ -1,6 +1,8 @@
 #use std_core::io::IO;
 #use std_core::io::FileDescriptor;
 #use std_core::path::PathBuf;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_get;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_from_u8;
 #use std_core::primitive::u8::u8;
@@ -19,8 +21,8 @@
     #let len : i32 <- IO::read fd bytes_ref 64i32;
     #let _ : () <- IO::close fd;
     #let _ : () <- IO::write stdout bytes_ref len;
-    #let left : i32 = i32_from_u8 (digits_ref .> get 0i32);
-    #let right : i32 = i32_from_u8 (digits_ref .> get 1i32);
+    #let left : i32 = i32_from_u8 (array_get digits_ref 0i32);
+    #let right : i32 = i32_from_u8 (array_get digits_ref 1i32);
     #let code : i32 = i32_add left right;
     #let _ : () <- IO::exit code;
     ()

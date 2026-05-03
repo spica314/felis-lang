@@ -2,6 +2,9 @@
 #use std_core::primitive::reference::ref_set;
 #use std_core::io::FileDescriptor;
 #use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_get;
+#use std_core::primitive::array::array_set;
 #use std_core::primitive::bool::bool_and;
 #use std_core::primitive::bool::bool_or;
 #use std_core::primitive::i32::i32_add;
@@ -21,7 +24,7 @@
 #entrypoint main;
 
 #fn literal_satisfied_flag : (assignments_ref : &^ Array i32 12i32) -> (lit_var : i32) -> (lit_negated : i32) -> i32 {
-    #let assigned : i32 = assignments_ref .> get lit_var;
+    #let assigned : i32 = array_get assignments_ref lit_var;
     i32_mod (i32_add assigned lit_negated) 2i32
 }
 
@@ -30,7 +33,7 @@
         #if i32_gte ((ref_get i32 index_ref)) len {
             #break;
         };
-        #let byte : u8 = bytes_ref .> get ((ref_get i32 index_ref));
+        #let byte : u8 = array_get bytes_ref ((ref_get i32 index_ref));
         ref_set i32 index_ref (i32_add ((ref_get i32 index_ref)) 1i32);
         #if u8_eq byte '\n' {
             #break;
@@ -46,7 +49,7 @@
         #if i32_gte ((ref_get i32 index_ref)) len {
             #break;
         };
-        #let byte : u8 = bytes_ref .> get ((ref_get i32 index_ref));
+        #let byte : u8 = array_get bytes_ref ((ref_get i32 index_ref));
         #if bool_or (bool_or (u8_eq byte ' ') (u8_eq byte '\t')) (u8_eq byte '\r') {
             ref_set i32 index_ref (i32_add ((ref_get i32 index_ref)) 1i32);
         } #else {
@@ -69,7 +72,7 @@
         #if i32_gte ((ref_get i32 index_ref)) len {
             #break;
         };
-        #let byte : u8 = bytes_ref .> get ((ref_get i32 index_ref));
+        #let byte : u8 = array_get bytes_ref ((ref_get i32 index_ref));
         #if u8_eq byte 'c' {
             skip_line bytes_ref len index_ref;
         } #else #if u8_eq byte '\n' {
@@ -86,7 +89,7 @@
 }
 
 #proc parse_clause_literals : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (var_count_ref : &^ i32) -> (clause_count_ref : &^ i32) -> (literal_count_ref : &^ i32) -> (ok_ref : &^ i32) -> () {
-    clause_starts_ref .> set 0i32 0i32;
+    array_set clause_starts_ref 0i32 0i32;
     #let value : i32 = 0i32;
     #letref #excl value : &^ i32 #borrow value;
     #let sign : i32 = 0i32;
@@ -101,7 +104,7 @@
         #if i32_gte ((ref_get i32 index_ref)) len {
             #break;
         };
-        #let byte : u8 = bytes_ref .> get ((ref_get i32 index_ref));
+        #let byte : u8 = array_get bytes_ref ((ref_get i32 index_ref));
         #if u8_eq byte 'c' {
             skip_line bytes_ref len index_ref;
         } #else #if u8_eq byte '\n' {
@@ -118,7 +121,7 @@
                 #if i32_gte ((ref_get i32 index_ref)) len {
                     #break;
                 };
-                #let digit : u8 = bytes_ref .> get ((ref_get i32 index_ref));
+                #let digit : u8 = array_get bytes_ref ((ref_get i32 index_ref));
                 #if bool_and (u8_gte digit '0') (u8_lte digit '9') {
                     ref_set i32 in_number 1i32;
                     ref_set i32 value (i32_add (i32_mul ((ref_get i32 value)) 10i32) (i32_sub (i32_from_u8 digit) 48i32));
@@ -134,10 +137,10 @@
                     ref_set i32 ok_ref 0i32;
                     #break;
                 };
-                clause_ends_ref .> set ((ref_get i32 clause_count_ref)) ((ref_get i32 literal_count_ref));
+                array_set clause_ends_ref ((ref_get i32 clause_count_ref)) ((ref_get i32 literal_count_ref));
                 ref_set i32 clause_count_ref (i32_add ((ref_get i32 clause_count_ref)) 1i32);
                 #if i32_lt ((ref_get i32 clause_count_ref)) 256i32 {
-                    clause_starts_ref .> set ((ref_get i32 clause_count_ref)) ((ref_get i32 literal_count_ref));
+                    array_set clause_starts_ref ((ref_get i32 clause_count_ref)) ((ref_get i32 literal_count_ref));
                 };
             } #else {
                 #if i32_gt ((ref_get i32 value)) 12i32 {
@@ -151,8 +154,8 @@
                 #if i32_gt ((ref_get i32 value)) ((ref_get i32 var_count_ref)) {
                     ref_set i32 var_count_ref ((ref_get i32 value));
                 };
-                lit_vars_ref .> set ((ref_get i32 literal_count_ref)) (i32_sub ((ref_get i32 value)) 1i32);
-                lit_negated_ref .> set ((ref_get i32 literal_count_ref)) ((ref_get i32 sign));
+                array_set lit_vars_ref ((ref_get i32 literal_count_ref)) (i32_sub ((ref_get i32 value)) 1i32);
+                array_set lit_negated_ref ((ref_get i32 literal_count_ref)) ((ref_get i32 sign));
                 ref_set i32 literal_count_ref (i32_add ((ref_get i32 literal_count_ref)) 1i32);
             };
         };
@@ -162,15 +165,15 @@
 
 #proc clause_satisfied_flag : (assignments_ref : &^ Array i32 12i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (clause_index : i32) -> (result_ref : &^ i32) -> () {
     ref_set i32 result_ref 0i32;
-    #let literal_index : i32 = clause_starts_ref .> get clause_index;
+    #let literal_index : i32 = array_get clause_starts_ref clause_index;
     #letref #excl literal_index : &^ i32 #borrow literal_index;
-    #let literal_end : i32 = clause_ends_ref .> get clause_index;
+    #let literal_end : i32 = array_get clause_ends_ref clause_index;
     #loop {
         #if i32_gte ((ref_get i32 literal_index)) literal_end {
             #break;
         };
-        #let lit_var : i32 = lit_vars_ref .> get ((ref_get i32 literal_index));
-        #let lit_negated : i32 = lit_negated_ref .> get ((ref_get i32 literal_index));
+        #let lit_var : i32 = array_get lit_vars_ref ((ref_get i32 literal_index));
+        #let lit_negated : i32 = array_get lit_negated_ref ((ref_get i32 literal_index));
         #let lit_sat : i32 = literal_satisfied_flag assignments_ref lit_var lit_negated;
         #if i32_eq lit_sat 1i32 {
             ref_set i32 result_ref 1i32;
@@ -210,7 +213,7 @@
         #if i32_gte ((ref_get i32 index)) var_count {
             #break;
         };
-        assignments_ref .> set ((ref_get i32 index)) (i32_mod ((ref_get i32 remaining)) 2i32);
+        array_set assignments_ref ((ref_get i32 index)) (i32_mod ((ref_get i32 remaining)) 2i32);
         ref_set i32 remaining (i32_div ((ref_get i32 remaining)) 2i32);
         ref_set i32 index (i32_add ((ref_get i32 index)) 1i32);
     };
@@ -260,24 +263,24 @@
     #let input_ref : &^ Array u8 10000i32 <- IO::array_new u8 10000i32;
     #let len : i32 <- IO::read stdin input_ref 10000i32;
     #let sat_ref : &^ Array u8 4i32 <- IO::array_new u8 4i32;
-    sat_ref .> set 0i32 'S';
-    sat_ref .> set 1i32 'A';
-    sat_ref .> set 2i32 'T';
-    sat_ref .> set 3i32 '\n';
+    array_set sat_ref 0i32 'S';
+    array_set sat_ref 1i32 'A';
+    array_set sat_ref 2i32 'T';
+    array_set sat_ref 3i32 '\n';
     #let unsat_ref : &^ Array u8 6i32 <- IO::array_new u8 6i32;
-    unsat_ref .> set 0i32 'U';
-    unsat_ref .> set 1i32 'N';
-    unsat_ref .> set 2i32 'S';
-    unsat_ref .> set 3i32 'A';
-    unsat_ref .> set 4i32 'T';
-    unsat_ref .> set 5i32 '\n';
+    array_set unsat_ref 0i32 'U';
+    array_set unsat_ref 1i32 'N';
+    array_set unsat_ref 2i32 'S';
+    array_set unsat_ref 3i32 'A';
+    array_set unsat_ref 4i32 'T';
+    array_set unsat_ref 5i32 '\n';
     #let error_ref : &^ Array u8 6i32 <- IO::array_new u8 6i32;
-    error_ref .> set 0i32 'E';
-    error_ref .> set 1i32 'R';
-    error_ref .> set 2i32 'R';
-    error_ref .> set 3i32 'O';
-    error_ref .> set 4i32 'R';
-    error_ref .> set 5i32 '\n';
+    array_set error_ref 0i32 'E';
+    array_set error_ref 1i32 'R';
+    array_set error_ref 2i32 'R';
+    array_set error_ref 3i32 'O';
+    array_set error_ref 4i32 'R';
+    array_set error_ref 5i32 '\n';
 
     #let assignments_ref : &^ Array i32 12i32 <- IO::array_new i32 12i32;
     #let lit_vars_ref : &^ Array i32 2048i32 <- IO::array_new i32 2048i32;

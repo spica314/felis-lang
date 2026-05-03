@@ -19,7 +19,9 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
     match term {
         Term::Group(inner) => lower_i32_expr(inner, state),
         Term::IntegerLiteral(literal) => parse_suffixed_i32_literal(literal),
-        Term::MethodCall { .. } => lower_i32_method_call(term, state),
+        Term::MethodCall { .. } => Err(Error::Unsupported(format!(
+            "unsupported `i32` expression in entrypoint body: {term:?}"
+        ))),
         Term::Path(_) | Term::FieldAccess { .. } => {
             match resolve_value(term, &state.environment)? {
                 Value::I32(expr) => Ok(expr),
@@ -52,33 +54,13 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
     }
 }
 
-fn lower_i32_method_call(term: &Term, state: &LoweringState) -> Result<I32Expr> {
-    let Term::MethodCall { receiver, method } = term else {
-        unreachable!();
-    };
-    match method.as_str() {
-        "len" => match resolve_value(receiver.as_ref(), &state.environment)? {
-            Value::StaticSlice { len, .. } => Ok(I32Expr::Literal(len)),
-            Value::Array {
-                slot,
-                kind: ArrayKind::Dynamic,
-                ..
-            } => Ok(I32Expr::ArrayLen { array_slot: slot }),
-            other => Err(Error::Unsupported(format!(
-                "`len` expects a dynamic array reference, got {other:?}"
-            ))),
-        },
-        _ => Err(Error::Unsupported(format!(
-            "unsupported `i32` expression in entrypoint body: {term:?}"
-        ))),
-    }
-}
-
 pub(crate) fn lower_i64_expr(term: &Term, state: &LoweringState) -> Result<I64Expr> {
     match term {
         Term::Group(inner) => lower_i64_expr(inner, state),
         Term::IntegerLiteral(literal) => parse_suffixed_i64_literal(literal),
-        Term::MethodCall { .. } => lower_i64_method_call(term, state),
+        Term::MethodCall { .. } => Err(Error::Unsupported(format!(
+            "unsupported `i64` expression in entrypoint body: {term:?}"
+        ))),
         Term::Path(_) | Term::FieldAccess { .. } => {
             match resolve_value(term, &state.environment)? {
                 Value::I64(expr) => Ok(expr),
@@ -111,27 +93,6 @@ pub(crate) fn lower_i64_expr(term: &Term, state: &LoweringState) -> Result<I64Ex
     }
 }
 
-fn lower_i64_method_call(term: &Term, state: &LoweringState) -> Result<I64Expr> {
-    let Term::MethodCall { receiver, method } = term else {
-        unreachable!();
-    };
-    match method.as_str() {
-        "len" => match resolve_value(receiver.as_ref(), &state.environment)? {
-            Value::Array {
-                slot,
-                kind: ArrayKind::Dynamic,
-                ..
-            } => Ok(I64Expr::ArrayLen { array_slot: slot }),
-            other => Err(Error::Unsupported(format!(
-                "`len` expects a dynamic array reference, got {other:?}"
-            ))),
-        },
-        _ => Err(Error::Unsupported(format!(
-            "unsupported `i64` expression in entrypoint body: {term:?}"
-        ))),
-    }
-}
-
 pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr> {
     match term {
         Term::Group(inner) => lower_u8_expr(inner, state),
@@ -150,9 +111,6 @@ pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr
                 return Ok(expr);
             }
             if let Some(expr) = lower_dyn_array_get_u8_call(callee, arguments, state)? {
-                return Ok(expr);
-            }
-            if let Some(expr) = lower_runtime_arg_get_call(callee, arguments, state)? {
                 return Ok(expr);
             }
             if let Some(expr) = lower_u8_array_get_call(callee, arguments, state)? {
@@ -704,31 +662,23 @@ fn dynamic_array_slot(value: &Value) -> Option<usize> {
 }
 
 fn array_get_call_parts(callee: &Term, arguments: &[Term]) -> Result<Option<(Term, Term)>> {
-    match callee {
-        Term::MethodCall { receiver, method } if method == "get" => {
-            let normalized = normalize_numeric_literal_arguments(arguments);
-            let [index] = normalized.as_slice() else {
-                return Err(Error::Unsupported(
-                    "`get` must receive exactly one index argument".to_string(),
-                ));
-            };
-            Ok(Some((receiver.as_ref().clone(), index.clone())))
-        }
-        Term::Path(path)
-            if path.token_keyword_package.is_none()
-                && path.segments.len() == 1
-                && path.segments[0].lexeme == "array_get" =>
-        {
-            let normalized = normalize_numeric_literal_arguments(arguments);
-            let [receiver, index] = normalized.as_slice() else {
-                return Err(Error::Unsupported(
-                    "`array_get` must receive exactly an array and an index".to_string(),
-                ));
-            };
-            Ok(Some((receiver.clone(), index.clone())))
-        }
-        _ => Ok(None),
+    let Term::Path(path) = callee else {
+        return Ok(None);
+    };
+    if path.token_keyword_package.is_some()
+        || path.segments.len() != 1
+        || path.segments[0].lexeme != "array_get"
+    {
+        return Ok(None);
     }
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [receiver, index] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`array_get` must receive exactly an array and an index".to_string(),
+        ));
+    };
+    Ok(Some((receiver.clone(), index.clone())))
 }
 
 fn array_len_call_receiver<'a>(
@@ -1052,38 +1002,6 @@ fn lower_u8_array_get_call(
         array_slot,
         index: Box::new(lower_array_index_expr(&index, state)?),
     }))
-}
-
-fn lower_runtime_arg_get_call(
-    callee: &Term,
-    arguments: &[Term],
-    state: &LoweringState,
-) -> Result<Option<U8Expr>> {
-    let Term::MethodCall { receiver, method } = callee else {
-        return Ok(None);
-    };
-    if method != "get" {
-        return Ok(None);
-    }
-
-    let normalized = normalize_numeric_literal_arguments(arguments);
-    let [index] = normalized.as_slice() else {
-        return Err(Error::Unsupported(
-            "`get` must receive exactly one index argument".to_string(),
-        ));
-    };
-
-    match resolve_value(receiver.as_ref(), &state.environment)? {
-        Value::RuntimeArg(arg_index) => Ok(Some(U8Expr::RuntimeArgGet {
-            arg_index: Box::new(arg_index),
-            index: Box::new(lower_array_index_expr(index, state)?),
-        })),
-        Value::StaticSlice { data_index, .. } => Ok(Some(U8Expr::StaticDataGet {
-            data_index,
-            index: Box::new(lower_array_index_expr(index, state)?),
-        })),
-        _ => Ok(None),
-    }
 }
 
 pub(crate) fn lower_array_index_expr(term: &Term, state: &LoweringState) -> Result<I64Expr> {
