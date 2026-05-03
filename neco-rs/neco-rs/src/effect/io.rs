@@ -151,7 +151,9 @@ pub(crate) fn lower_io_call(
                     Ok(value) => value,
                     Err(err) => return Some(Err(err)),
                 };
-            if matches!(path[1], "array_new" | "arrayvl_new") && matches!(ty, Term::Reference { .. }) {
+            if matches!(path[1], "array_new" | "arrayvl_new")
+                && matches!(ty, Term::Reference { .. })
+            {
                 let expected = if path[1] == "array_new" {
                     "Array T len"
                 } else {

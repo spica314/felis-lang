@@ -138,9 +138,11 @@ fn rejects_string_literal_as_arrayvl_value() {
     };
 
     let error = lower_package_to_program(&package).expect_err("lowering must reject old form");
-    assert!(error
-        .to_string()
-        .contains("expected a value of type `ArrayVL u8`"));
+    assert!(
+        error
+            .to_string()
+            .contains("expected a value of type `ArrayVL u8`")
+    );
 }
 
 #[test]
