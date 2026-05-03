@@ -46,7 +46,6 @@ fn compiles_and_runs_hello_world_with_neco_felis_fixture() {
 }
 
 #[test]
-#[ignore]
 fn compiles_i32_ops_with_neco_felis_fixture() {
     let input_path = repo_root().join("tests/testcases/i32-ops");
     let (run, emitted_bytes, emitted_run) =
