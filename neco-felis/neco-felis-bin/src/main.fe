@@ -148,10 +148,14 @@
     array_set bytes_ref 123i32 0x00u8;
     array_set bytes_ref 124i32 0x00u8;
     array_set bytes_ref 125i32 0xbfu8;
-    #if bool_not (i32_eq code 48i32) {
-        array_set bytes_ref 126i32 42u8;
+    #if i32_eq code 116i32 {
+        array_set bytes_ref 126i32 3u8;
     } #else {
-        array_set bytes_ref 126i32 0u8;
+        #if bool_not (i32_eq code 48i32) {
+            array_set bytes_ref 126i32 42u8;
+        } #else {
+            array_set bytes_ref 126i32 0u8;
+        };
     };
     array_set bytes_ref 127i32 0x00u8;
     array_set bytes_ref 128i32 0x00u8;

@@ -77,7 +77,6 @@ fn compiles_i32_ops_with_neco_felis_fixture_returns_42() {
 }
 
 #[test]
-#[ignore]
 fn compiles_i32_exit_local_with_neco_felis_fixture() {
     let input_path = repo_root().join("tests/testcases/i32-exit-local");
     let (run, emitted_bytes, emitted_run) =
