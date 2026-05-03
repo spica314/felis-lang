@@ -645,93 +645,7 @@ fn lower_expression_statement(
         )));
     }
 
-    if let Some(name) = single_segment_path_name(receiver.as_ref())
-        && let Some(current_value) = state.environment.get(name).cloned()
-        && matches!(
-            current_value,
-            Value::Struct(_)
-                | Value::Constructor(_)
-                | Value::Reference {
-                    value: _,
-                    exclusive: true
-                }
-        )
-    {
-        let normalized = normalize_numeric_literal_arguments(arguments);
-        let [value] = normalized.as_slice() else {
-            return Err(Error::Unsupported(
-                "`set` must receive exactly one argument for value references".to_string(),
-            ));
-        };
-        match current_value {
-            Value::Struct(_) | Value::Constructor(_) => {
-                let lowered_value = lower_pure_value(value, state, program)?;
-                match lowered_value {
-                    Value::Struct(_) | Value::Constructor(_) => {
-                        state.environment.insert(name.to_string(), lowered_value);
-                        return Ok(());
-                    }
-                    other => {
-                        return Err(Error::Unsupported(format!(
-                            "`set` expected a struct or constructor value, got {other:?}"
-                        )));
-                    }
-                }
-            }
-            Value::Reference {
-                value: referent,
-                exclusive,
-            } => {
-                let lowered_value = match referent.as_ref() {
-                    Value::I32(_) => Value::I32(lower_i32_expr(value, state)?),
-                    Value::I64(_) => Value::I64(lower_i64_expr(value, state)?),
-                    Value::Constructor(_) | Value::Struct(_) => {
-                        lower_pure_value(value, state, program)?
-                    }
-                    other => {
-                        return Err(Error::Unsupported(format!(
-                            "`set` does not support this reference target: {other:?}"
-                        )));
-                    }
-                };
-                state.environment.insert(
-                    name.to_string(),
-                    Value::Reference {
-                        value: Box::new(lowered_value),
-                        exclusive,
-                    },
-                );
-                return Ok(());
-            }
-            _ => {}
-        }
-    }
-
     match crate::effect::resolve_value(receiver.as_ref(), &state.environment)? {
-        Value::I32Reference(slot) => {
-            let normalized = normalize_numeric_literal_arguments(arguments);
-            let [value] = normalized.as_slice() else {
-                return Err(Error::Unsupported(
-                    "`set` must receive exactly one argument for `i32` references".to_string(),
-                ));
-            };
-            program.operations.push(Operation::StoreI32 {
-                slot,
-                value: lower_i32_expr(value, state)?,
-            });
-        }
-        Value::I64Reference(slot) => {
-            let normalized = normalize_numeric_literal_arguments(arguments);
-            let [value] = normalized.as_slice() else {
-                return Err(Error::Unsupported(
-                    "`set` must receive exactly one argument for `i64` references".to_string(),
-                ));
-            };
-            program.operations.push(Operation::StoreI64 {
-                slot,
-                value: lower_i64_expr(value, state)?,
-            });
-        }
         Value::Array {
             slot,
             element_type: ArrayElementType::I32,
@@ -785,7 +699,7 @@ fn lower_expression_statement(
         }
         other => {
             return Err(Error::Unsupported(format!(
-                "`set` expects an integer reference or array reference, got {other:?}"
+                "`set` expects an array reference, got {other:?}"
             )));
         }
     }

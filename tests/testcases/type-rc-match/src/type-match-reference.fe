@@ -1,3 +1,4 @@
+#use std_core::primitive::reference::ref_get;
 #use std_core::io::IO;
 #use std_core::primitive::i32::i32;
 
@@ -9,7 +10,7 @@
 #fn token_ref_code : (token_ref : & Token) -> i32 {
     #match token_ref {
         Token::empty => 1i32,
-        Token::number value_ref => value_ref .> get,
+        Token::number value_ref => (ref_get i32 value_ref),
     }
 }
 

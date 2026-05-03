@@ -32,8 +32,8 @@ Call a function by writing the function name followed by its arguments.
 
 ```felis
 #proc add_into_ref : (value_ref : &^ i32) -> (delta : i32) -> i32 {
-    value_ref .> set (i32_add (value_ref .> get) delta);
-    i32_add (value_ref .> get) delta
+    ref_set i32 value_ref (i32_add ((ref_get i32 value_ref)) delta);
+    i32_add ((ref_get i32 value_ref)) delta
 }
 ```
 

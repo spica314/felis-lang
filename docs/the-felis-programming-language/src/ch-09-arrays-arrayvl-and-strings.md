@@ -82,5 +82,5 @@ Use `string_from_arrayvl_parts` to create a string from existing `ArrayVL` stora
 #let name_len : i32 = 0i32;
 #letref #excl name_len_ref : &^ i32 #borrow name_len;
 string_push_u8_unchecked empty name_len_ref 'f';
-#let name : String = string_with_len empty (name_len_ref .> get);
+#let name : String = string_with_len empty ((ref_get i32 name_len_ref));
 ```

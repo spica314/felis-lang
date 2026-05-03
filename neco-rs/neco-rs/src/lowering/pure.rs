@@ -85,8 +85,7 @@ pub(super) fn lower_pure_value(
 }
 
 fn lower_reference_get_value(term: &Term, state: &LoweringState) -> Result<Option<Value>> {
-    let (receiver, arguments) = match term {
-        Term::MethodCall { receiver, method } if method == "get" => (receiver.as_ref(), &[][..]),
+    match term {
         Term::Application { callee, arguments } => {
             if let Term::Path(path) = callee.as_ref()
                 && path.token_keyword_package.is_none()
@@ -101,20 +100,10 @@ fn lower_reference_get_value(term: &Term, state: &LoweringState) -> Result<Optio
                 };
                 return lower_reference_get_receiver_value(receiver, state).map(Some);
             }
-            let Term::MethodCall { receiver, method } = callee.as_ref() else {
-                return Ok(None);
-            };
-            if method != "get" {
-                return Ok(None);
-            }
-            (receiver.as_ref(), arguments.as_slice())
+            Ok(None)
         }
-        _ => return Ok(None),
-    };
-    if !arguments.is_empty() {
-        return Ok(None);
+        _ => Ok(None),
     }
-    lower_reference_get_receiver_value(receiver, state).map(Some)
 }
 
 fn lower_reference_get_receiver_value(receiver: &Term, state: &LoweringState) -> Result<Value> {

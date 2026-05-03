@@ -1,3 +1,4 @@
+#use std_core::primitive::reference::ref_get;
 #use std_core::io::IO;
 #use std_core::primitive::array::DynArray;
 #use std_core::primitive::i32::i32_add;
@@ -54,7 +55,7 @@
     string_push_u8_unchecked empty_name name_len_ref 'x';
     string_set_u8 empty_name 1i32 'o';
     string_push_u8_unchecked empty_name name_len_ref 'o';
-    #let built_name : String = string_with_len empty_name (name_len_ref .> get);
+    #let built_name : String = string_with_len empty_name ((ref_get i32 name_len_ref));
 
     #let eq_ref : i32 = 0i32;
     #letref #excl eq_ref : &^ i32 #borrow eq_ref;
@@ -64,10 +65,10 @@
     mark_string_span_eq built_name source 4i32 7i32 span_eq_ref;
 
     #let exit_code : i32 = code;
-    #if i32_eq (eq_ref .> get) 0i32 {
+    #if i32_eq ((ref_get i32 eq_ref)) 0i32 {
         #let _ : () <- IO::exit 1i32;
     };
-    #if i32_eq (span_eq_ref .> get) 0i32 {
+    #if i32_eq ((ref_get i32 span_eq_ref)) 0i32 {
         #let _ : () <- IO::exit 2i32;
     };
     #let _ : () <- IO::exit exit_code;

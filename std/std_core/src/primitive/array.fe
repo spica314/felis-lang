@@ -1,3 +1,5 @@
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
 #use std_core::io::IO;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_gte;
@@ -45,17 +47,17 @@
     #let len : i32 = dyn_array_len t source;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
     #loop {
-        #if i32_gte (index_ref .> get) len {
+        #if i32_gte ((ref_get i32 index_ref)) len {
             #break;
         };
-        dest_ref .> set (index_ref .> get) (dyn_array_get t source (index_ref .> get));
-        index_ref .> set (i32_add (index_ref .> get) 1i32);
+        dest_ref .> set ((ref_get i32 index_ref)) (dyn_array_get t source ((ref_get i32 index_ref)));
+        ref_set i32 index_ref (i32_add ((ref_get i32 index_ref)) 1i32);
     };
     ()
 }
 
 #proc dyn_array_grow : (t : Type[0]) -> (array_ref : &^ DynArray t) -> () #with IO {
-    #let array : DynArray t = array_ref .> get;
+    #let array : DynArray t = (ref_get (DynArray t) array_ref);
     #let capacity : i32 = dyn_array_capacity t array;
     #let next_capacity : i32 = i32_mul capacity 2i32;
     #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
@@ -67,21 +69,21 @@
 }
 
 #proc dyn_array_push : (t : Type[0]) -> (array_ref : &^ DynArray t) -> (value : t) -> () #with IO {
-    #let array : DynArray t = array_ref .> get;
+    #let array : DynArray t = (ref_get (DynArray t) array_ref);
     #let len : i32 = dyn_array_len t array;
     #let capacity : i32 = dyn_array_capacity t array;
     #if i32_gte len capacity {
         dyn_array_grow t array_ref;
     };
-    #let grown_array : DynArray t = array_ref .> get;
+    #let grown_array : DynArray t = (ref_get (DynArray t) array_ref);
     dyn_array_set t grown_array len value;
-    array_ref .> set (DynArray::dyn_array t (dyn_array_arrayvl t grown_array) (i64_from_i32 (i32_add len 1i32)));
+    ref_set (DynArray t) array_ref (DynArray::dyn_array t (dyn_array_arrayvl t grown_array) (i64_from_i32 (i32_add len 1i32)));
     ()
 }
 
 #proc append_u8 : (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () {
-    dest_ref .> set (dest_index_ref .> get) byte;
-    dest_index_ref .> set (i32_add (dest_index_ref .> get) 1i32);
+    dest_ref .> set ((ref_get i32 dest_index_ref)) byte;
+    ref_set i32 dest_index_ref (i32_add ((ref_get i32 dest_index_ref)) 1i32);
     ()
 }
 
@@ -89,12 +91,12 @@
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     #loop {
-        #let byte : u8 = source_ref .> get (source_index_ref .> get);
+        #let byte : u8 = source_ref .> get ((ref_get i32 source_index_ref));
         #if u8_eq byte '\0' {
             #break;
         };
         append_u8 dest_ref dest_index_ref byte;
-        source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+        ref_set i32 source_index_ref (i32_add ((ref_get i32 source_index_ref)) 1i32);
     };
     ()
 }
@@ -103,12 +105,12 @@
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     #loop {
-        #let byte : u8 = source_ref .> get (source_index_ref .> get);
+        #let byte : u8 = source_ref .> get ((ref_get i32 source_index_ref));
         #if u8_eq byte '\0' {
             #break;
         };
         append_u8 dest_ref dest_index_ref byte;
-        source_index_ref .> set (i32_add (source_index_ref .> get) 1i32);
+        ref_set i32 source_index_ref (i32_add ((ref_get i32 source_index_ref)) 1i32);
     };
     ()
 }
@@ -117,11 +119,11 @@
     #let index_ref : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
     #loop {
-        #if i32_gte (index_ref .> get) (dest_ref .> len) {
+        #if i32_gte ((ref_get i32 index_ref)) (dest_ref .> len) {
             #break;
         };
-        dest_ref .> set (index_ref .> get) byte;
-        index_ref .> set (i32_add (index_ref .> get) 1i32);
+        dest_ref .> set ((ref_get i32 index_ref)) byte;
+        ref_set i32 index_ref (i32_add ((ref_get i32 index_ref)) 1i32);
     };
     ()
 }

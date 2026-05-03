@@ -1,3 +1,5 @@
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
 #use std_core::io::IO;
 #use std_core::primitive::i32::i32;
 
@@ -8,8 +10,8 @@
 
 #proc apply_token : (token : Token) -> (code_ref : &^ i32) -> () {
     #match token {
-        Token::empty => code_ref .> set 1i32,
-        Token::number value => code_ref .> set value,
+        Token::empty => ref_set i32 code_ref 1i32,
+        Token::number value => ref_set i32 code_ref value,
     };
     ()
 }
@@ -21,6 +23,6 @@
     #letref #excl code_ref : &^ i32 #borrow code_ref;
     #let token : Token = Token::number 42i32;
     apply_token token code_ref;
-    #let _ : () <- IO::exit (code_ref .> get);
+    #let _ : () <- IO::exit ((ref_get i32 code_ref));
     ()
 }

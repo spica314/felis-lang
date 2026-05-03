@@ -65,7 +65,7 @@ i32_add 20i32 22i32
 Parentheses can group an argument expression.
 
 ```felis
-i32_add (sum_ref .> get) 1i32
+i32_add ((ref_get i32 sum_ref)) 1i32
 ```
 
 ## Comments

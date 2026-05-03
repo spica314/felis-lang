@@ -43,6 +43,27 @@ fn operations_contain_static_data_get(operations: &[Operation]) -> bool {
     })
 }
 
+fn parse_inline_binary_package(name: &str, source: &str) -> ParsedPackage {
+    let source_path = PathBuf::from("src/main.fe");
+    let (tokens, syntax) = neco_rs_parser::parse_source(source).expect("parse source");
+    ParsedPackage {
+        root_dir: PathBuf::from("."),
+        manifest_path: PathBuf::from("neco-package.json"),
+        manifest: neco_rs_parser::PackageManifest {
+            name: name.to_string(),
+            dependencies: Vec::new(),
+            felis_lib_entrypoint: None,
+            felis_bin_entrypoints: vec![source_path.clone()],
+        },
+        source_files: vec![neco_rs_parser::ParsedSourceFile {
+            path: source_path,
+            role: neco_rs_parser::SourceFileRole::BinaryEntrypoint,
+            tokens,
+            syntax: syntax.expect("source file syntax"),
+        }],
+    }
+}
+
 #[test]
 fn lowers_exit_fixture_to_program() {
     let root = repo_root().join("tests/testcases/exit-42");
@@ -57,6 +78,53 @@ fn lowers_exit_fixture_to_program() {
     );
     assert!(program.data.is_empty());
     assert!(program.arrays.is_empty());
+}
+
+#[test]
+fn rejects_reference_method_get() {
+    let package = parse_inline_binary_package(
+        "reference-method-get",
+        r#"
+#use std_core::io::IO;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let value : i32 = 42i32;
+    #letref value_ref : & i32 #borrow value;
+    #let code : i32 = value_ref .> get;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package).expect_err("lowering must reject `.> get`");
+    assert!(error.to_string().contains("unsupported pure expression"));
+}
+
+#[test]
+fn rejects_reference_method_set() {
+    let package = parse_inline_binary_package(
+        "reference-method-set",
+        r#"
+#use std_core::io::IO;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let value : i32 = 0i32;
+    #letref #excl value_ref : &^ i32 #borrow value;
+    value_ref .> set 42i32;
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package).expect_err("lowering must reject `.> set`");
+    assert!(
+        error
+            .to_string()
+            .contains("`set` expects an array reference")
+    );
 }
 
 #[test]

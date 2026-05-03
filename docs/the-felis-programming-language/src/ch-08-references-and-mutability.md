@@ -8,7 +8,7 @@ Create a reference with `#letref` and `#borrow`.
 
 ```felis
 #fn add1 : (value_ref : & i32) -> i32 {
-    i32_add (value_ref .> get) 1i32
+    i32_add ((ref_get i32 value_ref)) 1i32
 }
 
 #let value : i32 = 41i32;
@@ -16,7 +16,7 @@ Create a reference with `#letref` and `#borrow`.
 #let r : i32 = add1 value_ref;
 ```
 
-Read through a reference with `.> get`.
+Read through a reference with `ref_get`.
 
 ## Mutable References
 
@@ -27,14 +27,14 @@ A mutable reference has type `&^ T` and is created with `#letref #excl`.
 #letref #excl counter_ref : &^ i32 #borrow counter;
 ```
 
-Read with `.> get` and write with `.> set`.
+Read with `ref_get` and write with `ref_set`.
 
 ```felis
-#let next : i32 = i32_add (counter_ref .> get) 1i32;
-counter_ref .> set next;
+#let next : i32 = i32_add ((ref_get i32 counter_ref)) 1i32;
+ref_set i32 counter_ref next;
 ```
 
-The same primitive reference operations are also exposed as builtin functions through
+Primitive reference operations are exposed as builtin functions through
 `std_core::primitive::reference`.
 
 ```felis
@@ -49,7 +49,7 @@ You can also replace a whole struct value through a mutable reference.
 
 ```felis
 #proc set_span_ref : (span_ref : &^ Span) -> () {
-    span_ref .> set Span { start = 20i32, end = 22i32 };
+    ref_set Span span_ref Span { start = 20i32, end = 22i32 };
     ()
 }
 ```

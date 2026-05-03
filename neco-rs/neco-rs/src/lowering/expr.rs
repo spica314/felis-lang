@@ -38,9 +38,6 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
             if let Some(expr) = lower_dyn_array_get_i32_call(callee, arguments, state)? {
                 return Ok(expr);
             }
-            if let Some(expr) = lower_i32_reference_get_call(callee, arguments, state)? {
-                return Ok(expr);
-            }
             if let Some(expr) = lower_array_get_call(callee, arguments, state)? {
                 return Ok(expr);
             }
@@ -57,18 +54,6 @@ fn lower_i32_method_call(term: &Term, state: &LoweringState) -> Result<I32Expr> 
         unreachable!();
     };
     match method.as_str() {
-        "get" => match resolve_value(receiver.as_ref(), &state.environment)? {
-            Value::I32Reference(slot) => Ok(I32Expr::Local(slot)),
-            Value::Reference { value, .. } => match value.as_ref() {
-                Value::I32(expr) => Ok(expr.clone()),
-                other => Err(Error::Unsupported(format!(
-                    "`get` expects an `i32` reference, got {other:?}"
-                ))),
-            },
-            other => Err(Error::Unsupported(format!(
-                "`get` expects an `i32` reference, got {other:?}"
-            ))),
-        },
         "len" => match resolve_value(receiver.as_ref(), &state.environment)? {
             Value::StaticSlice { len, .. } => Ok(I32Expr::Literal(len)),
             Value::Array {
@@ -109,9 +94,6 @@ pub(crate) fn lower_i64_expr(term: &Term, state: &LoweringState) -> Result<I64Ex
             if let Some(expr) = lower_dyn_array_get_i64_call(callee, arguments, state)? {
                 return Ok(expr);
             }
-            if let Some(expr) = lower_i64_reference_get_call(callee, arguments, state)? {
-                return Ok(expr);
-            }
             if let Some(expr) = lower_i64_array_get_call(callee, arguments, state)? {
                 return Ok(expr);
             }
@@ -128,18 +110,6 @@ fn lower_i64_method_call(term: &Term, state: &LoweringState) -> Result<I64Expr> 
         unreachable!();
     };
     match method.as_str() {
-        "get" => match resolve_value(receiver.as_ref(), &state.environment)? {
-            Value::I64Reference(slot) => Ok(I64Expr::Local(slot)),
-            Value::Reference { value, .. } => match value.as_ref() {
-                Value::I64(expr) => Ok(expr.clone()),
-                other => Err(Error::Unsupported(format!(
-                    "`get` expects an `i64` reference, got {other:?}"
-                ))),
-            },
-            other => Err(Error::Unsupported(format!(
-                "`get` expects an `i64` reference, got {other:?}"
-            ))),
-        },
         "len" => match resolve_value(receiver.as_ref(), &state.environment)? {
             Value::Array {
                 slot,
@@ -900,24 +870,6 @@ fn lower_i64_array_get_call(
     }))
 }
 
-fn lower_i32_reference_get_call(
-    callee: &Term,
-    arguments: &[Term],
-    state: &LoweringState,
-) -> Result<Option<I32Expr>> {
-    let Term::MethodCall { receiver, method } = callee else {
-        return Ok(None);
-    };
-    if method != "get" || !arguments.is_empty() {
-        return Ok(None);
-    }
-
-    match resolve_value(receiver.as_ref(), &state.environment)? {
-        Value::I32Reference(slot) => Ok(Some(I32Expr::Local(slot))),
-        _ => Ok(None),
-    }
-}
-
 fn lower_i32_reference_get_builtin_call(
     callee: &Term,
     arguments: &[Term],
@@ -933,24 +885,6 @@ fn lower_i32_reference_get_builtin_call(
             Value::I32(expr) => Ok(Some(expr.clone())),
             _ => Ok(None),
         },
-        _ => Ok(None),
-    }
-}
-
-fn lower_i64_reference_get_call(
-    callee: &Term,
-    arguments: &[Term],
-    state: &LoweringState,
-) -> Result<Option<I64Expr>> {
-    let Term::MethodCall { receiver, method } = callee else {
-        return Ok(None);
-    };
-    if method != "get" || !arguments.is_empty() {
-        return Ok(None);
-    }
-
-    match resolve_value(receiver.as_ref(), &state.environment)? {
-        Value::I64Reference(slot) => Ok(Some(I64Expr::Local(slot))),
         _ => Ok(None),
     }
 }

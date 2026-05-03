@@ -1,3 +1,5 @@
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
 #use std_core::io::IO;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
@@ -5,15 +7,15 @@
 #use std_core::primitive::u8::u8_eq;
 
 #proc find_byte_offset : (bytes_ref : & ArrayVL u8) -> (target : u8) -> (len : i32) -> (offset_ref : &^ i32) -> () {
-    offset_ref .> set 0i32;
+    ref_set i32 offset_ref 0i32;
     #loop {
-        #if i32_gte (offset_ref .> get) len {
+        #if i32_gte ((ref_get i32 offset_ref)) len {
             #break;
         };
-        #if u8_eq (bytes_ref .> get (offset_ref .> get)) target {
+        #if u8_eq (bytes_ref .> get ((ref_get i32 offset_ref))) target {
             #break;
         };
-        offset_ref .> set (i32_add (offset_ref .> get) 1i32);
+        ref_set i32 offset_ref (i32_add ((ref_get i32 offset_ref)) 1i32);
     };
     ()
 }
@@ -25,7 +27,7 @@
     #let offset_ref : i32 = 0i32;
     #letref #excl offset_ref : &^ i32 #borrow offset_ref;
     find_byte_offset bytes_ref ':' (bytes_ref .> len) offset_ref;
-    #let code : i32 = i32_add (offset_ref .> get) 39i32;
+    #let code : i32 = i32_add ((ref_get i32 offset_ref)) 39i32;
     #let _ : () <- IO::exit code;
     ()
 }

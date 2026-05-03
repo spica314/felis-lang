@@ -1,3 +1,4 @@
+#use std_core::primitive::reference::ref_get;
 #use std_core::io::IO;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
@@ -8,7 +9,7 @@
 }
 
 #fn head_value : (head_ref : & i32) -> i32 {
-    head_ref .> get
+    (ref_get i32 head_ref)
 }
 
 #fn list_sum_ref : (list_ref : & List) -> i32 {

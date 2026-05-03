@@ -30,7 +30,7 @@ When `#if` is used as a statement, the block is followed by `;`.
 
 ```felis
 #loop {
-    #if i32_eq (counter .> get) 10i32 {
+    #if i32_eq ((ref_get i32 counter)) 10i32 {
         #break;
     };
 };
@@ -40,9 +40,9 @@ Use `#continue` to skip to the next iteration.
 
 ```felis
 #loop {
-    #let new_counter : i32 = i32_add (counter .> get) 1i32;
-    counter .> set new_counter;
-    #if i32_eq (counter .> get) 5i32 {
+    #let new_counter : i32 = i32_add ((ref_get i32 counter)) 1i32;
+    ref_set i32 counter new_counter;
+    #if i32_eq ((ref_get i32 counter)) 5i32 {
         #continue;
     };
 };

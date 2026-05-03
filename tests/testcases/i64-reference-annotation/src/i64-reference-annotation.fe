@@ -1,3 +1,4 @@
+#use std_core::primitive::reference::ref_get;
 #use std_core::io::IO;
 #use std_core::primitive::i64::i64;
 #use std_core::primitive::i64::i64_add;
@@ -5,7 +6,7 @@
 #entrypoint main;
 
 #fn add1 : (value_ref : & i64) -> i64 {
-    i64_add (value_ref .> get) 1i64
+    i64_add ((ref_get i64 value_ref)) 1i64
 }
 
 #fn main : () #with IO {
