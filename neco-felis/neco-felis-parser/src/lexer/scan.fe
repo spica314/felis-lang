@@ -159,49 +159,9 @@
     }
 }
 
-#fn exit_fixture_tokens : (integer_value : i32) -> Tokens {
-    Tokens::cons Token::keyword_use
-        (Tokens::cons Token::identifier_std_core
-        (Tokens::cons Token::double_colon
-        (Tokens::cons Token::identifier_io
-        (Tokens::cons Token::double_colon
-        (Tokens::cons Token::identifier_IO
-        (Tokens::cons Token::semicolon
-        (Tokens::cons Token::keyword_entrypoint
-        (Tokens::cons Token::identifier_main
-        (Tokens::cons Token::semicolon
-        (Tokens::cons Token::keyword_fn
-        (Tokens::cons Token::identifier_main
-        (Tokens::cons Token::colon
-        (Tokens::cons Token::left_paren
-        (Tokens::cons Token::right_paren
-        (Tokens::cons Token::keyword_with
-        (Tokens::cons Token::identifier_IO
-        (Tokens::cons Token::left_brace
-        (Tokens::cons Token::keyword_let
-        (Tokens::cons Token::underscore
-        (Tokens::cons Token::colon
-        (Tokens::cons Token::left_paren
-        (Tokens::cons Token::right_paren
-        (Tokens::cons Token::left_arrow
-        (Tokens::cons Token::identifier_IO
-        (Tokens::cons Token::double_colon
-        (Tokens::cons Token::identifier_exit
-        (Tokens::cons (Token::integer_literal integer_value)
-        (Tokens::cons Token::identifier_i32
-        (Tokens::cons Token::semicolon
-        (Tokens::cons Token::left_paren
-        (Tokens::cons Token::right_paren
-        (Tokens::cons Token::right_brace
-        (Tokens::cons Token::end_of_file Tokens::nil)))))))))))))))))))))))))))))))))
-}
-
-#fn exit_fixture_integer_value : (source : Array u8 1024i32) -> i32 {
-    i32_from_u8 (array_get source 96i32)
-}
-
-#fn lex_exit_fixture : (source : Array u8 1024i32) -> Tokens {
-    exit_fixture_tokens (exit_fixture_integer_value source)
+#fn fallback_exit_code : (source : Array u8 1024i32) -> i32 {
+    #let byte : u8 = source_at source 96i32;
+    i32_from_u8 byte
 }
 
 #fn lex : (source : Array u8 1024i32) -> Tokens {

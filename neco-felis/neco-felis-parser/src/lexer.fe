@@ -3,5 +3,5 @@
 
 #pub #use Token;
 #pub #use Tokens;
+#pub #use fallback_exit_code;
 #pub #use lex;
-#pub #use lex_exit_fixture;
