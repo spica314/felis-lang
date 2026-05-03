@@ -8,6 +8,10 @@
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_from_u8;
+#use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_lte;
+#use std_core::primitive::i32::i32_mul;
+#use std_core::primitive::i32::i32_sub;
 #use std_core::primitive::u8::u8_eq;
 
 #fn source_at : (source : Array u8 1024i32) -> (index : i32) -> u8 {
@@ -100,16 +104,33 @@
 
 #fn lex_word_or_integer_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
     #let byte : u8 = source_at source index;
-    #let next : u8 = source_at source (i32_add index 1i32);
     #match (u8_eq byte '_') {
         true => Tokens::cons Token::underscore (lex_from source (i32_add index 1i32)),
-        false => #match (u8_eq byte '0') {
-            true => Tokens::cons (Token::integer_literal 0i32) (lex_from source (i32_add index 1i32)),
-            false => #match (bool_and (u8_eq byte '4') (u8_eq next '2')) {
-                true => Tokens::cons (Token::integer_literal 42i32) (lex_from source (i32_add index 2i32)),
-                false => lex_identifier_from source index,
-            },
+        false => #match (is_digit byte) {
+            true => lex_integer_from source index 0i32,
+            false => lex_identifier_from source index,
         },
+    }
+}
+
+#fn is_digit : (byte : u8) -> bool {
+    bool_and
+        (i32_gte (i32_from_u8 byte) 48i32)
+        (i32_lte (i32_from_u8 byte) 57i32)
+}
+
+#fn digit_value : (byte : u8) -> i32 {
+    i32_sub (i32_from_u8 byte) 48i32
+}
+
+#fn lex_integer_from : (source : Array u8 1024i32) -> (index : i32) -> (value : i32) -> Tokens {
+    #let byte : u8 = source_at source index;
+    #match (is_digit byte) {
+        true => lex_integer_from
+            source
+            (i32_add index 1i32)
+            (i32_add (i32_mul value 10i32) (digit_value byte)),
+        false => Tokens::cons (Token::integer_literal value) (lex_from source index),
     }
 }
 
