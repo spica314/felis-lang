@@ -34,6 +34,17 @@ Read with `.> get` and write with `.> set`.
 counter_ref .> set next;
 ```
 
+The same primitive reference operations are also exposed as builtin functions through
+`std_core::primitive::reference`.
+
+```felis
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
+
+#let next : i32 = i32_add (ref_get i32 counter_ref) 1i32;
+ref_set i32 counter_ref next;
+```
+
 You can also replace a whole struct value through a mutable reference.
 
 ```felis

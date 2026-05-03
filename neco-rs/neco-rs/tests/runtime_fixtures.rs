@@ -441,6 +441,13 @@ fn compiles_and_runs_i32_reference_annotation_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_reference_builtins_fixture() {
+    let root = repo_root().join("tests/testcases/reference-builtins");
+    let status = run_fixture_status(&root, "reference-builtins");
+    assert_eq!(status.code(), Some(82));
+}
+
+#[test]
 fn compiles_and_runs_proc_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/proc-reference-annotation");
     let status = run_fixture_status(&root, "proc-reference-annotation");

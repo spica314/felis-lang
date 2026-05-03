@@ -2,4 +2,5 @@
 #pub #mod bool;
 #pub #mod i32;
 #pub #mod i64;
+#pub #mod reference;
 #pub #mod u8;

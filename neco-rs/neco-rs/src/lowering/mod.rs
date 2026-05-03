@@ -622,6 +622,9 @@ fn lower_expression_statement(
         lower_match_expression_statement(match_expr, state, program)?;
         return Ok(());
     }
+    if lower_reference_set_builtin_statement(term, state, program)? {
+        return Ok(());
+    }
     if lower_procedure_call_statement(term, state, program)?.is_some() {
         return Ok(());
     }
@@ -787,6 +790,88 @@ fn lower_expression_statement(
         }
     }
     Ok(())
+}
+
+fn lower_reference_set_builtin_statement(
+    term: &Term,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<bool> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(false);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(false);
+    };
+    if path.token_keyword_package.is_some()
+        || path.segments.len() != 1
+        || path.segments[0].lexeme != "ref_set"
+    {
+        return Ok(false);
+    }
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [_ty, receiver, value] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`ref_set` must receive exactly a type, a reference, and a value".to_string(),
+        ));
+    };
+
+    if let Some(name) = single_segment_path_name(receiver)
+        && let Some(current_value) = state.environment.get(name).cloned()
+        && let Value::Reference {
+            value: referent,
+            exclusive: true,
+        } = current_value
+    {
+        let lowered_value = match referent.as_ref() {
+            Value::I32(_) => Value::I32(lower_i32_expr(value, state)?),
+            Value::I64(_) => Value::I64(lower_i64_expr(value, state)?),
+            Value::Constructor(_) | Value::Struct(_) => lower_pure_value(value, state, program)?,
+            other => {
+                return Err(Error::Unsupported(format!(
+                    "`ref_set` does not support this reference target: {other:?}"
+                )));
+            }
+        };
+        state.environment.insert(
+            name.to_string(),
+            Value::Reference {
+                value: Box::new(lowered_value),
+                exclusive: true,
+            },
+        );
+        return Ok(true);
+    }
+
+    match crate::effect::resolve_value(receiver, &state.environment)? {
+        Value::I32Reference(slot) => {
+            program.operations.push(Operation::StoreI32 {
+                slot,
+                value: lower_i32_expr(value, state)?,
+            });
+        }
+        Value::I64Reference(slot) => {
+            program.operations.push(Operation::StoreI64 {
+                slot,
+                value: lower_i64_expr(value, state)?,
+            });
+        }
+        Value::Reference {
+            exclusive: false, ..
+        } => {
+            return Err(Error::Unsupported(
+                "`ref_set` requires an exclusive reference".to_string(),
+            ));
+        }
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`ref_set` expects an integer or value reference, got {other:?}"
+            )));
+        }
+    }
+
+    Ok(true)
 }
 
 fn single_segment_path_name(term: &Term) -> Option<&str> {

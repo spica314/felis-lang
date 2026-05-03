@@ -88,6 +88,19 @@ fn lower_reference_get_value(term: &Term, state: &LoweringState) -> Result<Optio
     let (receiver, arguments) = match term {
         Term::MethodCall { receiver, method } if method == "get" => (receiver.as_ref(), &[][..]),
         Term::Application { callee, arguments } => {
+            if let Term::Path(path) = callee.as_ref()
+                && path.token_keyword_package.is_none()
+                && path.segments.len() == 1
+                && path.segments[0].lexeme == "ref_get"
+            {
+                let normalized = normalize_numeric_literal_arguments(arguments);
+                let [_ty, receiver] = normalized.as_slice() else {
+                    return Err(Error::Unsupported(
+                        "`ref_get` must receive exactly a type and a reference".to_string(),
+                    ));
+                };
+                return lower_reference_get_receiver_value(receiver, state).map(Some);
+            }
             let Term::MethodCall { receiver, method } = callee.as_ref() else {
                 return Ok(None);
             };
@@ -101,13 +114,17 @@ fn lower_reference_get_value(term: &Term, state: &LoweringState) -> Result<Optio
     if !arguments.is_empty() {
         return Ok(None);
     }
+    lower_reference_get_receiver_value(receiver, state).map(Some)
+}
+
+fn lower_reference_get_receiver_value(receiver: &Term, state: &LoweringState) -> Result<Value> {
     let value = resolve_value(receiver, &state.environment)?;
-    Ok(Some(match value {
+    Ok(match value {
         Value::I32Reference(slot) => Value::I32(I32Expr::Local(slot)),
         Value::I64Reference(slot) => Value::I64(I64Expr::Local(slot)),
         Value::Reference { value, .. } => *value,
         other => other,
-    }))
+    })
 }
 
 fn lower_path_value(

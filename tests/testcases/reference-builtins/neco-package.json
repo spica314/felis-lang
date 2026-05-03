@@ -1,0 +1,4 @@
+{
+    "name": "reference-builtins",
+    "felis-bin-entrypoints": ["src/reference-builtins.fe"]
+}

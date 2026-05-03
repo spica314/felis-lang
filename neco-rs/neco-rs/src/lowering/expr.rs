@@ -32,6 +32,9 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
             if let Some(expr) = lower_i32_literal_application(callee, arguments)? {
                 return Ok(expr);
             }
+            if let Some(expr) = lower_i32_reference_get_builtin_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
             if let Some(expr) = lower_dyn_array_get_i32_call(callee, arguments, state)? {
                 return Ok(expr);
             }
@@ -98,6 +101,9 @@ pub(crate) fn lower_i64_expr(term: &Term, state: &LoweringState) -> Result<I64Ex
         }
         Term::Application { callee, arguments } => {
             if let Some(expr) = lower_i64_literal_application(callee, arguments)? {
+                return Ok(expr);
+            }
+            if let Some(expr) = lower_i64_reference_get_builtin_call(callee, arguments, state)? {
                 return Ok(expr);
             }
             if let Some(expr) = lower_dyn_array_get_i64_call(callee, arguments, state)? {
@@ -912,6 +918,25 @@ fn lower_i32_reference_get_call(
     }
 }
 
+fn lower_i32_reference_get_builtin_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<I32Expr>> {
+    let Some(receiver) = reference_get_builtin_receiver(callee, arguments)? else {
+        return Ok(None);
+    };
+
+    match resolve_value(receiver, &state.environment)? {
+        Value::I32Reference(slot) => Ok(Some(I32Expr::Local(slot))),
+        Value::Reference { value, .. } => match value.as_ref() {
+            Value::I32(expr) => Ok(Some(expr.clone())),
+            _ => Ok(None),
+        },
+        _ => Ok(None),
+    }
+}
+
 fn lower_i64_reference_get_call(
     callee: &Term,
     arguments: &[Term],
@@ -928,6 +953,48 @@ fn lower_i64_reference_get_call(
         Value::I64Reference(slot) => Ok(Some(I64Expr::Local(slot))),
         _ => Ok(None),
     }
+}
+
+fn lower_i64_reference_get_builtin_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<I64Expr>> {
+    let Some(receiver) = reference_get_builtin_receiver(callee, arguments)? else {
+        return Ok(None);
+    };
+
+    match resolve_value(receiver, &state.environment)? {
+        Value::I64Reference(slot) => Ok(Some(I64Expr::Local(slot))),
+        Value::Reference { value, .. } => match value.as_ref() {
+            Value::I64(expr) => Ok(Some(expr.clone())),
+            _ => Ok(None),
+        },
+        _ => Ok(None),
+    }
+}
+
+fn reference_get_builtin_receiver<'a>(
+    callee: &'a Term,
+    arguments: &'a [Term],
+) -> Result<Option<&'a Term>> {
+    let Term::Path(path) = callee else {
+        return Ok(None);
+    };
+    if path.token_keyword_package.is_some()
+        || path.segments.len() != 1
+        || path.segments[0].lexeme != "ref_get"
+    {
+        return Ok(None);
+    }
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [_ty, _receiver] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`ref_get` must receive exactly a type and a reference".to_string(),
+        ));
+    };
+    Ok(Some(&arguments[1]))
 }
 
 fn lower_u8_array_get_call(

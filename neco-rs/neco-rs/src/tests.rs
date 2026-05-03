@@ -837,6 +837,33 @@ fn lowers_i32_reference_annotation_fixture_to_runtime_expression_tree() {
 }
 
 #[test]
+fn lowers_reference_builtin_fixture_to_runtime_expression_tree() {
+    let root = repo_root().join("tests/testcases/reference-builtins");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::StoreI32 {
+                slot: 0,
+                value: I32Expr::Literal(0),
+            },
+            Operation::StoreI32 {
+                slot: 0,
+                value: I32Expr::Literal(41),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
+                Box::new(I32Expr::Local(0)),
+                Box::new(I32Expr::Local(0)),
+            ))),
+        ]
+    );
+}
+
+#[test]
 fn lowers_proc_reference_annotation_fixture_to_runtime_expression_tree() {
     let root = repo_root().join("tests/testcases/proc-reference-annotation");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

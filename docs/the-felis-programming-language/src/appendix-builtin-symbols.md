@@ -84,6 +84,13 @@ Import them through `std_core` modules instead of relying on implicit names.
 | `.> set` | `(index : i32) -> (value : t) -> ()`; writes one element through an exclusive array reference. |
 | `.> len` | `i32`; returns the runtime length of an `ArrayVL t`. |
 
+## Reference Functions
+
+| Symbol | Description |
+| --- | --- |
+| `ref_get` | `(t : Type[0]) -> (r : & t) -> t`; reads through a reference. |
+| `ref_set` | `(t : Type[0]) -> (r : &^ t) -> (x : t) -> ()`; writes through an exclusive reference. |
+
 ## `IO` Operations
 
 All `IO` operations must be used in a function or procedure annotated with `#with IO`.
