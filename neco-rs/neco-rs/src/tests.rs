@@ -2270,9 +2270,10 @@ fn builds_elf_image_with_runtime_i32_ops() {
 
 #[test]
 fn defaults_output_into_package_neco_directory() {
-    let root = repo_root().join("tests/testcases/exit-42");
-    let output = default_output_path(&root);
-    assert_eq!(output, root.join(".neco").join("exit-42"));
+    let root = repo_root().join("tests/testcases/workspace-basic/workspace-app");
+    let package = selected_fixture_package(&root, "main");
+    let output = default_output_path(&package);
+    assert_eq!(output, root.join(".neco").join("main"));
 }
 
 #[test]

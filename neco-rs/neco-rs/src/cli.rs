@@ -46,6 +46,29 @@ pub(crate) fn select_package_for_build(parsed: ParsedRoot, output: &Path) -> Res
     }
 }
 
+pub(crate) fn select_package_for_default_build(parsed: ParsedRoot) -> Result<ParsedPackage> {
+    match parsed {
+        ParsedRoot::Package(package) => select_default_binary_from_package(package),
+        ParsedRoot::Workspace(workspace) => {
+            let binary_packages: Vec<_> = workspace
+                .packages
+                .into_iter()
+                .filter(|package| !package.manifest.felis_bin_entrypoints.is_empty())
+                .collect();
+
+            match binary_packages.len() {
+                0 => Err(Error::Unsupported(
+                    "workspace root does not contain a binary package".to_string(),
+                )),
+                1 => select_default_binary_from_package(binary_packages.into_iter().next().unwrap()),
+                _ => Err(Error::Unsupported(
+                    "workspace root resolves to multiple binary packages; choose an output path that identifies the target package".to_string(),
+                )),
+            }
+        }
+    }
+}
+
 pub(crate) fn select_binary_from_package(
     package: ParsedPackage,
     output: &Path,
@@ -87,6 +110,15 @@ pub(crate) fn select_binary_from_package(
                 source_files,
             })
         }
+    }
+}
+
+fn select_default_binary_from_package(package: ParsedPackage) -> Result<ParsedPackage> {
+    match package.manifest.felis_bin_entrypoints.len() {
+        0 | 1 => Ok(package),
+        _ => Err(Error::Unsupported(
+            "package contains multiple binary entrypoints; choose an output path that identifies the target binary".to_string(),
+        )),
     }
 }
 
@@ -145,7 +177,7 @@ pub(crate) fn set_output_executable(output: &Path) -> Result<()> {
 
 pub(crate) struct CliOptions {
     pub(crate) input: PathBuf,
-    pub(crate) output: PathBuf,
+    pub(crate) output: Option<PathBuf>,
 }
 
 impl CliOptions {
@@ -188,26 +220,18 @@ impl CliOptions {
         }
 
         let input = input.ok_or_else(|| Error::Usage("missing package root path".to_string()))?;
-        let output = output.unwrap_or_else(|| default_output_path(&input));
-
         Ok(Self { input, output })
     }
 }
 
-pub(crate) fn default_output_path(input: &Path) -> PathBuf {
-    let package_root = if input
-        .file_name()
-        .is_some_and(|name| name == std::ffi::OsStr::new("neco-package.json"))
-    {
-        input.parent().unwrap_or(input)
-    } else {
-        input
-    };
-
-    let name = package_root
-        .file_name()
+pub(crate) fn default_output_path(package: &ParsedPackage) -> PathBuf {
+    let name = package
+        .manifest
+        .felis_bin_entrypoints
+        .first()
+        .and_then(|path| path.file_stem())
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| std::ffi::OsStr::new("a.out"));
 
-    package_root.join(".neco").join(name)
+    package.root_dir.join(".neco").join(name)
 }

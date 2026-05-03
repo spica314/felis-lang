@@ -61,14 +61,26 @@ where
     I: IntoIterator<Item = String>,
 {
     let options = cli::CliOptions::parse(args)?;
-    compile_path_to_elf(&options.input, &options.output)
+    let parsed = parse_root(&options.input)?;
+    let (package, output) = match options.output {
+        Some(output) => (cli::select_package_for_build(parsed, &output)?, output),
+        None => {
+            let package = cli::select_package_for_default_build(parsed)?;
+            let output = cli::default_output_path(&package);
+            (package, output)
+        }
+    };
+    compile_package_to_elf(&package, &output)
 }
 
 pub fn compile_path_to_elf(input: &Path, output: &Path) -> Result<()> {
     let parsed = parse_root(input)?;
     let package = cli::select_package_for_build(parsed, output)?;
+    compile_package_to_elf(&package, output)
+}
 
-    let program = lower_package_to_program(&package)?;
+fn compile_package_to_elf(package: &neco_rs_parser::ParsedPackage, output: &Path) -> Result<()> {
+    let program = lower_package_to_program(package)?;
     let elf = codegen::build_linux_x86_64_program_executable(&program).to_bytes()?;
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent).map_err(|source| Error::Io {
