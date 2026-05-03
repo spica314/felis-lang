@@ -160,7 +160,7 @@ pub(crate) fn lower_io_call(
                 return Some(Err(Error::Unsupported(format!(
                     "`IO::{}` returns an `{}` value; use `#let` for the value, then `#letref #excl` to borrow it",
                     path[1], expected
-                )));
+                ))));
             }
             let kind = match path[1] {
                 "array_new" => ArrayKind::Fixed,
