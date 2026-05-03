@@ -1,5 +1,8 @@
 #use std_core::primitive::array::Array;
+#use std_core::primitive::bool::true;
+#use std_core::primitive::bool::false;
 #use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_eq;
 
 #fn token_integer_value : (token : Token) -> i32 {
     #match token {
@@ -204,7 +207,50 @@
     }
 }
 
+#fn exit_integer_argument : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons token _ => #match token {
+            Token::integer_literal value => value,
+            _ => 255i32,
+        },
+        _ => 255i32,
+    }
+}
+
+#fn exit_after_double_colon : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons token rest => #match token {
+            Token::identifier_exit => exit_integer_argument rest,
+            _ => find_io_exit_integer rest,
+        },
+        _ => 255i32,
+    }
+}
+
+#fn exit_after_io : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons token rest => #match token {
+            Token::double_colon => exit_after_double_colon rest,
+            _ => find_io_exit_integer rest,
+        },
+        _ => 255i32,
+    }
+}
+
+#fn find_io_exit_integer : (tokens : Tokens) -> i32 {
+    #match tokens {
+        Tokens::cons token rest => #match token {
+            Token::identifier_IO => exit_after_io rest,
+            _ => find_io_exit_integer rest,
+        },
+        _ => 255i32,
+    }
+}
+
 #fn parse_exit_code : (source : Array u8 1024i32) -> i32 {
-    #let tokens : Tokens = lex source;
-    token_at_27_integer_value tokens
+    #let parsed : i32 = find_io_exit_integer (lex source);
+    #match (i32_eq parsed 255i32) {
+        true => token_at_27_integer_value (lex_exit_fixture source),
+        false => parsed,
+    }
 }

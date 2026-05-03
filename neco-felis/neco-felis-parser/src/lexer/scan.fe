@@ -175,6 +175,10 @@
         (Tokens::cons Token::end_of_file Tokens::nil)))))))))))))))))))))))))))))))))
 }
 
-#fn lex : (source : Array u8 1024i32) -> Tokens {
+#fn lex_exit_fixture : (source : Array u8 1024i32) -> Tokens {
     exit_fixture_tokens (i32_from_u8 (array_get source 96i32))
+}
+
+#fn lex : (source : Array u8 1024i32) -> Tokens {
+    lex_from source 0i32
 }

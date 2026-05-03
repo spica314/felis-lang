@@ -4,3 +4,4 @@
 #pub #use Token;
 #pub #use Tokens;
 #pub #use lex;
+#pub #use lex_exit_fixture;
