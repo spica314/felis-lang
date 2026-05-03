@@ -6,17 +6,17 @@ Fixed-size arrays are written as `Array T N`. Examples that allocate arrays thro
 
 ```felis
 #let array_ref : Array i32 4i32 <- IO::array_new i32 4i32;
-array_ref .> set 0i32 7i32;
-array_ref .> set 1i32 14i32;
-#let first : i32 = array_ref .> get 0i32;
+array_set array_ref 0i32 7i32;
+array_set array_ref 1i32 14i32;
+#let first : i32 = array_get array_ref 0i32;
 ```
 
 Array references can be used as function parameters.
 
 ```felis
 #fn sum3 : (array_ref : &^ Array i32 4i32) -> i32 {
-    #let a0 : i32 = array_ref .> get 0i32;
-    #let a1 : i32 = array_ref .> get 1i32;
+    #let a0 : i32 = array_get array_ref 0i32;
+    #let a1 : i32 = array_get array_ref 1i32;
     i32_add a0 a1
 }
 ```
@@ -28,7 +28,7 @@ Array references can be used as function parameters.
 ```felis
 #let arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 42i32;
 #letref #excl arrayvl_ref : &^ ArrayVL u8 #borrow arrayvl;
-#let len : i32 = arrayvl_ref .> len;
+#let len : i32 = array_len arrayvl_ref;
 ```
 
 String literals can be used as `& ArrayVL u8`.

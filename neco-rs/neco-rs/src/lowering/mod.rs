@@ -625,6 +625,9 @@ fn lower_expression_statement(
     if lower_reference_set_builtin_statement(term, state, program)? {
         return Ok(());
     }
+    if lower_array_set_builtin_statement(term, state, program)? {
+        return Ok(());
+    }
     if lower_procedure_call_statement(term, state, program)?.is_some() {
         return Ok(());
     }
@@ -634,33 +637,57 @@ fn lower_expression_statement(
             "unsupported expression statement in entrypoint body: {term:?}"
         )));
     };
-    let Term::MethodCall { receiver, method } = callee.as_ref() else {
+    lower_array_set_statement(callee.as_ref(), arguments, state, program)
+}
+
+fn lower_array_set_builtin_statement(
+    term: &Term,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<bool> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(false);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(false);
+    };
+    if path.token_keyword_package.is_some()
+        || path.segments.len() != 1
+        || path.segments[0].lexeme != "array_set"
+    {
+        return Ok(false);
+    }
+    lower_array_set_statement(callee.as_ref(), arguments, state, program)?;
+    Ok(true)
+}
+
+fn lower_array_set_statement(
+    callee: &Term,
+    arguments: &[Term],
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<()> {
+    let Some((receiver, normalized_arguments)) = array_set_call_parts(callee, arguments)? else {
         return Err(Error::Unsupported(format!(
-            "unsupported expression statement in entrypoint body: {term:?}"
+            "unsupported expression statement in entrypoint body: {callee:?}"
         )));
     };
-    if method != "set" {
-        return Err(Error::Unsupported(format!(
-            "unsupported expression statement in entrypoint body: {term:?}"
-        )));
-    }
 
-    match crate::effect::resolve_value(receiver.as_ref(), &state.environment)? {
+    match crate::effect::resolve_value(&receiver, &state.environment)? {
         Value::Array {
             slot,
             element_type: ArrayElementType::I32,
             ..
         } => {
-            let normalized = normalize_numeric_literal_arguments(arguments);
-            let [index, value] = normalized.as_slice() else {
+            let [index, value] = normalized_arguments.as_slice() else {
                 return Err(Error::Unsupported(
                     "`set` must receive exactly two arguments for arrays".to_string(),
                 ));
             };
             program.operations.push(Operation::ArraySetI32 {
                 array_slot: slot,
-                index: lower_array_index_expr(index, state)?,
-                value: lower_i32_expr(value, state)?,
+                index: lower_array_index_expr(&index, state)?,
+                value: lower_i32_expr(&value, state)?,
             });
         }
         Value::Array {
@@ -668,16 +695,15 @@ fn lower_expression_statement(
             element_type: ArrayElementType::I64,
             ..
         } => {
-            let normalized = normalize_numeric_literal_arguments(arguments);
-            let [index, value] = normalized.as_slice() else {
+            let [index, value] = normalized_arguments.as_slice() else {
                 return Err(Error::Unsupported(
                     "`set` must receive exactly two arguments for arrays".to_string(),
                 ));
             };
             program.operations.push(Operation::ArraySetI64 {
                 array_slot: slot,
-                index: lower_array_index_expr(index, state)?,
-                value: lower_i64_expr(value, state)?,
+                index: lower_array_index_expr(&index, state)?,
+                value: lower_i64_expr(&value, state)?,
             });
         }
         Value::Array {
@@ -685,16 +711,15 @@ fn lower_expression_statement(
             element_type: ArrayElementType::U8,
             ..
         } => {
-            let normalized = normalize_numeric_literal_arguments(arguments);
-            let [index, value] = normalized.as_slice() else {
+            let [index, value] = normalized_arguments.as_slice() else {
                 return Err(Error::Unsupported(
                     "`set` must receive exactly two arguments for arrays".to_string(),
                 ));
             };
             program.operations.push(Operation::ArraySetU8 {
                 array_slot: slot,
-                index: lower_array_index_expr(index, state)?,
-                value: lower_u8_expr(value, state)?,
+                index: lower_array_index_expr(&index, state)?,
+                value: lower_u8_expr(&value, state)?,
             });
         }
         other => {
@@ -704,6 +729,29 @@ fn lower_expression_statement(
         }
     }
     Ok(())
+}
+
+fn array_set_call_parts(callee: &Term, arguments: &[Term]) -> Result<Option<(Term, Vec<Term>)>> {
+    match callee {
+        Term::MethodCall { receiver, method } if method == "set" => {
+            let normalized = normalize_numeric_literal_arguments(arguments);
+            Ok(Some((receiver.as_ref().clone(), normalized)))
+        }
+        Term::Path(path)
+            if path.token_keyword_package.is_none()
+                && path.segments.len() == 1
+                && path.segments[0].lexeme == "array_set" =>
+        {
+            let normalized = normalize_numeric_literal_arguments(arguments);
+            let [receiver, index, value] = normalized.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`array_set` must receive exactly an array, an index, and a value".to_string(),
+                ));
+            };
+            Ok(Some((receiver.clone(), vec![index.clone(), value.clone()])))
+        }
+        _ => Ok(None),
+    }
 }
 
 fn lower_reference_set_builtin_statement(

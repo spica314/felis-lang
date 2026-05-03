@@ -80,9 +80,9 @@ Import them through `std_core` modules instead of relying on implicit names.
 
 | Symbol | Description |
 | --- | --- |
-| `.> get` | `(index : i32) -> t`; reads one element from an `Array t n` or `ArrayVL t`. |
-| `.> set` | `(index : i32) -> (value : t) -> ()`; writes one element through an exclusive array reference. |
-| `.> len` | `i32`; returns the runtime length of an `ArrayVL t`. |
+| `array_get` | `(array : Array t n or ArrayVL t) -> (index : i32 or i64) -> t`; reads one element. |
+| `array_set` | `(array : &^ Array t n or &^ ArrayVL t) -> (index : i32 or i64) -> (value : t) -> ()`; writes one element. |
+| `array_len` | `(array : ArrayVL t) -> i32`; returns the runtime length of an `ArrayVL t`. |
 
 ## Reference Functions
 

@@ -38,6 +38,9 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
             if let Some(expr) = lower_dyn_array_get_i32_call(callee, arguments, state)? {
                 return Ok(expr);
             }
+            if let Some(expr) = lower_array_len_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
             if let Some(expr) = lower_array_get_call(callee, arguments, state)? {
                 return Ok(expr);
             }
@@ -92,6 +95,9 @@ pub(crate) fn lower_i64_expr(term: &Term, state: &LoweringState) -> Result<I64Ex
                 return Ok(expr);
             }
             if let Some(expr) = lower_dyn_array_get_i64_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
+            if let Some(expr) = lower_i64_array_len_call(callee, arguments, state)? {
                 return Ok(expr);
             }
             if let Some(expr) = lower_i64_array_get_call(callee, arguments, state)? {
@@ -637,37 +643,114 @@ fn lower_array_get_call(
     arguments: &[Term],
     state: &LoweringState,
 ) -> Result<Option<I32Expr>> {
-    let Term::MethodCall { receiver, method } = callee else {
+    let Some((receiver, index)) = array_get_call_parts(callee, arguments)? else {
         return Ok(None);
     };
-    if method != "get" {
-        return Ok(None);
-    }
 
-    let normalized = normalize_numeric_literal_arguments(arguments);
-    let [index] = normalized.as_slice() else {
-        return Err(Error::Unsupported(
-            "`get` must receive exactly one index argument".to_string(),
-        ));
-    };
-
-    let array_slot = match resolve_value(receiver.as_ref(), &state.environment)? {
-        Value::Array {
-            slot,
-            element_type: ArrayElementType::I32,
-            ..
-        } => slot,
-        other => {
-            return Err(Error::Unsupported(format!(
-                "`get` expects an `i32` array reference, got {other:?}"
-            )));
-        }
+    let resolved = resolve_value(&receiver, &state.environment)?;
+    let Some(array_slot) = array_slot_for_element(&resolved, ArrayElementType::I32) else {
+        return Err(Error::Unsupported(format!(
+            "`get` expects an `i32` array reference, got {resolved:?}"
+        )));
     };
 
     Ok(Some(I32Expr::ArrayGet {
         array_slot,
-        index: Box::new(lower_array_index_expr(index, state)?),
+        index: Box::new(lower_array_index_expr(&index, state)?),
     }))
+}
+
+fn lower_array_len_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<I32Expr>> {
+    let Some(receiver) = array_len_call_receiver(callee, arguments)? else {
+        return Ok(None);
+    };
+
+    let resolved = resolve_value(receiver, &state.environment)?;
+    match resolved {
+        Value::StaticSlice { len, .. } => Ok(Some(I32Expr::Literal(len))),
+        _ => match dynamic_array_slot(&resolved) {
+            Some(slot) => Ok(Some(I32Expr::ArrayLen { array_slot: slot })),
+            None => Err(Error::Unsupported(format!(
+                "`array_len` expects a dynamic array reference, got {resolved:?}"
+            ))),
+        },
+    }
+}
+
+fn array_slot_for_element(value: &Value, expected_element_type: ArrayElementType) -> Option<usize> {
+    match value {
+        Value::Array {
+            slot, element_type, ..
+        } if *element_type == expected_element_type => Some(*slot),
+        Value::Reference { value, .. } => array_slot_for_element(value, expected_element_type),
+        _ => None,
+    }
+}
+
+fn dynamic_array_slot(value: &Value) -> Option<usize> {
+    match value {
+        Value::Array {
+            slot,
+            kind: ArrayKind::Dynamic,
+            ..
+        } => Some(*slot),
+        Value::Reference { value, .. } => dynamic_array_slot(value),
+        _ => None,
+    }
+}
+
+fn array_get_call_parts(callee: &Term, arguments: &[Term]) -> Result<Option<(Term, Term)>> {
+    match callee {
+        Term::MethodCall { receiver, method } if method == "get" => {
+            let normalized = normalize_numeric_literal_arguments(arguments);
+            let [index] = normalized.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`get` must receive exactly one index argument".to_string(),
+                ));
+            };
+            Ok(Some((receiver.as_ref().clone(), index.clone())))
+        }
+        Term::Path(path)
+            if path.token_keyword_package.is_none()
+                && path.segments.len() == 1
+                && path.segments[0].lexeme == "array_get" =>
+        {
+            let normalized = normalize_numeric_literal_arguments(arguments);
+            let [receiver, index] = normalized.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`array_get` must receive exactly an array and an index".to_string(),
+                ));
+            };
+            Ok(Some((receiver.clone(), index.clone())))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn array_len_call_receiver<'a>(
+    callee: &'a Term,
+    arguments: &'a [Term],
+) -> Result<Option<&'a Term>> {
+    let Term::Path(path) = callee else {
+        return Ok(None);
+    };
+    if path.token_keyword_package.is_some()
+        || path.segments.len() != 1
+        || path.segments[0].lexeme != "array_len"
+    {
+        return Ok(None);
+    }
+
+    let [_receiver] = arguments else {
+        return Err(Error::Unsupported(
+            "`array_len` must receive exactly an array".to_string(),
+        ));
+    };
+    Ok(Some(&arguments[0]))
 }
 
 fn lower_dyn_array_get_i32_call(
@@ -837,37 +920,39 @@ fn lower_i64_array_get_call(
     arguments: &[Term],
     state: &LoweringState,
 ) -> Result<Option<I64Expr>> {
-    let Term::MethodCall { receiver, method } = callee else {
+    let Some((receiver, index)) = array_get_call_parts(callee, arguments)? else {
         return Ok(None);
     };
-    if method != "get" {
-        return Ok(None);
-    }
 
-    let normalized = normalize_numeric_literal_arguments(arguments);
-    let [index] = normalized.as_slice() else {
-        return Err(Error::Unsupported(
-            "`get` must receive exactly one index argument".to_string(),
-        ));
-    };
-
-    let array_slot = match resolve_value(receiver.as_ref(), &state.environment)? {
-        Value::Array {
-            slot,
-            element_type: ArrayElementType::I64,
-            ..
-        } => slot,
-        other => {
-            return Err(Error::Unsupported(format!(
-                "`get` expects an `i64` array reference, got {other:?}"
-            )));
-        }
+    let resolved = resolve_value(&receiver, &state.environment)?;
+    let Some(array_slot) = array_slot_for_element(&resolved, ArrayElementType::I64) else {
+        return Err(Error::Unsupported(format!(
+            "`get` expects an `i64` array reference, got {resolved:?}"
+        )));
     };
 
     Ok(Some(I64Expr::ArrayGet {
         array_slot,
-        index: Box::new(lower_array_index_expr(index, state)?),
+        index: Box::new(lower_array_index_expr(&index, state)?),
     }))
+}
+
+fn lower_i64_array_len_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<I64Expr>> {
+    let Some(receiver) = array_len_call_receiver(callee, arguments)? else {
+        return Ok(None);
+    };
+
+    let resolved = resolve_value(receiver, &state.environment)?;
+    match dynamic_array_slot(&resolved) {
+        Some(slot) => Ok(Some(I64Expr::ArrayLen { array_slot: slot })),
+        None => Err(Error::Unsupported(format!(
+            "`array_len` expects a dynamic array reference, got {resolved:?}"
+        ))),
+    }
 }
 
 fn lower_i32_reference_get_builtin_call(
@@ -936,36 +1021,36 @@ fn lower_u8_array_get_call(
     arguments: &[Term],
     state: &LoweringState,
 ) -> Result<Option<U8Expr>> {
-    let Term::MethodCall { receiver, method } = callee else {
+    let Some((receiver, index)) = array_get_call_parts(callee, arguments)? else {
         return Ok(None);
     };
-    if method != "get" {
-        return Ok(None);
+
+    let resolved = resolve_value(&receiver, &state.environment)?;
+    match resolved {
+        Value::RuntimeArg(arg_index) => {
+            return Ok(Some(U8Expr::RuntimeArgGet {
+                arg_index: Box::new(arg_index),
+                index: Box::new(lower_array_index_expr(&index, state)?),
+            }));
+        }
+        Value::StaticSlice { data_index, .. } => {
+            return Ok(Some(U8Expr::StaticDataGet {
+                data_index,
+                index: Box::new(lower_array_index_expr(&index, state)?),
+            }));
+        }
+        _ => {}
     }
 
-    let normalized = normalize_numeric_literal_arguments(arguments);
-    let [index] = normalized.as_slice() else {
-        return Err(Error::Unsupported(
-            "`get` must receive exactly one index argument".to_string(),
-        ));
-    };
-
-    let array_slot = match resolve_value(receiver.as_ref(), &state.environment)? {
-        Value::Array {
-            slot,
-            element_type: ArrayElementType::U8,
-            ..
-        } => slot,
-        other => {
-            return Err(Error::Unsupported(format!(
-                "`get` expects a `u8` array reference, got {other:?}"
-            )));
-        }
+    let Some(array_slot) = array_slot_for_element(&resolved, ArrayElementType::U8) else {
+        return Err(Error::Unsupported(format!(
+            "`get` expects a `u8` array reference, got {resolved:?}"
+        )));
     };
 
     Ok(Some(U8Expr::ArrayGet {
         array_slot,
-        index: Box::new(lower_array_index_expr(index, state)?),
+        index: Box::new(lower_array_index_expr(&index, state)?),
     }))
 }
 

@@ -54,15 +54,15 @@ You can also replace a whole struct value through a mutable reference.
 }
 ```
 
-For containers such as `Array` and `ArrayVL`, pass an index to `.> get` and `.> set`.
+For containers such as `Array` and `ArrayVL`, pass the array and index to `array_get` and `array_set`.
 
 ```felis
-array_ref .> set 0i32 7i32;
-#let first : i32 = array_ref .> get 0i32;
+array_set array_ref 0i32 7i32;
+#let first : i32 = array_get array_ref 0i32;
 ```
 
-`ArrayVL` also provides `.> len`.
+Use `array_len` to read the runtime length of an `ArrayVL`.
 
 ```felis
-#let len : i32 = arrayvl_ref .> len;
+#let len : i32 = array_len arrayvl_ref;
 ```

@@ -1,10 +1,11 @@
 #use std_core::io::IO;
+#use std_core::primitive::array::array_len;
 #entrypoint main;
 
 #fn main : () #with IO {
     #let arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 42i32;
     #letref #excl arrayvl_ref : &^ ArrayVL u8 #borrow arrayvl;
-    #let len : i32 = arrayvl_ref .> len;
+    #let len : i32 = array_len arrayvl_ref;
     #let _ : () <- IO::exit len;
     ()
 }

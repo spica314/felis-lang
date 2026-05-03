@@ -9,6 +9,9 @@
 
 #bind_builtin "Array" #as Array;
 #bind_builtin "ArrayVL" #as ArrayVL;
+#bind_builtin "array_get" #as array_get;
+#bind_builtin "array_set" #as array_set;
+#bind_builtin "array_len" #as array_len;
 
 #type DynArray : (t : Type[0]) -> Type[0] {
     dyn_array : (t : Type[0]) -> ArrayVL t -> i64 -> DynArray t,
@@ -22,7 +25,7 @@
 
 #fn dyn_array_capacity : (t : Type[0]) -> (array : DynArray t) -> i32 {
     #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
-    arrayvl .> len
+    array_len arrayvl
 }
 
 #fn dyn_array_len : (t : Type[0]) -> (array : DynArray t) -> i32 {
@@ -33,12 +36,12 @@
 
 #fn dyn_array_get : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> t {
     #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
-    arrayvl .> get (i64_from_i32 index)
+    array_get arrayvl (i64_from_i32 index)
 }
 
 #proc dyn_array_set : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> (value : t) -> () {
     #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
-    arrayvl .> set (i64_from_i32 index) value;
+    array_set arrayvl (i64_from_i32 index) value;
     ()
 }
 
@@ -50,7 +53,7 @@
         #if i32_gte ((ref_get i32 index_ref)) len {
             #break;
         };
-        dest_ref .> set ((ref_get i32 index_ref)) (dyn_array_get t source ((ref_get i32 index_ref)));
+        array_set dest_ref ((ref_get i32 index_ref)) (dyn_array_get t source ((ref_get i32 index_ref)));
         ref_set i32 index_ref (i32_add ((ref_get i32 index_ref)) 1i32);
     };
     ()
@@ -82,7 +85,7 @@
 }
 
 #proc append_u8 : (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () {
-    dest_ref .> set ((ref_get i32 dest_index_ref)) byte;
+    array_set dest_ref ((ref_get i32 dest_index_ref)) byte;
     ref_set i32 dest_index_ref (i32_add ((ref_get i32 dest_index_ref)) 1i32);
     ()
 }
@@ -91,7 +94,7 @@
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     #loop {
-        #let byte : u8 = source_ref .> get ((ref_get i32 source_index_ref));
+        #let byte : u8 = array_get source_ref ((ref_get i32 source_index_ref));
         #if u8_eq byte '\0' {
             #break;
         };
@@ -105,7 +108,7 @@
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     #loop {
-        #let byte : u8 = source_ref .> get ((ref_get i32 source_index_ref));
+        #let byte : u8 = array_get source_ref ((ref_get i32 source_index_ref));
         #if u8_eq byte '\0' {
             #break;
         };
@@ -119,10 +122,10 @@
     #let index_ref : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
     #loop {
-        #if i32_gte ((ref_get i32 index_ref)) (dest_ref .> len) {
+        #if i32_gte ((ref_get i32 index_ref)) (array_len dest_ref) {
             #break;
         };
-        dest_ref .> set ((ref_get i32 index_ref)) byte;
+        array_set dest_ref ((ref_get i32 index_ref)) byte;
         ref_set i32 index_ref (i32_add ((ref_get i32 index_ref)) 1i32);
     };
     ()
@@ -130,6 +133,9 @@
 
 #pub #use Array;
 #pub #use ArrayVL;
+#pub #use array_get;
+#pub #use array_set;
+#pub #use array_len;
 #pub #use DynArray;
 #pub #use dyn_array_arrayvl;
 #pub #use dyn_array_capacity;
