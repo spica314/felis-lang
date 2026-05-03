@@ -9,7 +9,9 @@ can land incrementally:
    and `rc` structs without requiring value construction or field access.
 2. `struct-field-access.fe` checks named struct construction and `x.field`
    access for a plain product type.
-3. `struct-rc-field-access.fe` checks that `#struct(rc)` follows the same
+3. `struct-nested-field-access.fe` checks a struct with struct-typed fields
+   and chained `x.field.field` access.
+4. `struct-rc-field-access.fe` checks that `#struct(rc)` follows the same
    allocation and payload-access direction as `#type(rc)`.
 
 Once a stage is implemented, register the corresponding source file in the

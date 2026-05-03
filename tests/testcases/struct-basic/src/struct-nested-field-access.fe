@@ -1,0 +1,31 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#struct Point : Type[0] {
+    x : i32,
+    y : i32,
+}
+
+#struct Segment : Type[0] {
+    start : Point,
+    end : Point,
+}
+
+#fn segment_code : (segment : Segment) -> i32 {
+    #let start_sum : i32 = i32_add segment.start.x segment.start.y;
+    #let end_sum : i32 = i32_add segment.end.x segment.end.y;
+    i32_add start_sum end_sum
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let segment : Segment = Segment {
+        start = Point { x = 10i32, y = 11i32 },
+        end = Point { x = 9i32, y = 12i32 },
+    };
+    #let code : i32 = segment_code segment;
+    #let _ : () <- IO::exit code;
+    ()
+}

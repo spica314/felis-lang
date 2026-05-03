@@ -515,6 +515,13 @@ fn compiles_and_runs_struct_field_access_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_struct_nested_field_access_fixture() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let status = run_fixture_status(&root, "struct-nested-field-access");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_struct_rc_field_access_fixture() {
     let root = repo_root().join("tests/testcases/struct-basic");
     let status = run_fixture_status(&root, "struct-rc-field-access");
