@@ -157,6 +157,13 @@ fn compiles_and_runs_nested_user_call_argument_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_nested_conversion_argument_fixture() {
+    let root = repo_root().join("tests/testcases/compiler-expression-limits");
+    let status = run_fixture_status(&root, "nested-conversion-argument");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_enum_equality_true_fixture() {
     let root = repo_root().join("tests/testcases/equality-basic");
     let status = run_fixture_status(&root, "enum-eq-true");

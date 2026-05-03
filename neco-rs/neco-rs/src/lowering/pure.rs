@@ -8,7 +8,7 @@ use neco_rs_parser::{
 use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::ir::{
     ConstructorValue, I32Expr, I64Expr, LoweredProgram, Operation, StructFieldValue, StructValue,
-    intern_data,
+    U8Expr, intern_data,
 };
 use crate::{Error, Result};
 
@@ -57,6 +57,9 @@ pub(super) fn lower_pure_value(
             {
                 return Ok(value);
             }
+            if let Some(value) = lower_numeric_conversion_value(term, state, program)? {
+                return Ok(value);
+            }
             if let Some(value) = lower_i32_primitive_value(term, state, program)? {
                 return Ok(value);
             }
@@ -85,6 +88,64 @@ pub(super) fn lower_pure_value(
             "unsupported pure expression in entrypoint body: {term:?}"
         ))),
     }
+}
+
+fn lower_numeric_conversion_value(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Option<Value>> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(None);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(None);
+    };
+    let primitive = path
+        .segments
+        .last()
+        .map(|segment| segment.lexeme.as_str())
+        .unwrap_or_default();
+    if !matches!(
+        primitive,
+        "i32_from_u8"
+            | "i32_from_i64"
+            | "i64_from_i32"
+            | "i64_from_u8"
+            | "u8_from_i32"
+            | "u8_from_i64"
+    ) {
+        return Ok(None);
+    }
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [value] = normalized.as_slice() else {
+        return Err(Error::Unsupported(format!(
+            "`{primitive}` must receive exactly one argument"
+        )));
+    };
+
+    Ok(Some(match primitive {
+        "i32_from_u8" => Value::I32(I32Expr::FromU8(Box::new(lower_pure_u8_argument(
+            value, state, program,
+        )?))),
+        "i32_from_i64" => Value::I32(I32Expr::FromI64(Box::new(lower_pure_i64_argument(
+            value, state, program,
+        )?))),
+        "i64_from_i32" => Value::I64(I64Expr::FromI32(Box::new(lower_pure_i32_argument(
+            value, state, program,
+        )?))),
+        "i64_from_u8" => Value::I64(I64Expr::FromU8(Box::new(lower_pure_u8_argument(
+            value, state, program,
+        )?))),
+        "u8_from_i32" => Value::U8(U8Expr::FromI32(Box::new(lower_pure_i32_argument(
+            value, state, program,
+        )?))),
+        "u8_from_i64" => Value::U8(U8Expr::FromI64(Box::new(lower_pure_i64_argument(
+            value, state, program,
+        )?))),
+        _ => unreachable!("checked above"),
+    }))
 }
 
 fn lower_i32_primitive_value(
@@ -138,6 +199,32 @@ fn lower_pure_i32_argument(
         Value::I32(expr) => Ok(expr),
         other => Err(Error::Unsupported(format!(
             "expected an `i32` value, got {other:?}"
+        ))),
+    }
+}
+
+fn lower_pure_i64_argument(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<I64Expr> {
+    match lower_pure_value(term, state, program)? {
+        Value::I64(expr) => Ok(expr),
+        other => Err(Error::Unsupported(format!(
+            "expected an `i64` value, got {other:?}"
+        ))),
+    }
+}
+
+fn lower_pure_u8_argument(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<U8Expr> {
+    match lower_pure_value(term, state, program)? {
+        Value::U8(expr) => Ok(expr),
+        other => Err(Error::Unsupported(format!(
+            "expected a `u8` value, got {other:?}"
         ))),
     }
 }

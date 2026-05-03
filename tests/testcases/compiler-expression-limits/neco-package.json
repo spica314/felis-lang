@@ -1,6 +1,7 @@
 {
     "name": "compiler-expression-limits",
     "felis-bin-entrypoints": [
-        "src/nested-user-call-argument.fe"
+        "src/nested-user-call-argument.fe",
+        "src/nested-conversion-argument.fe"
     ]
 }

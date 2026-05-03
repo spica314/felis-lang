@@ -1,0 +1,16 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_from_u8;
+#use std_core::primitive::u8::u8;
+
+#entrypoint main;
+
+#fn byte_value : (base : i32) -> u8 {
+    42u8
+}
+
+#fn main : () #with IO {
+    #let code : i32 = i32_from_u8 (byte_value 0i32);
+    #let _ : () <- IO::exit code;
+    ()
+}
