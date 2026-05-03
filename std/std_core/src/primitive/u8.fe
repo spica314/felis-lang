@@ -9,6 +9,8 @@
 #bind_builtin "u8_lt" #as u8_lt;
 #bind_builtin "u8_gte" #as u8_gte;
 #bind_builtin "u8_gt" #as u8_gt;
+#bind_builtin "u8_from_i32" #as u8_from_i32;
+#bind_builtin "u8_from_i64" #as u8_from_i64;
 
 #pub #use u8;
 #pub #use u8_add;
@@ -21,3 +23,5 @@
 #pub #use u8_lt;
 #pub #use u8_gte;
 #pub #use u8_gt;
+#pub #use u8_from_i32;
+#pub #use u8_from_i64;

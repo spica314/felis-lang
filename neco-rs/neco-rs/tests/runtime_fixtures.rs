@@ -129,6 +129,13 @@ fn compiles_and_runs_u8_ops_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_primitive_conversions_fixture() {
+    let root = repo_root().join("tests/testcases/primitive-conversions");
+    let status = run_fixture_status(&root, "primitive-conversions");
+    assert_eq!(status.code(), Some(112));
+}
+
+#[test]
 fn compiles_and_runs_bool_basic_fixture() {
     let root = repo_root().join("tests/testcases/bool-basic");
     let status = run_fixture_status(&root, "bool-basic");

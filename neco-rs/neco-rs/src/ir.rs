@@ -96,6 +96,8 @@ pub(crate) enum ConditionExpr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum U8Expr {
     Literal(u8),
+    FromI32(Box<I32Expr>),
+    FromI64(Box<I64Expr>),
     Add(Box<U8Expr>, Box<U8Expr>),
     Sub(Box<U8Expr>, Box<U8Expr>),
     Mul(Box<U8Expr>, Box<U8Expr>),

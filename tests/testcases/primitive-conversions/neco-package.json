@@ -1,0 +1,4 @@
+{
+    "name": "primitive-conversions",
+    "felis-bin-entrypoints": ["src/primitive-conversions.fe"]
+}

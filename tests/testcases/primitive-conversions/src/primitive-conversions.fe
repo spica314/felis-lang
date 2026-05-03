@@ -1,0 +1,32 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_from_i64;
+#use std_core::primitive::i32::i32_from_u8;
+#use std_core::primitive::i64::i64;
+#use std_core::primitive::i64::i64_from_i32;
+#use std_core::primitive::i64::i64_from_u8;
+#use std_core::primitive::u8::u8;
+#use std_core::primitive::u8::u8_from_i32;
+#use std_core::primitive::u8::u8_from_i64;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let from_u8_to_i32 : i32 = i32_from_u8 10u8;
+    #let from_i64_to_i32 : i32 = i32_from_i64 20i64;
+    #let from_i32_to_i64 : i64 = i64_from_i32 30i32;
+    #let from_u8_to_i64 : i64 = i64_from_u8 40u8;
+    #let from_i32_to_u8 : u8 = u8_from_i32 5i32;
+    #let from_i64_to_u8 : u8 = u8_from_i64 7i64;
+
+    #let sum_i32 : i32 = i32_add from_u8_to_i32 from_i64_to_i32;
+    #let from_i64_sum : i32 = i32_from_i64 from_i32_to_i64;
+    #let from_u8_sum : i32 = i32_from_u8 from_i32_to_u8;
+    #let first : i32 = i32_add sum_i32 from_i64_sum;
+    #let second : i32 = i32_add first (i32_from_i64 from_u8_to_i64);
+    #let third : i32 = i32_add second from_u8_sum;
+    #let code : i32 = i32_add third (i32_from_u8 from_i64_to_u8);
+    #let _ : () <- IO::exit code;
+    ()
+}

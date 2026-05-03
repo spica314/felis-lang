@@ -67,6 +67,8 @@ Import them through `std_core` modules instead of relying on implicit names.
 | `u8_lt` | `(lhs : u8) -> (rhs : u8) -> bool`; returns whether `lhs < rhs`. |
 | `u8_gte` | `(lhs : u8) -> (rhs : u8) -> bool`; returns whether `lhs >= rhs`. |
 | `u8_gt` | `(lhs : u8) -> (rhs : u8) -> bool`; returns whether `lhs > rhs`. |
+| `u8_from_i32` | `(value : i32) -> u8`; converts an `i32` value to `u8`. |
+| `u8_from_i64` | `(value : i64) -> u8`; converts an `i64` value to `u8`. |
 
 ## `bool` Functions
 

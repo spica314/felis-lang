@@ -714,6 +714,14 @@ fn emit_u8_expr_to_eax(expr: &U8Expr, code: &mut Vec<u8>, program: &LoweredProgr
             code.push(0xb8);
             code.extend_from_slice(&u32::from(*value).to_le_bytes());
         }
+        U8Expr::FromI32(value) => {
+            emit_i32_expr_to_eax(value, code, program);
+            code.extend_from_slice(&[0x0f, 0xb6, 0xc0]);
+        }
+        U8Expr::FromI64(value) => {
+            emit_i64_expr_to_rax(value, code, program);
+            code.extend_from_slice(&[0x0f, 0xb6, 0xc0]);
+        }
         U8Expr::Add(lhs, rhs) => emit_u8_binary_expr(lhs, rhs, code, program, &[0x00, 0xc8]),
         U8Expr::Sub(lhs, rhs) => emit_u8_binary_expr(lhs, rhs, code, program, &[0x28, 0xc8]),
         U8Expr::Mul(lhs, rhs) => emit_u8_mul_expr(lhs, rhs, code, program),
