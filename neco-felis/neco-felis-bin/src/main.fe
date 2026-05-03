@@ -160,7 +160,7 @@
 }
 
 #proc write_exit_elf : (code : i32) -> () #with IO {
-    #let path_ref : ArrayVL u8 = "a.out";
+    #let path_ref : & ArrayVL u8 = "a.out";
     #let fd : FileDescriptor <- IO::open path_ref 577i32 493i32;
     #let bytes_ref : Array u8 132i32 <- IO::array_new u8 132i32;
     set_elf_header bytes_ref;

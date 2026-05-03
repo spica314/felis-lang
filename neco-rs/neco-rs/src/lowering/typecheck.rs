@@ -31,7 +31,6 @@ pub(crate) fn validate_value_against_type(
 
     if let Some(element_type) = parse_slice_type_annotation(ty)? {
         return match value {
-            Value::StaticSlice { .. } if element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
                 kind: ArrayKind::Dynamic,

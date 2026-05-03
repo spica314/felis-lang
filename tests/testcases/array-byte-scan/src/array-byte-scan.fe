@@ -4,7 +4,7 @@
 #use std_core::primitive::i32::i32_gte;
 #use std_core::primitive::u8::u8_eq;
 
-#proc find_byte_offset : (bytes_ref : ArrayVL u8) -> (target : u8) -> (len : i32) -> (offset_ref : &^ i32) -> () {
+#proc find_byte_offset : (bytes_ref : & ArrayVL u8) -> (target : u8) -> (len : i32) -> (offset_ref : &^ i32) -> () {
     offset_ref .> set 0i32;
     #loop {
         #if i32_gte (offset_ref .> get) len {
@@ -21,7 +21,7 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let bytes_ref : ArrayVL u8 = "abc:42";
+    #let bytes_ref : & ArrayVL u8 = "abc:42";
     #let offset_ref : i32 = 0i32;
     #letref #excl offset_ref : &^ i32 #borrow offset_ref;
     find_byte_offset bytes_ref ':' (bytes_ref .> len) offset_ref;

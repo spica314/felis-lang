@@ -4,7 +4,7 @@
 
 #fn main : () #with IO {
     #let stdout : FileDescriptor <- IO::stdout;
-    #let path_ref : ArrayVL u8 = "message.txt";
+    #let path_ref : & ArrayVL u8 = "message.txt";
     #let fd : FileDescriptor <- IO::open path_ref 0i32 0i32;
     #let bytes_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 128i32;
     #letref #excl bytes_arrayvl_ref : &^ ArrayVL u8 #borrow bytes_arrayvl;

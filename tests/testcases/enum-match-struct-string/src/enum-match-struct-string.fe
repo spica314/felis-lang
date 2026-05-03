@@ -3,14 +3,14 @@
 #use std_core::primitive::u8::u8;
 
 #struct Envelope : Type[0] {
-    body : ArrayVL u8,
+    body : (& ArrayVL u8),
 }
 
 #type Event : Type[0] {
     received : Envelope -> Event,
 }
 
-#fn event_bytes : (event : Event) -> ArrayVL u8 {
+#fn event_bytes : (event : Event) -> (& ArrayVL u8) {
     #match event {
         Event::received envelope => envelope.body,
     }
@@ -19,7 +19,7 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let bytes_ref : ArrayVL u8 = event_bytes (Event::received (Envelope { body = "A" }));
+    #let bytes_ref : & ArrayVL u8 = event_bytes (Event::received (Envelope { body = "A" }));
     #let code : i32 = i32_from_u8 (bytes_ref .> get 0i32);
     #let _ : () <- IO::exit code;
     ()

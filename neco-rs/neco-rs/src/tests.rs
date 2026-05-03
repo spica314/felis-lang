@@ -108,6 +108,42 @@ fn lowers_comments_basic_fixture_to_program() {
 }
 
 #[test]
+fn rejects_string_literal_as_arrayvl_value() {
+    let source_path = PathBuf::from("src/main.fe");
+    let source = r#"
+#use std_core::io::IO;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let message : ArrayVL u8 = "Hello\n";
+    ()
+}
+"#;
+    let (tokens, syntax) = neco_rs_parser::parse_source(source).expect("parse source");
+    let package = ParsedPackage {
+        root_dir: PathBuf::from("."),
+        manifest_path: PathBuf::from("neco-package.json"),
+        manifest: neco_rs_parser::PackageManifest {
+            name: "string-literal-arrayvl-value".to_string(),
+            dependencies: Vec::new(),
+            felis_lib_entrypoint: None,
+            felis_bin_entrypoints: vec![source_path.clone()],
+        },
+        source_files: vec![neco_rs_parser::ParsedSourceFile {
+            path: source_path,
+            role: neco_rs_parser::SourceFileRole::BinaryEntrypoint,
+            tokens,
+            syntax: syntax.expect("source file syntax"),
+        }],
+    };
+
+    let error = lower_package_to_program(&package).expect_err("lowering must reject old form");
+    assert!(error
+        .to_string()
+        .contains("expected a value of type `ArrayVL u8`"));
+}
+
+#[test]
 fn lowers_i32_ops_fixture_to_runtime_expression_tree() {
     let root = repo_root().join("tests/testcases/i32-ops");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

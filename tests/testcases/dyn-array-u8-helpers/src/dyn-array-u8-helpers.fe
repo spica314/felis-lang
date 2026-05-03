@@ -7,7 +7,7 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let source_bytes_ref : ArrayVL u8 = "ab";
+    #let source_bytes_ref : & ArrayVL u8 = "ab";
     #let buffer_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 8i32;
     #letref #excl buffer_arrayvl_ref : &^ ArrayVL u8 #borrow buffer_arrayvl;
     #let index_ref : i32 = 0i32;

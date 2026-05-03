@@ -4,9 +4,9 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let path_ref : ArrayVL u8 = "created.txt";
+    #let path_ref : & ArrayVL u8 = "created.txt";
     #let fd : FileDescriptor <- IO::open path_ref 577i32 420i32;
-    #let message_ref : ArrayVL u8 = "open/write/close fixture\n";
+    #let message_ref : & ArrayVL u8 = "open/write/close fixture\n";
     #let _ : () <- IO::write fd message_ref 25i32;
     #let _ : () <- IO::close fd;
     ()

@@ -5,7 +5,7 @@
 
 #fn main : () #with IO {
     #let stdout : FileDescriptor <- IO::stdout;
-    #let hello_world_ref : ArrayVL u8 = "Hello, world!\n";
+    #let hello_world_ref : & ArrayVL u8 = "Hello, world!\n";
     #let _ : () <- IO::write stdout hello_world_ref 14i32;
     ()
 }

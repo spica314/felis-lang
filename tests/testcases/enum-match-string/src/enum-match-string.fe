@@ -3,10 +3,10 @@
 #use std_core::primitive::u8::u8;
 
 #type Message : Type[0] {
-    text : ArrayVL u8 -> Message,
+    text : (& ArrayVL u8) -> Message,
 }
 
-#fn message_bytes : (message : Message) -> ArrayVL u8 {
+#fn message_bytes : (message : Message) -> (& ArrayVL u8) {
     #match message {
         Message::text text => text,
     }
@@ -15,7 +15,7 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let bytes_ref : ArrayVL u8 = message_bytes (Message::text "A");
+    #let bytes_ref : & ArrayVL u8 = message_bytes (Message::text "A");
     #let code : i32 = i32_from_u8 (bytes_ref .> get 0i32);
     #let _ : () <- IO::exit code;
     ()

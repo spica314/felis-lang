@@ -109,8 +109,8 @@ Character literals can be used as `u8` values.
 #let c : u8 = 'f';
 ```
 
-String literals are used as `ArrayVL u8`.
+String literals are used as `& ArrayVL u8`.
 
 ```felis
-#let message : ArrayVL u8 = "Hello, world!\n";
+#let message : & ArrayVL u8 = "Hello, world!\n";
 ```

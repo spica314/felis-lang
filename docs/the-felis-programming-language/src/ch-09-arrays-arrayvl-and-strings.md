@@ -31,10 +31,10 @@ Array references can be used as function parameters.
 #let len : i32 = arrayvl_ref .> len;
 ```
 
-String literals can be used as `ArrayVL u8`.
+String literals can be used as `& ArrayVL u8`.
 
 ```felis
-#let path : ArrayVL u8 = "message.txt";
+#let path : & ArrayVL u8 = "message.txt";
 ```
 
 ## DynArray
