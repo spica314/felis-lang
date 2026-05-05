@@ -28,10 +28,10 @@ Call a function by writing the function name followed by its arguments.
 
 ## Reference-updating Functions
 
-`#fn` can perform reference updates and can return a value.
+`#fn` can perform reference updates and can return a value. Reference and array operations are IO-effectful, so functions that use them are annotated with `#with IO`.
 
 ```felis
-#fn add_into_ref : (value_ref : &^ i32) -> (delta : i32) -> i32 {
+#fn add_into_ref : (value_ref : &^ i32) -> (delta : i32) -> i32 #with IO {
     ref_set i32 value_ref (i32_add ((ref_get i32 value_ref)) delta);
     i32_add ((ref_get i32 value_ref)) delta
 }

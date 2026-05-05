@@ -80,6 +80,8 @@ Import them through `std_core` modules instead of relying on implicit names.
 
 ## Array Operations
 
+These operations require a function annotated with `#with IO`.
+
 | Symbol | Description |
 | --- | --- |
 | `array_get` | `(array : Array t n or ArrayVL t) -> (index : i32 or i64) -> t`; reads one element. |
@@ -87,6 +89,8 @@ Import them through `std_core` modules instead of relying on implicit names.
 | `array_len` | `(array : ArrayVL t) -> i32`; returns the runtime length of an `ArrayVL t`. |
 
 ## Reference Functions
+
+These operations require a function annotated with `#with IO`.
 
 | Symbol | Description |
 | --- | --- |

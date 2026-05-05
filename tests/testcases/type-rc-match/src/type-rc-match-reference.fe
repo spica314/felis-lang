@@ -8,15 +8,15 @@
     cons : i32 -> List -> List,
 }
 
-#fn head_value : (head_ref : & i32) -> i32 {
+#fn head_value : (head_ref : & i32) -> i32 #with IO {
     (ref_get i32 head_ref)
 }
 
-#fn list_sum_ref : (list_ref : & List) -> i32 {
+#fn list_sum_ref : (list_ref : & List) -> i32 #with IO {
     #match list_ref {
         List::nil => 0i32,
         List::cons head tail => {
-            #let head_code : i32 = head_value head;
+            #let head_code : i32 = ref_get i32 head;
             #let tail_sum : i32 = list_sum_ref tail;
             i32_add head_code tail_sum
         }

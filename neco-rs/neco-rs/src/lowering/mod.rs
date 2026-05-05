@@ -39,6 +39,7 @@ pub(crate) struct LoweringState {
     pub(crate) next_array_slot: usize,
     pub(crate) next_i32_slot: usize,
     pub(crate) next_i64_slot: usize,
+    pub(crate) io_effect_allowed: bool,
     functions: HashMap<String, PureFunction>,
     statement_functions: HashMap<String, StatementFunction>,
     constructors: HashMap<String, ConstructorSignature>,
@@ -53,6 +54,7 @@ impl LoweringState {
             next_array_slot: 0,
             next_i32_slot: 0,
             next_i64_slot: 0,
+            io_effect_allowed: false,
             functions: HashMap::new(),
             statement_functions: HashMap::new(),
             constructors: HashMap::new(),
@@ -149,6 +151,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     state.constructors = collect_constructors(&callable_packages)?;
     state.structs = collect_structs(&callable_packages)?;
     initialize_zero_arg_use_bindings(package, &callable_packages, &mut state, &mut program)?;
+    state.io_effect_allowed = function_has_io_effect(main_fn);
     let mut terminated = false;
 
     for statement in &main_fn.body.statements {
@@ -171,6 +174,13 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     program.i64_slots = state.next_i64_slot;
 
     Ok(program)
+}
+
+fn function_has_io_effect(function: &neco_rs_parser::FunctionDeclaration) -> bool {
+    function
+        .effect
+        .as_ref()
+        .is_some_and(|effect| effect.lexeme == "IO")
 }
 
 fn initialize_zero_arg_use_bindings(
@@ -340,6 +350,7 @@ pub(super) fn lower_statement(
                 Ok(false)
             }
             LetOperator::LeftArrow => {
+                ensure_io_effect_allowed(state, "effectful operation")?;
                 let ty = substitute_type_bindings(
                     let_stmt.ty.as_ref(),
                     &type_bindings_from_environment(&state.environment),
@@ -654,6 +665,7 @@ fn lower_array_set_builtin_statement(
     {
         return Ok(false);
     }
+    ensure_io_effect_allowed(state, "array_set")?;
     lower_array_set_statement(callee.as_ref(), arguments, state, program)?;
     Ok(true)
 }
@@ -765,6 +777,7 @@ fn lower_reference_set_builtin_statement(
     {
         return Ok(false);
     }
+    ensure_io_effect_allowed(state, "ref_set")?;
 
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [_ty, receiver, value] = normalized.as_slice() else {
@@ -828,6 +841,15 @@ fn lower_reference_set_builtin_statement(
     }
 
     Ok(true)
+}
+
+pub(crate) fn ensure_io_effect_allowed(state: &LoweringState, operation: &str) -> Result<()> {
+    if state.io_effect_allowed {
+        return Ok(());
+    }
+    Err(Error::Unsupported(format!(
+        "`{operation}` requires `#with IO`"
+    )))
 }
 
 fn single_segment_path_name(term: &Term) -> Option<&str> {

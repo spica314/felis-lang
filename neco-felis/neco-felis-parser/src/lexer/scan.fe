@@ -14,7 +14,7 @@
 #use std_core::primitive::i32::i32_sub;
 #use std_core::primitive::u8::u8_eq;
 
-#fn source_at : (source : Array u8 1024i32) -> (index : i32) -> u8 {
+#fn source_at : (source : Array u8 1024i32) -> (index : i32) -> u8 #with IO {
     array_get source index
 }
 
@@ -28,7 +28,7 @@
                 (u8_eq byte '\r')))
 }
 
-#fn lex_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+#fn lex_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
     #let byte : u8 = source_at source index;
     #match (u8_eq byte '\0') {
         true => Tokens::cons Token::end_of_file Tokens::nil,
@@ -39,7 +39,7 @@
     }
 }
 
-#fn lex_token_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+#fn lex_token_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
     #let byte : u8 = source_at source index;
     #match (u8_eq byte '#') {
         true => lex_keyword_from source index,
@@ -53,7 +53,7 @@
     }
 }
 
-#fn lex_keyword_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+#fn lex_keyword_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
     #let second : u8 = source_at source (i32_add index 1i32);
     #match (u8_eq second 'u') {
         true => Tokens::cons Token::keyword_use (lex_from source (i32_add index 4i32)),
@@ -70,7 +70,7 @@
     }
 }
 
-#fn lex_colon_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+#fn lex_colon_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
     #let next : u8 = source_at source (i32_add index 1i32);
     #match (u8_eq next ':') {
         true => Tokens::cons Token::double_colon (lex_from source (i32_add index 2i32)),
@@ -78,11 +78,11 @@
     }
 }
 
-#fn lex_left_arrow_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+#fn lex_left_arrow_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
     Tokens::cons Token::left_arrow (lex_from source (i32_add index 2i32))
 }
 
-#fn lex_single_or_word_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+#fn lex_single_or_word_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
     #let byte : u8 = source_at source index;
     #match (u8_eq byte '(') {
         true => Tokens::cons Token::left_paren (lex_from source (i32_add index 1i32)),
@@ -102,7 +102,7 @@
     }
 }
 
-#fn lex_word_or_integer_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+#fn lex_word_or_integer_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
     #let byte : u8 = source_at source index;
     #match (u8_eq byte '_') {
         true => Tokens::cons Token::underscore (lex_from source (i32_add index 1i32)),
@@ -123,7 +123,7 @@
     i32_sub (i32_from_u8 byte) 48i32
 }
 
-#fn lex_integer_from : (source : Array u8 1024i32) -> (index : i32) -> (value : i32) -> Tokens {
+#fn lex_integer_from : (source : Array u8 1024i32) -> (index : i32) -> (value : i32) -> Tokens #with IO {
     #let byte : u8 = source_at source index;
     #match (is_digit byte) {
         true => lex_integer_from
@@ -134,7 +134,7 @@
     }
 }
 
-#fn lex_identifier_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+#fn lex_identifier_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
     #let byte : u8 = source_at source index;
     #match (u8_eq byte 's') {
         true => Tokens::cons Token::identifier_std_core (lex_from source (i32_add index 8i32)),
@@ -151,7 +151,7 @@
     }
 }
 
-#fn lex_i_identifier_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens {
+#fn lex_i_identifier_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
     #let next : u8 = source_at source (i32_add index 1i32);
     #match (u8_eq next 'o') {
         true => Tokens::cons Token::identifier_io (lex_from source (i32_add index 2i32)),
@@ -159,11 +159,11 @@
     }
 }
 
-#fn fallback_exit_code : (source : Array u8 1024i32) -> i32 {
+#fn fallback_exit_code : (source : Array u8 1024i32) -> i32 #with IO {
     #let byte : u8 = source_at source 96i32;
     i32_from_u8 byte
 }
 
-#fn lex : (source : Array u8 1024i32) -> Tokens {
+#fn lex : (source : Array u8 1024i32) -> Tokens #with IO {
     lex_from source 0i32
 }

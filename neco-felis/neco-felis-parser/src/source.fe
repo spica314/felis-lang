@@ -5,6 +5,6 @@
     exit_code : i32,
 }
 
-#fn parse_source : (source : Array u8 1024i32) -> ParsedSourceFile {
+#fn parse_source : (source : Array u8 1024i32) -> ParsedSourceFile #with IO {
     ParsedSourceFile { exit_code = parse_exit_code source }
 }

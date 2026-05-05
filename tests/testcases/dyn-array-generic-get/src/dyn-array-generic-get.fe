@@ -9,7 +9,7 @@
 
 #entrypoint main;
 
-#fn write_first : (t : Type[0]) -> (array : DynArray t) -> (value : t) -> () {
+#fn write_first : (t : Type[0]) -> (array : DynArray t) -> (value : t) -> () #with IO {
     dyn_array_set t array 0i32 value;
     ()
 }

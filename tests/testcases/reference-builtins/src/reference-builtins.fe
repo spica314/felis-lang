@@ -6,12 +6,12 @@
 
 #entrypoint main;
 
-#fn write_ref : (value_ref : &^ i32) -> () {
+#fn write_ref : (value_ref : &^ i32) -> () #with IO {
     ref_set i32 value_ref 41i32;
     ()
 }
 
-#fn read_ref : (value_ref : & i32) -> i32 {
+#fn read_ref : (value_ref : & i32) -> i32 #with IO {
     ref_get i32 value_ref
 }
 

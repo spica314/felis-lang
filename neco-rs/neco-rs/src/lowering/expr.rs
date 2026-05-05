@@ -7,13 +7,13 @@ use crate::ir::{
 };
 use crate::{Error, Result};
 
-use super::LoweringState;
 use super::pure::lower_pure_value;
 use super::typecheck::{
     is_i32_suffix_term, is_i64_suffix_term, is_u8_suffix_term, parse_bare_i32_literal,
     parse_bare_i64_literal, parse_bare_u8_literal, parse_suffixed_i32_literal,
     parse_suffixed_i64_literal, parse_suffixed_u8_literal,
 };
+use super::{LoweringState, ensure_io_effect_allowed};
 
 pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Expr> {
     match term {
@@ -621,6 +621,7 @@ fn lower_array_get_call(
     let Some((receiver, index)) = array_get_call_parts(callee, arguments)? else {
         return Ok(None);
     };
+    ensure_io_effect_allowed(state, "array_get")?;
 
     let resolved = resolve_value(&receiver, &state.environment)?;
     let Some(array_slot) = array_slot_for_element(&resolved, ArrayElementType::I32) else {
@@ -643,6 +644,7 @@ fn lower_array_len_call(
     let Some(receiver) = array_len_call_receiver(callee, arguments)? else {
         return Ok(None);
     };
+    ensure_io_effect_allowed(state, "array_len")?;
 
     let resolved = resolve_value(receiver, &state.environment)?;
     match resolved {
@@ -890,6 +892,7 @@ fn lower_i64_array_get_call(
     let Some((receiver, index)) = array_get_call_parts(callee, arguments)? else {
         return Ok(None);
     };
+    ensure_io_effect_allowed(state, "array_get")?;
 
     let resolved = resolve_value(&receiver, &state.environment)?;
     let Some(array_slot) = array_slot_for_element(&resolved, ArrayElementType::I64) else {
@@ -912,6 +915,7 @@ fn lower_i64_array_len_call(
     let Some(receiver) = array_len_call_receiver(callee, arguments)? else {
         return Ok(None);
     };
+    ensure_io_effect_allowed(state, "array_len")?;
 
     let resolved = resolve_value(receiver, &state.environment)?;
     match dynamic_array_slot(&resolved) {
@@ -930,6 +934,7 @@ fn lower_i32_reference_get_builtin_call(
     let Some(receiver) = reference_get_builtin_receiver(callee, arguments)? else {
         return Ok(None);
     };
+    ensure_io_effect_allowed(state, "ref_get")?;
 
     match resolve_value(receiver, &state.environment)? {
         Value::I32Reference(slot) => Ok(Some(I32Expr::Local(slot))),
@@ -949,6 +954,7 @@ fn lower_i64_reference_get_builtin_call(
     let Some(receiver) = reference_get_builtin_receiver(callee, arguments)? else {
         return Ok(None);
     };
+    ensure_io_effect_allowed(state, "ref_get")?;
 
     match resolve_value(receiver, &state.environment)? {
         Value::I64Reference(slot) => Ok(Some(I64Expr::Local(slot))),
@@ -991,6 +997,7 @@ fn lower_u8_array_get_call(
     let Some((receiver, index)) = array_get_call_parts(callee, arguments)? else {
         return Ok(None);
     };
+    ensure_io_effect_allowed(state, "array_get")?;
 
     let resolved = resolve_value(&receiver, &state.environment)?;
     match resolved {

@@ -23,7 +23,7 @@
     }
 }
 
-#fn dyn_array_capacity : (t : Type[0]) -> (array : DynArray t) -> i32 {
+#fn dyn_array_capacity : (t : Type[0]) -> (array : DynArray t) -> i32 #with IO {
     #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
     array_len arrayvl
 }
@@ -34,18 +34,18 @@
     }
 }
 
-#fn dyn_array_get : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> t {
+#fn dyn_array_get : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> t #with IO {
     #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
     array_get arrayvl (i64_from_i32 index)
 }
 
-#fn dyn_array_set : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> (value : t) -> () {
+#fn dyn_array_set : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> (value : t) -> () #with IO {
     #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
     array_set arrayvl (i64_from_i32 index) value;
     ()
 }
 
-#fn dyn_array_copy_into : (t : Type[0]) -> (source : DynArray t) -> (dest_ref : &^ ArrayVL t) -> () {
+#fn dyn_array_copy_into : (t : Type[0]) -> (source : DynArray t) -> (dest_ref : &^ ArrayVL t) -> () #with IO {
     #let index_ref : i32 = 0i32;
     #let len : i32 = dyn_array_len t source;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
@@ -84,13 +84,13 @@
     ()
 }
 
-#fn append_u8 : (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () {
+#fn append_u8 : (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () #with IO {
     array_set dest_ref ((ref_get i32 dest_index_ref)) byte;
     ref_set i32 dest_index_ref (i32_add ((ref_get i32 dest_index_ref)) 1i32);
     ()
 }
 
-#fn append_nul_terminated_u8 : (source_ref : & Array u8) -> (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> () {
+#fn append_nul_terminated_u8 : (source_ref : & Array u8) -> (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> () #with IO {
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     #loop {
@@ -104,7 +104,7 @@
     ()
 }
 
-#fn append_dyn_nul_terminated_u8 : (source_ref : & ArrayVL u8) -> (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> () {
+#fn append_dyn_nul_terminated_u8 : (source_ref : & ArrayVL u8) -> (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> () #with IO {
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     #loop {
@@ -118,7 +118,7 @@
     ()
 }
 
-#fn fill_u8 : (dest_ref : &^ ArrayVL u8) -> (byte : u8) -> () {
+#fn fill_u8 : (dest_ref : &^ ArrayVL u8) -> (byte : u8) -> () #with IO {
     #let index_ref : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
     #loop {

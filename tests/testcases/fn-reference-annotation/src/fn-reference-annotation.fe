@@ -9,14 +9,14 @@
 
 #entrypoint main;
 
-#fn fill_refs : (value_ref : &^ i32) -> (array_ref : &^ Array i32 2i32) -> () {
+#fn fill_refs : (value_ref : &^ i32) -> (array_ref : &^ Array i32 2i32) -> () #with IO {
     ref_set i32 value_ref 40i32;
     array_set array_ref 0i32 1i32;
     array_set array_ref 1i32 2i32;
     ()
 }
 
-#fn sum_refs : (value_ref : & i32) -> (array_ref : &^ Array i32 2i32) -> i32 {
+#fn sum_refs : (value_ref : & i32) -> (array_ref : &^ Array i32 2i32) -> i32 #with IO {
     i32_add ((ref_get i32 value_ref)) (i32_add (array_get array_ref 0i32) (array_get array_ref 1i32))
 }
 

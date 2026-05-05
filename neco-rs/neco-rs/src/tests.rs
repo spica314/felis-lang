@@ -1008,6 +1008,136 @@ fn lowers_reference_builtin_fixture_to_runtime_expression_tree() {
 }
 
 #[test]
+fn rejects_reference_and_array_builtins_without_io_effect() {
+    let cases = [
+        (
+            "ref-get-without-io",
+            r#"
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn read_ref : (value_ref : & i32) -> i32 {
+    ref_get i32 value_ref
+}
+
+#fn main : () #with IO {
+    #let value : i32 = 42i32;
+    #letref value_ref : & i32 #borrow value;
+    #let code : i32 = read_ref value_ref;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#,
+            "`ref_get` requires `#with IO`",
+        ),
+        (
+            "ref-set-without-io",
+            r#"
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn write_ref : (value_ref : &^ i32) -> () {
+    ref_set i32 value_ref 42i32;
+    ()
+}
+
+#fn main : () #with IO {
+    #let value : i32 = 0i32;
+    #letref #excl value_ref : &^ i32 #borrow value;
+    write_ref value_ref;
+    #let _ : () <- IO::exit ((ref_get i32 value_ref));
+    ()
+}
+"#,
+            "`ref_set` requires `#with IO`",
+        ),
+        (
+            "array-get-without-io",
+            r#"
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_get;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn read_array : (array_ref : & Array i32 1i32) -> i32 {
+    array_get array_ref 0i32
+}
+
+#fn main : () #with IO {
+    #let array_ref : Array i32 1i32 <- IO::array_new i32 1i32;
+    #let code : i32 = read_array array_ref;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#,
+            "`array_get` requires `#with IO`",
+        ),
+        (
+            "array-set-without-io",
+            r#"
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_get;
+#use std_core::primitive::array::array_set;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn write_array : (array_ref : &^ Array i32 1i32) -> () {
+    array_set array_ref 0i32 42i32;
+    ()
+}
+
+#fn main : () #with IO {
+    #let array_ref : Array i32 1i32 <- IO::array_new i32 1i32;
+    write_array array_ref;
+    #let _ : () <- IO::exit (array_get array_ref 0i32);
+    ()
+}
+"#,
+            "`array_set` requires `#with IO`",
+        ),
+        (
+            "array-len-without-io",
+            r#"
+#use std_core::io::IO;
+#use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::array::array_len;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn read_len : (array_ref : & ArrayVL i32) -> i32 {
+    array_len array_ref
+}
+
+#fn main : () #with IO {
+    #let arrayvl : ArrayVL i32 <- IO::arrayvl_new i32 1i32;
+    #letref array_ref : & ArrayVL i32 #borrow arrayvl;
+    #let code : i32 = read_len array_ref;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#,
+            "`array_len` requires `#with IO`",
+        ),
+    ];
+
+    for (name, source, expected_message) in cases {
+        let package = parse_inline_binary_package(name, source);
+        let error = lower_package_to_program(&package).expect_err("lowering must reject builtin");
+        assert!(
+            error.to_string().contains(expected_message),
+            "expected `{expected_message}`, got `{error}`"
+        );
+    }
+}
+
+#[test]
 fn lowers_fn_reference_annotation_fixture_to_runtime_expression_tree() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

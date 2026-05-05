@@ -32,7 +32,7 @@
     String::string (DynArray::dyn_array u8 (dyn_array_arrayvl u8 array) (i64_from_i32 len))
 }
 
-#fn string_copy_from_dyn_array_range_into : (source : DynArray u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
+#fn string_copy_from_dyn_array_range_into : (source : DynArray u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () #with IO {
     #let len : i32 = i32_sub end start;
     #let index_ref : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
@@ -48,12 +48,12 @@
     ()
 }
 
-#fn string_copy_from_string_range_into : (source : String) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
+#fn string_copy_from_string_range_into : (source : String) -> (start : i32) -> (end : i32) -> (dest : String) -> () #with IO {
     string_copy_from_dyn_array_range_into (string_as_dyn_array source) start end dest;
     ()
 }
 
-#fn string_copy_from_string_range : (source : String) -> (start : i32) -> (end : i32) -> (dest : String) -> String {
+#fn string_copy_from_string_range : (source : String) -> (start : i32) -> (end : i32) -> (dest : String) -> String #with IO {
     string_copy_from_string_range_into source start end dest;
     string_with_len dest (i32_sub end start)
 }
@@ -72,26 +72,26 @@
     dyn_array_len u8 (string_as_dyn_array string)
 }
 
-#fn string_capacity : (string : String) -> i32 {
+#fn string_capacity : (string : String) -> i32 #with IO {
     dyn_array_capacity u8 (string_as_dyn_array string)
 }
 
-#fn string_get_u8 : (string : String) -> (index : i32) -> u8 {
+#fn string_get_u8 : (string : String) -> (index : i32) -> u8 #with IO {
     dyn_array_get u8 (string_as_dyn_array string) index
 }
 
-#fn string_set_u8 : (string : String) -> (index : i32) -> (byte : u8) -> () {
+#fn string_set_u8 : (string : String) -> (index : i32) -> (byte : u8) -> () #with IO {
     dyn_array_set u8 (string_as_dyn_array string) index byte;
     ()
 }
 
-#fn string_push_u8_unchecked : (string : String) -> (len_ref : &^ i32) -> (byte : u8) -> () {
+#fn string_push_u8_unchecked : (string : String) -> (len_ref : &^ i32) -> (byte : u8) -> () #with IO {
     string_set_u8 string ((ref_get i32 len_ref)) byte;
     ref_set i32 len_ref (i32_add ((ref_get i32 len_ref)) 1i32);
     ()
 }
 
-#fn mark_string_eq : (left : String) -> (right : String) -> (result_ref : &^ i32) -> () {
+#fn mark_string_eq : (left : String) -> (right : String) -> (result_ref : &^ i32) -> () #with IO {
     #let left_len : i32 = string_len left;
     #let right_len : i32 = string_len right;
     ref_set i32 result_ref 0i32;
@@ -116,7 +116,7 @@
     ()
 }
 
-#fn mark_string_span_eq : (string : String) -> (source : DynArray u8) -> (start : i32) -> (end : i32) -> (result_ref : &^ i32) -> () {
+#fn mark_string_span_eq : (string : String) -> (source : DynArray u8) -> (start : i32) -> (end : i32) -> (result_ref : &^ i32) -> () #with IO {
     #let string_len_value : i32 = string_len string;
     #let span_len : i32 = i32_sub end start;
     ref_set i32 result_ref 0i32;

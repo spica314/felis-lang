@@ -9,7 +9,7 @@
 #use std_core::primitive::i32::i32_gte;
 #use std_core::primitive::u8::u8_eq;
 
-#fn find_byte_offset : (bytes_ref : & ArrayVL u8) -> (target : u8) -> (len : i32) -> (offset_ref : &^ i32) -> () {
+#fn find_byte_offset : (bytes_ref : & ArrayVL u8) -> (target : u8) -> (len : i32) -> (offset_ref : &^ i32) -> () #with IO {
     ref_set i32 offset_ref 0i32;
     #loop {
         #if i32_gte ((ref_get i32 offset_ref)) len {

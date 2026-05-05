@@ -41,6 +41,6 @@
     }
 }
 
-#fn parse_exit_code : (source : Array u8 1024i32) -> i32 {
+#fn parse_exit_code : (source : Array u8 1024i32) -> i32 #with IO {
     fallback_exit_code source
 }

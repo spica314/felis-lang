@@ -19,7 +19,8 @@ use super::typecheck::{
     is_type_universe_annotation, nul_terminated_bytes, validate_value_against_type,
 };
 use super::{
-    LoweringState, allocate_heap_slot, lower_statement, normalize_numeric_literal_arguments,
+    LoweringState, allocate_heap_slot, ensure_io_effect_allowed, lower_statement,
+    normalize_numeric_literal_arguments,
 };
 
 pub(super) fn lower_pure_value(
@@ -50,6 +51,7 @@ pub(super) fn lower_pure_value(
             )))
         }
         Term::IntegerLiteral(_) | Term::Application { .. } | Term::MethodCall { .. } => {
+            reject_io_expression_builtin_without_effect(term, state)?;
             if let Some(value) = lower_reference_get_value(term, state)? {
                 return Ok(value);
             }
@@ -66,6 +68,9 @@ pub(super) fn lower_pure_value(
                 return Ok(value);
             }
             if let Some(value) = lower_pure_function_call(term, state, program)? {
+                return Ok(value);
+            }
+            if let Some(value) = lower_io_function_call_value(term, state, program)? {
                 return Ok(value);
             }
             if let Ok(condition) = super::lower_bool_expr(term, state) {
@@ -89,6 +94,24 @@ pub(super) fn lower_pure_value(
         _ => Err(Error::Unsupported(format!(
             "unsupported pure expression in entrypoint body: {term:?}"
         ))),
+    }
+}
+
+fn reject_io_expression_builtin_without_effect(term: &Term, state: &LoweringState) -> Result<()> {
+    let Term::Application { callee, .. } = term else {
+        return Ok(());
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(());
+    };
+    if path.token_keyword_package.is_some() || path.segments.len() != 1 {
+        return Ok(());
+    }
+    match path.segments[0].lexeme.as_str() {
+        "ref_get" => ensure_io_effect_allowed(state, "ref_get"),
+        "array_get" => ensure_io_effect_allowed(state, "array_get"),
+        "array_len" => ensure_io_effect_allowed(state, "array_len"),
+        _ => Ok(()),
     }
 }
 
@@ -254,6 +277,7 @@ fn lower_reference_get_value(term: &Term, state: &LoweringState) -> Result<Optio
 }
 
 fn lower_reference_get_receiver_value(receiver: &Term, state: &LoweringState) -> Result<Value> {
+    ensure_io_effect_allowed(state, "ref_get")?;
     let value = resolve_value(receiver, &state.environment)?;
     Ok(match value {
         Value::I32Reference(slot) => Value::I32(I32Expr::Local(slot)),
@@ -801,6 +825,71 @@ fn lower_pure_function_call(
     }
 
     let mut scoped_state = state.child_scope();
+    scoped_state.io_effect_allowed = false;
+    let mut type_bindings = HashMap::new();
+    for (parameter, argument) in function.parameters.iter().zip(normalized_arguments.iter()) {
+        let parameter_ty = substitute_type_bindings(&parameter.ty, &type_bindings);
+        let value = if is_type_universe_annotation(&parameter_ty) {
+            Value::Type(resolve_type_argument(argument, state))
+        } else {
+            lower_pure_value(argument, state, program)?
+        };
+        validate_value_against_type(&value, &parameter_ty, program)?;
+        if let Value::Type(ty) = &value {
+            type_bindings.insert(parameter.name.clone(), ty.clone());
+        }
+        let value = wrap_reference_parameter(value, &parameter_ty);
+        scoped_state
+            .environment
+            .insert(parameter.name.clone(), value);
+    }
+
+    let value = lower_pure_block_value(&function.body, &scoped_state, program)?;
+    let result_ty = substitute_type_bindings(&function.result_ty, &type_bindings);
+    validate_value_against_type(&value, &result_ty, program)?;
+    Ok(Some(value))
+}
+
+fn lower_io_function_call_value(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Option<Value>> {
+    if !state.io_effect_allowed {
+        return Ok(None);
+    }
+
+    let Term::Application { callee, arguments } = term else {
+        return Ok(None);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(None);
+    };
+    if path.token_keyword_package.is_some() || path.segments.len() != 1 {
+        return Ok(None);
+    }
+
+    let name = path.segments[0].lexeme.as_str();
+    if state.environment.contains_key(name) {
+        return Ok(None);
+    }
+    let Some(function) = state.statement_functions.get(name).cloned() else {
+        return Ok(None);
+    };
+    if !statement_function_has_io_effect(&function) {
+        return Ok(None);
+    }
+
+    let normalized_arguments = normalize_numeric_literal_arguments(arguments);
+    if function.parameters.len() != normalized_arguments.len() {
+        return Err(Error::Unsupported(format!(
+            "function `{name}` must receive exactly {} arguments",
+            function.parameters.len()
+        )));
+    }
+
+    let mut scoped_state = state.child_scope();
+    scoped_state.io_effect_allowed = true;
     let mut type_bindings = HashMap::new();
     for (parameter, argument) in function.parameters.iter().zip(normalized_arguments.iter()) {
         let parameter_ty = substitute_type_bindings(&parameter.ty, &type_bindings);
@@ -975,12 +1064,14 @@ pub(super) fn lower_function_call_statement(
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<Option<bool>> {
-    let Some((function, normalized_arguments, _name)) = resolve_function_call(term, state)? else {
+    let Some((function, normalized_arguments, name)) = resolve_function_call(term, state)? else {
         return Ok(None);
     };
+    ensure_function_effect_allowed(&function, name, state)?;
 
     let (mut scoped_state, _type_bindings) =
         bind_function_arguments(&function.parameters, &normalized_arguments, state, program)?;
+    scoped_state.io_effect_allowed = statement_function_has_io_effect(&function);
 
     let terminated = lower_function_body_statements(&function.body, &mut scoped_state, program)?;
     propagate_reference_arguments(
@@ -1005,9 +1096,11 @@ pub(super) fn lower_function_call_value(
     let Some((function, normalized_arguments, name)) = resolve_function_call(term, state)? else {
         return Ok(None);
     };
+    ensure_function_effect_allowed(&function, name, state)?;
 
     let (mut scoped_state, type_bindings) =
         bind_function_arguments(&function.parameters, &normalized_arguments, state, program)?;
+    scoped_state.io_effect_allowed = statement_function_has_io_effect(&function);
 
     let terminated = lower_function_body_statements(&function.body, &mut scoped_state, program)?;
     if terminated {
@@ -1036,6 +1129,23 @@ pub(super) fn lower_function_call_value(
     state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
 
     Ok(Some(value))
+}
+
+fn ensure_function_effect_allowed(
+    function: &StatementFunction,
+    name: &str,
+    state: &LoweringState,
+) -> Result<()> {
+    if !statement_function_has_io_effect(function) || state.io_effect_allowed {
+        return Ok(());
+    }
+    Err(Error::Unsupported(format!(
+        "function `{name}` requires `#with IO`"
+    )))
+}
+
+fn statement_function_has_io_effect(function: &StatementFunction) -> bool {
+    function.effect.as_deref() == Some("IO")
 }
 
 fn resolve_function_call<'a>(

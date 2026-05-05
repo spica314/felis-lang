@@ -24,6 +24,7 @@ pub(super) struct PureFunctionParameter {
 pub(super) struct StatementFunction {
     pub(super) parameters: Vec<StatementFunctionParameter>,
     pub(super) result_ty: Term,
+    pub(super) effect: Option<String>,
     pub(super) body: Block,
 }
 
@@ -278,6 +279,7 @@ fn statement_function_from_decl(function: &FunctionDeclaration) -> Result<Statem
     Ok(StatementFunction {
         parameters,
         result_ty: current.clone(),
+        effect: function.effect.as_ref().map(|effect| effect.lexeme.clone()),
         body: function.body.clone(),
     })
 }

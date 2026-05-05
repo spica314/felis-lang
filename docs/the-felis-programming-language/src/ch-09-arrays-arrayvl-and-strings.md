@@ -14,7 +14,7 @@ array_set array_ref 1i32 14i32;
 Array references can be used as function parameters.
 
 ```felis
-#fn sum3 : (array_ref : &^ Array i32 4i32) -> i32 {
+#fn sum3 : (array_ref : &^ Array i32 4i32) -> i32 #with IO {
     #let a0 : i32 = array_get array_ref 0i32;
     #let a1 : i32 = array_get array_ref 1i32;
     i32_add a0 a1
