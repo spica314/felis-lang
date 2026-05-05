@@ -3,7 +3,7 @@
 
 #entrypoint main;
 
-#proc main : () #with IO {
+#fn main : () #with IO {
     #if i32_eq 3i32 4i32 {
         #let _ : () <- IO::exit 1i32;
     } #else {

@@ -1008,8 +1008,8 @@ fn lowers_reference_builtin_fixture_to_runtime_expression_tree() {
 }
 
 #[test]
-fn lowers_proc_reference_annotation_fixture_to_runtime_expression_tree() {
-    let root = repo_root().join("tests/testcases/proc-reference-annotation");
+fn lowers_fn_reference_annotation_fixture_to_runtime_expression_tree() {
+    let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
         panic!("expected package root");
     };
@@ -1063,8 +1063,8 @@ fn lowers_proc_reference_annotation_fixture_to_runtime_expression_tree() {
 }
 
 #[test]
-fn lowers_proc_cli_arg_reference_fixture_to_runtime_expression_tree() {
-    let root = repo_root().join("tests/testcases/proc-cli-arg-reference");
+fn lowers_fn_cli_arg_reference_fixture_to_runtime_expression_tree() {
+    let root = repo_root().join("tests/testcases/fn-cli-arg-reference");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
         panic!("expected package root");
     };

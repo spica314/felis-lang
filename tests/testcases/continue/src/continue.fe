@@ -6,7 +6,7 @@
 
 #entrypoint main;
 
-#proc main : () #with IO {
+#fn main : () #with IO {
     #let counter : i32 = 0i32;
     #letref #excl counter : &^ i32 #borrow counter;
     #let sum : i32 = 0i32;

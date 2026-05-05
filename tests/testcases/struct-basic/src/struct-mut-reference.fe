@@ -9,7 +9,7 @@
     end : i32,
 }
 
-#proc set_span_ref : (span_ref : &^ Span) -> (code_ref : &^ i32) -> () {
+#fn set_span_ref : (span_ref : &^ Span) -> (code_ref : &^ i32) -> () {
     ref_set Span span_ref Span { start = 20i32, end = 22i32 };
     ref_set i32 code_ref (i32_add span_ref.start span_ref.end);
     ()

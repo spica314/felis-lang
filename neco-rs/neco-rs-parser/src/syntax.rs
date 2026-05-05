@@ -6,7 +6,7 @@ mod term;
 
 pub use item::{
     BindBuiltinDeclaration, ConstructorDeclaration, DeclaredName, EntryPointDeclaration,
-    FunctionDeclaration, FunctionKind, Item, ModuleDeclaration, PropDeclaration, StructDeclaration,
+    FunctionDeclaration, Item, ModuleDeclaration, PropDeclaration, StructDeclaration,
     StructFieldDeclaration, TheoremDeclaration, TypeDeclaration, UseDeclaration,
 };
 pub use path::{PathExpression, PathSegment};

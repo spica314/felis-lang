@@ -5,17 +5,17 @@
 
 #bind_builtin "PathBuf" #as PathBuf;
 
-#proc pathbuf_new : (capacity : i32) -> PathBuf #with IO {
+#fn pathbuf_new : (capacity : i32) -> PathBuf #with IO {
     #let path : PathBuf <- IO::pathbuf_new capacity;
     path
 }
 
-#proc pathbuf_push : (path_ref : &^ PathBuf) -> (source_ref : & ArrayVL u8) -> () #with IO {
+#fn pathbuf_push : (path_ref : &^ PathBuf) -> (source_ref : & ArrayVL u8) -> () #with IO {
     #let _ : () <- IO::pathbuf_push path_ref source_ref;
     ()
 }
 
-#proc pathbuf_pop : (path_ref : &^ PathBuf) -> () #with IO {
+#fn pathbuf_pop : (path_ref : &^ PathBuf) -> () #with IO {
     #let _ : () <- IO::pathbuf_pop path_ref;
     ()
 }

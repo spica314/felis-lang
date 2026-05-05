@@ -95,7 +95,7 @@ Import them through `std_core` modules instead of relying on implicit names.
 
 ## `IO` Operations
 
-All `IO` operations must be used in a function or procedure annotated with `#with IO`.
+All `IO` operations must be used in a function annotated with `#with IO`.
 
 | Symbol | Description |
 | --- | --- |

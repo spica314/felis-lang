@@ -6,7 +6,7 @@
 
 #entrypoint main;
 
-#proc add_into_ref : (value_ref : &^ i32) -> (delta : i32) -> i32 {
+#fn add_into_ref : (value_ref : &^ i32) -> (delta : i32) -> i32 {
     ref_set i32 value_ref (i32_add ((ref_get i32 value_ref)) delta);
     i32_add ((ref_get i32 value_ref)) delta
 }

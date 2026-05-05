@@ -13,7 +13,7 @@
 
 #entrypoint main;
 
-#proc set_elf_header : (bytes_ref : Array u8 132i32) -> () {
+#fn set_elf_header : (bytes_ref : Array u8 132i32) -> () {
     array_set bytes_ref 0i32 0x7fu8;
     array_set bytes_ref 1i32 'E';
     array_set bytes_ref 2i32 'L';
@@ -81,7 +81,7 @@
     ()
 }
 
-#proc set_program_header : (bytes_ref : Array u8 132i32) -> () {
+#fn set_program_header : (bytes_ref : Array u8 132i32) -> () {
     array_set bytes_ref 64i32 0x01u8;
     array_set bytes_ref 65i32 0x00u8;
     array_set bytes_ref 66i32 0x00u8;
@@ -141,7 +141,7 @@
     ()
 }
 
-#proc set_exit_code : (bytes_ref : Array u8 132i32) -> (code : i32) -> () {
+#fn set_exit_code : (bytes_ref : Array u8 132i32) -> (code : i32) -> () {
     array_set bytes_ref 120i32 0xb8u8;
     array_set bytes_ref 121i32 0x3cu8;
     array_set bytes_ref 122i32 0x00u8;
@@ -165,7 +165,7 @@
     ()
 }
 
-#proc write_exit_elf : (code : i32) -> () #with IO {
+#fn write_exit_elf : (code : i32) -> () #with IO {
     #let path : PathBuf <- IO::pathbuf_new 16i32;
     #letref #excl path_ref : &^ PathBuf #borrow path;
     #let _ : () <- IO::pathbuf_push path_ref "a.out";

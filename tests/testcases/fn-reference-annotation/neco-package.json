@@ -1,0 +1,4 @@
+{
+    "name": "fn-reference-annotation",
+    "felis-bin-entrypoints": ["src/fn-reference-annotation.fe"]
+}

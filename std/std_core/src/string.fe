@@ -32,7 +32,7 @@
     String::string (DynArray::dyn_array u8 (dyn_array_arrayvl u8 array) (i64_from_i32 len))
 }
 
-#proc string_copy_from_dyn_array_range_into : (source : DynArray u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
+#fn string_copy_from_dyn_array_range_into : (source : DynArray u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
     #let len : i32 = i32_sub end start;
     #let index_ref : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
@@ -48,7 +48,7 @@
     ()
 }
 
-#proc string_copy_from_string_range_into : (source : String) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
+#fn string_copy_from_string_range_into : (source : String) -> (start : i32) -> (end : i32) -> (dest : String) -> () {
     string_copy_from_dyn_array_range_into (string_as_dyn_array source) start end dest;
     ()
 }
@@ -80,18 +80,18 @@
     dyn_array_get u8 (string_as_dyn_array string) index
 }
 
-#proc string_set_u8 : (string : String) -> (index : i32) -> (byte : u8) -> () {
+#fn string_set_u8 : (string : String) -> (index : i32) -> (byte : u8) -> () {
     dyn_array_set u8 (string_as_dyn_array string) index byte;
     ()
 }
 
-#proc string_push_u8_unchecked : (string : String) -> (len_ref : &^ i32) -> (byte : u8) -> () {
+#fn string_push_u8_unchecked : (string : String) -> (len_ref : &^ i32) -> (byte : u8) -> () {
     string_set_u8 string ((ref_get i32 len_ref)) byte;
     ref_set i32 len_ref (i32_add ((ref_get i32 len_ref)) 1i32);
     ()
 }
 
-#proc mark_string_eq : (left : String) -> (right : String) -> (result_ref : &^ i32) -> () {
+#fn mark_string_eq : (left : String) -> (right : String) -> (result_ref : &^ i32) -> () {
     #let left_len : i32 = string_len left;
     #let right_len : i32 = string_len right;
     ref_set i32 result_ref 0i32;
@@ -116,7 +116,7 @@
     ()
 }
 
-#proc mark_string_span_eq : (string : String) -> (source : DynArray u8) -> (start : i32) -> (end : i32) -> (result_ref : &^ i32) -> () {
+#fn mark_string_span_eq : (string : String) -> (source : DynArray u8) -> (start : i32) -> (end : i32) -> (result_ref : &^ i32) -> () {
     #let string_len_value : i32 = string_len string;
     #let span_len : i32 = i32_sub end start;
     ref_set i32 result_ref 0i32;

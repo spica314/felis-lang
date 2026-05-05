@@ -8,7 +8,7 @@
     number : i32 -> Token,
 }
 
-#proc apply_token : (token : Token) -> (code_ref : &^ i32) -> () {
+#fn apply_token : (token : Token) -> (code_ref : &^ i32) -> () {
     #match token {
         Token::empty => ref_set i32 code_ref 1i32,
         Token::number value => ref_set i32 code_ref value,

@@ -12,7 +12,9 @@ use crate::ir::{
 };
 use crate::{Error, Result};
 
-use super::declarations::{ConstructorSignature, Procedure, ProcedureParameter, constructor_key};
+use super::declarations::{
+    ConstructorSignature, StatementFunction, StatementFunctionParameter, constructor_key,
+};
 use super::typecheck::{
     is_type_universe_annotation, nul_terminated_bytes, validate_value_against_type,
 };
@@ -968,22 +970,21 @@ pub(super) fn lower_pure_block_value(
     lower_pure_value(tail, &scoped_state, program)
 }
 
-pub(super) fn lower_procedure_call_statement(
+pub(super) fn lower_function_call_statement(
     term: &Term,
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<Option<bool>> {
-    let Some((procedure, normalized_arguments, _name)) = resolve_procedure_call(term, state)?
-    else {
+    let Some((function, normalized_arguments, _name)) = resolve_function_call(term, state)? else {
         return Ok(None);
     };
 
     let (mut scoped_state, _type_bindings) =
-        bind_procedure_arguments(&procedure.parameters, &normalized_arguments, state, program)?;
+        bind_function_arguments(&function.parameters, &normalized_arguments, state, program)?;
 
-    let terminated = lower_procedure_body_statements(&procedure.body, &mut scoped_state, program)?;
+    let terminated = lower_function_body_statements(&function.body, &mut scoped_state, program)?;
     propagate_reference_arguments(
-        &procedure.parameters,
+        &function.parameters,
         &normalized_arguments,
         &scoped_state,
         state,
@@ -996,35 +997,35 @@ pub(super) fn lower_procedure_call_statement(
     Ok(Some(terminated))
 }
 
-pub(super) fn lower_procedure_call_value(
+pub(super) fn lower_function_call_value(
     term: &Term,
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<Option<Value>> {
-    let Some((procedure, normalized_arguments, name)) = resolve_procedure_call(term, state)? else {
+    let Some((function, normalized_arguments, name)) = resolve_function_call(term, state)? else {
         return Ok(None);
     };
 
     let (mut scoped_state, type_bindings) =
-        bind_procedure_arguments(&procedure.parameters, &normalized_arguments, state, program)?;
+        bind_function_arguments(&function.parameters, &normalized_arguments, state, program)?;
 
-    let terminated = lower_procedure_body_statements(&procedure.body, &mut scoped_state, program)?;
+    let terminated = lower_function_body_statements(&function.body, &mut scoped_state, program)?;
     if terminated {
         return Err(Error::Unsupported(format!(
-            "procedure `{name}` used as a value cannot terminate before returning"
+            "function `{name}` used as a value cannot terminate before returning"
         )));
     }
 
-    let Some(tail) = procedure.body.tail.as_deref() else {
+    let Some(tail) = function.body.tail.as_deref() else {
         return Err(Error::Unsupported(format!(
-            "procedure `{name}` body must end with a value expression"
+            "function `{name}` body must end with a value expression"
         )));
     };
     let value = lower_pure_value(tail, &scoped_state, program)?;
-    let result_ty = substitute_type_bindings(&procedure.result_ty, &type_bindings);
+    let result_ty = substitute_type_bindings(&function.result_ty, &type_bindings);
     validate_value_against_type(&value, &result_ty, program)?;
     propagate_reference_arguments(
-        &procedure.parameters,
+        &function.parameters,
         &normalized_arguments,
         &scoped_state,
         state,
@@ -1037,10 +1038,10 @@ pub(super) fn lower_procedure_call_value(
     Ok(Some(value))
 }
 
-fn resolve_procedure_call<'a>(
+fn resolve_function_call<'a>(
     term: &'a Term,
     state: &LoweringState,
-) -> Result<Option<(Procedure, Vec<Term>, &'a str)>> {
+) -> Result<Option<(StatementFunction, Vec<Term>, &'a str)>> {
     let Term::Application { callee, arguments } = term else {
         return Ok(None);
     };
@@ -1055,23 +1056,23 @@ fn resolve_procedure_call<'a>(
     if state.environment.contains_key(name) {
         return Ok(None);
     }
-    let Some(procedure) = state.procedures.get(name).cloned() else {
+    let Some(function) = state.statement_functions.get(name).cloned() else {
         return Ok(None);
     };
 
     let normalized_arguments = normalize_numeric_literal_arguments(arguments);
-    if procedure.parameters.len() != normalized_arguments.len() {
+    if function.parameters.len() != normalized_arguments.len() {
         return Err(Error::Unsupported(format!(
-            "procedure `{name}` must receive exactly {} arguments",
-            procedure.parameters.len()
+            "function `{name}` must receive exactly {} arguments",
+            function.parameters.len()
         )));
     }
 
-    Ok(Some((procedure, normalized_arguments, name)))
+    Ok(Some((function, normalized_arguments, name)))
 }
 
-fn bind_procedure_arguments(
-    parameters: &[ProcedureParameter],
+fn bind_function_arguments(
+    parameters: &[StatementFunctionParameter],
     normalized_arguments: &[Term],
     state: &mut LoweringState,
     program: &mut LoweredProgram,
@@ -1098,7 +1099,7 @@ fn bind_procedure_arguments(
 }
 
 fn propagate_reference_arguments(
-    parameters: &[ProcedureParameter],
+    parameters: &[StatementFunctionParameter],
     normalized_arguments: &[Term],
     scoped_state: &LoweringState,
     caller_state: &mut LoweringState,
@@ -1150,7 +1151,7 @@ fn simple_local_name(term: &Term) -> Option<&str> {
     }
 }
 
-fn lower_procedure_body_statements(
+fn lower_function_body_statements(
     body: &Block,
     scoped_state: &mut LoweringState,
     program: &mut LoweredProgram,

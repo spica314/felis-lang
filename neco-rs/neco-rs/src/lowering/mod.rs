@@ -18,12 +18,12 @@ use crate::ir::{
 use crate::{Error, Result};
 
 use declarations::{
-    ConstructorSignature, Procedure, PureFunction, StructSignature, collect_constructors,
-    collect_procedures, collect_pure_functions, collect_structs, pure_function_from_decl,
+    ConstructorSignature, PureFunction, StatementFunction, StructSignature, collect_constructors,
+    collect_pure_functions, collect_statement_functions, collect_structs, pure_function_from_decl,
 };
 use expr::lower_condition_expr;
 use pure::{
-    lower_procedure_call_statement, lower_procedure_call_value, lower_pure_block_value,
+    lower_function_call_statement, lower_function_call_value, lower_pure_block_value,
     lower_pure_value, pattern_match_bindings, substitute_type_bindings,
 };
 pub(crate) use typecheck::validate_value_against_type;
@@ -40,7 +40,7 @@ pub(crate) struct LoweringState {
     pub(crate) next_i32_slot: usize,
     pub(crate) next_i64_slot: usize,
     functions: HashMap<String, PureFunction>,
-    procedures: HashMap<String, Procedure>,
+    statement_functions: HashMap<String, StatementFunction>,
     constructors: HashMap<String, ConstructorSignature>,
     structs: HashMap<String, StructSignature>,
     loop_depth: usize,
@@ -54,7 +54,7 @@ impl LoweringState {
             next_i32_slot: 0,
             next_i64_slot: 0,
             functions: HashMap::new(),
-            procedures: HashMap::new(),
+            statement_functions: HashMap::new(),
             constructors: HashMap::new(),
             structs: HashMap::new(),
             loop_depth: 0,
@@ -143,12 +143,12 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
         requires_argv: false,
     };
     let mut state = LoweringState::new();
-    let procedure_packages = collect_procedure_packages(package)?;
-    state.functions = collect_pure_functions(&procedure_packages)?;
-    state.procedures = collect_procedures(&procedure_packages)?;
-    state.constructors = collect_constructors(&procedure_packages)?;
-    state.structs = collect_structs(&procedure_packages)?;
-    initialize_zero_arg_use_bindings(package, &procedure_packages, &mut state, &mut program)?;
+    let callable_packages = collect_callable_packages(package)?;
+    state.functions = collect_pure_functions(&callable_packages)?;
+    state.statement_functions = collect_statement_functions(&callable_packages)?;
+    state.constructors = collect_constructors(&callable_packages)?;
+    state.structs = collect_structs(&callable_packages)?;
+    initialize_zero_arg_use_bindings(package, &callable_packages, &mut state, &mut program)?;
     let mut terminated = false;
 
     for statement in &main_fn.body.statements {
@@ -235,7 +235,7 @@ fn resolve_zero_arg_imported_pure_function(
         let Item::Function(function) = item else {
             continue;
         };
-        if function.kind != neco_rs_parser::FunctionKind::Fn || function.effect.is_some() {
+        if function.effect.is_some() {
             continue;
         }
         if function.name.name != last_segment.lexeme {
@@ -252,7 +252,7 @@ fn resolve_zero_arg_imported_pure_function(
     Ok(None)
 }
 
-fn collect_procedure_packages(package: &ParsedPackage) -> Result<Vec<ParsedPackage>> {
+fn collect_callable_packages(package: &ParsedPackage) -> Result<Vec<ParsedPackage>> {
     let mut packages = resolve_workspace_dependency_packages(package)?;
     if let Some(std_core) = find_std_core_package(package)? {
         packages.push(std_core);
@@ -513,7 +513,7 @@ fn lower_let_equals_statement(
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<()> {
-    let value = match lower_procedure_call_value(value_term, state, program)? {
+    let value = match lower_function_call_value(value_term, state, program)? {
         Some(value) => value,
         None => lower_pure_value(value_term, state, program)?,
     };
@@ -628,7 +628,7 @@ fn lower_expression_statement(
     if lower_array_set_builtin_statement(term, state, program)? {
         return Ok(());
     }
-    if lower_procedure_call_statement(term, state, program)?.is_some() {
+    if lower_function_call_statement(term, state, program)?.is_some() {
         return Ok(());
     }
 

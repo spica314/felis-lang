@@ -28,7 +28,7 @@
     i32_mod (i32_add assigned lit_negated) 2i32
 }
 
-#proc skip_line : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> () {
+#fn skip_line : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> () {
     #loop {
         #if i32_gte ((ref_get i32 index_ref)) len {
             #break;
@@ -42,7 +42,7 @@
     ()
 }
 
-#proc skip_spaces : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> () {
+#fn skip_spaces : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> () {
     #let done : i32 = 0i32;
     #letref #excl done : &^ i32 #borrow done;
     #loop {
@@ -62,7 +62,7 @@
     ()
 }
 
-#proc parse_header : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> (ok_ref : &^ i32) -> () {
+#fn parse_header : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> (ok_ref : &^ i32) -> () {
     ref_set i32 ok_ref 0i32;
     #loop {
         #if i32_gte ((ref_get i32 index_ref)) len {
@@ -88,7 +88,7 @@
     ()
 }
 
-#proc parse_clause_literals : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (var_count_ref : &^ i32) -> (clause_count_ref : &^ i32) -> (literal_count_ref : &^ i32) -> (ok_ref : &^ i32) -> () {
+#fn parse_clause_literals : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (var_count_ref : &^ i32) -> (clause_count_ref : &^ i32) -> (literal_count_ref : &^ i32) -> (ok_ref : &^ i32) -> () {
     array_set clause_starts_ref 0i32 0i32;
     #let value : i32 = 0i32;
     #letref #excl value : &^ i32 #borrow value;
@@ -163,7 +163,7 @@
     ()
 }
 
-#proc clause_satisfied_flag : (assignments_ref : &^ Array i32 12i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (clause_index : i32) -> (result_ref : &^ i32) -> () {
+#fn clause_satisfied_flag : (assignments_ref : &^ Array i32 12i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (clause_index : i32) -> (result_ref : &^ i32) -> () {
     ref_set i32 result_ref 0i32;
     #let literal_index : i32 = array_get clause_starts_ref clause_index;
     #letref #excl literal_index : &^ i32 #borrow literal_index;
@@ -184,7 +184,7 @@
     ()
 }
 
-#proc formula_satisfied_flag : (assignments_ref : &^ Array i32 12i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (clause_count : i32) -> (result_ref : &^ i32) -> () {
+#fn formula_satisfied_flag : (assignments_ref : &^ Array i32 12i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (clause_count : i32) -> (result_ref : &^ i32) -> () {
     ref_set i32 result_ref 1i32;
     #let clause_index : i32 = 0i32;
     #letref #excl clause_index : &^ i32 #borrow clause_index;
@@ -204,7 +204,7 @@
     ()
 }
 
-#proc assign_from_mask : (assignments_ref : &^ Array i32 12i32) -> (var_count : i32) -> (mask : i32) -> () {
+#fn assign_from_mask : (assignments_ref : &^ Array i32 12i32) -> (var_count : i32) -> (mask : i32) -> () {
     #let index : i32 = 0i32;
     #letref #excl index : &^ i32 #borrow index;
     #let remaining : i32 = mask;
@@ -220,7 +220,7 @@
     ()
 }
 
-#proc pow2 : (value : i32) -> (result_ref : &^ i32) -> () {
+#fn pow2 : (value : i32) -> (result_ref : &^ i32) -> () {
     ref_set i32 result_ref 1i32;
     #let index : i32 = 0i32;
     #letref #excl index : &^ i32 #borrow index;
@@ -234,7 +234,7 @@
     ()
 }
 
-#proc solve : (assignments_ref : &^ Array i32 12i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (var_count : i32) -> (clause_count : i32) -> (found_ref : &^ i32) -> () {
+#fn solve : (assignments_ref : &^ Array i32 12i32) -> (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (var_count : i32) -> (clause_count : i32) -> (found_ref : &^ i32) -> () {
     #let max_mask : i32 = 0i32;
     #letref #excl max_mask : &^ i32 #borrow max_mask;
     pow2 var_count max_mask;
@@ -257,7 +257,7 @@
     ()
 }
 
-#proc main : () #with IO {
+#fn main : () #with IO {
     #let stdin : FileDescriptor <- IO::stdin;
     #let stdout : FileDescriptor <- IO::stdout;
     #let input : Array u8 10000i32 <- IO::array_new u8 10000i32;

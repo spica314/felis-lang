@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use neco_rs_parser::{
-    ArrowParameter, Block, ConstructorDeclaration, DeclaredName, FunctionDeclaration, FunctionKind,
-    Item, ParsedPackage, StructDeclaration, Term,
+    ArrowParameter, Block, ConstructorDeclaration, DeclaredName, FunctionDeclaration, Item,
+    ParsedPackage, StructDeclaration, Term,
 };
 
 use crate::{Error, Result};
@@ -21,14 +21,14 @@ pub(super) struct PureFunctionParameter {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Procedure {
-    pub(super) parameters: Vec<ProcedureParameter>,
+pub(super) struct StatementFunction {
+    pub(super) parameters: Vec<StatementFunctionParameter>,
     pub(super) result_ty: Term,
     pub(super) body: Block,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ProcedureParameter {
+pub(super) struct StatementFunctionParameter {
     pub(super) name: String,
     pub(super) ty: Term,
 }
@@ -74,7 +74,7 @@ pub(super) fn collect_pure_functions(
             let Item::Function(function) = item else {
                 continue;
             };
-            if function.kind != FunctionKind::Fn || function.effect.is_some() {
+            if function.effect.is_some() {
                 continue;
             }
             functions.insert(
@@ -86,8 +86,10 @@ pub(super) fn collect_pure_functions(
     Ok(functions)
 }
 
-pub(super) fn collect_procedures(packages: &[ParsedPackage]) -> Result<HashMap<String, Procedure>> {
-    let mut procedures = HashMap::new();
+pub(super) fn collect_statement_functions(
+    packages: &[ParsedPackage],
+) -> Result<HashMap<String, StatementFunction>> {
+    let mut functions = HashMap::new();
     for package in packages {
         for item in package
             .source_files
@@ -97,13 +99,13 @@ pub(super) fn collect_procedures(packages: &[ParsedPackage]) -> Result<HashMap<S
             let Item::Function(function) = item else {
                 continue;
             };
-            if function.kind != FunctionKind::Proc {
-                continue;
-            }
-            procedures.insert(function.name.name.clone(), procedure_from_decl(function)?);
+            functions.insert(
+                function.name.name.clone(),
+                statement_function_from_decl(function)?,
+            );
         }
     }
-    Ok(procedures)
+    Ok(functions)
 }
 
 pub(super) fn collect_constructors(
@@ -251,17 +253,17 @@ pub(super) fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<
     })
 }
 
-fn procedure_from_decl(function: &FunctionDeclaration) -> Result<Procedure> {
+fn statement_function_from_decl(function: &FunctionDeclaration) -> Result<StatementFunction> {
     let mut parameters = Vec::new();
     let mut current = &function.ty;
     while let Term::Arrow(arrow) = current {
         let ArrowParameter::Binder(binder) = &arrow.parameter else {
             return Err(Error::Unsupported(format!(
-                "procedure `{}` must use named parameters",
+                "function `{}` must use named parameters",
                 function.name.name
             )));
         };
-        parameters.push(ProcedureParameter {
+        parameters.push(StatementFunctionParameter {
             name: binder.name.clone(),
             ty: binder.ty.as_ref().clone(),
         });
@@ -269,11 +271,11 @@ fn procedure_from_decl(function: &FunctionDeclaration) -> Result<Procedure> {
     }
     if function.body.tail.is_none() {
         return Err(Error::Unsupported(format!(
-            "procedure `{}` body must end with a value expression",
+            "function `{}` body must end with a value expression",
             function.name.name
         )));
     }
-    Ok(Procedure {
+    Ok(StatementFunction {
         parameters,
         result_ty: current.clone(),
         body: function.body.clone(),

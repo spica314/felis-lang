@@ -8,6 +8,6 @@
         "src/type-rc-match-reference.fe",
         "src/type-rc-match-mut-reference.fe",
         "src/type-rc-match-mut-rc-reference.fe",
-        "src/type-rc-match-proc.fe"
+        "src/type-rc-match-fn.fe"
     ]
 }

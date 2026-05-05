@@ -48,7 +48,7 @@ ref_set i32 counter_ref next;
 You can also replace a whole struct value through a mutable reference.
 
 ```felis
-#proc set_span_ref : (span_ref : &^ Span) -> () {
+#fn set_span_ref : (span_ref : &^ Span) -> () {
     ref_set Span span_ref Span { start = 20i32, end = 22i32 };
     ()
 }

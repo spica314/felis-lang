@@ -1,0 +1,4 @@
+{
+    "name": "fn-return",
+    "felis-bin-entrypoints": ["src/fn-return.fe"]
+}

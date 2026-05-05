@@ -283,26 +283,25 @@ fn compiles_and_runs_reference_builtins_fixture() {
 }
 
 #[test]
-fn compiles_and_runs_proc_reference_annotation_fixture() {
-    let root = repo_root().join("tests/testcases/proc-reference-annotation");
-    let status = run_fixture_status(&root, "proc-reference-annotation");
+fn compiles_and_runs_fn_reference_annotation_fixture() {
+    let root = repo_root().join("tests/testcases/fn-reference-annotation");
+    let status = run_fixture_status(&root, "fn-reference-annotation");
     assert_eq!(status.code(), Some(43));
 }
 
 #[test]
-fn compiles_and_runs_proc_return_fixture() {
-    let root = repo_root().join("tests/testcases/proc-return");
-    let status = run_fixture_status(&root, "proc-return");
+fn compiles_and_runs_fn_return_fixture() {
+    let root = repo_root().join("tests/testcases/fn-return");
+    let status = run_fixture_status(&root, "fn-return");
     assert_eq!(status.code(), Some(42));
 }
 
 #[test]
-fn compiles_and_runs_proc_cli_arg_reference_fixture() {
-    let root = repo_root().join("tests/testcases/proc-cli-arg-reference");
-    let (output, mut child) =
-        compile_and_spawn_fixture(&root, "proc-cli-arg-reference", |command| {
-            command.arg("15");
-        });
+fn compiles_and_runs_fn_cli_arg_reference_fixture() {
+    let root = repo_root().join("tests/testcases/fn-cli-arg-reference");
+    let (output, mut child) = compile_and_spawn_fixture(&root, "fn-cli-arg-reference", |command| {
+        command.arg("15");
+    });
     let run = child.wait().expect("collect child status");
     cleanup_fixture_binary(&output);
     assert_eq!(run.code(), Some(102));
@@ -476,9 +475,9 @@ fn compiles_and_runs_type_rc_match_mut_rc_reference_fixture() {
 }
 
 #[test]
-fn compiles_and_runs_type_rc_match_proc_fixture() {
+fn compiles_and_runs_type_rc_match_fn_fixture() {
     let root = repo_root().join("tests/testcases/type-rc-match");
-    let status = run_fixture_status(&root, "type-rc-match-proc");
+    let status = run_fixture_status(&root, "type-rc-match-fn");
     assert_eq!(status.code(), Some(42));
 }
 

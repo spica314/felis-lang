@@ -1,6 +1,6 @@
-# Functions, Procedures, and IO
+# Functions and IO
 
-Felis provides both `#fn` and `#proc`. Both forms write parameter and return types explicitly.
+Felis defines functions with `#fn`. Parameter and return types are written explicitly.
 
 ## Functions
 
@@ -26,12 +26,12 @@ Call a function by writing the function name followed by its arguments.
 #let x : i32 = add 20i32 22i32;
 ```
 
-## Procedures
+## Reference-updating Functions
 
-`#proc` can also return a value. It is useful for code that performs reference updates.
+`#fn` can perform reference updates and can return a value.
 
 ```felis
-#proc add_into_ref : (value_ref : &^ i32) -> (delta : i32) -> i32 {
+#fn add_into_ref : (value_ref : &^ i32) -> (delta : i32) -> i32 {
     ref_set i32 value_ref (i32_add ((ref_get i32 value_ref)) delta);
     i32_add ((ref_get i32 value_ref)) delta
 }

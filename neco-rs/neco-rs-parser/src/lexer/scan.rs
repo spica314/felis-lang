@@ -87,7 +87,6 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>> {
                 "#entrypoint" => TokenKeywordKind::EntryPoint,
                 "#else" => TokenKeywordKind::Else,
                 "#fn" => TokenKeywordKind::Fn,
-                "#proc" => TokenKeywordKind::Proc,
                 "#struct" => TokenKeywordKind::Struct,
                 "#pub" => TokenKeywordKind::Pub,
                 "#type" => TokenKeywordKind::Type,

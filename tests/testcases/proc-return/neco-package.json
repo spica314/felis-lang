@@ -1,4 +1,0 @@
-{
-    "name": "proc-return",
-    "felis-bin-entrypoints": ["src/proc-return.fe"]
-}

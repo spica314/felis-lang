@@ -9,7 +9,7 @@
     y : i32,
 }
 
-#proc set_point_ref : (point_ref : &^ Point) -> (code_ref : &^ i32) -> () {
+#fn set_point_ref : (point_ref : &^ Point) -> (code_ref : &^ i32) -> () {
     ref_set Point point_ref Point { x = 20i32, y = 22i32 };
     ref_set i32 code_ref (i32_add point_ref.x point_ref.y);
     ()

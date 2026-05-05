@@ -1,4 +1,0 @@
-{
-    "name": "proc-reference-annotation",
-    "felis-bin-entrypoints": ["src/proc-reference-annotation.fe"]
-}

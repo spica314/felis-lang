@@ -182,7 +182,6 @@ impl Parse for BindBuiltinDeclaration {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionDeclaration {
     pub token_keyword_pub: Option<TokenKeyword>,
-    pub kind: FunctionKind,
     pub name: DeclaredName,
     pub ty: Term,
     pub effect: Option<TokenIdentifier>,
@@ -201,17 +200,9 @@ impl Parse for FunctionDeclaration {
 
         let token_keyword_pub =
             TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Pub))?;
-        let kind = if TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Fn))?
-            .is_some()
-        {
-            FunctionKind::Fn
-        } else if TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Proc))?
-            .is_some()
-        {
-            FunctionKind::Proc
-        } else {
+        if TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::Fn))?.is_none() {
             return Ok(None);
-        };
+        }
         let Some(name) = DeclaredName::parse(tokens, &mut k)? else {
             return Err(expected("function name"));
         };
@@ -239,7 +230,6 @@ impl Parse for FunctionDeclaration {
         *i = k;
         Ok(Some(Self {
             token_keyword_pub,
-            kind,
             name,
             ty,
             effect,
@@ -297,12 +287,6 @@ impl Parse for StructDeclaration {
             fields,
         }))
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FunctionKind {
-    Fn,
-    Proc,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

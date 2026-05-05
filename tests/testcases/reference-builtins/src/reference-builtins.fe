@@ -6,7 +6,7 @@
 
 #entrypoint main;
 
-#proc write_ref : (value_ref : &^ i32) -> () {
+#fn write_ref : (value_ref : &^ i32) -> () {
     ref_set i32 value_ref 41i32;
     ()
 }

@@ -640,7 +640,6 @@ pub enum TokenKeywordKind {
     EntryPoint,
     Else,
     Fn,
-    Proc,
     Struct,
     Pub,
     Type,
