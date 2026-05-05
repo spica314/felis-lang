@@ -25,9 +25,9 @@ To write a string to standard output, import and use IO from the standard librar
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let stdout : FileDescriptor <- IO::stdout;
+    #let stdout : FileDescriptor #with IO <- IO::stdout;
     #let message : & ArrayVL u8 = "Hello, world!\n";
-    #let _ : () <- IO::write stdout message 14i32;
+    #let _ : () #with IO <- IO::write stdout message 14i32;
     ()
 }
 ```

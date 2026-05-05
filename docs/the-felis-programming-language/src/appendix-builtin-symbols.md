@@ -84,9 +84,9 @@ These operations require a function annotated with `#with IO`.
 
 | Symbol | Description |
 | --- | --- |
-| `array_get` | `(array : Array t n or ArrayVL t) -> (index : i32 or i64) -> t`; reads one element. |
-| `array_set` | `(array : &^ Array t n or &^ ArrayVL t) -> (index : i32 or i64) -> (value : t) -> ()`; writes one element. |
-| `array_len` | `(array : ArrayVL t) -> i32`; returns the runtime length of an `ArrayVL t`. |
+| `array_get` | `(array : Array t n or ArrayVL t) -> (index : i32 or i64) -> t #with IO`; reads one element. |
+| `array_set` | `(array : &^ Array t n or &^ ArrayVL t) -> (index : i32 or i64) -> (value : t) -> () #with IO`; writes one element. |
+| `array_len` | `(array : ArrayVL t) -> i32 #with IO`; returns the runtime length of an `ArrayVL t`. |
 
 ## Reference Functions
 
@@ -94,8 +94,8 @@ These operations require a function annotated with `#with IO`.
 
 | Symbol | Description |
 | --- | --- |
-| `ref_get` | `(t : Type[0]) -> (r : & t) -> t`; reads through a reference. |
-| `ref_set` | `(t : Type[0]) -> (r : &^ t) -> (x : t) -> ()`; writes through an exclusive reference. |
+| `ref_get` | `(t : Type[0]) -> (r : & t) -> t #with IO`; reads through a reference. |
+| `ref_set` | `(t : Type[0]) -> (r : &^ t) -> (x : t) -> () #with IO`; writes through an exclusive reference. |
 
 ## `IO` Operations
 
@@ -103,17 +103,17 @@ All `IO` operations must be used in a function annotated with `#with IO`.
 
 | Symbol | Description |
 | --- | --- |
-| `IO::stdin` | `FileDescriptor`; returns the standard input descriptor. |
-| `IO::stdout` | `FileDescriptor`; returns the standard output descriptor. |
-| `IO::read` | `(fd : FileDescriptor) -> (buffer : Array u8 n or ArrayVL u8) -> (len : i32) -> i32`; reads bytes and returns the byte count. |
-| `IO::write` | `(fd : FileDescriptor) -> (bytes : Array u8 n or ArrayVL u8) -> (len : i32) -> ()`; writes bytes to a descriptor. |
-| `IO::open` | `(path : & PathBuf) -> (flags : i32) -> (mode : i32) -> FileDescriptor`; opens a path and returns a descriptor. |
-| `IO::close` | `(fd : FileDescriptor) -> ()`; closes a descriptor. |
-| `IO::exit` | `(code : i32 or i64 or u8) -> ()`; terminates the process with the given exit code. |
-| `IO::array_new` | `(t : Type[0]) -> (len : i32) -> Array t len`; allocates a fixed-size array. |
-| `IO::arrayvl_new` | `(t : Type[0]) -> (len : i32) -> ArrayVL t`; allocates a runtime-sized array value. |
-| `IO::arrayvl_replace` | `(t : Type[0]) -> (dest : ArrayVL t) -> (source : ArrayVL t) -> ()`; replaces the backing storage of a dynamic array. |
-| `IO::pathbuf_new` | `(capacity : i32) -> PathBuf`; allocates an empty NUL-terminated path buffer. |
-| `IO::pathbuf_push` | `(path : &^ PathBuf) -> (source : & ArrayVL u8) -> ()`; appends NUL-terminated bytes while preserving the trailing NUL. |
-| `IO::pathbuf_pop` | `(path : &^ PathBuf) -> ()`; removes the last path component while preserving the trailing NUL. |
-| `IO::arg` | `(index : i32) -> & ArrayVL u8`; returns a command-line argument as a byte array reference. |
+| `IO::stdin` | `FileDescriptor #with IO`; returns the standard input descriptor. |
+| `IO::stdout` | `FileDescriptor #with IO`; returns the standard output descriptor. |
+| `IO::read` | `(fd : FileDescriptor) -> (buffer : Array u8 n or ArrayVL u8) -> (len : i32) -> i32 #with IO`; reads bytes and returns the byte count. |
+| `IO::write` | `(fd : FileDescriptor) -> (bytes : Array u8 n or ArrayVL u8) -> (len : i32) -> () #with IO`; writes bytes to a descriptor. |
+| `IO::open` | `(path : & PathBuf) -> (flags : i32) -> (mode : i32) -> FileDescriptor #with IO`; opens a path and returns a descriptor. |
+| `IO::close` | `(fd : FileDescriptor) -> () #with IO`; closes a descriptor. |
+| `IO::exit` | `(code : i32 or i64 or u8) -> () #with IO`; terminates the process with the given exit code. |
+| `IO::array_new` | `(t : Type[0]) -> (len : i32) -> Array t len #with IO`; allocates a fixed-size array. |
+| `IO::arrayvl_new` | `(t : Type[0]) -> (len : i32) -> ArrayVL t #with IO`; allocates a runtime-sized array value. |
+| `IO::arrayvl_replace` | `(t : Type[0]) -> (dest : ArrayVL t) -> (source : ArrayVL t) -> () #with IO`; replaces the backing storage of a dynamic array. |
+| `IO::pathbuf_new` | `(capacity : i32) -> PathBuf #with IO`; allocates an empty NUL-terminated path buffer. |
+| `IO::pathbuf_push` | `(path : &^ PathBuf) -> (source : & ArrayVL u8) -> () #with IO`; appends NUL-terminated bytes while preserving the trailing NUL. |
+| `IO::pathbuf_pop` | `(path : &^ PathBuf) -> () #with IO`; removes the last path component while preserving the trailing NUL. |
+| `IO::arg` | `(index : i32) -> & ArrayVL u8 #with IO`; returns a command-line argument as a byte array reference. |

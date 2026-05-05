@@ -6,7 +6,7 @@
 
 ```felis
 #if i32_eq 3i32 3i32 {
-    #let _ : () <- IO::exit 42i32;
+    #let _ : () #with IO <- IO::exit 42i32;
 };
 ```
 
@@ -14,11 +14,11 @@
 
 ```felis
 #if i32_eq 3i32 4i32 {
-    #let _ : () <- IO::exit 1i32;
+    #let _ : () #with IO <- IO::exit 1i32;
 } #else #if i32_eq 5i32 5i32 {
-    #let _ : () <- IO::exit 42i32;
+    #let _ : () #with IO <- IO::exit 42i32;
 } #else {
-    #let _ : () <- IO::exit 2i32;
+    #let _ : () #with IO <- IO::exit 2i32;
 };
 ```
 

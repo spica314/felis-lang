@@ -40,8 +40,8 @@ Bind ordinary values with `#let name : Type = expression;`.
 Use `<-` when binding a value produced by an effect such as IO.
 
 ```felis
-#let stdout : FileDescriptor <- IO::stdout;
-#let _ : () <- IO::write stdout message 14i32;
+#let stdout : FileDescriptor #with IO <- IO::stdout;
+#let _ : () #with IO <- IO::write stdout message 14i32;
 ```
 
 Bind to `_` when the returned value is intentionally ignored.
