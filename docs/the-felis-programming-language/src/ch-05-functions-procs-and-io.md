@@ -109,6 +109,6 @@ File-writing code can pass open flags and a mode to `IO::open`. For example, `57
 Command-line arguments are read with `IO::arg`. The index is passed as an `i32`.
 
 ```felis
-#let path_ref : & Array u8 <- IO::arg 1i32;
-#let digits_ref : & Array u8 <- IO::arg 2i32;
+#let path_ref : & ArrayVL u8 <- IO::arg 1i32;
+#let digits_ref : & ArrayVL u8 <- IO::arg 2i32;
 ```

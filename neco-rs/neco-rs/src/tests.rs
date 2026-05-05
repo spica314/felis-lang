@@ -1104,6 +1104,56 @@ fn lowers_proc_cli_arg_reference_fixture_to_runtime_expression_tree() {
 }
 
 #[test]
+fn rejects_io_arg_as_unsized_array_reference() {
+    let package = parse_inline_binary_package(
+        "io-arg-unsized-array-reference",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let arg_ref : & Array u8 <- IO::arg 1i32;
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject IO::arg as Array u8");
+    assert!(
+        error
+            .to_string()
+            .contains("expected a value of type `& Array u8`")
+    );
+}
+
+#[test]
+fn rejects_io_arg_as_arrayvl_value() {
+    let package = parse_inline_binary_package(
+        "io-arg-arrayvl-value",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::array::ArrayVL;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let arg : ArrayVL u8 <- IO::arg 1i32;
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject IO::arg as ArrayVL");
+    assert!(
+        error
+            .to_string()
+            .contains("expected a value of type `ArrayVL u8`")
+    );
+}
+
+#[test]
 fn lowers_u8_array_hello_world_fixture_to_runtime_array_operations() {
     let root = repo_root().join("tests/testcases/u8-array-hello-world");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

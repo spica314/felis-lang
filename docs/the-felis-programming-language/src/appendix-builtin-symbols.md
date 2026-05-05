@@ -112,4 +112,4 @@ All `IO` operations must be used in a function or procedure annotated with `#wit
 | `IO::pathbuf_new` | `(capacity : i32) -> PathBuf`; allocates an empty NUL-terminated path buffer. |
 | `IO::pathbuf_push` | `(path : &^ PathBuf) -> (source : & ArrayVL u8) -> ()`; appends NUL-terminated bytes while preserving the trailing NUL. |
 | `IO::pathbuf_pop` | `(path : &^ PathBuf) -> ()`; removes the last path component while preserving the trailing NUL. |
-| `IO::arg` | `(index : i32) -> & Array u8`; returns a command-line argument as a byte array reference. |
+| `IO::arg` | `(index : i32) -> & ArrayVL u8`; returns a command-line argument as a byte array reference. |

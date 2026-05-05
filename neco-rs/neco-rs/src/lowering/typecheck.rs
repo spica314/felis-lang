@@ -36,7 +36,6 @@ pub(crate) fn validate_value_against_type(
                 kind: ArrayKind::Dynamic,
                 ..
             } if *actual_element_type == element_type => Ok(()),
-            Value::RuntimeArg(_) if element_type == ArrayElementType::U8 => Ok(()),
             _ => Err(Error::Unsupported(format!(
                 "expected a value of type `{}` but got {value:?}",
                 render_term(ty)
@@ -178,7 +177,6 @@ fn validate_reference_value_against_type(
                 kind: ArrayKind::Dynamic,
                 ..
             } if *actual_element_type == element_type => Ok(()),
-            Value::RuntimeArg(_) if element_type == ArrayElementType::U8 => Ok(()),
             _ => Err(Error::Unsupported(format!(
                 "expected a value of type `{}` but got {value:?}",
                 render_reference_term(referent, false)
