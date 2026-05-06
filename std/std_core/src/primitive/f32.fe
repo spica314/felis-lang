@@ -1,0 +1,27 @@
+#bind_builtin "f32" #as f32;
+#bind_builtin "f32_add" #as f32_add;
+#bind_builtin "f32_sub" #as f32_sub;
+#bind_builtin "f32_mul" #as f32_mul;
+#bind_builtin "f32_div" #as f32_div;
+#bind_builtin "f32_eq" #as f32_eq;
+#bind_builtin "f32_lte" #as f32_lte;
+#bind_builtin "f32_lt" #as f32_lt;
+#bind_builtin "f32_gte" #as f32_gte;
+#bind_builtin "f32_gt" #as f32_gt;
+#bind_builtin "f32_from_i32" #as f32_from_i32;
+#bind_builtin "f32_from_i64" #as f32_from_i64;
+#bind_builtin "f32_from_u8" #as f32_from_u8;
+
+#pub #use f32;
+#pub #use f32_add;
+#pub #use f32_sub;
+#pub #use f32_mul;
+#pub #use f32_div;
+#pub #use f32_eq;
+#pub #use f32_lte;
+#pub #use f32_lt;
+#pub #use f32_gte;
+#pub #use f32_gt;
+#pub #use f32_from_i32;
+#pub #use f32_from_i64;
+#pub #use f32_from_u8;

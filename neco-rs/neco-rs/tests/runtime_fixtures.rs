@@ -17,6 +17,13 @@ fn compiles_and_runs_i32_ops_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_f32_ops_fixture() {
+    let root = repo_root().join("tests/testcases/f32-ops");
+    let status = run_fixture_status(&root, "f32-ops");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_function_generics_fixture() {
     let root = repo_root().join("tests/testcases/function-generics");
     let status = run_fixture_status(&root, "function-generics");

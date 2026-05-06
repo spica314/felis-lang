@@ -523,6 +523,7 @@ fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {
             && matches!(arguments[index], Term::IntegerLiteral(_))
             && (is_i32_suffix(&arguments[index + 1])
                 || is_i64_suffix(&arguments[index + 1])
+                || is_f32_suffix(&arguments[index + 1])
                 || is_u8_suffix(&arguments[index + 1]))
         {
             normalized.push(Term::Application {
@@ -617,9 +618,10 @@ fn parse_array_element_type(
     match type_name {
         "i32" => Ok(ArrayElementType::I32),
         "i64" => Ok(ArrayElementType::I64),
+        "f32" => Ok(ArrayElementType::F32),
         "u8" => Ok(ArrayElementType::U8),
         _ => Err(Error::Unsupported(format!(
-            "`IO::{builtin_name}` currently supports only `i32`, `i64`, and `u8` arrays"
+            "`IO::{builtin_name}` currently supports only `i32`, `i64`, `f32`, and `u8` arrays"
         ))),
     }
 }
@@ -650,6 +652,13 @@ fn is_i32_suffix(term: &Term) -> bool {
 fn is_i64_suffix(term: &Term) -> bool {
     match term {
         Term::Path(path) => path.segments.len() == 1 && path.segments[0].lexeme == "i64",
+        _ => false,
+    }
+}
+
+fn is_f32_suffix(term: &Term) -> bool {
+    match term {
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].lexeme == "f32",
         _ => false,
     }
 }

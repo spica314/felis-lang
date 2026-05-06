@@ -2,16 +2,17 @@ use neco_rs_parser::Term;
 
 use crate::effect::{Value, resolve_value};
 use crate::ir::{
-    ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, I32Expr, I64Expr, LoweredProgram,
-    U8Expr,
+    ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, F32Expr, I32Expr, I64Expr,
+    LoweredProgram, U8Expr,
 };
 use crate::{Error, Result};
 
 use super::pure::lower_pure_value;
 use super::typecheck::{
-    is_i32_suffix_term, is_i64_suffix_term, is_u8_suffix_term, parse_bare_i32_literal,
-    parse_bare_i64_literal, parse_bare_u8_literal, parse_suffixed_i32_literal,
-    parse_suffixed_i64_literal, parse_suffixed_u8_literal,
+    is_f32_suffix_term, is_i32_suffix_term, is_i64_suffix_term, is_u8_suffix_term,
+    parse_bare_f32_literal, parse_bare_i32_literal, parse_bare_i64_literal, parse_bare_u8_literal,
+    parse_suffixed_f32_literal, parse_suffixed_i32_literal, parse_suffixed_i64_literal,
+    parse_suffixed_u8_literal,
 };
 use super::{LoweringState, ensure_io_effect_allowed};
 
@@ -89,6 +90,39 @@ pub(crate) fn lower_i64_expr(term: &Term, state: &LoweringState) -> Result<I64Ex
         }
         _ => Err(Error::Unsupported(format!(
             "unsupported `i64` expression in entrypoint body: {term:?}"
+        ))),
+    }
+}
+
+pub(crate) fn lower_f32_expr(term: &Term, state: &LoweringState) -> Result<F32Expr> {
+    match term {
+        Term::Group(inner) => lower_f32_expr(inner, state),
+        Term::IntegerLiteral(literal) => parse_suffixed_f32_literal(literal),
+        Term::Path(_) | Term::FieldAccess { .. } => {
+            match resolve_value(term, &state.environment)? {
+                Value::F32(expr) => Ok(expr),
+                other => Err(Error::Unsupported(format!(
+                    "expected an `f32` value, got {other:?}"
+                ))),
+            }
+        }
+        Term::Application { callee, arguments } => {
+            if let Some(expr) = lower_f32_literal_application(callee, arguments)? {
+                return Ok(expr);
+            }
+            if let Some(expr) = lower_f32_reference_get_builtin_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
+            if let Some(expr) = lower_dyn_array_get_f32_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
+            if let Some(expr) = lower_f32_array_get_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
+            lower_f32_primitive_call(callee, arguments, state)
+        }
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `f32` expression in entrypoint body: {term:?}"
         ))),
     }
 }
@@ -354,6 +388,13 @@ fn lower_comparison_expr(
             rhs: lower_i64_expr(rhs, state)?,
         });
     }
+    if let Some(kind) = f32_comparison_kind(primitive) {
+        return Ok(ConditionExpr::F32 {
+            kind,
+            lhs: lower_f32_expr(lhs, state)?,
+            rhs: lower_f32_expr(rhs, state)?,
+        });
+    }
     if let Some(kind) = u8_comparison_kind(primitive) {
         return Ok(ConditionExpr::U8 {
             kind,
@@ -406,6 +447,19 @@ fn lower_u8_literal_application(callee: &Term, arguments: &[Term]) -> Result<Opt
     Ok(Some(parse_bare_u8_literal(literal)?))
 }
 
+fn lower_f32_literal_application(callee: &Term, arguments: &[Term]) -> Result<Option<F32Expr>> {
+    let [suffix] = arguments else {
+        return Ok(None);
+    };
+    let Term::IntegerLiteral(literal) = callee else {
+        return Ok(None);
+    };
+    if !is_f32_suffix_term(suffix) {
+        return Ok(None);
+    }
+    parse_bare_f32_literal(literal).map(Some)
+}
+
 fn i32_comparison_kind(name: &str) -> Option<ComparisonKind> {
     match name {
         "i32_eq" => Some(ComparisonKind::Eq),
@@ -424,6 +478,17 @@ fn i64_comparison_kind(name: &str) -> Option<ComparisonKind> {
         "i64_lt" => Some(ComparisonKind::Lt),
         "i64_gte" => Some(ComparisonKind::Gte),
         "i64_gt" => Some(ComparisonKind::Gt),
+        _ => None,
+    }
+}
+
+fn f32_comparison_kind(name: &str) -> Option<ComparisonKind> {
+    match name {
+        "f32_eq" => Some(ComparisonKind::Eq),
+        "f32_lte" => Some(ComparisonKind::Lte),
+        "f32_lt" => Some(ComparisonKind::Lt),
+        "f32_gte" => Some(ComparisonKind::Gte),
+        "f32_gt" => Some(ComparisonKind::Gt),
         _ => None,
     }
 }
@@ -474,6 +539,15 @@ fn lower_i32_primitive_call(
             )));
         };
         return Ok(I32Expr::FromI64(Box::new(lower_i64_expr(value, state)?)));
+    }
+    if primitive == "i32_from_f32" {
+        let [value] = normalized.as_slice() else {
+            return Err(Error::Unsupported(format!(
+                "`{}` must receive exactly one argument",
+                segments.join("::")
+            )));
+        };
+        return Ok(I32Expr::FromF32(Box::new(lower_f32_expr(value, state)?)));
     }
     let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
@@ -533,6 +607,15 @@ fn lower_i64_primitive_call(
         };
         return Ok(I64Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
     }
+    if primitive == "i64_from_f32" {
+        let [value] = normalized.as_slice() else {
+            return Err(Error::Unsupported(format!(
+                "`{}` must receive exactly one argument",
+                segments.join("::")
+            )));
+        };
+        return Ok(I64Expr::FromF32(Box::new(lower_f32_expr(value, state)?)));
+    }
     let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
             "`{}` must receive exactly two arguments",
@@ -591,6 +674,15 @@ fn lower_u8_primitive_call(
         };
         return Ok(U8Expr::FromI64(Box::new(lower_i64_expr(value, state)?)));
     }
+    if primitive == "u8_from_f32" {
+        let [value] = normalized.as_slice() else {
+            return Err(Error::Unsupported(format!(
+                "`{}` must receive exactly one argument",
+                segments.join("::")
+            )));
+        };
+        return Ok(U8Expr::FromF32(Box::new(lower_f32_expr(value, state)?)));
+    }
     let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
             "`{}` must receive exactly two arguments",
@@ -608,6 +700,76 @@ fn lower_u8_primitive_call(
         "u8_mod" => Ok(U8Expr::Mod(lhs, rhs)),
         _ => Err(Error::Unsupported(format!(
             "unsupported `u8` primitive call `{}`",
+            segments.join("::")
+        ))),
+    }
+}
+
+fn lower_f32_primitive_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<F32Expr> {
+    let Term::Path(path) = callee else {
+        return Err(Error::Unsupported(
+            "unsupported `f32` callee in entrypoint body".to_string(),
+        ));
+    };
+
+    let segments: Vec<_> = path
+        .segments
+        .iter()
+        .map(|segment| segment.lexeme.as_str())
+        .collect();
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let primitive = segments.last().copied().unwrap_or_default();
+    match primitive {
+        "f32_from_i32" => {
+            let [value] = normalized.as_slice() else {
+                return Err(Error::Unsupported(format!(
+                    "`{}` must receive exactly one argument",
+                    segments.join("::")
+                )));
+            };
+            return Ok(F32Expr::FromI32(Box::new(lower_i32_expr(value, state)?)));
+        }
+        "f32_from_i64" => {
+            let [value] = normalized.as_slice() else {
+                return Err(Error::Unsupported(format!(
+                    "`{}` must receive exactly one argument",
+                    segments.join("::")
+                )));
+            };
+            return Ok(F32Expr::FromI64(Box::new(lower_i64_expr(value, state)?)));
+        }
+        "f32_from_u8" => {
+            let [value] = normalized.as_slice() else {
+                return Err(Error::Unsupported(format!(
+                    "`{}` must receive exactly one argument",
+                    segments.join("::")
+                )));
+            };
+            return Ok(F32Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
+        }
+        _ => {}
+    }
+
+    let [lhs, rhs] = normalized.as_slice() else {
+        return Err(Error::Unsupported(format!(
+            "`{}` must receive exactly two arguments",
+            segments.join("::")
+        )));
+    };
+    let lhs = Box::new(lower_f32_expr(lhs, state)?);
+    let rhs = Box::new(lower_f32_expr(rhs, state)?);
+
+    match primitive {
+        "f32_add" => Ok(F32Expr::Add(lhs, rhs)),
+        "f32_sub" => Ok(F32Expr::Sub(lhs, rhs)),
+        "f32_mul" => Ok(F32Expr::Mul(lhs, rhs)),
+        "f32_div" => Ok(F32Expr::Div(lhs, rhs)),
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `f32` primitive call `{}`",
             segments.join("::")
         ))),
     }
@@ -766,6 +928,28 @@ fn lower_dyn_array_get_i64_call(
     }))
 }
 
+fn lower_dyn_array_get_f32_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<F32Expr>> {
+    let Some((array, index)) = dyn_array_get_call_parts(
+        callee,
+        arguments,
+        "dyn_array_get_f32",
+        ArrayElementType::F32,
+        state,
+    )?
+    else {
+        return Ok(None);
+    };
+    let array_slot = dyn_array_slot(array, state, ArrayElementType::F32)?;
+    Ok(Some(F32Expr::ArrayGet {
+        array_slot,
+        index: Box::new(lower_array_index_expr(index, state)?),
+    }))
+}
+
 fn lower_dyn_array_get_u8_call(
     callee: &Term,
     arguments: &[Term],
@@ -847,6 +1031,7 @@ fn type_argument_matches(
         (type_name, expected_element_type),
         ("i32", ArrayElementType::I32)
             | ("i64", ArrayElementType::I64)
+            | ("f32", ArrayElementType::F32)
             | ("u8", ArrayElementType::U8)
     )
 }
@@ -926,6 +1111,29 @@ fn lower_i64_array_len_call(
     }
 }
 
+fn lower_f32_array_get_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<F32Expr>> {
+    let Some((receiver, index)) = array_get_call_parts(callee, arguments)? else {
+        return Ok(None);
+    };
+    ensure_io_effect_allowed(state, "array_get")?;
+
+    let resolved = resolve_value(&receiver, &state.environment)?;
+    let Some(array_slot) = array_slot_for_element(&resolved, ArrayElementType::F32) else {
+        return Err(Error::Unsupported(format!(
+            "`get` expects an `f32` array reference, got {resolved:?}"
+        )));
+    };
+
+    Ok(Some(F32Expr::ArrayGet {
+        array_slot,
+        index: Box::new(lower_array_index_expr(&index, state)?),
+    }))
+}
+
 fn lower_i32_reference_get_builtin_call(
     callee: &Term,
     arguments: &[Term],
@@ -940,6 +1148,26 @@ fn lower_i32_reference_get_builtin_call(
         Value::I32Reference(slot) => Ok(Some(I32Expr::Local(slot))),
         Value::Reference { value, .. } => match value.as_ref() {
             Value::I32(expr) => Ok(Some(expr.clone())),
+            _ => Ok(None),
+        },
+        _ => Ok(None),
+    }
+}
+
+fn lower_f32_reference_get_builtin_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<F32Expr>> {
+    let Some(receiver) = reference_get_builtin_receiver(callee, arguments)? else {
+        return Ok(None);
+    };
+    ensure_io_effect_allowed(state, "ref_get")?;
+
+    match resolve_value(receiver, &state.environment)? {
+        Value::F32Reference(slot) => Ok(Some(F32Expr::Local(slot))),
+        Value::Reference { value, .. } => match value.as_ref() {
+            Value::F32(expr) => Ok(Some(expr.clone())),
             _ => Ok(None),
         },
         _ => Ok(None),
@@ -1045,6 +1273,7 @@ pub(crate) fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Ter
             && matches!(arguments[index], Term::IntegerLiteral(_))
             && (is_i32_suffix_term(&arguments[index + 1])
                 || is_i64_suffix_term(&arguments[index + 1])
+                || is_f32_suffix_term(&arguments[index + 1])
                 || is_u8_suffix_term(&arguments[index + 1]))
         {
             normalized.push(Term::Application {

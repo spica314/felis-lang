@@ -1,0 +1,4 @@
+{
+    "name": "f32-ops",
+    "felis-bin-entrypoints": ["src/f32-ops.fe"]
+}

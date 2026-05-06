@@ -9,6 +9,7 @@ Import them through `std_core` modules instead of relying on implicit names.
 | --- | --- | --- |
 | `i32` | `Type[0]` | Signed 32-bit integer type used by integer literals with the `i32` suffix. |
 | `i64` | `Type[0]` | Signed 64-bit integer type used by integer literals with the `i64` suffix. |
+| `f32` | `Type[0]` | 32-bit floating-point type used by decimal literals with the `f32` suffix. |
 | `u8` | `Type[0]` | Unsigned 8-bit integer type used by byte values and character literals. |
 | `bool` | `Type[0]` | Boolean type used by `#if` and comparison results. |
 | `true` | `bool` | Boolean true value. |
@@ -35,6 +36,7 @@ Import them through `std_core` modules instead of relying on implicit names.
 | `i32_gt` | `(lhs : i32) -> (rhs : i32) -> bool`; returns whether `lhs > rhs`. |
 | `i32_from_u8` | `(value : u8) -> i32`; converts a `u8` value to `i32`. |
 | `i32_from_i64` | `(value : i64) -> i32`; converts an `i64` value to `i32`. |
+| `i32_from_f32` | `(value : f32) -> i32`; converts an `f32` value to `i32`. |
 
 ## `i64` Functions
 
@@ -52,6 +54,24 @@ Import them through `std_core` modules instead of relying on implicit names.
 | `i64_gt` | `(lhs : i64) -> (rhs : i64) -> bool`; returns whether `lhs > rhs`. |
 | `i64_from_i32` | `(value : i32) -> i64`; converts an `i32` value to `i64`. |
 | `i64_from_u8` | `(value : u8) -> i64`; converts a `u8` value to `i64`. |
+| `i64_from_f32` | `(value : f32) -> i64`; converts an `f32` value to `i64`. |
+
+## `f32` Functions
+
+| Symbol | Description |
+| --- | --- |
+| `f32_add` | `(lhs : f32) -> (rhs : f32) -> f32`; returns `lhs + rhs`. |
+| `f32_sub` | `(lhs : f32) -> (rhs : f32) -> f32`; returns `lhs - rhs`. |
+| `f32_mul` | `(lhs : f32) -> (rhs : f32) -> f32`; returns `lhs * rhs`. |
+| `f32_div` | `(lhs : f32) -> (rhs : f32) -> f32`; returns `lhs / rhs`. |
+| `f32_eq` | `(lhs : f32) -> (rhs : f32) -> bool`; returns whether the two values are equal. |
+| `f32_lte` | `(lhs : f32) -> (rhs : f32) -> bool`; returns whether `lhs <= rhs`. |
+| `f32_lt` | `(lhs : f32) -> (rhs : f32) -> bool`; returns whether `lhs < rhs`. |
+| `f32_gte` | `(lhs : f32) -> (rhs : f32) -> bool`; returns whether `lhs >= rhs`. |
+| `f32_gt` | `(lhs : f32) -> (rhs : f32) -> bool`; returns whether `lhs > rhs`. |
+| `f32_from_i32` | `(value : i32) -> f32`; converts an `i32` value to `f32`. |
+| `f32_from_i64` | `(value : i64) -> f32`; converts an `i64` value to `f32`. |
+| `f32_from_u8` | `(value : u8) -> f32`; converts a `u8` value to `f32`. |
 
 ## `u8` Functions
 
@@ -69,6 +89,7 @@ Import them through `std_core` modules instead of relying on implicit names.
 | `u8_gt` | `(lhs : u8) -> (rhs : u8) -> bool`; returns whether `lhs > rhs`. |
 | `u8_from_i32` | `(value : i32) -> u8`; converts an `i32` value to `u8`. |
 | `u8_from_i64` | `(value : i64) -> u8`; converts an `i64` value to `u8`. |
+| `u8_from_f32` | `(value : f32) -> u8`; converts an `f32` value to `u8`. |
 
 ## `bool` Functions
 

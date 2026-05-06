@@ -7,8 +7,8 @@ use neco_rs_parser::{
 
 use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::ir::{
-    ConstructorValue, I32Expr, I64Expr, LoweredProgram, Operation, StructFieldValue, StructValue,
-    U8Expr, intern_data,
+    ConstructorValue, F32Expr, I32Expr, I64Expr, LoweredProgram, Operation, StructFieldValue,
+    StructValue, U8Expr, intern_data,
 };
 use crate::{Error, Result};
 
@@ -67,6 +67,9 @@ pub(super) fn lower_pure_value(
             if let Some(value) = lower_i32_primitive_value(term, state, program)? {
                 return Ok(value);
             }
+            if let Some(value) = lower_f32_primitive_value(term, state, program)? {
+                return Ok(value);
+            }
             if let Some(value) = lower_pure_function_call(term, state, program)? {
                 return Ok(value);
             }
@@ -81,6 +84,9 @@ pub(super) fn lower_pure_value(
             }
             if let Ok(expr) = super::lower_i64_expr(term, state) {
                 return Ok(Value::I64(expr));
+            }
+            if let Ok(expr) = super::lower_f32_expr(term, state) {
+                return Ok(Value::F32(expr));
             }
             if let Ok(expr) = super::lower_u8_expr(term, state) {
                 return Ok(Value::U8(expr));
@@ -137,8 +143,14 @@ fn lower_numeric_conversion_value(
             | "i32_from_i64"
             | "i64_from_i32"
             | "i64_from_u8"
+            | "f32_from_i32"
+            | "f32_from_i64"
+            | "f32_from_u8"
             | "u8_from_i32"
             | "u8_from_i64"
+            | "u8_from_f32"
+            | "i32_from_f32"
+            | "i64_from_f32"
     ) {
         return Ok(None);
     }
@@ -157,10 +169,25 @@ fn lower_numeric_conversion_value(
         "i32_from_i64" => Value::I32(I32Expr::FromI64(Box::new(lower_pure_i64_argument(
             value, state, program,
         )?))),
+        "i32_from_f32" => Value::I32(I32Expr::FromF32(Box::new(lower_pure_f32_argument(
+            value, state, program,
+        )?))),
         "i64_from_i32" => Value::I64(I64Expr::FromI32(Box::new(lower_pure_i32_argument(
             value, state, program,
         )?))),
         "i64_from_u8" => Value::I64(I64Expr::FromU8(Box::new(lower_pure_u8_argument(
+            value, state, program,
+        )?))),
+        "i64_from_f32" => Value::I64(I64Expr::FromF32(Box::new(lower_pure_f32_argument(
+            value, state, program,
+        )?))),
+        "f32_from_i32" => Value::F32(F32Expr::FromI32(Box::new(lower_pure_i32_argument(
+            value, state, program,
+        )?))),
+        "f32_from_i64" => Value::F32(F32Expr::FromI64(Box::new(lower_pure_i64_argument(
+            value, state, program,
+        )?))),
+        "f32_from_u8" => Value::F32(F32Expr::FromU8(Box::new(lower_pure_u8_argument(
             value, state, program,
         )?))),
         "u8_from_i32" => Value::U8(U8Expr::FromI32(Box::new(lower_pure_i32_argument(
@@ -169,8 +196,49 @@ fn lower_numeric_conversion_value(
         "u8_from_i64" => Value::U8(U8Expr::FromI64(Box::new(lower_pure_i64_argument(
             value, state, program,
         )?))),
+        "u8_from_f32" => Value::U8(U8Expr::FromF32(Box::new(lower_pure_f32_argument(
+            value, state, program,
+        )?))),
         _ => unreachable!("checked above"),
     }))
+}
+
+fn lower_f32_primitive_value(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Option<Value>> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(None);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(None);
+    };
+    let primitive = path
+        .segments
+        .last()
+        .map(|segment| segment.lexeme.as_str())
+        .unwrap_or_default();
+    if !matches!(primitive, "f32_add" | "f32_sub" | "f32_mul" | "f32_div") {
+        return Ok(None);
+    }
+
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [lhs, rhs] = normalized.as_slice() else {
+        return Err(Error::Unsupported(format!(
+            "`{primitive}` must receive exactly two arguments"
+        )));
+    };
+    let lhs = Box::new(lower_pure_f32_argument(lhs, state, program)?);
+    let rhs = Box::new(lower_pure_f32_argument(rhs, state, program)?);
+
+    Ok(Some(Value::F32(match primitive {
+        "f32_add" => F32Expr::Add(lhs, rhs),
+        "f32_sub" => F32Expr::Sub(lhs, rhs),
+        "f32_mul" => F32Expr::Mul(lhs, rhs),
+        "f32_div" => F32Expr::Div(lhs, rhs),
+        _ => unreachable!("checked above"),
+    })))
 }
 
 fn lower_i32_primitive_value(
@@ -254,6 +322,19 @@ fn lower_pure_u8_argument(
     }
 }
 
+fn lower_pure_f32_argument(
+    term: &Term,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<F32Expr> {
+    match lower_pure_value(term, state, program)? {
+        Value::F32(expr) => Ok(expr),
+        other => Err(Error::Unsupported(format!(
+            "expected an `f32` value, got {other:?}"
+        ))),
+    }
+}
+
 fn lower_reference_get_value(term: &Term, state: &LoweringState) -> Result<Option<Value>> {
     match term {
         Term::Application { callee, arguments } => {
@@ -282,6 +363,7 @@ fn lower_reference_get_receiver_value(receiver: &Term, state: &LoweringState) ->
     Ok(match value {
         Value::I32Reference(slot) => Value::I32(I32Expr::Local(slot)),
         Value::I64Reference(slot) => Value::I64(I64Expr::Local(slot)),
+        Value::F32Reference(slot) => Value::F32(F32Expr::Local(slot)),
         Value::Reference { value, .. } => *value,
         other => other,
     })
@@ -486,6 +568,9 @@ fn lower_rc_struct_field_store(
             });
             Ok(())
         }
+        Value::F32(_) => Err(Error::Unsupported(
+            "`struct(rc)` currently supports only integer and nested rc payload fields".to_string(),
+        )),
         Value::Constructor(ConstructorValue {
             heap_slot: Some(source_heap_slot),
             ..

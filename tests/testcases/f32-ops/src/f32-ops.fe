@@ -1,0 +1,62 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_get;
+#use std_core::primitive::array::array_set;
+#use std_core::primitive::f32::f32;
+#use std_core::primitive::f32::f32_add;
+#use std_core::primitive::f32::f32_sub;
+#use std_core::primitive::f32::f32_mul;
+#use std_core::primitive::f32::f32_div;
+#use std_core::primitive::f32::f32_eq;
+#use std_core::primitive::f32::f32_gt;
+#use std_core::primitive::f32::f32_gte;
+#use std_core::primitive::f32::f32_lt;
+#use std_core::primitive::f32::f32_lte;
+#use std_core::primitive::f32::f32_from_i32;
+#use std_core::primitive::f32::f32_from_i64;
+#use std_core::primitive::f32::f32_from_u8;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_from_f32;
+#use std_core::primitive::i64::i64_from_f32;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
+#use std_core::primitive::u8::u8_from_f32;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let a : f32 = 3.5f32;
+    #let b : f32 = 7.5f32;
+    #let c : f32 = 4.0f32;
+    #let d : f32 = 6.0f32;
+    #let e : f32 = 3.0f32;
+    #let x1 : f32 = f32_add a b;
+    #let x2 : f32 = f32_sub x1 c;
+    #let x3 : f32 = f32_mul x2 d;
+    #let x4 : f32 = f32_div x3 e;
+    #letref #excl x_ref : &^ f32 #borrow x4;
+    #let current : f32 = ref_get f32 x_ref;
+    ref_set f32 x_ref (f32_add current (f32_from_i32 1i32));
+    #let arr : Array f32 1i32 <- IO::array_new f32 1i32;
+    #let next : f32 = ref_get f32 x_ref;
+    array_set arr 0i32 next;
+    #let result : f32 = array_get arr 0i32;
+    #if f32_gt result 14.0f32 {
+        #if f32_eq result 15.0f32 {
+            #if f32_lte result 15.0f32 {
+                #if f32_gte result 15.0f32 {
+                    #if f32_lt result 16.0f32 {
+                        #let from_i64 : f32 = f32_from_i64 (i64_from_f32 2.0f32);
+                        #let from_u8 : f32 = f32_from_u8 (u8_from_f32 3.0f32);
+                        #let converted_sum : f32 = f32_add from_i64 from_u8;
+                        #let exit_value : f32 = f32_add (f32_add result converted_sum) 22.0f32;
+                        #let exit_code : i32 = i32_from_f32 exit_value;
+                        #let _ : () <- IO::exit exit_code;
+                    };
+                };
+            };
+        };
+    };
+    #let _ : () <- IO::exit 1i32;
+    ()
+}

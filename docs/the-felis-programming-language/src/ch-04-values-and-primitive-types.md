@@ -1,6 +1,6 @@
 # Values and Primitive Types
 
-Felis provides primitive types such as `i32`, `i64`, `u8`, `bool`, `()`, `Array`, and `ArrayVL`.
+Felis provides primitive types such as `i32`, `i64`, `f32`, `u8`, `bool`, `()`, `Array`, and `ArrayVL`.
 
 ## Integers
 
@@ -42,6 +42,37 @@ Arithmetic operations are standard library functions.
 ```
 
 `i64` and `u8` provide the same style of operations, such as `i64_add` and `u8_add`.
+
+## Floating-Point Numbers
+
+`f32` values use decimal literals with the `f32` suffix.
+
+```felis
+#let a : f32 = 3.5f32;
+#let b : f32 = 7.5f32;
+```
+
+`f32` provides arithmetic and comparison functions with the same naming style as integer primitives, except that there is no `f32_mod`.
+
+```felis
+#use std_core::primitive::f32::f32_add;
+#use std_core::primitive::f32::f32_div;
+#use std_core::primitive::f32::f32_gt;
+
+#let sum : f32 = f32_add 3.5f32 7.5f32;
+#let half : f32 = f32_div sum 2.0f32;
+#let large : bool = f32_gt half 5.0f32;
+```
+
+Primitive conversion functions convert between `f32` and integer types.
+
+```felis
+#use std_core::primitive::f32::f32_from_i32;
+#use std_core::primitive::i32::i32_from_f32;
+
+#let x : f32 = f32_from_i32 42i32;
+#let y : i32 = i32_from_f32 x;
+```
 
 ## bool
 

@@ -6,6 +6,7 @@ pub(crate) struct LoweredProgram {
     pub(crate) heap_slots: usize,
     pub(crate) i32_slots: usize,
     pub(crate) i64_slots: usize,
+    pub(crate) f32_slots: usize,
     pub(crate) requires_argv: bool,
 }
 
@@ -27,6 +28,7 @@ pub(crate) enum I32Expr {
     Local(usize),
     FromU8(Box<U8Expr>),
     FromI64(Box<I64Expr>),
+    FromF32(Box<F32Expr>),
     Add(Box<I32Expr>, Box<I32Expr>),
     Sub(Box<I32Expr>, Box<I32Expr>),
     Mul(Box<I32Expr>, Box<I32Expr>),
@@ -47,6 +49,7 @@ pub(crate) enum I64Expr {
     Local(usize),
     FromI32(Box<I32Expr>),
     FromU8(Box<U8Expr>),
+    FromF32(Box<F32Expr>),
     Add(Box<I64Expr>, Box<I64Expr>),
     Sub(Box<I64Expr>, Box<I64Expr>),
     Mul(Box<I64Expr>, Box<I64Expr>),
@@ -58,6 +61,23 @@ pub(crate) enum I64Expr {
     },
     ArrayLen {
         array_slot: usize,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum F32Expr {
+    LiteralBits(u32),
+    Local(usize),
+    FromI32(Box<I32Expr>),
+    FromI64(Box<I64Expr>),
+    FromU8(Box<U8Expr>),
+    Add(Box<F32Expr>, Box<F32Expr>),
+    Sub(Box<F32Expr>, Box<F32Expr>),
+    Mul(Box<F32Expr>, Box<F32Expr>),
+    Div(Box<F32Expr>, Box<F32Expr>),
+    ArrayGet {
+        array_slot: usize,
+        index: Box<I64Expr>,
     },
 }
 
@@ -86,6 +106,11 @@ pub(crate) enum ConditionExpr {
         lhs: I64Expr,
         rhs: I64Expr,
     },
+    F32 {
+        kind: ComparisonKind,
+        lhs: F32Expr,
+        rhs: F32Expr,
+    },
     U8 {
         kind: ComparisonKind,
         lhs: U8Expr,
@@ -98,6 +123,7 @@ pub(crate) enum U8Expr {
     Literal(u8),
     FromI32(Box<I32Expr>),
     FromI64(Box<I64Expr>),
+    FromF32(Box<F32Expr>),
     Add(Box<U8Expr>, Box<U8Expr>),
     Sub(Box<U8Expr>, Box<U8Expr>),
     Mul(Box<U8Expr>, Box<U8Expr>),
@@ -128,6 +154,7 @@ pub(crate) enum ExitCodeExpr {
 pub(crate) enum ArrayElementType {
     I32,
     I64,
+    F32,
     U8,
 }
 
@@ -154,6 +181,10 @@ pub(crate) enum Operation {
     StoreI64 {
         slot: usize,
         value: I64Expr,
+    },
+    StoreF32 {
+        slot: usize,
+        value: F32Expr,
     },
     Mmap {
         len: I32Expr,
@@ -223,6 +254,11 @@ pub(crate) enum Operation {
         array_slot: usize,
         index: I64Expr,
         value: I64Expr,
+    },
+    ArraySetF32 {
+        array_slot: usize,
+        index: I64Expr,
+        value: F32Expr,
     },
     ArraySetU8 {
         array_slot: usize,

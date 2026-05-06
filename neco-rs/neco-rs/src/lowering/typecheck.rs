@@ -1,7 +1,7 @@
 use neco_rs_parser::{ArrowParameter, Term};
 
 use crate::effect::Value;
-use crate::ir::{ArrayElementType, ArrayKind, I32Expr, I64Expr, LoweredProgram, U8Expr};
+use crate::ir::{ArrayElementType, ArrayKind, F32Expr, I32Expr, I64Expr, LoweredProgram, U8Expr};
 use crate::{Error, Result};
 
 pub(crate) fn validate_value_against_type(
@@ -101,6 +101,7 @@ pub(crate) fn validate_value_against_type(
             match segment.lexeme.as_str() {
                 "i32" if matches!(value, Value::I32(_)) => Ok(()),
                 "i64" if matches!(value, Value::I64(_)) => Ok(()),
+                "f32" if matches!(value, Value::F32(_)) => Ok(()),
                 "u8" if matches!(value, Value::U8(_)) => Ok(()),
                 "bool" if matches!(value, Value::Bool(_)) => Ok(()),
                 "FileDescriptor" if matches!(value, Value::FileDescriptor(_)) => Ok(()),
@@ -224,6 +225,7 @@ fn validate_reference_value_against_type(
             match path.segments[0].lexeme.as_str() {
                 "i32" if matches!(value, Value::I32Reference(_)) => Ok(()),
                 "i64" if matches!(value, Value::I64Reference(_)) => Ok(()),
+                "f32" if matches!(value, Value::F32Reference(_)) => Ok(()),
                 "PathBuf" if matches!(value, Value::PathBuf { .. }) => Ok(()),
                 type_name => match value {
                     Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
@@ -352,9 +354,10 @@ fn parse_array_element_type(term: &Term, type_name: &str) -> Result<ArrayElement
             match path.segments[0].lexeme.as_str() {
                 "i32" => Ok(ArrayElementType::I32),
                 "i64" => Ok(ArrayElementType::I64),
+                "f32" => Ok(ArrayElementType::F32),
                 "u8" => Ok(ArrayElementType::U8),
                 _ => Err(Error::Unsupported(format!(
-                    "`{type_name}` element type must be `i32`, `i64`, or `u8`"
+                    "`{type_name}` element type must be `i32`, `i64`, `f32`, or `u8`"
                 ))),
             }
         }
@@ -409,6 +412,22 @@ pub(super) fn parse_suffixed_u8_literal(literal: &str) -> Result<U8Expr> {
         Error::Unsupported("integer literal must use the `u8` suffix".to_string())
     })?;
     Ok(U8Expr::Literal(parse_u8_digits(digits, literal)?))
+}
+
+pub(super) fn parse_suffixed_f32_literal(literal: &str) -> Result<F32Expr> {
+    let digits = literal.strip_suffix("f32").ok_or_else(|| {
+        Error::Unsupported("numeric literal must use the `f32` suffix".to_string())
+    })?;
+    parse_bare_f32_literal(digits)
+}
+
+pub(super) fn parse_bare_f32_literal(literal: &str) -> Result<F32Expr> {
+    let value = literal.parse::<f32>().map_err(|_| {
+        Error::Unsupported(format!(
+            "numeric literal `{literal}` could not be parsed as f32"
+        ))
+    })?;
+    Ok(F32Expr::LiteralBits(value.to_bits()))
 }
 
 pub(super) fn parse_bare_u8_literal(literal: &str) -> Result<U8Expr> {
@@ -582,6 +601,13 @@ pub(super) fn is_i32_suffix_term(term: &Term) -> bool {
 pub(super) fn is_i64_suffix_term(term: &Term) -> bool {
     match term {
         Term::Path(path) => path.segments.len() == 1 && path.segments[0].lexeme == "i64",
+        _ => false,
+    }
+}
+
+pub(super) fn is_f32_suffix_term(term: &Term) -> bool {
+    match term {
+        Term::Path(path) => path.segments.len() == 1 && path.segments[0].lexeme == "f32",
         _ => false,
     }
 }

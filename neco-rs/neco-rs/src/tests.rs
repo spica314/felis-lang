@@ -2450,6 +2450,7 @@ fn builds_elf_image_with_exit_syscall() {
         heap_slots: 0,
         i32_slots: 0,
         i64_slots: 0,
+        f32_slots: 0,
         requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)
@@ -2478,6 +2479,7 @@ fn builds_elf_image_with_write_and_implicit_exit() {
         heap_slots: 0,
         i32_slots: 0,
         i64_slots: 0,
+        f32_slots: 0,
         requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)
@@ -2524,6 +2526,7 @@ fn builds_elf_image_with_runtime_i32_ops() {
         heap_slots: 0,
         i32_slots: 0,
         i64_slots: 0,
+        f32_slots: 0,
         requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)

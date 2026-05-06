@@ -1,5 +1,6 @@
 #pub #mod array;
 #pub #mod bool;
+#pub #mod f32;
 #pub #mod i32;
 #pub #mod i64;
 #pub #mod reference;

@@ -29,8 +29,8 @@ use pure::{
 pub(crate) use typecheck::validate_value_against_type;
 
 pub(crate) use expr::{
-    lower_array_index_expr, lower_bool_expr, lower_i32_expr, lower_i64_expr, lower_u8_expr,
-    normalize_numeric_literal_arguments,
+    lower_array_index_expr, lower_bool_expr, lower_f32_expr, lower_i32_expr, lower_i64_expr,
+    lower_u8_expr, normalize_numeric_literal_arguments,
 };
 
 #[derive(Clone)]
@@ -39,6 +39,7 @@ pub(crate) struct LoweringState {
     pub(crate) next_array_slot: usize,
     pub(crate) next_i32_slot: usize,
     pub(crate) next_i64_slot: usize,
+    pub(crate) next_f32_slot: usize,
     pub(crate) io_effect_allowed: bool,
     functions: HashMap<String, PureFunction>,
     statement_functions: HashMap<String, StatementFunction>,
@@ -54,6 +55,7 @@ impl LoweringState {
             next_array_slot: 0,
             next_i32_slot: 0,
             next_i64_slot: 0,
+            next_f32_slot: 0,
             io_effect_allowed: false,
             functions: HashMap::new(),
             statement_functions: HashMap::new(),
@@ -94,6 +96,12 @@ impl LoweringState {
     pub(crate) fn allocate_i64_slot(&mut self) -> usize {
         let slot = self.next_i64_slot;
         self.next_i64_slot += 1;
+        slot
+    }
+
+    pub(crate) fn allocate_f32_slot(&mut self) -> usize {
+        let slot = self.next_f32_slot;
+        self.next_f32_slot += 1;
         slot
     }
 }
@@ -142,6 +150,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
         heap_slots: 0,
         i32_slots: 0,
         i64_slots: 0,
+        f32_slots: 0,
         requires_argv: false,
     };
     let mut state = LoweringState::new();
@@ -172,6 +181,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
 
     program.i32_slots = state.next_i32_slot;
     program.i64_slots = state.next_i64_slot;
+    program.f32_slots = state.next_f32_slot;
 
     Ok(program)
 }
@@ -396,6 +406,7 @@ pub(super) fn lower_statement(
                 heap_slots: program.heap_slots,
                 i32_slots: program.i32_slots,
                 i64_slots: program.i64_slots,
+                f32_slots: program.f32_slots,
                 requires_argv: program.requires_argv,
             };
             for statement in &loop_stmt.body.statements {
@@ -411,6 +422,7 @@ pub(super) fn lower_statement(
             state.next_array_slot = state.next_array_slot.max(loop_state.next_array_slot);
             state.next_i32_slot = state.next_i32_slot.max(loop_state.next_i32_slot);
             state.next_i64_slot = state.next_i64_slot.max(loop_state.next_i64_slot);
+            state.next_f32_slot = state.next_f32_slot.max(loop_state.next_f32_slot);
             program.operations.push(Operation::Loop {
                 body_operations: loop_program.operations,
             });
@@ -456,6 +468,7 @@ fn lower_if_statement(
         heap_slots: program.heap_slots,
         i32_slots: program.i32_slots,
         i64_slots: program.i64_slots,
+        f32_slots: program.f32_slots,
         requires_argv: program.requires_argv,
     };
     for statement in &if_stmt.then_block.statements {
@@ -469,6 +482,7 @@ fn lower_if_statement(
     let mut next_array_slot = then_state.next_array_slot;
     let mut next_i32_slot = then_state.next_i32_slot;
     let mut next_i64_slot = then_state.next_i64_slot;
+    let mut next_f32_slot = then_state.next_f32_slot;
 
     if let Some(else_branch) = &if_stmt.else_branch {
         let mut else_state = state.child_scope();
@@ -479,6 +493,7 @@ fn lower_if_statement(
             heap_slots: then_program.heap_slots,
             i32_slots: then_program.i32_slots,
             i64_slots: then_program.i64_slots,
+            f32_slots: then_program.f32_slots,
             requires_argv: then_program.requires_argv,
         };
         match else_branch {
@@ -503,6 +518,7 @@ fn lower_if_statement(
         next_array_slot = next_array_slot.max(else_state.next_array_slot);
         next_i32_slot = next_i32_slot.max(else_state.next_i32_slot);
         next_i64_slot = next_i64_slot.max(else_state.next_i64_slot);
+        next_f32_slot = next_f32_slot.max(else_state.next_f32_slot);
     } else {
         program.data = then_program.data;
         program.arrays = then_program.arrays;
@@ -512,6 +528,7 @@ fn lower_if_statement(
     state.next_array_slot = next_array_slot;
     state.next_i32_slot = next_i32_slot;
     state.next_i64_slot = next_i64_slot;
+    state.next_f32_slot = next_f32_slot;
     program.operations.push(Operation::If {
         condition,
         then_operations,
@@ -545,6 +562,7 @@ fn wrap_reference_value(value: Value, ty: &Term) -> Value {
     match value {
         Value::I32Reference(_)
         | Value::I64Reference(_)
+        | Value::F32Reference(_)
         | Value::Reference { .. }
         | Value::StaticSlice { .. }
         | Value::RuntimeArg(_)
@@ -591,6 +609,13 @@ fn lower_letref_borrow_statement(
                 .operations
                 .push(Operation::StoreI64 { slot, value: expr });
             Value::I64Reference(slot)
+        }
+        Value::F32(expr) => {
+            let slot = state.allocate_f32_slot();
+            program
+                .operations
+                .push(Operation::StoreF32 { slot, value: expr });
+            Value::F32Reference(slot)
         }
         other => other,
     };
@@ -721,6 +746,22 @@ fn lower_array_set_statement(
         }
         Value::Array {
             slot,
+            element_type: ArrayElementType::F32,
+            ..
+        } => {
+            let [index, value] = normalized_arguments.as_slice() else {
+                return Err(Error::Unsupported(
+                    "`set` must receive exactly two arguments for arrays".to_string(),
+                ));
+            };
+            program.operations.push(Operation::ArraySetF32 {
+                array_slot: slot,
+                index: lower_array_index_expr(&index, state)?,
+                value: lower_f32_expr(&value, state)?,
+            });
+        }
+        Value::Array {
+            slot,
             element_type: ArrayElementType::U8,
             ..
         } => {
@@ -800,6 +841,7 @@ fn lower_reference_set_builtin_statement(
         let lowered_value = match referent.as_ref() {
             Value::I32(_) => Value::I32(lower_i32_expr(value, state)?),
             Value::I64(_) => Value::I64(lower_i64_expr(value, state)?),
+            Value::F32(_) => Value::F32(lower_f32_expr(value, state)?),
             Value::Constructor(_) | Value::Struct(_) => lower_pure_value(value, state, program)?,
             other => {
                 return Err(Error::Unsupported(format!(
@@ -828,6 +870,12 @@ fn lower_reference_set_builtin_statement(
             program.operations.push(Operation::StoreI64 {
                 slot,
                 value: lower_i64_expr(value, state)?,
+            });
+        }
+        Value::F32Reference(slot) => {
+            program.operations.push(Operation::StoreF32 {
+                slot,
+                value: lower_f32_expr(value, state)?,
             });
         }
         Value::Reference {

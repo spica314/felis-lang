@@ -400,6 +400,14 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>> {
                     i += 1;
                     c += 1;
                 }
+                if i + 1 < chars.len() && chars[i] == '.' && chars[i + 1].is_ascii_digit() {
+                    i += 1;
+                    c += 1;
+                    while i < chars.len() && chars[i].is_ascii_digit() {
+                        i += 1;
+                        c += 1;
+                    }
+                }
             }
             let lexeme: String = chars[start_i..i].iter().collect();
             tokens.push(Token::IntegerLiteral(TokenIntegerLiteral {

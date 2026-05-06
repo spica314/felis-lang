@@ -2,7 +2,7 @@ use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
 
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
-    I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, PathBufSource, U8Expr,
+    F32Expr, I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, PathBufSource, U8Expr,
 };
 
 const DATA_VIRTUAL_ADDRESS: u64 = 0x410000;
@@ -115,6 +115,12 @@ fn emit_operations(
                 emit_i64_expr_to_rax(value, code, program);
                 let slot_offset = i64_slot_offset(program, *slot);
                 code.extend_from_slice(&[0x48, 0x89, 0x85]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+            }
+            Operation::StoreF32 { slot, value } => {
+                emit_f32_expr_to_xmm0(value, code, program);
+                let slot_offset = f32_slot_offset(program, *slot);
+                code.extend_from_slice(&[0xf3, 0x0f, 0x11, 0x85]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
             }
             Operation::Mmap { len, result_slot } => {
@@ -344,6 +350,11 @@ fn emit_operations(
                 index,
                 value,
             } => emit_i64_array_set(*array_slot, index, value, code, program),
+            Operation::ArraySetF32 {
+                array_slot,
+                index,
+                value,
+            } => emit_f32_array_set(*array_slot, index, value, code, program),
             Operation::ArraySetU8 {
                 array_slot,
                 index,
@@ -449,6 +460,11 @@ fn emit_condition_false_jumps(
             emit_jcc_false(*kind, false, code);
             vec![emit_jump_placeholder(code)]
         }
+        ConditionExpr::F32 { kind, lhs, rhs } => {
+            emit_f32_comparison(lhs, rhs, code, program);
+            emit_f32_jcc_false(*kind, code);
+            vec![emit_jump_placeholder(code)]
+        }
         ConditionExpr::U8 { kind, lhs, rhs } => {
             emit_u8_expr_to_eax(lhs, code, program);
             code.push(0x50);
@@ -503,6 +519,11 @@ fn emit_condition_true_jumps(
             code.push(0x58);
             code.extend_from_slice(&[0x48, 0x39, 0xc8]);
             emit_jcc_true(*kind, false, code);
+            vec![emit_jump_placeholder(code)]
+        }
+        ConditionExpr::F32 { kind, lhs, rhs } => {
+            emit_f32_comparison(lhs, rhs, code, program);
+            emit_f32_jcc_true(*kind, code);
             vec![emit_jump_placeholder(code)]
         }
         ConditionExpr::U8 { kind, lhs, rhs } => {
@@ -592,6 +613,10 @@ fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>, program: &LoweredPro
         }
         I32Expr::FromU8(value) => emit_u8_expr_to_eax(value, code, program),
         I32Expr::FromI64(value) => emit_i64_expr_to_rax(value, code, program),
+        I32Expr::FromF32(value) => {
+            emit_f32_expr_to_xmm0(value, code, program);
+            code.extend_from_slice(&[0xf3, 0x0f, 0x2c, 0xc0]);
+        }
         I32Expr::Add(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0x01, 0xc8]),
         I32Expr::Sub(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0x29, 0xc8]),
         I32Expr::Mul(lhs, rhs) => {
@@ -656,6 +681,10 @@ fn emit_i64_expr_to_rax(expr: &I64Expr, code: &mut Vec<u8>, program: &LoweredPro
             code.extend_from_slice(&[0x48, 0x98]);
         }
         I64Expr::FromU8(value) => emit_u8_expr_to_eax(value, code, program),
+        I64Expr::FromF32(value) => {
+            emit_f32_expr_to_xmm0(value, code, program);
+            code.extend_from_slice(&[0xf3, 0x48, 0x0f, 0x2c, 0xc0]);
+        }
         I64Expr::Add(lhs, rhs) => {
             emit_i64_binary_expr(lhs, rhs, code, program, &[0x48, 0x01, 0xc8])
         }
@@ -708,6 +737,104 @@ fn emit_i64_div_mod_expr(
     }
 }
 
+fn emit_f32_expr_to_xmm0(expr: &F32Expr, code: &mut Vec<u8>, program: &LoweredProgram) {
+    match expr {
+        F32Expr::LiteralBits(bits) => {
+            code.push(0xb8);
+            code.extend_from_slice(&bits.to_le_bytes());
+            code.extend_from_slice(&[0x66, 0x0f, 0x6e, 0xc0]);
+        }
+        F32Expr::Local(slot) => {
+            let slot_offset = f32_slot_offset(program, *slot);
+            code.extend_from_slice(&[0xf3, 0x0f, 0x10, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
+        }
+        F32Expr::FromI32(value) => {
+            emit_i32_expr_to_eax(value, code, program);
+            code.extend_from_slice(&[0xf3, 0x0f, 0x2a, 0xc0]);
+        }
+        F32Expr::FromI64(value) => {
+            emit_i64_expr_to_rax(value, code, program);
+            code.extend_from_slice(&[0xf3, 0x48, 0x0f, 0x2a, 0xc0]);
+        }
+        F32Expr::FromU8(value) => {
+            emit_u8_expr_to_eax(value, code, program);
+            code.extend_from_slice(&[0xf3, 0x0f, 0x2a, 0xc0]);
+        }
+        F32Expr::Add(lhs, rhs) => {
+            emit_f32_binary_expr(lhs, rhs, code, program, &[0xf3, 0x0f, 0x58, 0xc1])
+        }
+        F32Expr::Sub(lhs, rhs) => {
+            emit_f32_binary_expr(lhs, rhs, code, program, &[0xf3, 0x0f, 0x5c, 0xc1])
+        }
+        F32Expr::Mul(lhs, rhs) => {
+            emit_f32_binary_expr(lhs, rhs, code, program, &[0xf3, 0x0f, 0x59, 0xc1])
+        }
+        F32Expr::Div(lhs, rhs) => {
+            emit_f32_binary_expr(lhs, rhs, code, program, &[0xf3, 0x0f, 0x5e, 0xc1])
+        }
+        F32Expr::ArrayGet { array_slot, index } => {
+            emit_f32_array_get(*array_slot, index, code, program)
+        }
+    }
+}
+
+fn emit_f32_binary_expr(
+    lhs: &F32Expr,
+    rhs: &F32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+    opcode: &[u8],
+) {
+    emit_f32_expr_to_xmm0(lhs, code, program);
+    code.extend_from_slice(&[0x48, 0x83, 0xec, 0x08]);
+    code.extend_from_slice(&[0xf3, 0x0f, 0x11, 0x04, 0x24]);
+    emit_f32_expr_to_xmm0(rhs, code, program);
+    code.extend_from_slice(&[0xf3, 0x0f, 0x10, 0xc8]);
+    code.extend_from_slice(&[0xf3, 0x0f, 0x10, 0x04, 0x24]);
+    code.extend_from_slice(&[0x48, 0x83, 0xc4, 0x08]);
+    code.extend_from_slice(opcode);
+}
+
+fn emit_f32_comparison(lhs: &F32Expr, rhs: &F32Expr, code: &mut Vec<u8>, program: &LoweredProgram) {
+    emit_f32_expr_to_xmm0(lhs, code, program);
+    code.extend_from_slice(&[0x48, 0x83, 0xec, 0x08]);
+    code.extend_from_slice(&[0xf3, 0x0f, 0x11, 0x04, 0x24]);
+    emit_f32_expr_to_xmm0(rhs, code, program);
+    code.extend_from_slice(&[0xf3, 0x0f, 0x10, 0xc8]);
+    code.extend_from_slice(&[0xf3, 0x0f, 0x10, 0x04, 0x24]);
+    code.extend_from_slice(&[0x48, 0x83, 0xc4, 0x08]);
+    code.extend_from_slice(&[0x0f, 0x2e, 0xc1]);
+}
+
+fn emit_f32_jcc_false(kind: ComparisonKind, code: &mut Vec<u8>) {
+    code.extend_from_slice(&[0x0f, f32_false_jump_opcode(kind)]);
+}
+
+fn emit_f32_jcc_true(kind: ComparisonKind, code: &mut Vec<u8>) {
+    code.extend_from_slice(&[0x0f, f32_true_jump_opcode(kind)]);
+}
+
+fn f32_false_jump_opcode(kind: ComparisonKind) -> u8 {
+    match kind {
+        ComparisonKind::Eq => 0x85,
+        ComparisonKind::Lte => 0x87,
+        ComparisonKind::Lt => 0x83,
+        ComparisonKind::Gte => 0x82,
+        ComparisonKind::Gt => 0x86,
+    }
+}
+
+fn f32_true_jump_opcode(kind: ComparisonKind) -> u8 {
+    match kind {
+        ComparisonKind::Eq => 0x84,
+        ComparisonKind::Lte => 0x86,
+        ComparisonKind::Lt => 0x82,
+        ComparisonKind::Gte => 0x83,
+        ComparisonKind::Gt => 0x87,
+    }
+}
+
 fn emit_u8_expr_to_eax(expr: &U8Expr, code: &mut Vec<u8>, program: &LoweredProgram) {
     match expr {
         U8Expr::Literal(value) => {
@@ -720,6 +847,11 @@ fn emit_u8_expr_to_eax(expr: &U8Expr, code: &mut Vec<u8>, program: &LoweredProgr
         }
         U8Expr::FromI64(value) => {
             emit_i64_expr_to_rax(value, code, program);
+            code.extend_from_slice(&[0x0f, 0xb6, 0xc0]);
+        }
+        U8Expr::FromF32(value) => {
+            emit_f32_expr_to_xmm0(value, code, program);
+            code.extend_from_slice(&[0xf3, 0x0f, 0x2c, 0xc0]);
             code.extend_from_slice(&[0x0f, 0xb6, 0xc0]);
         }
         U8Expr::Add(lhs, rhs) => emit_u8_binary_expr(lhs, rhs, code, program, &[0x00, 0xc8]),
@@ -840,8 +972,9 @@ fn stack_frame_size(program: &LoweredProgram) -> usize {
     let pointer_bytes = array_descriptor_bytes + program.heap_slots * 8;
     let i32_slot_bytes = program.i32_slots * 4;
     let i64_slot_bytes = program.i64_slots * 8;
+    let f32_slot_bytes = program.f32_slots * 4;
     let array_bytes: usize = program.arrays.iter().map(array_storage_size).sum();
-    pointer_bytes + i32_slot_bytes + i64_slot_bytes + array_bytes
+    pointer_bytes + i32_slot_bytes + i64_slot_bytes + f32_slot_bytes + array_bytes
 }
 
 fn heap_slot_offset(slot: usize) -> i32 {
@@ -876,7 +1009,8 @@ fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
     let pointer_bytes = (program.heap_slots * 8) as i32 + descriptor_bytes;
     let i32_slot_bytes = (program.i32_slots * 4) as i32;
     let i64_slot_bytes = (program.i64_slots * 8) as i32;
-    let mut offset = pointer_bytes + i32_slot_bytes + i64_slot_bytes;
+    let f32_slot_bytes = (program.f32_slots * 4) as i32;
+    let mut offset = pointer_bytes + i32_slot_bytes + i64_slot_bytes + f32_slot_bytes;
     for array in &program.arrays {
         offset += array_storage_size(array) as i32;
         if array.slot == slot {
@@ -911,6 +1045,18 @@ fn i64_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
     -(pointer_bytes + i32_slot_bytes + 8 * (slot as i32 + 1))
 }
 
+fn f32_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
+    let descriptor_bytes: i32 = program
+        .arrays
+        .iter()
+        .map(|array| array_descriptor_size(array) as i32)
+        .sum();
+    let pointer_bytes = (program.heap_slots * 8) as i32 + descriptor_bytes;
+    let i32_slot_bytes = (program.i32_slots * 4) as i32;
+    let i64_slot_bytes = (program.i64_slots * 8) as i32;
+    -(pointer_bytes + i32_slot_bytes + i64_slot_bytes + 4 * (slot as i32 + 1))
+}
+
 fn emit_array_initializers(program: &LoweredProgram, code: &mut Vec<u8>) {
     for array in &program.arrays {
         let slot_offset = array_slot_offset(program, array.slot);
@@ -942,6 +1088,7 @@ fn array_element_size(array: &ArrayAllocation) -> usize {
     match array.element_type {
         ArrayElementType::I32 => 4,
         ArrayElementType::I64 => 8,
+        ArrayElementType::F32 => 4,
         ArrayElementType::U8 => 1,
     }
 }
@@ -992,6 +1139,25 @@ fn emit_i64_array_set(
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());
     code.extend_from_slice(&[0x48, 0x89, 0x14, 0x0b]);
+}
+
+fn emit_f32_array_set(
+    array_slot: usize,
+    index: &I64Expr,
+    value: &F32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    emit_i64_expr_to_rax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x02]);
+    code.push(0x51);
+    emit_f32_expr_to_xmm0(value, code, program);
+    code.push(0x59);
+    let slot_offset = array_slot_offset(program, array_slot);
+    code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
+    code.extend_from_slice(&slot_offset.to_le_bytes());
+    code.extend_from_slice(&[0xf3, 0x0f, 0x11, 0x04, 0x0b]);
 }
 
 fn emit_array_len(array_slot: usize, code: &mut Vec<u8>, program: &LoweredProgram) {
@@ -1162,6 +1328,21 @@ fn emit_i64_array_get(
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());
     code.extend_from_slice(&[0x48, 0x8b, 0x04, 0x0b]);
+}
+
+fn emit_f32_array_get(
+    array_slot: usize,
+    index: &I64Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    emit_i64_expr_to_rax(index, code, program);
+    code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x02]);
+    let slot_offset = array_slot_offset(program, array_slot);
+    code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
+    code.extend_from_slice(&slot_offset.to_le_bytes());
+    code.extend_from_slice(&[0xf3, 0x0f, 0x10, 0x04, 0x0b]);
 }
 
 fn emit_u8_array_get(
