@@ -22,8 +22,10 @@
     #let len : i32 <- IO::read fd bytes_ref 64i32;
     #let _ : () <- IO::close fd;
     #let _ : () <- IO::write stdout bytes_ref len;
-    #let left : i32 = i32_from_u8 (array_get digits_ref 0i32);
-    #let right : i32 = i32_from_u8 (array_get digits_ref 1i32);
+    #let left_digit : u8 = array_get digits_ref 0i32;
+    #let right_digit : u8 = array_get digits_ref 1i32;
+    #let left : i32 = i32_from_u8 left_digit;
+    #let right : i32 = i32_from_u8 right_digit;
     #let code : i32 = i32_add left right;
     #let _ : () <- IO::exit code;
     ()

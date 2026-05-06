@@ -12,17 +12,23 @@
     #let sum : i32 = 0i32;
     #letref #excl sum : &^ i32 #borrow sum;
     #loop {
-        #let new_counter : i32 = i32_add ((ref_get i32 counter)) 1i32;
+        #let counter_value : i32 = ref_get i32 counter;
+        #let new_counter : i32 = i32_add counter_value 1i32;
         ref_set i32 counter new_counter;
-        #if i32_eq ((ref_get i32 counter)) 5i32 {
+        #let counter_after_increment : i32 = ref_get i32 counter;
+        #if i32_eq counter_after_increment 5i32 {
             #continue;
         };
-        #let new_sum : i32 = i32_add ((ref_get i32 sum)) ((ref_get i32 counter));
+        #let sum_value : i32 = ref_get i32 sum;
+        #let counter_for_sum : i32 = ref_get i32 counter;
+        #let new_sum : i32 = i32_add sum_value counter_for_sum;
         ref_set i32 sum new_sum;
-        #if i32_eq ((ref_get i32 counter)) 10i32 {
+        #let counter_after_sum : i32 = ref_get i32 counter;
+        #if i32_eq counter_after_sum 10i32 {
             #break;
         };
     };
-    #let _ : () <- IO::exit ((ref_get i32 sum));
+    #let code : i32 = ref_get i32 sum;
+    #let _ : () <- IO::exit code;
     ()
 }

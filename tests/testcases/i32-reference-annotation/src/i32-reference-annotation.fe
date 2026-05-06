@@ -6,7 +6,8 @@
 #entrypoint main;
 
 #fn add1 : (value_ref : & i32) -> i32 #with IO {
-    i32_add ((ref_get i32 value_ref)) 1i32
+    #let value : i32 = ref_get i32 value_ref;
+    i32_add value 1i32
 }
 
 #fn main : () #with IO {

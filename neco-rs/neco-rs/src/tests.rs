@@ -1138,6 +1138,102 @@ fn rejects_reference_and_array_builtins_without_io_effect() {
 }
 
 #[test]
+fn rejects_effectful_operations_in_function_arguments() {
+    let cases = [
+        (
+            "nested-ref-get-argument",
+            r#"
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let value : i32 = 41i32;
+    #letref value_ref : & i32 #borrow value;
+    #let code : i32 = i32_add (ref_get i32 value_ref) 1i32;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#,
+            "`ref_get` is effectful and must be used as a top-level statement",
+        ),
+        (
+            "nested-io-call-argument",
+            r#"
+#use std_core::io::IO;
+#use std_core::io::FileDescriptor;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let bytes_ref : & ArrayVL u8 = "x";
+    #let _ : () <- IO::write (IO::stdout) bytes_ref 1i32;
+    ()
+}
+"#,
+            "`IO::stdout` is effectful and must be used as a top-level statement",
+        ),
+        (
+            "nested-io-function-argument",
+            r#"
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#entrypoint main;
+
+#fn read_ref : (value_ref : & i32) -> i32 #with IO {
+    ref_get i32 value_ref
+}
+
+#fn main : () #with IO {
+    #let value : i32 = 41i32;
+    #letref value_ref : & i32 #borrow value;
+    #let code : i32 = i32_add (read_ref value_ref) 1i32;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#,
+            "`read_ref` is effectful and must be used as a top-level statement",
+        ),
+        (
+            "nested-io-operation-in-function-tail",
+            r#"
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#entrypoint main;
+
+#fn add1 : (value_ref : & i32) -> i32 #with IO {
+    i32_add (ref_get i32 value_ref) 1i32
+}
+
+#fn main : () #with IO {
+    #let value : i32 = 41i32;
+    #letref value_ref : & i32 #borrow value;
+    #let code : i32 = add1 value_ref;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#,
+            "`ref_get` is effectful and must be used as a top-level statement",
+        ),
+    ];
+
+    for (name, source, expected_message) in cases {
+        let package = parse_inline_binary_package(name, source);
+        let error =
+            lower_package_to_program(&package).expect_err("lowering must reject nested IO effect");
+        assert!(
+            error.to_string().contains(expected_message),
+            "expected `{expected_message}`, got `{error}`"
+        );
+    }
+}
+
+#[test]
 fn lowers_fn_reference_annotation_fixture_to_runtime_expression_tree() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

@@ -12,13 +12,16 @@
 #fn find_byte_offset : (bytes_ref : & ArrayVL u8) -> (target : u8) -> (len : i32) -> (offset_ref : &^ i32) -> () #with IO {
     ref_set i32 offset_ref 0i32;
     #loop {
-        #if i32_gte ((ref_get i32 offset_ref)) len {
+        #let offset : i32 = ref_get i32 offset_ref;
+        #if i32_gte offset len {
             #break;
         };
-        #if u8_eq (array_get bytes_ref ((ref_get i32 offset_ref))) target {
+        #let byte : u8 = array_get bytes_ref offset;
+        #if u8_eq byte target {
             #break;
         };
-        ref_set i32 offset_ref (i32_add ((ref_get i32 offset_ref)) 1i32);
+        #let next_offset : i32 = i32_add offset 1i32;
+        ref_set i32 offset_ref next_offset;
     };
     ()
 }
@@ -29,8 +32,10 @@
     #let bytes_ref : & ArrayVL u8 = "abc:42";
     #let offset_ref : i32 = 0i32;
     #letref #excl offset_ref : &^ i32 #borrow offset_ref;
-    find_byte_offset bytes_ref ':' (array_len bytes_ref) offset_ref;
-    #let code : i32 = i32_add ((ref_get i32 offset_ref)) 39i32;
+    #let len : i32 = array_len bytes_ref;
+    find_byte_offset bytes_ref ':' len offset_ref;
+    #let offset : i32 = ref_get i32 offset_ref;
+    #let code : i32 = i32_add offset 39i32;
     #let _ : () <- IO::exit code;
     ()
 }

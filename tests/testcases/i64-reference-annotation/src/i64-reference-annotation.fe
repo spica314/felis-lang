@@ -6,7 +6,8 @@
 #entrypoint main;
 
 #fn add1 : (value_ref : & i64) -> i64 #with IO {
-    i64_add ((ref_get i64 value_ref)) 1i64
+    #let value : i64 = ref_get i64 value_ref;
+    i64_add value 1i64
 }
 
 #fn main : () #with IO {

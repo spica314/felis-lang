@@ -10,8 +10,12 @@
 #entrypoint main;
 
 #fn read_digits : (digits_ref : & ArrayVL u8) -> (left_ref : &^ i32) -> (right_ref : &^ i32) -> () #with IO {
-    ref_set i32 left_ref (i32_from_u8 (array_get digits_ref 0i32));
-    ref_set i32 right_ref (i32_from_u8 (array_get digits_ref 1i32));
+    #let left_digit : u8 = array_get digits_ref 0i32;
+    #let right_digit : u8 = array_get digits_ref 1i32;
+    #let left : i32 = i32_from_u8 left_digit;
+    #let right : i32 = i32_from_u8 right_digit;
+    ref_set i32 left_ref left;
+    ref_set i32 right_ref right;
     ()
 }
 
@@ -22,7 +26,9 @@
     #let right_ref : i32 = 0i32;
     #letref #excl right_ref : &^ i32 #borrow right_ref;
     read_digits digits_ref left_ref right_ref;
-    #let code : i32 = i32_add ((ref_get i32 left_ref)) ((ref_get i32 right_ref));
+    #let left : i32 = ref_get i32 left_ref;
+    #let right : i32 = ref_get i32 right_ref;
+    #let code : i32 = i32_add left right;
     #let _ : () <- IO::exit code;
     ()
 }

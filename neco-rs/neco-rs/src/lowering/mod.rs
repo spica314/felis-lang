@@ -340,6 +340,7 @@ pub(super) fn lower_statement(
     match statement {
         Statement::Let(let_stmt) => match let_stmt.operator {
             LetOperator::Equals => {
+                ensure_no_nested_io_effects(let_stmt.value.as_ref(), state)?;
                 lower_let_equals_statement(
                     &let_stmt.binder,
                     let_stmt.ty.as_ref(),
@@ -351,6 +352,7 @@ pub(super) fn lower_statement(
             }
             LetOperator::LeftArrow => {
                 ensure_io_effect_allowed(state, "effectful operation")?;
+                ensure_no_nested_io_effects(let_stmt.value.as_ref(), state)?;
                 let ty = substitute_type_bindings(
                     let_stmt.ty.as_ref(),
                     &type_bindings_from_environment(&state.environment),
@@ -443,6 +445,7 @@ fn lower_if_statement(
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<bool> {
+    ensure_no_io_effects(if_stmt.condition.as_ref(), state)?;
     let condition = lower_condition_expr(if_stmt.condition.as_ref(), state, program)?;
     let mut then_state = state.child_scope();
     let mut then_operations = Vec::new();
@@ -622,6 +625,7 @@ fn lower_expression_statement(
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<()> {
+    ensure_no_nested_io_effects(term, state)?;
     if let Term::Block(block) = term {
         lower_effectful_block(block, state, program)?;
         return Ok(());
@@ -850,6 +854,149 @@ pub(crate) fn ensure_io_effect_allowed(state: &LoweringState, operation: &str) -
     Err(Error::Unsupported(format!(
         "`{operation}` requires `#with IO`"
     )))
+}
+
+fn ensure_no_nested_io_effects(term: &Term, state: &LoweringState) -> Result<()> {
+    ensure_no_io_effects_below_root(term, state, true)
+}
+
+fn ensure_no_io_effects(term: &Term, state: &LoweringState) -> Result<()> {
+    ensure_no_io_effects_below_root(term, state, false)
+}
+
+fn ensure_no_io_effects_below_root(
+    term: &Term,
+    state: &LoweringState,
+    allow_root_effect: bool,
+) -> Result<()> {
+    if !allow_root_effect && let Some(operation) = io_effect_operation_name(term, state) {
+        return Err(Error::Unsupported(format!(
+            "`{operation}` is effectful and must be used as a top-level statement"
+        )));
+    }
+
+    match term {
+        Term::Group(inner) => ensure_no_io_effects_below_root(inner, state, allow_root_effect),
+        Term::Application { arguments, .. } => {
+            for argument in arguments {
+                ensure_no_io_effects(argument, state)?;
+            }
+            Ok(())
+        }
+        Term::MethodCall { receiver, .. } | Term::FieldAccess { receiver, .. } => {
+            ensure_no_io_effects(receiver, state)
+        }
+        Term::StructLiteral { fields, .. } => {
+            for field in fields {
+                ensure_no_io_effects(&field.value, state)?;
+            }
+            Ok(())
+        }
+        Term::Reference { referent, .. } => ensure_no_io_effects(referent, state),
+        Term::Arrow(arrow) => {
+            match &arrow.parameter {
+                neco_rs_parser::ArrowParameter::Binder(binder) => {
+                    ensure_no_io_effects(&binder.ty, state)?;
+                }
+                neco_rs_parser::ArrowParameter::Domain(domain) => {
+                    ensure_no_io_effects(domain, state)?;
+                }
+            }
+            ensure_no_io_effects(&arrow.result, state)
+        }
+        Term::Forall(forall) => {
+            ensure_no_io_effects(&forall.binder.ty, state)?;
+            ensure_no_io_effects(&forall.body, state)
+        }
+        Term::Block(block) => {
+            for statement in &block.statements {
+                match statement {
+                    Statement::Let(let_stmt) => {
+                        ensure_no_nested_io_effects(let_stmt.value.as_ref(), state)?;
+                    }
+                    Statement::LetRef(letref_stmt) => {
+                        ensure_no_io_effects(letref_stmt.source.as_ref(), state)?;
+                    }
+                    Statement::Expression(term) => {
+                        ensure_no_nested_io_effects(term.as_ref(), state)?;
+                    }
+                    Statement::If(if_stmt) => {
+                        ensure_no_io_effects(if_stmt.condition.as_ref(), state)?;
+                    }
+                    Statement::Loop(loop_stmt) => {
+                        ensure_no_io_effects_below_root(
+                            &Term::Block(loop_stmt.body.clone()),
+                            state,
+                            false,
+                        )?;
+                    }
+                    Statement::Break | Statement::Continue | Statement::Item(_) => {}
+                }
+            }
+            if let Some(tail) = block.tail.as_deref() {
+                ensure_no_nested_io_effects(tail, state)?;
+            }
+            Ok(())
+        }
+        Term::Match(match_expr) => {
+            ensure_no_io_effects(match_expr.scrutinee.as_ref(), state)?;
+            for arm in &match_expr.arms {
+                ensure_no_nested_io_effects(arm.result.as_ref(), state)?;
+            }
+            Ok(())
+        }
+        Term::Unit
+        | Term::StringLiteral(_)
+        | Term::CharLiteral(_)
+        | Term::IntegerLiteral(_)
+        | Term::Path(_)
+        | Term::TypedBinder(_) => Ok(()),
+    }
+}
+
+fn io_effect_operation_name(term: &Term, state: &LoweringState) -> Option<String> {
+    match term {
+        Term::Group(inner) => io_effect_operation_name(inner, state),
+        Term::Path(path) => {
+            let segments = simple_path_segments(path)?;
+            match segments.as_slice() {
+                ["IO", name] => Some(format!("IO::{name}")),
+                [name] => state.statement_functions.get(*name).and_then(|function| {
+                    (function.effect.as_deref() == Some("IO")).then(|| (*name).to_string())
+                }),
+                _ => None,
+            }
+        }
+        Term::Application { callee, .. } => {
+            let Term::Path(path) = callee.as_ref() else {
+                return None;
+            };
+            let segments = simple_path_segments(path)?;
+            match segments.as_slice() {
+                ["IO", name] => Some(format!("IO::{name}")),
+                ["ref_get" | "ref_set" | "array_get" | "array_set" | "array_len"] => {
+                    Some(segments[0].to_string())
+                }
+                [name] => state.statement_functions.get(*name).and_then(|function| {
+                    (function.effect.as_deref() == Some("IO")).then(|| (*name).to_string())
+                }),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+fn simple_path_segments(path: &neco_rs_parser::PathExpression) -> Option<Vec<&str>> {
+    if path.token_keyword_package.is_some() {
+        return None;
+    }
+    Some(
+        path.segments
+            .iter()
+            .map(|segment| segment.lexeme.as_str())
+            .collect(),
+    )
 }
 
 fn single_segment_path_name(term: &Term) -> Option<&str> {

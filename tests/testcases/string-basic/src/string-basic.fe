@@ -57,7 +57,8 @@
     string_push_u8_unchecked empty_name name_len_ref 'x';
     string_set_u8 empty_name 1i32 'o';
     string_push_u8_unchecked empty_name name_len_ref 'o';
-    #let built_name : String = string_with_len empty_name ((ref_get i32 name_len_ref));
+    #let name_len : i32 = ref_get i32 name_len_ref;
+    #let built_name : String = string_with_len empty_name name_len;
 
     #let eq_ref : i32 = 0i32;
     #letref #excl eq_ref : &^ i32 #borrow eq_ref;
@@ -67,10 +68,12 @@
     mark_string_span_eq built_name source 4i32 7i32 span_eq_ref;
 
     #let exit_code : i32 = code;
-    #if i32_eq ((ref_get i32 eq_ref)) 0i32 {
+    #let eq : i32 = ref_get i32 eq_ref;
+    #if i32_eq eq 0i32 {
         #let _ : () <- IO::exit 1i32;
     };
-    #if i32_eq ((ref_get i32 span_eq_ref)) 0i32 {
+    #let span_eq : i32 = ref_get i32 span_eq_ref;
+    #if i32_eq span_eq 0i32 {
         #let _ : () <- IO::exit 2i32;
     };
     #let _ : () <- IO::exit exit_code;

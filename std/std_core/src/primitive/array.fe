@@ -50,11 +50,14 @@
     #let len : i32 = dyn_array_len t source;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
     #loop {
-        #if i32_gte ((ref_get i32 index_ref)) len {
+        #let index : i32 = ref_get i32 index_ref;
+        #if i32_gte index len {
             #break;
         };
-        array_set dest_ref ((ref_get i32 index_ref)) (dyn_array_get t source ((ref_get i32 index_ref)));
-        ref_set i32 index_ref (i32_add ((ref_get i32 index_ref)) 1i32);
+        #let value : t = dyn_array_get t source index;
+        array_set dest_ref index value;
+        #let next_index : i32 = i32_add index 1i32;
+        ref_set i32 index_ref next_index;
     };
     ()
 }
@@ -85,8 +88,10 @@
 }
 
 #fn append_u8 : (dest_ref : &^ ArrayVL u8) -> (dest_index_ref : &^ i32) -> (byte : u8) -> () #with IO {
-    array_set dest_ref ((ref_get i32 dest_index_ref)) byte;
-    ref_set i32 dest_index_ref (i32_add ((ref_get i32 dest_index_ref)) 1i32);
+    #let dest_index : i32 = ref_get i32 dest_index_ref;
+    array_set dest_ref dest_index byte;
+    #let next_dest_index : i32 = i32_add dest_index 1i32;
+    ref_set i32 dest_index_ref next_dest_index;
     ()
 }
 
@@ -94,12 +99,14 @@
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     #loop {
-        #let byte : u8 = array_get source_ref ((ref_get i32 source_index_ref));
+        #let source_index : i32 = ref_get i32 source_index_ref;
+        #let byte : u8 = array_get source_ref source_index;
         #if u8_eq byte '\0' {
             #break;
         };
         append_u8 dest_ref dest_index_ref byte;
-        ref_set i32 source_index_ref (i32_add ((ref_get i32 source_index_ref)) 1i32);
+        #let next_source_index : i32 = i32_add source_index 1i32;
+        ref_set i32 source_index_ref next_source_index;
     };
     ()
 }
@@ -108,12 +115,14 @@
     #let source_index_ref : i32 = 0i32;
     #letref #excl source_index_ref : &^ i32 #borrow source_index_ref;
     #loop {
-        #let byte : u8 = array_get source_ref ((ref_get i32 source_index_ref));
+        #let source_index : i32 = ref_get i32 source_index_ref;
+        #let byte : u8 = array_get source_ref source_index;
         #if u8_eq byte '\0' {
             #break;
         };
         append_u8 dest_ref dest_index_ref byte;
-        ref_set i32 source_index_ref (i32_add ((ref_get i32 source_index_ref)) 1i32);
+        #let next_source_index : i32 = i32_add source_index 1i32;
+        ref_set i32 source_index_ref next_source_index;
     };
     ()
 }
@@ -122,11 +131,14 @@
     #let index_ref : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
     #loop {
-        #if i32_gte ((ref_get i32 index_ref)) (array_len dest_ref) {
+        #let index : i32 = ref_get i32 index_ref;
+        #let len : i32 = array_len dest_ref;
+        #if i32_gte index len {
             #break;
         };
-        array_set dest_ref ((ref_get i32 index_ref)) byte;
-        ref_set i32 index_ref (i32_add ((ref_get i32 index_ref)) 1i32);
+        array_set dest_ref index byte;
+        #let next_index : i32 = i32_add index 1i32;
+        ref_set i32 index_ref next_index;
     };
     ()
 }

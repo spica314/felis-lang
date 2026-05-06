@@ -12,8 +12,11 @@
     array_set array_ref 0i64 10i64;
     array_set array_ref 1i64 20i64;
     array_set array_ref 2i64 12i64;
-    #let first_sum : i64 = i64_add (array_get array_ref 0i64) (array_get array_ref 1i64);
-    #let code : i64 = i64_add first_sum (array_get array_ref 2i64);
+    #let first : i64 = array_get array_ref 0i64;
+    #let second : i64 = array_get array_ref 1i64;
+    #let third : i64 = array_get array_ref 2i64;
+    #let first_sum : i64 = i64_add first second;
+    #let code : i64 = i64_add first_sum third;
     #let _ : () <- IO::exit code;
     ()
 }

@@ -1114,6 +1114,7 @@ pub(super) fn lower_function_call_value(
             "function `{name}` body must end with a value expression"
         )));
     };
+    super::ensure_no_nested_io_effects(tail, &scoped_state)?;
     let value = lower_pure_value(tail, &scoped_state, program)?;
     let result_ty = substitute_type_bindings(&function.result_ty, &type_bindings);
     validate_value_against_type(&value, &result_ty, program)?;

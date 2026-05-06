@@ -18,6 +18,7 @@
     append_dyn_nul_terminated_u8 source_bytes_ref buffer_arrayvl_ref index_ref;
     append_u8 buffer_arrayvl_ref index_ref 'c';
     #let exit_code : u8 = array_get buffer_arrayvl_ref 2i32;
-    #let _ : () <- IO::exit (i32_from_u8 exit_code);
+    #let code : i32 = i32_from_u8 exit_code;
+    #let _ : () <- IO::exit code;
     ()
 }
