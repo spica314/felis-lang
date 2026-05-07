@@ -128,6 +128,7 @@ pub(super) fn collect_constructors(
             let Item::Type(type_decl) = item else {
                 continue;
             };
+            validate_modifier("type", &type_decl.name.name, type_decl.modifier.as_deref())?;
 
             for (tag, constructor) in type_decl.constructors.iter().enumerate() {
                 let Some(parameters) = constructor_parameters(constructor, &type_decl.name) else {
@@ -182,6 +183,12 @@ pub(super) fn collect_structs(
 }
 
 fn struct_signature_from_decl(struct_decl: &StructDeclaration) -> Result<StructSignature> {
+    validate_modifier(
+        "struct",
+        &struct_decl.name.name,
+        struct_decl.modifier.as_deref(),
+    )?;
+
     let mut field_names = HashSet::new();
     let mut fields = Vec::new();
     for field in &struct_decl.fields {
@@ -203,6 +210,15 @@ fn struct_signature_from_decl(struct_decl: &StructDeclaration) -> Result<StructS
         is_rc: struct_decl.modifier.as_deref() == Some("rc"),
         fields,
     })
+}
+
+fn validate_modifier(decl_kind: &str, name: &str, modifier: Option<&str>) -> Result<()> {
+    match modifier {
+        Some("rc") | None => Ok(()),
+        Some(modifier) => Err(Error::Unsupported(format!(
+            "unknown {decl_kind} modifier `{modifier}` on `{name}`"
+        ))),
+    }
 }
 
 fn constructor_parameters(

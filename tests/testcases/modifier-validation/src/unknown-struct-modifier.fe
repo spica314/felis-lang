@@ -1,0 +1,11 @@
+#use std_core::primitive::i32::i32;
+
+#struct(refcounted) Point : Type[0] {
+    x : i32,
+}
+
+#entrypoint main;
+
+#fn main : () {
+    ()
+}

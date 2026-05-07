@@ -1,0 +1,7 @@
+{
+    "name": "modifier-validation",
+    "felis-bin-entrypoints": [
+        "src/unknown-type-modifier.fe",
+        "src/unknown-struct-modifier.fe"
+    ]
+}

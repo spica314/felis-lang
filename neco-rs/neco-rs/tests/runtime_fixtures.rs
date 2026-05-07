@@ -325,6 +325,20 @@ fn rejects_multiple_entrypoints_fixture() {
 }
 
 #[test]
+fn rejects_unknown_type_modifier_fixture() {
+    let root = repo_root().join("tests/testcases/modifier-validation");
+    let error = compile_fixture_error(&root, "unknown-type-modifier");
+    assert!(error.contains("unknown type modifier `refcounted` on `Token`"));
+}
+
+#[test]
+fn rejects_unknown_struct_modifier_fixture() {
+    let root = repo_root().join("tests/testcases/modifier-validation");
+    let error = compile_fixture_error(&root, "unknown-struct-modifier");
+    assert!(error.contains("unknown struct modifier `refcounted` on `Point`"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");

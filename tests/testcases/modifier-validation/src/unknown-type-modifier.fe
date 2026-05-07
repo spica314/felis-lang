@@ -1,0 +1,11 @@
+#use std_core::primitive::i32::i32;
+
+#type(refcounted) Token : Type[0] {
+    value : i32 -> Token,
+}
+
+#entrypoint main;
+
+#fn main : () {
+    ()
+}
