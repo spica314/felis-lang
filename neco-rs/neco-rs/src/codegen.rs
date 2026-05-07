@@ -963,7 +963,7 @@ fn emit_runtime_arg_u8_get(
 }
 
 fn stack_frame_size(program: &LoweredProgram) -> usize {
-    let array_descriptor_bytes: usize = program.arrays.iter().map(array_descriptor_size).sum();
+    let array_descriptor_bytes = array_descriptor_bytes(program);
     let pointer_bytes = array_descriptor_bytes + program.heap_slots * 8;
     let i32_slot_bytes = program.i32_slots * 4;
     let i64_slot_bytes = program.i64_slots * 8;
@@ -996,12 +996,7 @@ fn array_logical_len_offset(program: &LoweredProgram, slot: usize) -> i32 {
 }
 
 fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
-    let descriptor_bytes: i32 = program
-        .arrays
-        .iter()
-        .map(|array| array_descriptor_size(array) as i32)
-        .sum();
-    let pointer_bytes = (program.heap_slots * 8) as i32 + descriptor_bytes;
+    let pointer_bytes = pointer_bytes(program);
     let i32_slot_bytes = (program.i32_slots * 4) as i32;
     let i64_slot_bytes = (program.i64_slots * 8) as i32;
     let f32_slot_bytes = (program.f32_slots * 4) as i32;
@@ -1020,36 +1015,18 @@ fn static_data_address(program: &LoweredProgram, data_index: usize) -> u64 {
 }
 
 fn i32_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
-    let descriptor_bytes: i32 = program
-        .arrays
-        .iter()
-        .map(|array| array_descriptor_size(array) as i32)
-        .sum();
-    let pointer_bytes = (program.heap_slots * 8) as i32 + descriptor_bytes;
-    -(pointer_bytes + 4 * (slot as i32 + 1))
+    -(pointer_bytes(program) + 4 * (slot as i32 + 1))
 }
 
 fn i64_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
-    let descriptor_bytes: i32 = program
-        .arrays
-        .iter()
-        .map(|array| array_descriptor_size(array) as i32)
-        .sum();
-    let pointer_bytes = (program.heap_slots * 8) as i32 + descriptor_bytes;
     let i32_slot_bytes = (program.i32_slots * 4) as i32;
-    -(pointer_bytes + i32_slot_bytes + 8 * (slot as i32 + 1))
+    -(pointer_bytes(program) + i32_slot_bytes + 8 * (slot as i32 + 1))
 }
 
 fn f32_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
-    let descriptor_bytes: i32 = program
-        .arrays
-        .iter()
-        .map(|array| array_descriptor_size(array) as i32)
-        .sum();
-    let pointer_bytes = (program.heap_slots * 8) as i32 + descriptor_bytes;
     let i32_slot_bytes = (program.i32_slots * 4) as i32;
     let i64_slot_bytes = (program.i64_slots * 8) as i32;
-    -(pointer_bytes + i32_slot_bytes + i64_slot_bytes + 4 * (slot as i32 + 1))
+    -(pointer_bytes(program) + i32_slot_bytes + i64_slot_bytes + 4 * (slot as i32 + 1))
 }
 
 fn emit_array_initializers(program: &LoweredProgram, code: &mut Vec<u8>) {
@@ -1072,6 +1049,14 @@ fn array_descriptor_size(array: &ArrayAllocation) -> usize {
         ArrayKind::Fixed => 16,
         ArrayKind::Dynamic => 16,
     }
+}
+
+fn array_descriptor_bytes(program: &LoweredProgram) -> usize {
+    program.arrays.iter().map(array_descriptor_size).sum()
+}
+
+fn pointer_bytes(program: &LoweredProgram) -> i32 {
+    (program.heap_slots * 8 + array_descriptor_bytes(program)) as i32
 }
 
 fn array_storage_size(array: &ArrayAllocation) -> usize {
