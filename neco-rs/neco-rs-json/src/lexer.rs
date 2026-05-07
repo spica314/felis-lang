@@ -146,6 +146,14 @@ impl Lexer {
                         }
                     }
                 }
+                other if other <= '\u{001f}' => {
+                    return Err(Error::new("control character in string literal").with_span(
+                        Span {
+                            start,
+                            end: self.offset,
+                        },
+                    ));
+                }
                 other => value.push(other),
             }
         }

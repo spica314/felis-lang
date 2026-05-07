@@ -32,6 +32,14 @@ fn reports_unsupported_escape_sequence() {
 }
 
 #[test]
+fn reports_control_character_in_string() {
+    let error = parse("\"\n\"").expect_err("parse should fail");
+
+    assert_eq!(error.message, "control character in string literal");
+    assert_eq!(error.span, Some(Span { start: 0, end: 2 }));
+}
+
+#[test]
 fn reports_unterminated_escape_sequence() {
     let error = parse("{\"text\":\"\\").expect_err("parse should fail");
 
