@@ -290,6 +290,20 @@ fn compiles_and_runs_reference_builtins_fixture() {
 }
 
 #[test]
+fn rejects_shared_primitive_ref_set_fixture() {
+    let root = repo_root().join("tests/testcases/primitive-reference-mutability");
+    let error = compile_fixture_error(&root, "shared-ref-set");
+    assert!(error.contains("`ref_set` requires an exclusive reference"));
+}
+
+#[test]
+fn rejects_shared_primitive_reference_exclusive_parameter_fixture() {
+    let root = repo_root().join("tests/testcases/primitive-reference-mutability");
+    let error = compile_fixture_error(&root, "shared-ref-exclusive-parameter");
+    assert!(error.contains("expected a value of type `&^ i32`"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");

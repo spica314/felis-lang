@@ -1145,7 +1145,7 @@ fn lower_i32_reference_get_builtin_call(
     ensure_io_effect_allowed(state, "ref_get")?;
 
     match resolve_value(receiver, &state.environment)? {
-        Value::I32Reference(slot) => Ok(Some(I32Expr::Local(slot))),
+        Value::I32Reference { slot, .. } => Ok(Some(I32Expr::Local(slot))),
         Value::Reference { value, .. } => match value.as_ref() {
             Value::I32(expr) => Ok(Some(expr.clone())),
             _ => Ok(None),
@@ -1165,7 +1165,7 @@ fn lower_f32_reference_get_builtin_call(
     ensure_io_effect_allowed(state, "ref_get")?;
 
     match resolve_value(receiver, &state.environment)? {
-        Value::F32Reference(slot) => Ok(Some(F32Expr::Local(slot))),
+        Value::F32Reference { slot, .. } => Ok(Some(F32Expr::Local(slot))),
         Value::Reference { value, .. } => match value.as_ref() {
             Value::F32(expr) => Ok(Some(expr.clone())),
             _ => Ok(None),
@@ -1185,7 +1185,7 @@ fn lower_i64_reference_get_builtin_call(
     ensure_io_effect_allowed(state, "ref_get")?;
 
     match resolve_value(receiver, &state.environment)? {
-        Value::I64Reference(slot) => Ok(Some(I64Expr::Local(slot))),
+        Value::I64Reference { slot, .. } => Ok(Some(I64Expr::Local(slot))),
         Value::Reference { value, .. } => match value.as_ref() {
             Value::I64(expr) => Ok(Some(expr.clone())),
             _ => Ok(None),

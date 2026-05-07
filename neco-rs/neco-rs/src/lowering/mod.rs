@@ -560,9 +560,9 @@ fn wrap_reference_value(value: Value, ty: &Term) -> Value {
         return value;
     };
     match value {
-        Value::I32Reference(_)
-        | Value::I64Reference(_)
-        | Value::F32Reference(_)
+        Value::I32Reference { .. }
+        | Value::I64Reference { .. }
+        | Value::F32Reference { .. }
         | Value::Reference { .. }
         | Value::StaticSlice { .. }
         | Value::RuntimeArg(_)
@@ -601,21 +601,21 @@ fn lower_letref_borrow_statement(
             program
                 .operations
                 .push(Operation::StoreI32 { slot, value: expr });
-            Value::I32Reference(slot)
+            Value::I32Reference { slot, exclusive }
         }
         Value::I64(expr) => {
             let slot = state.allocate_i64_slot();
             program
                 .operations
                 .push(Operation::StoreI64 { slot, value: expr });
-            Value::I64Reference(slot)
+            Value::I64Reference { slot, exclusive }
         }
         Value::F32(expr) => {
             let slot = state.allocate_f32_slot();
             program
                 .operations
                 .push(Operation::StoreF32 { slot, value: expr });
-            Value::F32Reference(slot)
+            Value::F32Reference { slot, exclusive }
         }
         other => other,
     };
@@ -860,25 +860,47 @@ fn lower_reference_set_builtin_statement(
     }
 
     match crate::effect::resolve_value(receiver, &state.environment)? {
-        Value::I32Reference(slot) => {
+        Value::I32Reference {
+            slot,
+            exclusive: true,
+        } => {
             program.operations.push(Operation::StoreI32 {
                 slot,
                 value: lower_i32_expr(value, state)?,
             });
         }
-        Value::I64Reference(slot) => {
+        Value::I64Reference {
+            slot,
+            exclusive: true,
+        } => {
             program.operations.push(Operation::StoreI64 {
                 slot,
                 value: lower_i64_expr(value, state)?,
             });
         }
-        Value::F32Reference(slot) => {
+        Value::F32Reference {
+            slot,
+            exclusive: true,
+        } => {
             program.operations.push(Operation::StoreF32 {
                 slot,
                 value: lower_f32_expr(value, state)?,
             });
         }
         Value::Reference {
+            exclusive: false, ..
+        } => {
+            return Err(Error::Unsupported(
+                "`ref_set` requires an exclusive reference".to_string(),
+            ));
+        }
+        Value::I32Reference {
+            exclusive: false, ..
+        }
+        | Value::I64Reference {
+            exclusive: false, ..
+        }
+        | Value::F32Reference {
             exclusive: false, ..
         } => {
             return Err(Error::Unsupported(

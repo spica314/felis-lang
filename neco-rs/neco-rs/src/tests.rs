@@ -1008,6 +1008,69 @@ fn lowers_reference_builtin_fixture_to_runtime_expression_tree() {
 }
 
 #[test]
+fn rejects_ref_set_through_shared_primitive_reference() {
+    let package = parse_inline_binary_package(
+        "shared-primitive-ref-set",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_set;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let value : i32 = 1i32;
+    #letref value_ref : & i32 #borrow value;
+    ref_set i32 value_ref 2i32;
+    #let _ : () <- IO::exit 0i32;
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject ref_set through a shared primitive reference");
+    assert!(
+        error
+            .to_string()
+            .contains("`ref_set` requires an exclusive reference")
+    );
+}
+
+#[test]
+fn rejects_shared_primitive_reference_for_exclusive_parameter() {
+    let package = parse_inline_binary_package(
+        "shared-primitive-ref-exclusive-parameter",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_set;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn write_ref : (value_ref : &^ i32) -> () #with IO {
+    ref_set i32 value_ref 2i32;
+    ()
+}
+
+#fn main : () #with IO {
+    #let value : i32 = 1i32;
+    #letref value_ref : & i32 #borrow value;
+    write_ref value_ref;
+    #let _ : () <- IO::exit 0i32;
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject a shared primitive reference for an exclusive parameter");
+    assert!(
+        error
+            .to_string()
+            .contains("expected a value of type `&^ i32`")
+    );
+}
+
+#[test]
 fn rejects_reference_and_array_builtins_without_io_effect() {
     let cases = [
         (

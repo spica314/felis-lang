@@ -80,10 +80,10 @@ pub(crate) fn validate_value_against_type(
 
     if let Term::Reference {
         referent,
-        exclusive: _,
+        exclusive,
     } = ty
     {
-        return validate_reference_value_against_type(value, referent, program);
+        return validate_reference_value_against_type(value, referent, *exclusive, program);
     }
 
     match ty {
@@ -148,9 +148,20 @@ fn is_type_argument(term: &Term) -> bool {
 fn validate_reference_value_against_type(
     value: &Value,
     referent: &Term,
+    exclusive: bool,
     program: &LoweredProgram,
 ) -> Result<()> {
-    if let Value::Reference { value, .. } = value {
+    if let Value::Reference {
+        value,
+        exclusive: actual_exclusive,
+    } = value
+    {
+        if exclusive && !actual_exclusive {
+            return Err(Error::Unsupported(format!(
+                "expected a value of type `{}` but got {value:?}",
+                render_reference_term(referent, exclusive)
+            )));
+        }
         return validate_value_against_type(value, referent, program);
     }
 
@@ -165,7 +176,7 @@ fn validate_reference_value_against_type(
             Value::RuntimeArg(_) if element_type == ArrayElementType::U8 => Ok(()),
             _ => Err(Error::Unsupported(format!(
                 "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, false)
+                render_reference_term(referent, exclusive)
             ))),
         };
     }
@@ -180,7 +191,7 @@ fn validate_reference_value_against_type(
             } if *actual_element_type == element_type => Ok(()),
             _ => Err(Error::Unsupported(format!(
                 "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, false)
+                render_reference_term(referent, exclusive)
             ))),
         };
     }
@@ -194,13 +205,13 @@ fn validate_reference_value_against_type(
         else {
             return Err(Error::Unsupported(format!(
                 "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, false)
+                render_reference_term(referent, exclusive)
             )));
         };
         if *actual_element_type != element_type {
             return Err(Error::Unsupported(format!(
                 "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, false)
+                render_reference_term(referent, exclusive)
             )));
         }
         let actual_len = program
@@ -214,7 +225,7 @@ fn validate_reference_value_against_type(
         if actual_len != len {
             return Err(Error::Unsupported(format!(
                 "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, false)
+                render_reference_term(referent, exclusive)
             )));
         }
         return Ok(());
@@ -223,16 +234,46 @@ fn validate_reference_value_against_type(
     match referent {
         Term::Path(path) if path.token_keyword_package.is_none() && path.segments.len() == 1 => {
             match path.segments[0].lexeme.as_str() {
-                "i32" if matches!(value, Value::I32Reference(_)) => Ok(()),
-                "i64" if matches!(value, Value::I64Reference(_)) => Ok(()),
-                "f32" if matches!(value, Value::F32Reference(_)) => Ok(()),
+                "i32"
+                    if matches!(
+                        value,
+                        Value::I32Reference {
+                            exclusive: actual_exclusive,
+                            ..
+                        } if !exclusive || *actual_exclusive
+                    ) =>
+                {
+                    Ok(())
+                }
+                "i64"
+                    if matches!(
+                        value,
+                        Value::I64Reference {
+                            exclusive: actual_exclusive,
+                            ..
+                        } if !exclusive || *actual_exclusive
+                    ) =>
+                {
+                    Ok(())
+                }
+                "f32"
+                    if matches!(
+                        value,
+                        Value::F32Reference {
+                            exclusive: actual_exclusive,
+                            ..
+                        } if !exclusive || *actual_exclusive
+                    ) =>
+                {
+                    Ok(())
+                }
                 "PathBuf" if matches!(value, Value::PathBuf { .. }) => Ok(()),
                 type_name => match value {
                     Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
                     Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
                     _ => Err(Error::Unsupported(format!(
                         "expected a value of type `{}` but got {value:?}",
-                        render_reference_term(referent, false)
+                        render_reference_term(referent, exclusive)
                     ))),
                 },
             }
@@ -241,13 +282,13 @@ fn validate_reference_value_against_type(
             let Term::Path(path) = callee.as_ref() else {
                 return Err(Error::Unsupported(format!(
                     "unsupported reference type `{}`",
-                    render_reference_term(referent, false)
+                    render_reference_term(referent, exclusive)
                 )));
             };
             if path.token_keyword_package.is_some() || path.segments.len() != 1 {
                 return Err(Error::Unsupported(format!(
                     "unsupported reference type `{}`",
-                    render_reference_term(referent, false)
+                    render_reference_term(referent, exclusive)
                 )));
             }
             let type_name = path.segments[0].lexeme.as_str();
@@ -256,13 +297,13 @@ fn validate_reference_value_against_type(
                 Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
                 _ => Err(Error::Unsupported(format!(
                     "expected a value of type `{}` but got {value:?}",
-                    render_reference_term(referent, false)
+                    render_reference_term(referent, exclusive)
                 ))),
             }
         }
         _ => Err(Error::Unsupported(format!(
             "unsupported reference type `{}`",
-            render_reference_term(referent, false)
+            render_reference_term(referent, exclusive)
         ))),
     }
 }

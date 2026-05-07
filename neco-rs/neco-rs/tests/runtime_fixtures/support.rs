@@ -29,6 +29,23 @@ fn compile_fixture(root: &Path, name: &str) -> PathBuf {
     output
 }
 
+pub(super) fn compile_fixture_error(root: &Path, name: &str) -> String {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time")
+        .as_nanos();
+    let output_dir = std::env::temp_dir().join(format!("neco-rs-build-{name}-{unique}"));
+    fs::create_dir_all(&output_dir).expect("create build temp dir");
+    let output = output_dir.join(name);
+
+    let error = compile_path_to_elf(root, &output).expect_err("compile fixture must fail");
+    if output.exists() {
+        fs::remove_file(&output).expect("cleanup failed compile output");
+    }
+    fs::remove_dir(output.parent().expect("build temp dir")).expect("cleanup build temp dir");
+    error.to_string()
+}
+
 fn neco_felis_binary() -> &'static Path {
     NECO_FELIS_BINARY
         .get_or_init(|| {

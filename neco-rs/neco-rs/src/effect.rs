@@ -31,11 +31,20 @@ pub(crate) enum Value {
         slot: usize,
     },
     I32(I32Expr),
-    I32Reference(usize),
+    I32Reference {
+        slot: usize,
+        exclusive: bool,
+    },
     I64(I64Expr),
-    I64Reference(usize),
+    I64Reference {
+        slot: usize,
+        exclusive: bool,
+    },
     F32(F32Expr),
-    F32Reference(usize),
+    F32Reference {
+        slot: usize,
+        exclusive: bool,
+    },
     U8(U8Expr),
     Bool(ConditionExpr),
     Array {

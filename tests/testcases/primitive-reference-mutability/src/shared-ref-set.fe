@@ -1,0 +1,13 @@
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_set;
+#use std_core::primitive::i32::i32;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let value : i32 = 1i32;
+    #letref value_ref : & i32 #borrow value;
+    ref_set i32 value_ref 2i32;
+    #let _ : () <- IO::exit 0i32;
+    ()
+}

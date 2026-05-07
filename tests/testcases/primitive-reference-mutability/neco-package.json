@@ -1,0 +1,7 @@
+{
+    "name": "primitive-reference-mutability",
+    "felis-bin-entrypoints": [
+        "src/shared-ref-set.fe",
+        "src/shared-ref-exclusive-parameter.fe"
+    ]
+}

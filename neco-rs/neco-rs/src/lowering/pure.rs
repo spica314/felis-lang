@@ -361,9 +361,9 @@ fn lower_reference_get_receiver_value(receiver: &Term, state: &LoweringState) ->
     ensure_io_effect_allowed(state, "ref_get")?;
     let value = resolve_value(receiver, &state.environment)?;
     Ok(match value {
-        Value::I32Reference(slot) => Value::I32(I32Expr::Local(slot)),
-        Value::I64Reference(slot) => Value::I64(I64Expr::Local(slot)),
-        Value::F32Reference(slot) => Value::F32(F32Expr::Local(slot)),
+        Value::I32Reference { slot, .. } => Value::I32(I32Expr::Local(slot)),
+        Value::I64Reference { slot, .. } => Value::I64(I64Expr::Local(slot)),
+        Value::F32Reference { slot, .. } => Value::F32(F32Expr::Local(slot)),
         Value::Reference { value, .. } => *value,
         other => other,
     })
@@ -1017,8 +1017,9 @@ fn wrap_reference_parameter(value: Value, ty: &Term) -> Value {
         return value;
     };
     match value {
-        Value::I32Reference(_)
-        | Value::I64Reference(_)
+        Value::I32Reference { .. }
+        | Value::I64Reference { .. }
+        | Value::F32Reference { .. }
         | Value::Reference { .. }
         | Value::StaticSlice { .. }
         | Value::RuntimeArg(_)
