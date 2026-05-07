@@ -57,7 +57,7 @@ fn parses_nested_document() {
 
 #[test]
 fn parses_unicode_escape() {
-    let (_, value) = parse(r#"{"text":"A\u3042\u2605"}"#).expect("json parses");
+    let (_, value) = parse(r#"{"text":"A\u3042\u2605\uD834\uDD1E"}"#).expect("json parses");
 
     let JsonValue::Object(entries) = value else {
         panic!("expected object");
@@ -65,7 +65,7 @@ fn parses_unicode_escape() {
 
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].key, "text");
-    assert_eq!(entries[0].value, JsonValue::String("Aあ★".to_string()));
+    assert_eq!(entries[0].value, JsonValue::String("Aあ★𝄞".to_string()));
 }
 
 #[test]

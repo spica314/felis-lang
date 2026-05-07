@@ -132,8 +132,8 @@ impl Lexer {
                         'r' => value.push('\r'),
                         't' => value.push('\t'),
                         'u' => {
-                            let escaped = self.unicode_escape(start)?;
-                            value.push(escaped);
+                            let escaped = self.unicode_escape_value(start)?;
+                            value.push(self.unicode_escape_char(start, escaped)?);
                         }
                         other => {
                             return Err(Error::new(format!(
@@ -163,7 +163,7 @@ impl Lexer {
         }))
     }
 
-    fn unicode_escape(&mut self, start: usize) -> Result<char> {
+    fn unicode_escape_value(&mut self, start: usize) -> Result<u32> {
         let mut digits = String::new();
         for _ in 0..4 {
             let ch = self.bump_char().ok_or_else(|| {
@@ -183,13 +183,75 @@ impl Lexer {
             digits.push(ch);
         }
         // Four ASCII hex digits are validated above, so this conversion is infallible.
-        let value = u32::from_str_radix(&digits, 16).expect("validated unicode escape");
+        Ok(u32::from_str_radix(&digits, 16).expect("validated unicode escape"))
+    }
+
+    fn unicode_escape_char(&mut self, start: usize, value: u32) -> Result<char> {
+        if (0xd800..=0xdbff).contains(&value) {
+            let low = self.low_surrogate_escape(start)?;
+            let scalar = 0x10000 + ((value - 0xd800) << 10) + (low - 0xdc00);
+            return char::from_u32(scalar).ok_or_else(|| {
+                Error::new("unicode escape is not a valid scalar value").with_span(Span {
+                    start,
+                    end: self.offset,
+                })
+            });
+        }
+
+        if (0xdc00..=0xdfff).contains(&value) {
+            return Err(
+                Error::new("unicode low surrogate must follow a high surrogate").with_span(Span {
+                    start,
+                    end: self.offset,
+                }),
+            );
+        }
+
         char::from_u32(value).ok_or_else(|| {
             Error::new("unicode escape is not a valid scalar value").with_span(Span {
                 start,
                 end: self.offset,
             })
         })
+    }
+
+    fn low_surrogate_escape(&mut self, start: usize) -> Result<u32> {
+        if self.peek_char() != Some('\\') {
+            return Err(
+                Error::new("unicode high surrogate must be followed by low surrogate").with_span(
+                    Span {
+                        start,
+                        end: self.offset,
+                    },
+                ),
+            );
+        }
+        self.bump_char();
+        if self.peek_char() != Some('u') {
+            return Err(
+                Error::new("unicode high surrogate must be followed by low surrogate").with_span(
+                    Span {
+                        start,
+                        end: self.offset,
+                    },
+                ),
+            );
+        }
+        self.bump_char();
+
+        let low = self.unicode_escape_value(start)?;
+        if (0xdc00..=0xdfff).contains(&low) {
+            Ok(low)
+        } else {
+            Err(
+                Error::new("unicode high surrogate must be followed by low surrogate").with_span(
+                    Span {
+                        start,
+                        end: self.offset,
+                    },
+                ),
+            )
+        }
     }
 
     fn keyword(&mut self, start: usize, first: char, tail: &str, kind: TokenKind) -> Result<Token> {

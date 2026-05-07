@@ -118,7 +118,12 @@ fn reports_lexer_error_patterns() {
     );
     assert_parse_error(
         r#""\uD800""#,
-        "unicode escape is not a valid scalar value",
+        "unicode high surrogate must be followed by low surrogate",
+        Span { start: 0, end: 7 },
+    );
+    assert_parse_error(
+        r#""\uDD1E""#,
+        "unicode low surrogate must follow a high surrogate",
         Span { start: 0, end: 7 },
     );
 }
