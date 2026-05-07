@@ -137,6 +137,8 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
             ))
         })?;
 
+    validate_entrypoint_signature(main_fn)?;
+
     if !matches!(main_fn.body.tail.as_deref(), Some(Term::Unit)) {
         return Err(Error::Unsupported(
             "entrypoint body must end with `()`".to_string(),
@@ -184,6 +186,42 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     program.f32_slots = state.next_f32_slot;
 
     Ok(program)
+}
+
+fn validate_entrypoint_signature(function: &neco_rs_parser::FunctionDeclaration) -> Result<()> {
+    if function
+        .effect
+        .as_ref()
+        .is_some_and(|effect| effect.lexeme != "IO")
+    {
+        return Err(Error::Unsupported(format!(
+            "entrypoint `{}` effect must be `IO`",
+            function.name.name
+        )));
+    }
+
+    let mut parameter_count = 0;
+    let mut current = &function.ty;
+    while let Term::Arrow(arrow) = current {
+        parameter_count += 1;
+        current = arrow.result.as_ref();
+    }
+
+    if parameter_count != 0 {
+        return Err(Error::Unsupported(format!(
+            "entrypoint `{}` must not declare parameters",
+            function.name.name
+        )));
+    }
+
+    if !matches!(current, Term::Unit) {
+        return Err(Error::Unsupported(format!(
+            "entrypoint `{}` must declare result type `()`",
+            function.name.name
+        )));
+    }
+
+    Ok(())
 }
 
 fn function_has_io_effect(function: &neco_rs_parser::FunctionDeclaration) -> bool {

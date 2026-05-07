@@ -304,6 +304,20 @@ fn rejects_shared_primitive_reference_exclusive_parameter_fixture() {
 }
 
 #[test]
+fn rejects_entrypoint_parameter_fixture() {
+    let root = repo_root().join("tests/testcases/entrypoint-validation");
+    let error = compile_fixture_error(&root, "entrypoint-parameter");
+    assert!(error.contains("entrypoint `main` must not declare parameters"));
+}
+
+#[test]
+fn rejects_entrypoint_non_unit_result_fixture() {
+    let root = repo_root().join("tests/testcases/entrypoint-validation");
+    let error = compile_fixture_error(&root, "entrypoint-non-unit-result");
+    assert!(error.contains("entrypoint `main` must declare result type `()`"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");
