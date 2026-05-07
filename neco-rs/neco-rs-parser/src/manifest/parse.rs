@@ -7,7 +7,8 @@ use crate::{Error, FilePos, Result, Span};
 use super::model::{Dependency, DependencySource, Manifest, PackageManifest, WorkspaceManifest};
 
 pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
-    let (_, value) = neco_rs_json::parse(raw).map_err(|error| convert_json_error(path, error))?;
+    let (_, value) =
+        neco_rs_json::parse(raw).map_err(|error| convert_json_error(path, raw, error))?;
     let object = expect_object(path, &value, "manifest")?;
 
     let workspace = optional_field(object, "workspace")?;
@@ -185,16 +186,27 @@ fn parse_manifest_path(path: &Path, raw_path: &str, context: &str) -> Result<Pat
     Ok(parsed)
 }
 
-fn convert_json_error(path: &Path, error: neco_rs_json::Error) -> Error {
+fn convert_json_error(path: &Path, raw: &str, error: neco_rs_json::Error) -> Error {
     let mut converted = Error::new(error.message).with_path(path.to_path_buf());
     if let Some(span) = error.span {
         converted = converted.with_span(Span {
-            start: FilePos {
-                r: 0,
-                c: span.start,
-            },
-            end: FilePos { r: 0, c: span.end },
+            start: offset_to_file_pos(raw, span.start),
+            end: offset_to_file_pos(raw, span.end),
         });
     }
     converted
+}
+
+fn offset_to_file_pos(raw: &str, offset: usize) -> FilePos {
+    let mut r = 0;
+    let mut c = 0;
+    for ch in raw.chars().take(offset) {
+        if ch == '\n' {
+            r += 1;
+            c = 0;
+        } else {
+            c += 1;
+        }
+    }
+    FilePos { r, c }
 }

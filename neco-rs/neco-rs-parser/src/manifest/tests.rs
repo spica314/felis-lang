@@ -54,6 +54,24 @@ fn rejects_non_workspace_dependency_entries() {
 }
 
 #[test]
+fn reports_multiline_json_error_positions() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+  "name": @
+}"#,
+    ) {
+        Ok(_) => panic!("manifest should reject invalid JSON"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error.to_string().contains("neco-package.json:1:10..1:11"),
+        "unexpected error: {error:?}"
+    );
+}
+
+#[test]
 fn parses_workspace_manifest_without_serde() {
     let manifest = parse_manifest(
         Path::new("neco-package.json"),
