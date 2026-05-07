@@ -67,6 +67,7 @@ pub fn parse_root(path: impl AsRef<Path>) -> Result<ParsedRoot> {
                 .ok_or_else(|| Error::new("workspace manifest has no parent directory"))?
                 .to_path_buf();
             let mut packages = Vec::new();
+            let mut package_names = HashSet::new();
             for member in &manifest.members {
                 let member_root = root_dir.join(member);
                 let member_manifest = member_root.join("neco-package.json");
@@ -80,6 +81,13 @@ pub fn parse_root(path: impl AsRef<Path>) -> Result<ParsedRoot> {
                             .with_path(member_manifest));
                     }
                 };
+                if !package_names.insert(member_manifest_data.name.clone()) {
+                    return Err(Error::new(format!(
+                        "duplicate workspace package name `{}`",
+                        member_manifest_data.name
+                    ))
+                    .with_path(member_manifest));
+                }
                 packages.push(parse_package(
                     member_root,
                     member_manifest,

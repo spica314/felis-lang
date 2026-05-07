@@ -35,6 +35,18 @@ fn parses_std_workspace() {
 }
 
 #[test]
+fn rejects_duplicate_workspace_package_names() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/duplicate-package-names");
+    let error = parse_root(&root).expect_err("workspace should reject duplicate package names");
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate workspace package name `duplicate`"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn parses_ascii_char_literals() {
     let source = r#"
 #fn first_char : u8 {

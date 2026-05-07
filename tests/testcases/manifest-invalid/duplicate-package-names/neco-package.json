@@ -1,0 +1,8 @@
+{
+    "workspace": {
+        "members": [
+            "first",
+            "second"
+        ]
+    }
+}
