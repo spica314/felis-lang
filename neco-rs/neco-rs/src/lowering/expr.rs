@@ -998,9 +998,9 @@ fn dyn_array_get_call_parts<'a>(
         return Ok(None);
     }
     if normalized.len() != 3 {
-        return Err(Error::Unsupported(format!(
-            "`dyn_array_get` must receive exactly three arguments"
-        )));
+        return Err(Error::Unsupported(
+            "`dyn_array_get` must receive exactly three arguments".to_string(),
+        ));
     }
     if !type_argument_matches(&arguments[0], expected_element_type, state) {
         return Ok(None);

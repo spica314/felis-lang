@@ -86,7 +86,6 @@ fn program_syscall_code(
         &mut code,
         program,
         &addresses,
-        argv_global_address,
         None,
         None,
     );
@@ -99,7 +98,6 @@ fn emit_operations(
     code: &mut Vec<u8>,
     program: &LoweredProgram,
     addresses: &[u64],
-    argv_global_address: Option<u64>,
     mut break_patches: Option<&mut Vec<usize>>,
     mut continue_patches: Option<&mut Vec<usize>>,
 ) {
@@ -312,7 +310,6 @@ fn emit_operations(
                     code,
                     program,
                     addresses,
-                    argv_global_address,
                     break_patches.as_deref_mut(),
                     continue_patches.as_deref_mut(),
                 );
@@ -329,7 +326,6 @@ fn emit_operations(
                         code,
                         program,
                         addresses,
-                        argv_global_address,
                         break_patches.as_deref_mut(),
                         continue_patches.as_deref_mut(),
                     );
@@ -369,7 +365,6 @@ fn emit_operations(
                     code,
                     program,
                     addresses,
-                    argv_global_address,
                     Some(&mut loop_break_patches),
                     Some(&mut loop_continue_patches),
                 );

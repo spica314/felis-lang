@@ -724,8 +724,8 @@ fn lower_array_set_statement(
             };
             program.operations.push(Operation::ArraySetI32 {
                 array_slot: slot,
-                index: lower_array_index_expr(&index, state)?,
-                value: lower_i32_expr(&value, state)?,
+                index: lower_array_index_expr(index, state)?,
+                value: lower_i32_expr(value, state)?,
             });
         }
         Value::Array {
@@ -740,8 +740,8 @@ fn lower_array_set_statement(
             };
             program.operations.push(Operation::ArraySetI64 {
                 array_slot: slot,
-                index: lower_array_index_expr(&index, state)?,
-                value: lower_i64_expr(&value, state)?,
+                index: lower_array_index_expr(index, state)?,
+                value: lower_i64_expr(value, state)?,
             });
         }
         Value::Array {
@@ -756,8 +756,8 @@ fn lower_array_set_statement(
             };
             program.operations.push(Operation::ArraySetF32 {
                 array_slot: slot,
-                index: lower_array_index_expr(&index, state)?,
-                value: lower_f32_expr(&value, state)?,
+                index: lower_array_index_expr(index, state)?,
+                value: lower_f32_expr(value, state)?,
             });
         }
         Value::Array {
@@ -772,8 +772,8 @@ fn lower_array_set_statement(
             };
             program.operations.push(Operation::ArraySetU8 {
                 array_slot: slot,
-                index: lower_array_index_expr(&index, state)?,
-                value: lower_u8_expr(&value, state)?,
+                index: lower_array_index_expr(index, state)?,
+                value: lower_u8_expr(value, state)?,
             });
         }
         other => {
