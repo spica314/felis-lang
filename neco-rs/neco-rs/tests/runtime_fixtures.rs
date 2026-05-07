@@ -318,6 +318,13 @@ fn rejects_entrypoint_non_unit_result_fixture() {
 }
 
 #[test]
+fn rejects_multiple_entrypoints_fixture() {
+    let root = repo_root().join("tests/testcases/entrypoint-validation");
+    let error = compile_fixture_error(&root, "multiple-entrypoints");
+    assert!(error.contains("multiple #entrypoint declarations are not supported: main, fallback"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");

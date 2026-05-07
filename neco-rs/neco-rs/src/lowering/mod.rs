@@ -113,22 +113,33 @@ pub(super) fn allocate_heap_slot(program: &mut LoweredProgram) -> usize {
 }
 
 pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<LoweredProgram> {
-    let entrypoint_name = package
+    let entrypoint_names = package
         .source_files
         .iter()
         .flat_map(|file| file.syntax.items.iter())
-        .find_map(|item| match item {
+        .filter_map(|item| match item {
             Item::EntryPoint(entrypoint) => Some(entrypoint.token_ident.lexeme.as_str()),
             _ => None,
         })
-        .ok_or_else(|| Error::Unsupported("missing #entrypoint declaration".to_string()))?;
+        .collect::<Vec<_>>();
+    let [entrypoint_name] = entrypoint_names.as_slice() else {
+        return match entrypoint_names.as_slice() {
+            [] => Err(Error::Unsupported(
+                "missing #entrypoint declaration".to_string(),
+            )),
+            names => Err(Error::Unsupported(format!(
+                "multiple #entrypoint declarations are not supported: {}",
+                names.join(", ")
+            ))),
+        };
+    };
 
     let main_fn = package
         .source_files
         .iter()
         .flat_map(|file| file.syntax.items.iter())
         .find_map(|item| match item {
-            Item::Function(function) if function.name.name == entrypoint_name => Some(function),
+            Item::Function(function) if function.name.name == *entrypoint_name => Some(function),
             _ => None,
         })
         .ok_or_else(|| {

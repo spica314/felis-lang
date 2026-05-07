@@ -2,6 +2,7 @@
     "name": "entrypoint-validation",
     "felis-bin-entrypoints": [
         "src/entrypoint-parameter.fe",
-        "src/entrypoint-non-unit-result.fe"
+        "src/entrypoint-non-unit-result.fe",
+        "src/multiple-entrypoints.fe"
     ]
 }

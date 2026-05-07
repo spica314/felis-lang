@@ -1,0 +1,10 @@
+#entrypoint main;
+#entrypoint fallback;
+
+#fn main : () {
+    ()
+}
+
+#fn fallback : () {
+    ()
+}
