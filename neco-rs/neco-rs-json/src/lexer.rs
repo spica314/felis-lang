@@ -44,7 +44,8 @@ impl Lexer {
 
     pub(crate) fn lex(&mut self) -> Result<Vec<Token>> {
         let mut tokens = Vec::new();
-        while self.skip_trivia() {
+        loop {
+            self.skip_trivia();
             if self.is_eof() {
                 break;
             }
@@ -61,7 +62,7 @@ impl Lexer {
         Ok(tokens)
     }
 
-    fn skip_trivia(&mut self) -> bool {
+    fn skip_trivia(&mut self) {
         while let Some(ch) = self.peek_char() {
             if ch.is_whitespace() {
                 self.bump_char();
@@ -69,7 +70,6 @@ impl Lexer {
                 break;
             }
         }
-        true
     }
 
     fn next_token(&mut self) -> Result<Token> {
