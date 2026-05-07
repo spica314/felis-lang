@@ -56,6 +56,14 @@ fn reports_non_digit_after_minus() {
 }
 
 #[test]
+fn reports_leading_zero_number() {
+    let error = parse("01").expect_err("parse should fail");
+
+    assert_eq!(error.message, "leading zero is not allowed");
+    assert_eq!(error.span, Some(Span { start: 0, end: 2 }));
+}
+
+#[test]
 fn reports_parser_error_patterns() {
     assert_parse_error(
         r#"{true:1}"#,

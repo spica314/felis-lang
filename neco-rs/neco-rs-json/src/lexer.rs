@@ -222,7 +222,7 @@ impl Lexer {
     }
 
     fn number_literal(&mut self, start: usize, first: char) -> Result<Token> {
-        if first == '-' {
+        let first_digit = if first == '-' {
             let next = self.peek_char().ok_or_else(|| {
                 Error::new("expected digit after `-`").with_span(Span {
                     start,
@@ -235,9 +235,23 @@ impl Lexer {
                     end: self.offset,
                 }));
             }
-        }
+            self.bump_char();
+            next
+        } else {
+            first
+        };
 
-        self.consume_digits();
+        if first_digit == '0' {
+            if self.peek_char().is_some_and(|ch| ch.is_ascii_digit()) {
+                self.bump_char();
+                return Err(Error::new("leading zero is not allowed").with_span(Span {
+                    start,
+                    end: self.offset,
+                }));
+            }
+        } else {
+            self.consume_digits();
+        }
 
         if self.peek_char() == Some('.') {
             self.bump_char();
