@@ -15,10 +15,12 @@ impl Parser {
             TokenKind::LeftBrace => self.parse_object(),
             TokenKind::LeftBracket => self.parse_array(),
             TokenKind::String(value) => {
+                let value = value.clone();
                 self.cursor += 1;
                 Ok(JsonValue::String(value))
             }
             TokenKind::Number(value) => {
+                let value = value.clone();
                 self.cursor += 1;
                 Ok(JsonValue::Number(value))
             }
@@ -50,13 +52,14 @@ impl Parser {
         self.expect_punctuation(TokenKind::LeftBrace)?;
         let mut entries = Vec::new();
 
-        if self.consume_punctuation(TokenKind::RightBrace) {
+        if self.consume_punctuation(&TokenKind::RightBrace) {
             return Ok(JsonValue::Object(entries));
         }
 
         loop {
             let key = match self.peek_kind() {
                 TokenKind::String(value) => {
+                    let value = value.clone();
                     self.cursor += 1;
                     value
                 }
@@ -66,7 +69,7 @@ impl Parser {
             let value = self.parse_value()?;
             entries.push(JsonEntry { key, value });
 
-            if self.consume_punctuation(TokenKind::Comma) {
+            if self.consume_punctuation(&TokenKind::Comma) {
                 continue;
             }
             self.expect_punctuation(TokenKind::RightBrace)?;
@@ -80,13 +83,13 @@ impl Parser {
         self.expect_punctuation(TokenKind::LeftBracket)?;
         let mut values = Vec::new();
 
-        if self.consume_punctuation(TokenKind::RightBracket) {
+        if self.consume_punctuation(&TokenKind::RightBracket) {
             return Ok(JsonValue::Array(values));
         }
 
         loop {
             values.push(self.parse_value()?);
-            if self.consume_punctuation(TokenKind::Comma) {
+            if self.consume_punctuation(&TokenKind::Comma) {
                 continue;
             }
             self.expect_punctuation(TokenKind::RightBracket)?;
@@ -96,14 +99,14 @@ impl Parser {
         Ok(JsonValue::Array(values))
     }
 
-    fn peek_kind(&self) -> TokenKind {
+    fn peek_kind(&self) -> &TokenKind {
         self.tokens
             .get(self.cursor)
-            .map(|token| token.kind.clone())
-            .unwrap_or(TokenKind::EndOfFile)
+            .map(|token| &token.kind)
+            .unwrap_or(&TokenKind::EndOfFile)
     }
 
-    fn consume_punctuation(&mut self, expected: TokenKind) -> bool {
+    fn consume_punctuation(&mut self, expected: &TokenKind) -> bool {
         if self.peek_kind() == expected {
             self.cursor += 1;
             true
@@ -113,7 +116,7 @@ impl Parser {
     }
 
     fn expect_punctuation(&mut self, expected: TokenKind) -> Result<()> {
-        if self.consume_punctuation(expected.clone()) {
+        if self.consume_punctuation(&expected) {
             Ok(())
         } else {
             Err(self.error_here(format!("expected `{}`", punctuation_name(&expected))))
