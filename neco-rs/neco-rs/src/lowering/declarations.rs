@@ -78,10 +78,13 @@ pub(super) fn collect_pure_functions(
             if function.effect.is_some() {
                 continue;
             }
-            functions.insert(
-                function.name.name.clone(),
-                pure_function_from_decl(function)?,
-            );
+            let name = function.name.name.clone();
+            let value = pure_function_from_decl(function)?;
+            if functions.insert(name.clone(), value).is_some() {
+                return Err(Error::Unsupported(format!(
+                    "duplicate function `{name}` is not supported"
+                )));
+            }
         }
     }
     Ok(functions)
@@ -100,10 +103,13 @@ pub(super) fn collect_statement_functions(
             let Item::Function(function) = item else {
                 continue;
             };
-            functions.insert(
-                function.name.name.clone(),
-                statement_function_from_decl(function)?,
-            );
+            let name = function.name.name.clone();
+            let value = statement_function_from_decl(function)?;
+            if functions.insert(name.clone(), value).is_some() {
+                return Err(Error::Unsupported(format!(
+                    "duplicate function `{name}` is not supported"
+                )));
+            }
         }
     }
     Ok(functions)

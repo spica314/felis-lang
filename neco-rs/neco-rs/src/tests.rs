@@ -235,6 +235,74 @@ fn rejects_duplicate_struct_fields() {
 }
 
 #[test]
+fn rejects_duplicate_pure_functions() {
+    let package = parse_inline_binary_package(
+        "duplicate-pure-functions",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn answer : i32 {
+    1i32
+}
+
+#fn answer : i32 {
+    2i32
+}
+
+#fn main : () #with IO {
+    #let _ : () <- IO::exit 0i32;
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject duplicate pure functions");
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate function `answer` is not supported"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn rejects_duplicate_statement_functions() {
+    let package = parse_inline_binary_package(
+        "duplicate-statement-functions",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn write_once : () #with IO {
+    ()
+}
+
+#fn write_once : () #with IO {
+    ()
+}
+
+#fn main : () #with IO {
+    #let _ : () <- IO::exit 0i32;
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject duplicate statement functions");
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate function `write_once` is not supported"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn lowers_hello_world_fixture_to_program() {
     let root = repo_root().join("tests/testcases/hello-world");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
