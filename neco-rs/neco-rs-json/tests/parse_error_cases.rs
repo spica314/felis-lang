@@ -61,6 +61,12 @@ fn reports_leading_zero_number() {
 
     assert_eq!(error.message, "leading zero is not allowed");
     assert_eq!(error.span, Some(Span { start: 0, end: 2 }));
+
+    assert_parse_error(
+        "-01",
+        "leading zero is not allowed",
+        Span { start: 0, end: 3 },
+    );
 }
 
 #[test]
