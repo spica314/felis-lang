@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use neco_rs_parser::{
     ArrowParameter, Block, ConstructorDeclaration, DeclaredName, FunctionDeclaration, Item,
@@ -160,7 +160,7 @@ pub(super) fn collect_structs(
             let Item::Struct(struct_decl) = item else {
                 continue;
             };
-            let signature = struct_signature_from_decl(struct_decl);
+            let signature = struct_signature_from_decl(struct_decl)?;
             if structs
                 .insert(signature.type_name.clone(), signature)
                 .is_some()
@@ -175,19 +175,28 @@ pub(super) fn collect_structs(
     Ok(structs)
 }
 
-fn struct_signature_from_decl(struct_decl: &StructDeclaration) -> StructSignature {
-    StructSignature {
+fn struct_signature_from_decl(struct_decl: &StructDeclaration) -> Result<StructSignature> {
+    let mut field_names = HashSet::new();
+    let mut fields = Vec::new();
+    for field in &struct_decl.fields {
+        let name = field.token_ident.lexeme.clone();
+        if !field_names.insert(name.clone()) {
+            return Err(Error::Unsupported(format!(
+                "duplicate field `{name}` in struct `{}`",
+                struct_decl.name.name
+            )));
+        }
+        fields.push(StructFieldSignature {
+            name,
+            ty: field.ty.clone(),
+        });
+    }
+
+    Ok(StructSignature {
         type_name: struct_decl.name.name.clone(),
         is_rc: struct_decl.modifier.as_deref() == Some("rc"),
-        fields: struct_decl
-            .fields
-            .iter()
-            .map(|field| StructFieldSignature {
-                name: field.token_ident.lexeme.clone(),
-                ty: field.ty.clone(),
-            })
-            .collect(),
-    }
+        fields,
+    })
 }
 
 fn constructor_parameters(

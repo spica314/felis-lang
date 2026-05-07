@@ -204,6 +204,37 @@ fn rejects_array_method_len() {
 }
 
 #[test]
+fn rejects_duplicate_struct_fields() {
+    let package = parse_inline_binary_package(
+        "duplicate-struct-fields",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#struct Span : Type[0] {
+    start : i32,
+    start : i32,
+}
+
+#fn main : () #with IO {
+    #let _ : () <- IO::exit 0i32;
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject duplicate struct fields");
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate field `start` in struct `Span`"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn lowers_hello_world_fixture_to_program() {
     let root = repo_root().join("tests/testcases/hello-world");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
