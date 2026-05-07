@@ -3,7 +3,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use neco_rs_parser::{ParsedPackage, ParsedRoot};
+use neco_rs_parser::{ParsedPackage, ParsedRoot, ParsedWorkspace};
 
 use crate::{Error, Result};
 
@@ -11,19 +11,13 @@ pub(crate) fn select_package_for_build(parsed: ParsedRoot, output: &Path) -> Res
     match parsed {
         ParsedRoot::Package(package) => select_binary_from_package(package, output),
         ParsedRoot::Workspace(workspace) => {
-            let binary_packages: Vec<_> = workspace
-                .packages
-                .into_iter()
-                .filter(|package| !package.manifest.felis_bin_entrypoints.is_empty())
-                .collect();
+            let mut binary_packages = workspace_binary_packages(workspace);
 
             match binary_packages.len() {
                 0 => Err(Error::Unsupported(
                     "workspace root does not contain a binary package".to_string(),
                 )),
-                1 => {
-                    select_binary_from_package(binary_packages.into_iter().next().unwrap(), output)
-                }
+                1 => select_binary_from_package(binary_packages.remove(0), output),
                 _ => {
                     let output_name = output_selection_name(output);
                     let matches = binary_packages
@@ -50,23 +44,27 @@ pub(crate) fn select_package_for_default_build(parsed: ParsedRoot) -> Result<Par
     match parsed {
         ParsedRoot::Package(package) => select_default_binary_from_package(package),
         ParsedRoot::Workspace(workspace) => {
-            let binary_packages: Vec<_> = workspace
-                .packages
-                .into_iter()
-                .filter(|package| !package.manifest.felis_bin_entrypoints.is_empty())
-                .collect();
+            let mut binary_packages = workspace_binary_packages(workspace);
 
             match binary_packages.len() {
                 0 => Err(Error::Unsupported(
                     "workspace root does not contain a binary package".to_string(),
                 )),
-                1 => select_default_binary_from_package(binary_packages.into_iter().next().unwrap()),
+                1 => select_default_binary_from_package(binary_packages.remove(0)),
                 _ => Err(Error::Unsupported(
                     "workspace root resolves to multiple binary packages; choose an output path that identifies the target package".to_string(),
                 )),
             }
         }
     }
+}
+
+fn workspace_binary_packages(workspace: ParsedWorkspace) -> Vec<ParsedPackage> {
+    workspace
+        .packages
+        .into_iter()
+        .filter(|package| !package.manifest.felis_bin_entrypoints.is_empty())
+        .collect()
 }
 
 pub(crate) fn select_binary_from_package(
