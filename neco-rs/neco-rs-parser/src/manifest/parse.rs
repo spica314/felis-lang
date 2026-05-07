@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use neco_rs_json::{JsonEntry, JsonValue};
 
@@ -31,19 +31,21 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
             let workspace = expect_object(path, workspace, "`workspace`")?;
             let members = required_string_array_field(path, workspace, "members")?
                 .into_iter()
-                .map(PathBuf::from)
-                .collect();
+                .map(|member| parse_manifest_path(path, &member, "workspace member"))
+                .collect::<Result<Vec<_>>>()?;
 
             Ok(Manifest::Workspace(WorkspaceManifest { members }))
         }
         (None, Some(name)) => Ok(Manifest::Package(PackageManifest {
             name,
             dependencies: parse_dependencies(path, dependencies)?,
-            felis_lib_entrypoint: felis_lib_entrypoint.map(PathBuf::from),
+            felis_lib_entrypoint: felis_lib_entrypoint
+                .map(|entrypoint| parse_manifest_path(path, &entrypoint, "library entrypoint"))
+                .transpose()?,
             felis_bin_entrypoints: felis_bin_entrypoints
                 .into_iter()
-                .map(PathBuf::from)
-                .collect(),
+                .map(|entrypoint| parse_manifest_path(path, &entrypoint, "binary entrypoint"))
+                .collect::<Result<Vec<_>>>()?,
         })),
         (Some(_), Some(_)) => Err(
             Error::new("manifest cannot be both a workspace and a package")
@@ -164,6 +166,23 @@ fn expect_string_array(value: &JsonValue, context: &str) -> Result<Vec<String>> 
         .iter()
         .map(|value| expect_string(value, context))
         .collect()
+}
+
+fn parse_manifest_path(path: &Path, raw_path: &str, context: &str) -> Result<PathBuf> {
+    let parsed = PathBuf::from(raw_path);
+    let escapes_root = parsed.components().any(|component| {
+        matches!(
+            component,
+            Component::Prefix(_) | Component::RootDir | Component::ParentDir
+        )
+    });
+    if escapes_root {
+        return Err(Error::new(format!(
+            "{context} path `{raw_path}` must stay within the manifest root"
+        ))
+        .with_path(path.to_path_buf()));
+    }
+    Ok(parsed)
 }
 
 fn convert_json_error(path: &Path, error: neco_rs_json::Error) -> Error {

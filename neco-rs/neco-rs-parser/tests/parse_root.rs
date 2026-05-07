@@ -47,6 +47,42 @@ fn rejects_duplicate_workspace_package_names() {
 }
 
 #[test]
+fn rejects_absolute_workspace_member_paths() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/absolute-member-path");
+    let error = parse_root(&root).expect_err("workspace should reject absolute member paths");
+    assert!(
+        error
+            .to_string()
+            .contains("workspace member path `/tmp/outside` must stay within the manifest root"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn rejects_parent_workspace_member_paths() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/parent-member-path");
+    let error = parse_root(&root).expect_err("workspace should reject parent member paths");
+    assert!(
+        error
+            .to_string()
+            .contains("workspace member path `../outside` must stay within the manifest root"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn rejects_entrypoint_paths_that_escape_package_roots() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/parent-entrypoint-path");
+    let error = parse_root(&root).expect_err("package should reject escaping entrypoint paths");
+    assert!(
+        error
+            .to_string()
+            .contains("binary entrypoint path `../main.fe` must stay within the manifest root"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn parses_ascii_char_literals() {
     let source = r#"
 #fn first_char : u8 {

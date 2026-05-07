@@ -1,0 +1,6 @@
+{
+    "name": "parent-entrypoint-path",
+    "felis-bin-entrypoints": [
+        "../main.fe"
+    ]
+}
