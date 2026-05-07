@@ -1,0 +1,21 @@
+#use std_core::io::IO;
+#use std_core::primitive::bool::bool_and;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::i64::i64;
+#use std_core::primitive::i64::i64_eq;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let i32_min_hex : i32 = -0x80000000i32;
+    #let i32_min_dec : i32 = -2147483648i32;
+    #let i64_min_hex : i64 = -0x8000000000000000i64;
+    #let i64_min_dec : i64 = -9223372036854775808i64;
+
+    #if bool_and (i32_eq i32_min_hex i32_min_dec) (i64_eq i64_min_hex i64_min_dec) {
+        #let _ : () <- IO::exit 42i32;
+    };
+    #let _ : () <- IO::exit 1i32;
+    ()
+}

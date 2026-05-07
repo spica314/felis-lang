@@ -1,0 +1,4 @@
+{
+    "name": "signed-hex-literals",
+    "felis-bin-entrypoints": ["src/signed-hex-literals.fe"]
+}

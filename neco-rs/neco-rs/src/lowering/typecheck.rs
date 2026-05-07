@@ -469,7 +469,7 @@ fn parse_u8_digits(digits: &str, original: &str) -> Result<u8> {
     })
 }
 
-fn parse_prefixed_i32_digits(digits: &str) -> std::result::Result<i32, std::num::ParseIntError> {
+fn parse_prefixed_i32_digits(digits: &str) -> std::result::Result<i32, ()> {
     let original = digits;
     let (negative, digits) = if let Some(rest) = digits.strip_prefix('-') {
         (true, rest)
@@ -480,13 +480,18 @@ fn parse_prefixed_i32_digits(digits: &str) -> std::result::Result<i32, std::num:
         .strip_prefix("0x")
         .or_else(|| digits.strip_prefix("0X"))
     {
-        i32::from_str_radix(hex, 16).map(|value| if negative { -value } else { value })
+        if negative {
+            let magnitude = i64::from_str_radix(hex, 16).map_err(|_| ())?;
+            i32::try_from(-magnitude).map_err(|_| ())
+        } else {
+            i32::from_str_radix(hex, 16).map_err(|_| ())
+        }
     } else {
-        original.parse::<i32>()
+        original.parse::<i32>().map_err(|_| ())
     }
 }
 
-fn parse_prefixed_i64_digits(digits: &str) -> std::result::Result<i64, std::num::ParseIntError> {
+fn parse_prefixed_i64_digits(digits: &str) -> std::result::Result<i64, ()> {
     let original = digits;
     let (negative, digits) = if let Some(rest) = digits.strip_prefix('-') {
         (true, rest)
@@ -497,20 +502,30 @@ fn parse_prefixed_i64_digits(digits: &str) -> std::result::Result<i64, std::num:
         .strip_prefix("0x")
         .or_else(|| digits.strip_prefix("0X"))
     {
-        i64::from_str_radix(hex, 16).map(|value| if negative { -value } else { value })
+        if negative {
+            let magnitude = u64::from_str_radix(hex, 16).map_err(|_| ())?;
+            if magnitude == 1_u64 << 63 {
+                Ok(i64::MIN)
+            } else {
+                let value = i64::try_from(magnitude).map_err(|_| ())?;
+                Ok(-value)
+            }
+        } else {
+            i64::from_str_radix(hex, 16).map_err(|_| ())
+        }
     } else {
-        original.parse::<i64>()
+        original.parse::<i64>().map_err(|_| ())
     }
 }
 
-fn parse_prefixed_u8_digits(digits: &str) -> std::result::Result<u8, std::num::ParseIntError> {
+fn parse_prefixed_u8_digits(digits: &str) -> std::result::Result<u8, ()> {
     if let Some(hex) = digits
         .strip_prefix("0x")
         .or_else(|| digits.strip_prefix("0X"))
     {
-        u8::from_str_radix(hex, 16)
+        u8::from_str_radix(hex, 16).map_err(|_| ())
     } else {
-        digits.parse::<u8>()
+        digits.parse::<u8>().map_err(|_| ())
     }
 }
 

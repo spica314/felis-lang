@@ -333,6 +333,13 @@ fn compiles_and_runs_hex_literals_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_signed_hex_literals_fixture() {
+    let root = repo_root().join("tests/testcases/signed-hex-literals");
+    let status = run_fixture_status(&root, "signed-hex-literals");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_comments_basic_fixture() {
     let root = repo_root().join("tests/testcases/comments-basic");
     let run = run_fixture_output(&root, "comments-basic");
