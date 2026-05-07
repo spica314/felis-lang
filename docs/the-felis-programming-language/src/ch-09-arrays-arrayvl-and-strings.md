@@ -5,7 +5,7 @@
 Fixed-size arrays are written as `Array T N`. Examples that allocate arrays through IO now return the array value, which can then be used as an `&^ Array T N` by borrowing.
 
 ```felis
-#let array_ref : Array i32 4i32 #with IO <- IO::array_new i32 4i32;
+#let array_ref : Array i32 4i32 <- IO::array_new i32 4i32;
 array_set array_ref 0i32 7i32;
 array_set array_ref 1i32 14i32;
 #let first : i32 = array_get array_ref 0i32;
@@ -26,7 +26,7 @@ Array references can be used as function parameters.
 `ArrayVL T` represents a runtime-sized region. Allocate one with `IO::arrayvl_new`.
 
 ```felis
-#let arrayvl : ArrayVL u8 #with IO <- IO::arrayvl_new u8 42i32;
+#let arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 42i32;
 #letref #excl arrayvl_ref : &^ ArrayVL u8 #borrow arrayvl;
 #let len : i32 = array_len arrayvl_ref;
 ```
@@ -47,7 +47,7 @@ String literals can be used as `& ArrayVL u8`.
 #use std_core::primitive::array::dyn_array_len;
 #use std_core::primitive::array::dyn_array_push;
 
-#let bytes_arrayvl : ArrayVL u8 #with IO <- IO::arrayvl_new u8 1i32;
+#let bytes_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 1i32;
 #letref #excl bytes_arrayvl_ref : &^ ArrayVL u8 #borrow bytes_arrayvl;
 #let bytes : DynArray u8 = DynArray::dyn_array u8 bytes_arrayvl 0i64;
 dyn_array_push u8 bytes 1u8;
@@ -76,7 +76,7 @@ Use `dyn_array_capacity` to read the current capacity.
 Use `string_from_arrayvl_parts` to create a string from existing `ArrayVL` storage. Use `string_with_len` to create a length-bounded string view.
 
 ```felis
-#let arrayvl : ArrayVL u8 #with IO <- IO::arrayvl_new u8 4i32;
+#let arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 4i32;
 #letref #excl arrayvl_ref : &^ ArrayVL u8 #borrow arrayvl;
 #let empty : String = string_from_arrayvl_parts arrayvl 4i32 0i32;
 #let name_len : i32 = 0i32;
