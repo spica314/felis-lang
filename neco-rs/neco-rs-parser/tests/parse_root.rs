@@ -63,3 +63,18 @@ fn rejects_non_ascii_char_literals() {
         "unexpected error: {error}"
     );
 }
+
+#[test]
+fn rejects_unterminated_block_comment() {
+    let source = r#"
+#fn main : i32 {
+    42i32
+}
+/* missing close
+"#;
+    let error = parse_source(source).expect_err("source should fail");
+    assert!(
+        error.to_string().contains("unterminated block comment"),
+        "unexpected error: {error}"
+    );
+}

@@ -2,7 +2,7 @@ use crate::{Error, Result};
 
 use super::*;
 
-pub fn skip_trivia(chars: &[char], i: &mut usize, r: &mut usize, c: &mut usize) {
+pub fn skip_trivia(chars: &[char], i: &mut usize, r: &mut usize, c: &mut usize) -> Result<()> {
     while *i < chars.len() {
         if chars[*i].is_whitespace() {
             if chars[*i] == '\n' {
@@ -30,6 +30,7 @@ pub fn skip_trivia(chars: &[char], i: &mut usize, r: &mut usize, c: &mut usize) 
         }
 
         if chars[*i..].starts_with(&['/', '*']) {
+            let start = FilePos { r: *r, c: *c };
             *i += 2;
             *c += 2;
             while *i < chars.len() && !chars[*i..].starts_with(&['*', '/']) {
@@ -44,12 +45,21 @@ pub fn skip_trivia(chars: &[char], i: &mut usize, r: &mut usize, c: &mut usize) 
             if *i < chars.len() {
                 *i += 2;
                 *c += 2;
+            } else {
+                return Err(Error::MessageWithSpan(
+                    "unterminated block comment".to_string(),
+                    Span {
+                        start,
+                        end: FilePos { r: *r, c: *c },
+                    },
+                ));
             }
             continue;
         }
 
         break;
     }
+    Ok(())
 }
 
 pub(crate) fn lex(source: &str) -> Result<Vec<Token>> {
@@ -61,7 +71,7 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>> {
     let mut c = 0;
 
     while i < chars.len() {
-        skip_trivia(&chars, &mut i, &mut r, &mut c);
+        skip_trivia(&chars, &mut i, &mut r, &mut c)?;
         if i == chars.len() {
             break;
         }
