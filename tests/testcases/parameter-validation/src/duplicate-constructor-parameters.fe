@@ -1,0 +1,11 @@
+#use std_core::primitive::i32::i32;
+
+#type Pair : Type[0] {
+    pair : (value : i32) -> (value : i32) -> Pair,
+}
+
+#entrypoint main;
+
+#fn main : () {
+    ()
+}

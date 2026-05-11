@@ -374,6 +374,27 @@ fn rejects_struct_and_type_name_collision_fixture() {
 }
 
 #[test]
+fn rejects_duplicate_pure_function_parameters_fixture() {
+    let root = repo_root().join("tests/testcases/parameter-validation");
+    let error = compile_fixture_error(&root, "duplicate-pure-function-parameters");
+    assert!(error.contains("duplicate parameter `value` in function `pick`"));
+}
+
+#[test]
+fn rejects_duplicate_io_function_parameters_fixture() {
+    let root = repo_root().join("tests/testcases/parameter-validation");
+    let error = compile_fixture_error(&root, "duplicate-io-function-parameters");
+    assert!(error.contains("duplicate parameter `value` in function `write_value`"));
+}
+
+#[test]
+fn rejects_duplicate_constructor_parameters_fixture() {
+    let root = repo_root().join("tests/testcases/parameter-validation");
+    let error = compile_fixture_error(&root, "duplicate-constructor-parameters");
+    assert!(error.contains("duplicate parameter `value` in constructor `pair`"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");

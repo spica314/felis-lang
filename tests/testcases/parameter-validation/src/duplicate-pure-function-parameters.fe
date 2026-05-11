@@ -1,0 +1,11 @@
+#use std_core::primitive::i32::i32;
+
+#fn pick : (value : i32) -> (value : i32) -> i32 {
+    value
+}
+
+#entrypoint main;
+
+#fn main : () {
+    ()
+}

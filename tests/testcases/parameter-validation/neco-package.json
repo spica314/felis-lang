@@ -1,0 +1,8 @@
+{
+    "name": "parameter-validation",
+    "felis-bin-entrypoints": [
+        "src/duplicate-pure-function-parameters.fe",
+        "src/duplicate-io-function-parameters.fe",
+        "src/duplicate-constructor-parameters.fe"
+    ]
+}

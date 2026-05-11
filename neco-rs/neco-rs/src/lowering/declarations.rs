@@ -293,11 +293,18 @@ fn constructor_parameters(
     constructor: &ConstructorDeclaration,
     type_name: &DeclaredName,
 ) -> Result<Vec<ConstructorParameter>> {
+    let mut parameter_names = HashSet::new();
     let mut parameters = Vec::new();
     let mut current = &constructor.ty;
     while let Term::Arrow(arrow) = current {
         let (name, ty) = match &arrow.parameter {
             ArrowParameter::Binder(binder) => {
+                validate_parameter_name(
+                    &mut parameter_names,
+                    &binder.name,
+                    "constructor",
+                    &constructor.name.name,
+                )?;
                 (Some(binder.name.clone()), binder.ty.as_ref().clone())
             }
             ArrowParameter::Domain(domain) => (None, domain.as_ref().clone()),
@@ -341,6 +348,7 @@ pub(super) fn constructor_key(type_name: &str, constructor_name: &str) -> String
 }
 
 pub(super) fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<PureFunction> {
+    let mut parameter_names = HashSet::new();
     let mut parameters = Vec::new();
     let mut current = &function.ty;
     while let Term::Arrow(arrow) = current {
@@ -350,6 +358,12 @@ pub(super) fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<
                 function.name.name
             )));
         };
+        validate_parameter_name(
+            &mut parameter_names,
+            &binder.name,
+            "function",
+            &function.name.name,
+        )?;
         parameters.push(PureFunctionParameter {
             name: binder.name.clone(),
             ty: binder.ty.as_ref().clone(),
@@ -366,6 +380,7 @@ pub(super) fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<
 fn statement_function_from_decl(function: &FunctionDeclaration) -> Result<StatementFunction> {
     validate_function_effect(function)?;
 
+    let mut parameter_names = HashSet::new();
     let mut parameters = Vec::new();
     let mut current = &function.ty;
     while let Term::Arrow(arrow) = current {
@@ -375,6 +390,12 @@ fn statement_function_from_decl(function: &FunctionDeclaration) -> Result<Statem
                 function.name.name
             )));
         };
+        validate_parameter_name(
+            &mut parameter_names,
+            &binder.name,
+            "function",
+            &function.name.name,
+        )?;
         parameters.push(StatementFunctionParameter {
             name: binder.name.clone(),
             ty: binder.ty.as_ref().clone(),
@@ -393,6 +414,20 @@ fn statement_function_from_decl(function: &FunctionDeclaration) -> Result<Statem
         effect: function.effect.as_ref().map(|effect| effect.lexeme.clone()),
         body: function.body.clone(),
     })
+}
+
+fn validate_parameter_name(
+    parameter_names: &mut HashSet<String>,
+    name: &str,
+    decl_kind: &str,
+    decl_name: &str,
+) -> Result<()> {
+    if parameter_names.insert(name.to_string()) {
+        return Ok(());
+    }
+    Err(Error::Unsupported(format!(
+        "duplicate parameter `{name}` in {decl_kind} `{decl_name}`"
+    )))
 }
 
 fn validate_function_effect(function: &FunctionDeclaration) -> Result<()> {
