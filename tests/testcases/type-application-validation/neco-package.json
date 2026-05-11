@@ -1,0 +1,7 @@
+{
+    "name": "type-application-validation",
+    "felis-bin-entrypoints": [
+        "src/unknown-applied-type.fe",
+        "src/type-universe-variable.fe"
+    ]
+}

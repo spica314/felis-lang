@@ -1,0 +1,8 @@
+#use std_core::primitive::i32::i32;
+
+#entrypoint main;
+
+#fn main : () {
+    #let value : Missing i32 = 1i32;
+    ()
+}

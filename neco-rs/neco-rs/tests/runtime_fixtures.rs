@@ -416,6 +416,20 @@ fn rejects_statement_after_continue_fixture() {
 }
 
 #[test]
+fn rejects_unknown_applied_type_annotation_fixture() {
+    let root = repo_root().join("tests/testcases/type-application-validation");
+    let error = compile_fixture_error(&root, "unknown-applied-type");
+    assert!(error.contains("expected a value of type `Missing i32`"));
+}
+
+#[test]
+fn rejects_type_universe_variable_annotation_fixture() {
+    let root = repo_root().join("tests/testcases/type-application-validation");
+    let error = compile_fixture_error(&root, "type-universe-variable");
+    assert!(error.contains("expected a value of type `Type level`"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");

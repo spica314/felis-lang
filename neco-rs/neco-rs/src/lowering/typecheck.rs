@@ -87,6 +87,7 @@ pub(crate) fn validate_value_against_type(
     }
 
     match ty {
+        Term::Group(inner) => validate_value_against_type(value, inner, program),
         Term::Unit => {
             if matches!(value, Value::Unit) {
                 Ok(())
@@ -116,7 +117,33 @@ pub(crate) fn validate_value_against_type(
                 },
             }
         }
-        _ => Ok(()),
+        Term::Application { callee, .. } => {
+            let Term::Path(path) = callee.as_ref() else {
+                return Err(Error::Unsupported(format!(
+                    "unsupported type annotation `{}`",
+                    render_term(ty)
+                )));
+            };
+            if path.token_keyword_package.is_some() || path.segments.len() != 1 {
+                return Err(Error::Unsupported(format!(
+                    "unsupported type annotation `{}`",
+                    render_term(ty)
+                )));
+            }
+            let type_name = path.segments[0].lexeme.as_str();
+            match value {
+                Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
+                Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
+                _ => Err(Error::Unsupported(format!(
+                    "expected a value of type `{}` but got {value:?}",
+                    render_term(ty)
+                ))),
+            }
+        }
+        _ => Err(Error::Unsupported(format!(
+            "unsupported type annotation `{}`",
+            render_term(ty)
+        ))),
     }
 }
 
@@ -232,6 +259,9 @@ fn validate_reference_value_against_type(
     }
 
     match referent {
+        Term::Group(inner) => {
+            validate_reference_value_against_type(value, inner, exclusive, program)
+        }
         Term::Path(path) if path.token_keyword_package.is_none() && path.segments.len() == 1 => {
             match path.segments[0].lexeme.as_str() {
                 "i32"

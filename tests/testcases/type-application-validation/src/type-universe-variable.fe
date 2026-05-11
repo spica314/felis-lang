@@ -1,0 +1,8 @@
+#use std_core::primitive::i32::i32;
+
+#entrypoint main;
+
+#fn main : () {
+    #let value : Type level = 1i32;
+    ()
+}
