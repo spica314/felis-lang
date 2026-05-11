@@ -1186,6 +1186,7 @@ pub(super) fn lower_function_call_statement(
     state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
     state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
     state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
+    state.next_f32_slot = state.next_f32_slot.max(scoped_state.next_f32_slot);
 
     Ok(Some(terminated))
 }
@@ -1230,6 +1231,7 @@ pub(super) fn lower_function_call_value(
     state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
     state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
     state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
+    state.next_f32_slot = state.next_f32_slot.max(scoped_state.next_f32_slot);
 
     Ok(Some(value))
 }

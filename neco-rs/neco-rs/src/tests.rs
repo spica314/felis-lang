@@ -6,7 +6,7 @@ use crate::cli::{default_output_path, select_binary_from_package};
 use crate::codegen::build_linux_x86_64_program_executable;
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
-    I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, PathBufSource, U8Expr,
+    F32Expr, I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, PathBufSource, U8Expr,
 };
 use crate::lowering::lower_package_to_program;
 
@@ -663,6 +663,38 @@ fn lowers_i32_ops_fixture_to_runtime_expression_tree() {
     );
     assert!(program.data.is_empty());
     assert!(program.arrays.is_empty());
+}
+
+#[test]
+fn lowers_f32_function_reference_slot_fixture_to_runtime_slot() {
+    let root = repo_root().join("tests/testcases/f32-reference-slots");
+    let package = selected_fixture_package(&root, "f32-function-reference-slot");
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert!(program.operations.iter().any(|operation| matches!(
+        operation,
+        Operation::StoreF32 {
+            slot: 0,
+            value: F32Expr::LiteralBits(_)
+        }
+    )));
+    assert_eq!(program.f32_slots, 1);
+}
+
+#[test]
+fn lowers_f32_block_reference_slot_fixture_to_runtime_slot() {
+    let root = repo_root().join("tests/testcases/f32-reference-slots");
+    let package = selected_fixture_package(&root, "f32-block-reference-slot");
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert!(program.operations.iter().any(|operation| matches!(
+        operation,
+        Operation::StoreF32 {
+            slot: 0,
+            value: F32Expr::LiteralBits(_)
+        }
+    )));
+    assert_eq!(program.f32_slots, 1);
 }
 
 #[test]

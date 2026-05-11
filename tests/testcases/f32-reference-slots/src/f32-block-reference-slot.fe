@@ -1,0 +1,15 @@
+#use std_core::io::IO;
+#use std_core::primitive::f32::f32;
+#use std_core::primitive::i32::i32;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    {
+        #let value : f32 = 1f32;
+        #letref value_ref : & f32 #borrow value;
+        ()
+    };
+    #let _ : () <- IO::exit 42i32;
+    ()
+}

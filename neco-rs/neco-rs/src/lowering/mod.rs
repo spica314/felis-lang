@@ -1143,6 +1143,7 @@ fn lower_effectful_block(
             state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
             state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
             state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
+            state.next_f32_slot = state.next_f32_slot.max(scoped_state.next_f32_slot);
             return Ok(true);
         }
     }
@@ -1152,6 +1153,7 @@ fn lower_effectful_block(
     state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
     state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
     state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
+    state.next_f32_slot = state.next_f32_slot.max(scoped_state.next_f32_slot);
     Ok(false)
 }
 
@@ -1171,6 +1173,7 @@ fn lower_match_expression_statement(
             state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
             state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
             state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
+            state.next_f32_slot = state.next_f32_slot.max(scoped_state.next_f32_slot);
             return Ok(());
         }
     }

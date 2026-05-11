@@ -1,0 +1,7 @@
+{
+    "name": "f32-reference-slots",
+    "felis-bin-entrypoints": [
+        "src/f32-function-reference-slot.fe",
+        "src/f32-block-reference-slot.fe"
+    ]
+}

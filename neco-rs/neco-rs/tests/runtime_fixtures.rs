@@ -430,6 +430,20 @@ fn rejects_type_universe_variable_annotation_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_f32_function_reference_slot_fixture() {
+    let root = repo_root().join("tests/testcases/f32-reference-slots");
+    let status = run_fixture_status(&root, "f32-function-reference-slot");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_f32_block_reference_slot_fixture() {
+    let root = repo_root().join("tests/testcases/f32-reference-slots");
+    let status = run_fixture_status(&root, "f32-block-reference-slot");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");
