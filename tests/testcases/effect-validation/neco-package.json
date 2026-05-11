@@ -1,0 +1,6 @@
+{
+    "name": "effect-validation",
+    "felis-bin-entrypoints": [
+        "src/unknown-function-effect.fe"
+    ]
+}

@@ -339,6 +339,13 @@ fn rejects_unknown_struct_modifier_fixture() {
 }
 
 #[test]
+fn rejects_unknown_function_effect_fixture() {
+    let root = repo_root().join("tests/testcases/effect-validation");
+    let error = compile_fixture_error(&root, "unknown-function-effect");
+    assert!(error.contains("function `helper` effect must be `IO`"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");

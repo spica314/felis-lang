@@ -1,0 +1,10 @@
+#entrypoint main;
+
+#fn helper : () #with Disk {
+    ()
+}
+
+#fn main : () {
+    helper;
+    ()
+}

@@ -1170,6 +1170,33 @@ fn rejects_shared_primitive_reference_for_exclusive_parameter() {
 }
 
 #[test]
+fn rejects_unknown_effect_on_non_entrypoint_function() {
+    let package = parse_inline_binary_package(
+        "unknown-function-effect",
+        r#"
+#entrypoint main;
+
+#fn helper : () #with Disk {
+    ()
+}
+
+#fn main : () {
+    helper;
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject unknown non-entrypoint effects");
+    assert!(
+        error
+            .to_string()
+            .contains("function `helper` effect must be `IO`")
+    );
+}
+
+#[test]
 fn rejects_reference_and_array_builtins_without_io_effect() {
     let cases = [
         (

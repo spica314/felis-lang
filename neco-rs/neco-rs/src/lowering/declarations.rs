@@ -286,6 +286,8 @@ pub(super) fn pure_function_from_decl(function: &FunctionDeclaration) -> Result<
 }
 
 fn statement_function_from_decl(function: &FunctionDeclaration) -> Result<StatementFunction> {
+    validate_function_effect(function)?;
+
     let mut parameters = Vec::new();
     let mut current = &function.ty;
     while let Term::Arrow(arrow) = current {
@@ -313,4 +315,18 @@ fn statement_function_from_decl(function: &FunctionDeclaration) -> Result<Statem
         effect: function.effect.as_ref().map(|effect| effect.lexeme.clone()),
         body: function.body.clone(),
     })
+}
+
+fn validate_function_effect(function: &FunctionDeclaration) -> Result<()> {
+    if function
+        .effect
+        .as_ref()
+        .is_some_and(|effect| effect.lexeme != "IO")
+    {
+        return Err(Error::Unsupported(format!(
+            "function `{}` effect must be `IO`",
+            function.name.name
+        )));
+    }
+    Ok(())
 }
