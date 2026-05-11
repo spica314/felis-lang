@@ -402,6 +402,20 @@ fn rejects_pure_function_local_let_type_mismatch_fixture() {
 }
 
 #[test]
+fn rejects_statement_after_break_fixture() {
+    let root = repo_root().join("tests/testcases/loop-control-validation");
+    let error = compile_fixture_error(&root, "statement-after-break");
+    assert!(error.contains("statements after loop control are not supported"));
+}
+
+#[test]
+fn rejects_statement_after_continue_fixture() {
+    let root = repo_root().join("tests/testcases/loop-control-validation");
+    let error = compile_fixture_error(&root, "statement-after-continue");
+    assert!(error.contains("statements after loop control are not supported"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");

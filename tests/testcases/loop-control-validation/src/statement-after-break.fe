@@ -1,0 +1,11 @@
+#use std_core::primitive::i32::i32;
+
+#entrypoint main;
+
+#fn main : () {
+    #loop {
+        #break;
+        #let unreachable : i32 = 1i32;
+    };
+    ()
+}

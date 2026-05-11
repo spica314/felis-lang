@@ -458,11 +458,14 @@ pub(super) fn lower_statement(
                 f32_slots: program.f32_slots,
                 requires_argv: program.requires_argv,
             };
+            let mut terminated = false;
             for statement in &loop_stmt.body.statements {
-                let terminated = lower_statement(statement, &mut loop_state, &mut loop_program)?;
                 if terminated {
-                    break;
+                    return Err(Error::Unsupported(
+                        "statements after loop control are not supported".to_string(),
+                    ));
                 }
+                terminated = lower_statement(statement, &mut loop_state, &mut loop_program)?;
             }
             program.data = loop_program.data;
             program.arrays = loop_program.arrays;
@@ -484,7 +487,7 @@ pub(super) fn lower_statement(
                 ));
             }
             program.operations.push(Operation::Break);
-            Ok(false)
+            Ok(true)
         }
         Statement::Continue => {
             if state.loop_depth == 0 {
@@ -493,7 +496,7 @@ pub(super) fn lower_statement(
                 ));
             }
             program.operations.push(Operation::Continue);
-            Ok(false)
+            Ok(true)
         }
         Statement::Item(_) => Err(Error::Unsupported(
             "items inside entrypoint bodies are not supported".to_string(),

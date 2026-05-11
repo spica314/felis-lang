@@ -1,0 +1,7 @@
+{
+    "name": "loop-control-validation",
+    "felis-bin-entrypoints": [
+        "src/statement-after-break.fe",
+        "src/statement-after-continue.fe"
+    ]
+}
