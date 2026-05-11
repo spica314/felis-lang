@@ -235,6 +235,63 @@ fn rejects_duplicate_struct_fields() {
 }
 
 #[test]
+fn rejects_invalid_struct_kind_annotation() {
+    let package = parse_inline_binary_package(
+        "invalid-struct-kind",
+        r#"
+#use std_core::primitive::i32::i32;
+
+#struct Point : i32 {
+    x : i32,
+}
+
+#entrypoint main;
+
+#fn main : () {
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject invalid struct kind");
+    assert!(
+        error
+            .to_string()
+            .contains("struct `Point` kind must end in `Type[0]`")
+    );
+}
+
+#[test]
+fn rejects_invalid_type_kind_annotation() {
+    let package = parse_inline_binary_package(
+        "invalid-type-kind",
+        r#"
+#use std_core::primitive::bool::bool;
+#use std_core::primitive::i32::i32;
+
+#type Value : bool {
+    single : i32 -> Value,
+}
+
+#entrypoint main;
+
+#fn main : () {
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject invalid type kind");
+    assert!(
+        error
+            .to_string()
+            .contains("type `Value` kind must end in `Type[0]`")
+    );
+}
+
+#[test]
 fn rejects_duplicate_pure_functions() {
     let package = parse_inline_binary_package(
         "duplicate-pure-functions",

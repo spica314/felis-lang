@@ -1,0 +1,12 @@
+#use std_core::primitive::bool::bool;
+#use std_core::primitive::i32::i32;
+
+#type Value : bool {
+    single : i32 -> Value,
+}
+
+#entrypoint main;
+
+#fn main : () {
+    ()
+}

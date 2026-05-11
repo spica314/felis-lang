@@ -346,6 +346,20 @@ fn rejects_unknown_function_effect_fixture() {
 }
 
 #[test]
+fn rejects_invalid_struct_kind_fixture() {
+    let root = repo_root().join("tests/testcases/type-kind-validation");
+    let error = compile_fixture_error(&root, "invalid-struct-kind");
+    assert!(error.contains("struct `Point` kind must end in `Type[0]`"));
+}
+
+#[test]
+fn rejects_invalid_type_kind_fixture() {
+    let root = repo_root().join("tests/testcases/type-kind-validation");
+    let error = compile_fixture_error(&root, "invalid-type-kind");
+    assert!(error.contains("type `Value` kind must end in `Type[0]`"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");

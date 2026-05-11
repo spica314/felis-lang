@@ -1,0 +1,7 @@
+{
+    "name": "type-kind-validation",
+    "felis-bin-entrypoints": [
+        "src/invalid-struct-kind.fe",
+        "src/invalid-type-kind.fe"
+    ]
+}

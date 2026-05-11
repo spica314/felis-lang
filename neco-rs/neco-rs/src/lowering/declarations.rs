@@ -129,6 +129,7 @@ pub(super) fn collect_constructors(
                 continue;
             };
             validate_modifier("type", &type_decl.name.name, type_decl.modifier.as_deref())?;
+            validate_type_kind_annotation("type", &type_decl.name, &type_decl.ty)?;
 
             for (tag, constructor) in type_decl.constructors.iter().enumerate() {
                 let Some(parameters) = constructor_parameters(constructor, &type_decl.name) else {
@@ -188,6 +189,7 @@ fn struct_signature_from_decl(struct_decl: &StructDeclaration) -> Result<StructS
         &struct_decl.name.name,
         struct_decl.modifier.as_deref(),
     )?;
+    validate_type_kind_annotation("struct", &struct_decl.name, &struct_decl.ty)?;
 
     let mut field_names = HashSet::new();
     let mut fields = Vec::new();
@@ -219,6 +221,45 @@ fn validate_modifier(decl_kind: &str, name: &str, modifier: Option<&str>) -> Res
             "unknown {decl_kind} modifier `{modifier}` on `{name}`"
         ))),
     }
+}
+
+fn validate_type_kind_annotation(decl_kind: &str, name: &DeclaredName, ty: &Term) -> Result<()> {
+    let mut current = ty;
+    while let Term::Arrow(arrow) = current {
+        let parameter_ty = match &arrow.parameter {
+            ArrowParameter::Binder(binder) => binder.ty.as_ref(),
+            ArrowParameter::Domain(domain) => domain.as_ref(),
+        };
+        if !is_type_zero_annotation(parameter_ty) {
+            return Err(Error::Unsupported(format!(
+                "{decl_kind} `{}` kind parameters must have kind `Type[0]`",
+                name.name
+            )));
+        }
+        current = arrow.result.as_ref();
+    }
+
+    if is_type_zero_annotation(current) {
+        Ok(())
+    } else {
+        Err(Error::Unsupported(format!(
+            "{decl_kind} `{}` kind must end in `Type[0]`",
+            name.name
+        )))
+    }
+}
+
+fn is_type_zero_annotation(ty: &Term) -> bool {
+    let Term::Application { callee, arguments } = ty else {
+        return false;
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return false;
+    };
+    path.token_keyword_package.is_none()
+        && path.segments.len() == 1
+        && path.segments[0].lexeme == "Type"
+        && matches!(arguments.as_slice(), [Term::IntegerLiteral(level)] if level == "0")
 }
 
 fn constructor_parameters(
