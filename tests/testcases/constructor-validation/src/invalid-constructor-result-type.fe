@@ -1,0 +1,11 @@
+#use std_core::primitive::i32::i32;
+
+#type Value : Type[0] {
+    single : i32 -> Vaule,
+}
+
+#entrypoint main;
+
+#fn main : () {
+    ()
+}

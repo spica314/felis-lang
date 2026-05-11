@@ -292,6 +292,34 @@ fn rejects_invalid_type_kind_annotation() {
 }
 
 #[test]
+fn rejects_invalid_constructor_result_type() {
+    let package = parse_inline_binary_package(
+        "invalid-constructor-result-type",
+        r#"
+#use std_core::primitive::i32::i32;
+
+#type Value : Type[0] {
+    single : i32 -> Vaule,
+}
+
+#entrypoint main;
+
+#fn main : () {
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject constructor typo");
+    assert!(
+        error
+            .to_string()
+            .contains("constructor `single` result type must be `Value`")
+    );
+}
+
+#[test]
 fn rejects_duplicate_pure_functions() {
     let package = parse_inline_binary_package(
         "duplicate-pure-functions",

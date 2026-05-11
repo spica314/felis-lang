@@ -1,0 +1,6 @@
+{
+    "name": "constructor-validation",
+    "felis-bin-entrypoints": [
+        "src/invalid-constructor-result-type.fe"
+    ]
+}

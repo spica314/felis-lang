@@ -132,9 +132,7 @@ pub(super) fn collect_constructors(
             validate_type_kind_annotation("type", &type_decl.name, &type_decl.ty)?;
 
             for (tag, constructor) in type_decl.constructors.iter().enumerate() {
-                let Some(parameters) = constructor_parameters(constructor, &type_decl.name) else {
-                    continue;
-                };
+                let parameters = constructor_parameters(constructor, &type_decl.name)?;
 
                 let key = constructor_key(&type_decl.name.name, &constructor.name.name);
                 let value = ConstructorSignature {
@@ -265,7 +263,7 @@ fn is_type_zero_annotation(ty: &Term) -> bool {
 fn constructor_parameters(
     constructor: &ConstructorDeclaration,
     type_name: &DeclaredName,
-) -> Option<Vec<ConstructorParameter>> {
+) -> Result<Vec<ConstructorParameter>> {
     let mut parameters = Vec::new();
     let mut current = &constructor.ty;
     while let Term::Arrow(arrow) = current {
@@ -283,20 +281,30 @@ fn constructor_parameters(
         Term::Path(path) => path,
         Term::Application { callee, .. } => {
             let Term::Path(path) = callee.as_ref() else {
-                return None;
+                return Err(invalid_constructor_result_error(constructor, type_name));
             };
             path
         }
-        _ => return None,
+        _ => return Err(invalid_constructor_result_error(constructor, type_name)),
     };
     if path.token_keyword_package.is_none()
         && path.segments.len() == 1
         && path.segments[0].lexeme == type_name.name
     {
-        Some(parameters)
+        Ok(parameters)
     } else {
-        None
+        Err(invalid_constructor_result_error(constructor, type_name))
     }
+}
+
+fn invalid_constructor_result_error(
+    constructor: &ConstructorDeclaration,
+    type_name: &DeclaredName,
+) -> Error {
+    Error::Unsupported(format!(
+        "constructor `{}` result type must be `{}`",
+        constructor.name.name, type_name.name
+    ))
 }
 
 pub(super) fn constructor_key(type_name: &str, constructor_name: &str) -> String {

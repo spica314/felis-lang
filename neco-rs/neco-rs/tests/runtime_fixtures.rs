@@ -360,6 +360,13 @@ fn rejects_invalid_type_kind_fixture() {
 }
 
 #[test]
+fn rejects_invalid_constructor_result_type_fixture() {
+    let root = repo_root().join("tests/testcases/constructor-validation");
+    let error = compile_fixture_error(&root, "invalid-constructor-result-type");
+    assert!(error.contains("constructor `single` result type must be `Value`"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");
