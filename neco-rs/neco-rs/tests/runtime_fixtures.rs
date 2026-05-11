@@ -395,6 +395,13 @@ fn rejects_duplicate_constructor_parameters_fixture() {
 }
 
 #[test]
+fn rejects_pure_function_local_let_type_mismatch_fixture() {
+    let root = repo_root().join("tests/testcases/local-let-validation");
+    let error = compile_fixture_error(&root, "pure-let-type-mismatch");
+    assert!(error.contains("expected a value of type `bool`"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");

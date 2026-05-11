@@ -1092,6 +1092,12 @@ pub(super) fn lower_pure_block_value(
                 if let_stmt.operator == neco_rs_parser::LetOperator::Equals =>
             {
                 let value = lower_pure_value(let_stmt.value.as_ref(), &scoped_state, program)?;
+                let ty = substitute_type_bindings(
+                    let_stmt.ty.as_ref(),
+                    &type_bindings_from_environment(&scoped_state.environment),
+                );
+                validate_value_against_type(&value, &ty, program)?;
+                let value = wrap_reference_parameter(value, &ty);
                 bind_pattern(&let_stmt.binder, value, &mut scoped_state.environment);
             }
             Statement::Let(_) => {
@@ -1143,6 +1149,16 @@ pub(super) fn lower_pure_block_value(
         ));
     };
     lower_pure_value(tail, &scoped_state, program)
+}
+
+fn type_bindings_from_environment(environment: &HashMap<String, Value>) -> HashMap<String, Term> {
+    environment
+        .iter()
+        .filter_map(|(name, value)| match value {
+            Value::Type(ty) => Some((name.clone(), ty.clone())),
+            _ => None,
+        })
+        .collect()
 }
 
 pub(super) fn lower_function_call_statement(

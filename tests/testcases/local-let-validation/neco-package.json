@@ -1,0 +1,6 @@
+{
+    "name": "local-let-validation",
+    "felis-bin-entrypoints": [
+        "src/pure-let-type-mismatch.fe"
+    ]
+}

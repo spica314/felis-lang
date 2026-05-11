@@ -1,0 +1,14 @@
+#use std_core::primitive::bool::bool;
+#use std_core::primitive::i32::i32;
+
+#fn mismatch : (value : i32) -> i32 {
+    #let local : bool = value;
+    value
+}
+
+#entrypoint main;
+
+#fn main : () {
+    #let _ : i32 = mismatch 1i32;
+    ()
+}
