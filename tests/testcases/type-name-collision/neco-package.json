@@ -1,0 +1,6 @@
+{
+    "name": "type-name-collision",
+    "felis-bin-entrypoints": [
+        "src/type-name-collision.fe"
+    ]
+}

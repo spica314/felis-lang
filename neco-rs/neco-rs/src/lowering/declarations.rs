@@ -157,6 +157,7 @@ pub(super) fn collect_structs(
     packages: &[ParsedPackage],
 ) -> Result<HashMap<String, StructSignature>> {
     let mut structs = HashMap::new();
+    let type_names = collect_type_names(packages)?;
     for package in packages {
         for item in package
             .source_files
@@ -176,9 +177,37 @@ pub(super) fn collect_structs(
                     struct_decl.name.name
                 )));
             }
+            if type_names.contains(&struct_decl.name.name) {
+                return Err(Error::Unsupported(format!(
+                    "type name `{}` is already used by an algebraic type",
+                    struct_decl.name.name
+                )));
+            }
         }
     }
     Ok(structs)
+}
+
+fn collect_type_names(packages: &[ParsedPackage]) -> Result<HashSet<String>> {
+    let mut type_names = HashSet::new();
+    for package in packages {
+        for item in package
+            .source_files
+            .iter()
+            .flat_map(|file| file.syntax.items.iter())
+        {
+            let Item::Type(type_decl) = item else {
+                continue;
+            };
+            if !type_names.insert(type_decl.name.name.clone()) {
+                return Err(Error::Unsupported(format!(
+                    "duplicate type `{}` is not supported",
+                    type_decl.name.name
+                )));
+            }
+        }
+    }
+    Ok(type_names)
 }
 
 fn struct_signature_from_decl(struct_decl: &StructDeclaration) -> Result<StructSignature> {

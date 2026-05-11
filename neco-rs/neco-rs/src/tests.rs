@@ -320,6 +320,38 @@ fn rejects_invalid_constructor_result_type() {
 }
 
 #[test]
+fn rejects_struct_and_type_name_collision() {
+    let package = parse_inline_binary_package(
+        "type-name-collision",
+        r#"
+#use std_core::primitive::i32::i32;
+
+#type Token : Type[0] {
+    value : i32 -> Token,
+}
+
+#struct Token : Type[0] {
+    value : i32,
+}
+
+#entrypoint main;
+
+#fn main : () {
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject type-name collision");
+    assert!(
+        error
+            .to_string()
+            .contains("type name `Token` is already used by an algebraic type")
+    );
+}
+
+#[test]
 fn rejects_duplicate_pure_functions() {
     let package = parse_inline_binary_package(
         "duplicate-pure-functions",

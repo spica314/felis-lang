@@ -367,6 +367,13 @@ fn rejects_invalid_constructor_result_type_fixture() {
 }
 
 #[test]
+fn rejects_struct_and_type_name_collision_fixture() {
+    let root = repo_root().join("tests/testcases/type-name-collision");
+    let error = compile_fixture_error(&root, "type-name-collision");
+    assert!(error.contains("type name `Token` is already used by an algebraic type"));
+}
+
+#[test]
 fn compiles_and_runs_fn_reference_annotation_fixture() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let status = run_fixture_status(&root, "fn-reference-annotation");
