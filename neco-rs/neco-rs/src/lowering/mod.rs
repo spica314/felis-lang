@@ -1063,11 +1063,7 @@ fn if_statement_uses_io_builtin(
         }
 }
 
-fn term_uses_io_builtin(
-    term: &Term,
-    state: &LoweringState,
-    visited: &mut HashSet<String>,
-) -> bool {
+fn term_uses_io_builtin(term: &Term, state: &LoweringState, visited: &mut HashSet<String>) -> bool {
     match term {
         Term::Group(inner) => term_uses_io_builtin(inner, state, visited),
         Term::Path(path) => simple_path_segments(path)
@@ -1093,9 +1089,10 @@ fn term_uses_io_builtin(
                 .any(|argument| term_uses_io_builtin(argument, state, visited))
         }
         Term::MethodCall { receiver, .. } => term_uses_io_builtin(receiver, state, visited),
-        Term::FieldAccess { receiver, .. } | Term::Reference { referent: receiver, .. } => {
-            term_uses_io_builtin(receiver, state, visited)
-        }
+        Term::FieldAccess { receiver, .. }
+        | Term::Reference {
+            referent: receiver, ..
+        } => term_uses_io_builtin(receiver, state, visited),
         Term::StructLiteral { fields, .. } => fields
             .iter()
             .any(|field| term_uses_io_builtin(&field.value, state, visited)),

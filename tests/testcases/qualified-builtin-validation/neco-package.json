@@ -1,0 +1,8 @@
+{
+    "name": "qualified-builtin-validation",
+    "felis-bin-entrypoints": [
+        "src/qualified-array-type.fe",
+        "src/qualified-bool-comparison.fe",
+        "src/qualified-i32-primitive.fe"
+    ]
+}

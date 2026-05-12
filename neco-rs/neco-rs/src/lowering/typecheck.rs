@@ -1,4 +1,4 @@
-use neco_rs_parser::{ArrowParameter, Term};
+use neco_rs_parser::{ArrowParameter, PathExpression, Term};
 
 use crate::effect::Value;
 use crate::ir::{ArrayElementType, ArrayKind, F32Expr, I32Expr, I64Expr, LoweredProgram, U8Expr};
@@ -345,12 +345,7 @@ fn parse_array_type_annotation(ty: &Term) -> Result<Option<(ArrayElementType, us
     let Term::Path(path) = callee.as_ref() else {
         return Ok(None);
     };
-    if path.token_keyword_package.is_some()
-        || path
-            .segments
-            .last()
-            .is_none_or(|segment| segment.lexeme != "Array")
-    {
+    if !is_simple_type_path(path, "Array") {
         return Ok(None);
     }
 
@@ -377,12 +372,7 @@ fn parse_unsized_array_type_annotation(ty: &Term) -> Result<Option<ArrayElementT
     let Term::Path(path) = callee.as_ref() else {
         return Ok(None);
     };
-    if path.token_keyword_package.is_some()
-        || path
-            .segments
-            .last()
-            .is_none_or(|segment| segment.lexeme != "Array")
-    {
+    if !is_simple_type_path(path, "Array") {
         return Ok(None);
     }
 
@@ -400,15 +390,10 @@ fn parse_slice_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
     let Term::Path(path) = callee.as_ref() else {
         return Ok(None);
     };
-    let Some(type_name) = path.segments.last().map(|segment| segment.lexeme.as_str()) else {
-        return Ok(None);
-    };
-    if type_name != "ArrayVL" {
+    if !is_simple_type_path(path, "ArrayVL") {
         return Ok(None);
     }
-    if path.token_keyword_package.is_some() {
-        return Ok(None);
-    }
+    let type_name = "ArrayVL";
 
     let [element_type_term] = arguments.as_slice() else {
         return Err(Error::Unsupported(format!(
@@ -417,6 +402,12 @@ fn parse_slice_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
     };
 
     parse_array_element_type(element_type_term, type_name).map(Some)
+}
+
+fn is_simple_type_path(path: &PathExpression, name: &str) -> bool {
+    path.token_keyword_package.is_none()
+        && path.segments.len() == 1
+        && path.segments[0].lexeme == name
 }
 
 fn parse_array_element_type(term: &Term, type_name: &str) -> Result<ArrayElementType> {

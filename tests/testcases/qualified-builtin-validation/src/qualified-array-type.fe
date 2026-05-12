@@ -1,0 +1,11 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::i32::i32;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let values : missing::Array i32 1i32 <- IO::array_new i32 1i32;
+    #let _ : () <- IO::exit 0i32;
+    ()
+}

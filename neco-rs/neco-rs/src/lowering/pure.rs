@@ -23,6 +23,33 @@ use super::{
     normalize_numeric_literal_arguments,
 };
 
+fn simple_builtin_path_name<'a>(
+    path: &'a PathExpression,
+    kind: &str,
+    known_names: &[&str],
+) -> Result<Option<&'a str>> {
+    if path.token_keyword_package.is_none() && path.segments.len() == 1 {
+        return Ok(Some(path.segments[0].lexeme.as_str()));
+    }
+    if let Some(name) = path.segments.last().map(|segment| segment.lexeme.as_str())
+        && known_names.contains(&name)
+    {
+        return Err(Error::Unsupported(format!(
+            "`{kind}` builtin call must use a simple builtin path, got `{}`",
+            render_path(path)
+        )));
+    }
+    Ok(None)
+}
+
+fn render_path(path: &PathExpression) -> String {
+    path.segments
+        .iter()
+        .map(|segment| segment.lexeme.as_str())
+        .collect::<Vec<_>>()
+        .join("::")
+}
+
 pub(super) fn lower_pure_value(
     term: &Term,
     state: &LoweringState,
@@ -132,11 +159,27 @@ fn lower_numeric_conversion_value(
     let Term::Path(path) = callee.as_ref() else {
         return Ok(None);
     };
-    let primitive = path
-        .segments
-        .last()
-        .map(|segment| segment.lexeme.as_str())
-        .unwrap_or_default();
+    let Some(primitive) = simple_builtin_path_name(
+        path,
+        "numeric conversion",
+        &[
+            "i32_from_u8",
+            "i32_from_i64",
+            "i64_from_i32",
+            "i64_from_u8",
+            "f32_from_i32",
+            "f32_from_i64",
+            "f32_from_u8",
+            "u8_from_i32",
+            "u8_from_i64",
+            "u8_from_f32",
+            "i32_from_f32",
+            "i64_from_f32",
+        ],
+    )?
+    else {
+        return Ok(None);
+    };
     if !matches!(
         primitive,
         "i32_from_u8"
@@ -214,11 +257,14 @@ fn lower_f32_primitive_value(
     let Term::Path(path) = callee.as_ref() else {
         return Ok(None);
     };
-    let primitive = path
-        .segments
-        .last()
-        .map(|segment| segment.lexeme.as_str())
-        .unwrap_or_default();
+    let Some(primitive) = simple_builtin_path_name(
+        path,
+        "f32 primitive",
+        &["f32_add", "f32_sub", "f32_mul", "f32_div"],
+    )?
+    else {
+        return Ok(None);
+    };
     if !matches!(primitive, "f32_add" | "f32_sub" | "f32_mul" | "f32_div") {
         return Ok(None);
     }
@@ -252,11 +298,14 @@ fn lower_i32_primitive_value(
     let Term::Path(path) = callee.as_ref() else {
         return Ok(None);
     };
-    let primitive = path
-        .segments
-        .last()
-        .map(|segment| segment.lexeme.as_str())
-        .unwrap_or_default();
+    let Some(primitive) = simple_builtin_path_name(
+        path,
+        "i32 primitive",
+        &["i32_add", "i32_sub", "i32_mul", "i32_div", "i32_mod"],
+    )?
+    else {
+        return Ok(None);
+    };
     if !matches!(
         primitive,
         "i32_add" | "i32_sub" | "i32_mul" | "i32_div" | "i32_mod"

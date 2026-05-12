@@ -1,4 +1,4 @@
-use neco_rs_parser::Term;
+use neco_rs_parser::{PathExpression, Term};
 
 use crate::effect::{Value, resolve_value};
 use crate::ir::{
@@ -15,6 +15,21 @@ use super::typecheck::{
     parse_suffixed_u8_literal,
 };
 use super::{LoweringState, ensure_io_effect_allowed};
+
+fn simple_builtin_path_name(path: &PathExpression) -> Option<&str> {
+    if path.token_keyword_package.is_some() || path.segments.len() != 1 {
+        return None;
+    }
+    Some(path.segments[0].lexeme.as_str())
+}
+
+fn render_path(path: &PathExpression) -> String {
+    path.segments
+        .iter()
+        .map(|segment| segment.lexeme.as_str())
+        .collect::<Vec<_>>()
+        .join("::")
+}
 
 pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Expr> {
     match term {
@@ -215,11 +230,12 @@ fn lower_condition_bool_application_expr(
         ));
     };
 
-    let primitive = path
-        .segments
-        .last()
-        .map(|segment| segment.lexeme.as_str())
-        .unwrap_or_default();
+    let Some(primitive) = simple_builtin_path_name(path) else {
+        return Err(Error::Unsupported(format!(
+            "`bool` primitive call must use a simple builtin path, got `{}`",
+            render_path(path)
+        )));
+    };
 
     match primitive {
         "bool_and" => {
@@ -307,11 +323,12 @@ fn lower_bool_application_expr(term: &Term, state: &LoweringState) -> Result<Con
         ));
     };
 
-    let primitive = path
-        .segments
-        .last()
-        .map(|segment| segment.lexeme.as_str())
-        .unwrap_or_default();
+    let Some(primitive) = simple_builtin_path_name(path) else {
+        return Err(Error::Unsupported(format!(
+            "`bool` primitive call must use a simple builtin path, got `{}`",
+            render_path(path)
+        )));
+    };
 
     if let Some(condition) = lower_bool_primitive_call(primitive, arguments, state)? {
         return Ok(condition);
@@ -515,18 +532,17 @@ fn lower_i32_primitive_call(
         ));
     };
 
-    let segments: Vec<_> = path
-        .segments
-        .iter()
-        .map(|segment| segment.lexeme.as_str())
-        .collect();
+    let Some(primitive) = simple_builtin_path_name(path) else {
+        return Err(Error::Unsupported(format!(
+            "`i32` primitive call must use a simple builtin path, got `{}`",
+            render_path(path)
+        )));
+    };
     let normalized = normalize_numeric_literal_arguments(arguments);
-    let primitive = segments.last().copied().unwrap_or_default();
     if primitive == "i32_from_u8" {
         let [value] = normalized.as_slice() else {
             return Err(Error::Unsupported(format!(
-                "`{}` must receive exactly one argument",
-                segments.join("::")
+                "`{primitive}` must receive exactly one argument"
             )));
         };
         return Ok(I32Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
@@ -534,8 +550,7 @@ fn lower_i32_primitive_call(
     if primitive == "i32_from_i64" {
         let [value] = normalized.as_slice() else {
             return Err(Error::Unsupported(format!(
-                "`{}` must receive exactly one argument",
-                segments.join("::")
+                "`{primitive}` must receive exactly one argument"
             )));
         };
         return Ok(I32Expr::FromI64(Box::new(lower_i64_expr(value, state)?)));
@@ -543,16 +558,14 @@ fn lower_i32_primitive_call(
     if primitive == "i32_from_f32" {
         let [value] = normalized.as_slice() else {
             return Err(Error::Unsupported(format!(
-                "`{}` must receive exactly one argument",
-                segments.join("::")
+                "`{primitive}` must receive exactly one argument"
             )));
         };
         return Ok(I32Expr::FromF32(Box::new(lower_f32_expr(value, state)?)));
     }
     let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
-            "`{}` must receive exactly two arguments",
-            segments.join("::")
+            "`{primitive}` must receive exactly two arguments"
         )));
     };
     let lhs = Box::new(lower_i32_expr(lhs, state)?);
@@ -565,8 +578,7 @@ fn lower_i32_primitive_call(
         "i32_div" => Ok(I32Expr::Div(lhs, rhs)),
         "i32_mod" => Ok(I32Expr::Mod(lhs, rhs)),
         _ => Err(Error::Unsupported(format!(
-            "unsupported `i32` primitive call `{}`",
-            segments.join("::")
+            "unsupported `i32` primitive call `{primitive}`"
         ))),
     }
 }
@@ -582,18 +594,17 @@ fn lower_i64_primitive_call(
         ));
     };
 
-    let segments: Vec<_> = path
-        .segments
-        .iter()
-        .map(|segment| segment.lexeme.as_str())
-        .collect();
+    let Some(primitive) = simple_builtin_path_name(path) else {
+        return Err(Error::Unsupported(format!(
+            "`i64` primitive call must use a simple builtin path, got `{}`",
+            render_path(path)
+        )));
+    };
     let normalized = normalize_numeric_literal_arguments(arguments);
-    let primitive = segments.last().copied().unwrap_or_default();
     if primitive == "i64_from_i32" {
         let [value] = normalized.as_slice() else {
             return Err(Error::Unsupported(format!(
-                "`{}` must receive exactly one argument",
-                segments.join("::")
+                "`{primitive}` must receive exactly one argument"
             )));
         };
         return Ok(I64Expr::FromI32(Box::new(lower_i32_expr(value, state)?)));
@@ -601,8 +612,7 @@ fn lower_i64_primitive_call(
     if primitive == "i64_from_u8" {
         let [value] = normalized.as_slice() else {
             return Err(Error::Unsupported(format!(
-                "`{}` must receive exactly one argument",
-                segments.join("::")
+                "`{primitive}` must receive exactly one argument"
             )));
         };
         return Ok(I64Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
@@ -610,16 +620,14 @@ fn lower_i64_primitive_call(
     if primitive == "i64_from_f32" {
         let [value] = normalized.as_slice() else {
             return Err(Error::Unsupported(format!(
-                "`{}` must receive exactly one argument",
-                segments.join("::")
+                "`{primitive}` must receive exactly one argument"
             )));
         };
         return Ok(I64Expr::FromF32(Box::new(lower_f32_expr(value, state)?)));
     }
     let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
-            "`{}` must receive exactly two arguments",
-            segments.join("::")
+            "`{primitive}` must receive exactly two arguments"
         )));
     };
     let lhs = Box::new(lower_i64_expr(lhs, state)?);
@@ -632,8 +640,7 @@ fn lower_i64_primitive_call(
         "i64_div" => Ok(I64Expr::Div(lhs, rhs)),
         "i64_mod" => Ok(I64Expr::Mod(lhs, rhs)),
         _ => Err(Error::Unsupported(format!(
-            "unsupported `i64` primitive call `{}`",
-            segments.join("::")
+            "unsupported `i64` primitive call `{primitive}`"
         ))),
     }
 }
@@ -649,18 +656,17 @@ fn lower_u8_primitive_call(
         ));
     };
 
-    let segments: Vec<_> = path
-        .segments
-        .iter()
-        .map(|segment| segment.lexeme.as_str())
-        .collect();
+    let Some(primitive) = simple_builtin_path_name(path) else {
+        return Err(Error::Unsupported(format!(
+            "`u8` primitive call must use a simple builtin path, got `{}`",
+            render_path(path)
+        )));
+    };
     let normalized = normalize_numeric_literal_arguments(arguments);
-    let primitive = segments.last().copied().unwrap_or_default();
     if primitive == "u8_from_i32" {
         let [value] = normalized.as_slice() else {
             return Err(Error::Unsupported(format!(
-                "`{}` must receive exactly one argument",
-                segments.join("::")
+                "`{primitive}` must receive exactly one argument"
             )));
         };
         return Ok(U8Expr::FromI32(Box::new(lower_i32_expr(value, state)?)));
@@ -668,8 +674,7 @@ fn lower_u8_primitive_call(
     if primitive == "u8_from_i64" {
         let [value] = normalized.as_slice() else {
             return Err(Error::Unsupported(format!(
-                "`{}` must receive exactly one argument",
-                segments.join("::")
+                "`{primitive}` must receive exactly one argument"
             )));
         };
         return Ok(U8Expr::FromI64(Box::new(lower_i64_expr(value, state)?)));
@@ -677,16 +682,14 @@ fn lower_u8_primitive_call(
     if primitive == "u8_from_f32" {
         let [value] = normalized.as_slice() else {
             return Err(Error::Unsupported(format!(
-                "`{}` must receive exactly one argument",
-                segments.join("::")
+                "`{primitive}` must receive exactly one argument"
             )));
         };
         return Ok(U8Expr::FromF32(Box::new(lower_f32_expr(value, state)?)));
     }
     let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
-            "`{}` must receive exactly two arguments",
-            segments.join("::")
+            "`{primitive}` must receive exactly two arguments"
         )));
     };
     let lhs = Box::new(lower_u8_expr(lhs, state)?);
@@ -699,8 +702,7 @@ fn lower_u8_primitive_call(
         "u8_div" => Ok(U8Expr::Div(lhs, rhs)),
         "u8_mod" => Ok(U8Expr::Mod(lhs, rhs)),
         _ => Err(Error::Unsupported(format!(
-            "unsupported `u8` primitive call `{}`",
-            segments.join("::")
+            "unsupported `u8` primitive call `{primitive}`"
         ))),
     }
 }
@@ -716,19 +718,18 @@ fn lower_f32_primitive_call(
         ));
     };
 
-    let segments: Vec<_> = path
-        .segments
-        .iter()
-        .map(|segment| segment.lexeme.as_str())
-        .collect();
+    let Some(primitive) = simple_builtin_path_name(path) else {
+        return Err(Error::Unsupported(format!(
+            "`f32` primitive call must use a simple builtin path, got `{}`",
+            render_path(path)
+        )));
+    };
     let normalized = normalize_numeric_literal_arguments(arguments);
-    let primitive = segments.last().copied().unwrap_or_default();
     match primitive {
         "f32_from_i32" => {
             let [value] = normalized.as_slice() else {
                 return Err(Error::Unsupported(format!(
-                    "`{}` must receive exactly one argument",
-                    segments.join("::")
+                    "`{primitive}` must receive exactly one argument"
                 )));
             };
             return Ok(F32Expr::FromI32(Box::new(lower_i32_expr(value, state)?)));
@@ -736,8 +737,7 @@ fn lower_f32_primitive_call(
         "f32_from_i64" => {
             let [value] = normalized.as_slice() else {
                 return Err(Error::Unsupported(format!(
-                    "`{}` must receive exactly one argument",
-                    segments.join("::")
+                    "`{primitive}` must receive exactly one argument"
                 )));
             };
             return Ok(F32Expr::FromI64(Box::new(lower_i64_expr(value, state)?)));
@@ -745,8 +745,7 @@ fn lower_f32_primitive_call(
         "f32_from_u8" => {
             let [value] = normalized.as_slice() else {
                 return Err(Error::Unsupported(format!(
-                    "`{}` must receive exactly one argument",
-                    segments.join("::")
+                    "`{primitive}` must receive exactly one argument"
                 )));
             };
             return Ok(F32Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
@@ -756,8 +755,7 @@ fn lower_f32_primitive_call(
 
     let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
-            "`{}` must receive exactly two arguments",
-            segments.join("::")
+            "`{primitive}` must receive exactly two arguments"
         )));
     };
     let lhs = Box::new(lower_f32_expr(lhs, state)?);
@@ -769,8 +767,7 @@ fn lower_f32_primitive_call(
         "f32_mul" => Ok(F32Expr::Mul(lhs, rhs)),
         "f32_div" => Ok(F32Expr::Div(lhs, rhs)),
         _ => Err(Error::Unsupported(format!(
-            "unsupported `f32` primitive call `{}`",
-            segments.join("::")
+            "unsupported `f32` primitive call `{primitive}`"
         ))),
     }
 }

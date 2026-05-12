@@ -1,0 +1,10 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let status : i32 = missing::i32_add 20i32 22i32;
+    #let _ : () <- IO::exit status;
+    ()
+}

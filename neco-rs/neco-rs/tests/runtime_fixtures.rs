@@ -430,6 +430,36 @@ fn rejects_unknown_applied_type_annotation_fixture() {
 }
 
 #[test]
+fn rejects_qualified_i32_primitive_fixture() {
+    let root = repo_root().join("tests/testcases/qualified-builtin-validation");
+    let error = compile_fixture_error(&root, "qualified-i32-primitive");
+    assert!(
+        error.contains("`i32 primitive` builtin call must use a simple builtin path"),
+        "got {error}"
+    );
+}
+
+#[test]
+fn rejects_qualified_bool_comparison_fixture() {
+    let root = repo_root().join("tests/testcases/qualified-builtin-validation");
+    let error = compile_fixture_error(&root, "qualified-bool-comparison");
+    assert!(
+        error.contains("unsupported pure expression in entrypoint body"),
+        "got {error}"
+    );
+}
+
+#[test]
+fn rejects_qualified_array_type_fixture() {
+    let root = repo_root().join("tests/testcases/qualified-builtin-validation");
+    let error = compile_fixture_error(&root, "qualified-array-type");
+    assert!(
+        error.contains("unsupported type annotation `missing::Array i32 1 i32`"),
+        "got {error}"
+    );
+}
+
+#[test]
 fn rejects_type_universe_variable_annotation_fixture() {
     let root = repo_root().join("tests/testcases/type-application-validation");
     let error = compile_fixture_error(&root, "type-universe-variable");
