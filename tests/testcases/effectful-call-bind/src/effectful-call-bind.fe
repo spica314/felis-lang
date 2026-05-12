@@ -1,0 +1,15 @@
+#use std_core::io::IO;
+#use std_core::io::FileDescriptor;
+
+#entrypoint main;
+
+#fn read_status : (fallback : i32) -> i32 #with IO {
+    #let _ : FileDescriptor <- IO::stdout;
+    fallback
+}
+
+#fn main : () #with IO {
+    #let status : i32 <- read_status 0i32;
+    #let _ : () <- IO::exit status;
+    ()
+}

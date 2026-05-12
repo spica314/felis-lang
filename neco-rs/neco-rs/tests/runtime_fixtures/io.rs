@@ -73,3 +73,12 @@ fn compiles_and_runs_cli_args_fixture() {
     assert_eq!(run.stdout, b"via argv\n");
     assert!(run.stderr.is_empty());
 }
+
+#[test]
+fn compiles_and_runs_effectful_call_bind_fixture() {
+    let root = repo_root().join("tests/testcases/effectful-call-bind");
+    let run = run_fixture_output_in_dir(&root, "effectful-call-bind", &root);
+    assert_eq!(run.status.code(), Some(0));
+    assert!(run.stdout.is_empty());
+    assert!(run.stderr.is_empty());
+}

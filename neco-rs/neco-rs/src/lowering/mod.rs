@@ -3,7 +3,7 @@ mod expr;
 mod pure;
 mod typecheck;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use neco_rs_parser::{
@@ -399,6 +399,7 @@ pub(super) fn lower_statement(
     match statement {
         Statement::Let(let_stmt) => match let_stmt.operator {
             LetOperator::Equals => {
+                ensure_not_effectful_let_value(let_stmt.value.as_ref(), state)?;
                 ensure_no_nested_io_effects(let_stmt.value.as_ref(), state)?;
                 lower_let_equals_statement(
                     &let_stmt.binder,
@@ -412,6 +413,18 @@ pub(super) fn lower_statement(
             LetOperator::LeftArrow => {
                 ensure_io_effect_allowed(state, "effectful operation")?;
                 ensure_no_nested_io_effects(let_stmt.value.as_ref(), state)?;
+                if let Some(value) =
+                    lower_function_call_value(let_stmt.value.as_ref(), state, program)?
+                {
+                    let ty = substitute_type_bindings(
+                        let_stmt.ty.as_ref(),
+                        &type_bindings_from_environment(&state.environment),
+                    );
+                    validate_value_against_type(&value, &ty, program)?;
+                    let value = wrap_reference_value(value, &ty);
+                    bind_pattern(&let_stmt.binder, value, &mut state.environment);
+                    return Ok(false);
+                }
                 let ty = substitute_type_bindings(
                     let_stmt.ty.as_ref(),
                     &type_bindings_from_environment(&state.environment),
@@ -980,6 +993,140 @@ pub(crate) fn ensure_io_effect_allowed(state: &LoweringState, operation: &str) -
 
 fn ensure_no_nested_io_effects(term: &Term, state: &LoweringState) -> Result<()> {
     ensure_no_io_effects_below_root(term, state, true)
+}
+
+fn ensure_not_effectful_let_value(term: &Term, state: &LoweringState) -> Result<()> {
+    if let Some(operation) = root_io_statement_function_call_name(term, state) {
+        return Err(Error::Unsupported(format!(
+            "`{operation}` is effectful and must be bound with `<-`"
+        )));
+    }
+    Ok(())
+}
+
+fn root_io_statement_function_call_name<'a>(
+    term: &'a Term,
+    state: &'a LoweringState,
+) -> Option<&'a str> {
+    match term {
+        Term::Group(inner) => root_io_statement_function_call_name(inner, state),
+        Term::Application { callee, .. } => {
+            let name = single_segment_path_name(callee.as_ref())?;
+            let function = state.statement_functions.get(name)?;
+            (function.effect.as_deref() == Some("IO")
+                && statement_function_uses_io_builtin(function, state, &mut HashSet::new()))
+            .then_some(name)
+        }
+        _ => None,
+    }
+}
+
+fn statement_function_uses_io_builtin(
+    function: &StatementFunction,
+    state: &LoweringState,
+    visited: &mut HashSet<String>,
+) -> bool {
+    block_uses_io_builtin(&function.body, state, visited)
+}
+
+fn block_uses_io_builtin(
+    block: &neco_rs_parser::Block,
+    state: &LoweringState,
+    visited: &mut HashSet<String>,
+) -> bool {
+    block.statements.iter().any(|statement| match statement {
+        Statement::Let(let_stmt) => term_uses_io_builtin(let_stmt.value.as_ref(), state, visited),
+        Statement::LetRef(letref_stmt) => {
+            term_uses_io_builtin(letref_stmt.source.as_ref(), state, visited)
+        }
+        Statement::Expression(term) => term_uses_io_builtin(term.as_ref(), state, visited),
+        Statement::If(if_stmt) => if_statement_uses_io_builtin(if_stmt, state, visited),
+        Statement::Loop(loop_stmt) => block_uses_io_builtin(&loop_stmt.body, state, visited),
+        Statement::Break | Statement::Continue | Statement::Item(_) => false,
+    }) || block
+        .tail
+        .as_deref()
+        .is_some_and(|tail| term_uses_io_builtin(tail, state, visited))
+}
+
+fn if_statement_uses_io_builtin(
+    if_stmt: &neco_rs_parser::IfStatement,
+    state: &LoweringState,
+    visited: &mut HashSet<String>,
+) -> bool {
+    term_uses_io_builtin(if_stmt.condition.as_ref(), state, visited)
+        || block_uses_io_builtin(&if_stmt.then_block, state, visited)
+        || match &if_stmt.else_branch {
+            Some(ElseBranch::Block(block)) => block_uses_io_builtin(block, state, visited),
+            Some(ElseBranch::If(if_stmt)) => if_statement_uses_io_builtin(if_stmt, state, visited),
+            None => false,
+        }
+}
+
+fn term_uses_io_builtin(
+    term: &Term,
+    state: &LoweringState,
+    visited: &mut HashSet<String>,
+) -> bool {
+    match term {
+        Term::Group(inner) => term_uses_io_builtin(inner, state, visited),
+        Term::Path(path) => simple_path_segments(path)
+            .is_some_and(|segments| matches!(segments.as_slice(), ["IO", _])),
+        Term::Application { callee, arguments } => {
+            if let Term::Path(path) = callee.as_ref()
+                && let Some(segments) = simple_path_segments(path)
+            {
+                if matches!(segments.as_slice(), ["IO", _]) {
+                    return true;
+                }
+                if let [name] = segments.as_slice()
+                    && visited.insert((*name).to_string())
+                    && let Some(function) = state.statement_functions.get(*name)
+                    && function.effect.as_deref() == Some("IO")
+                    && statement_function_uses_io_builtin(function, state, visited)
+                {
+                    return true;
+                }
+            }
+            arguments
+                .iter()
+                .any(|argument| term_uses_io_builtin(argument, state, visited))
+        }
+        Term::MethodCall { receiver, .. } => term_uses_io_builtin(receiver, state, visited),
+        Term::FieldAccess { receiver, .. } | Term::Reference { referent: receiver, .. } => {
+            term_uses_io_builtin(receiver, state, visited)
+        }
+        Term::StructLiteral { fields, .. } => fields
+            .iter()
+            .any(|field| term_uses_io_builtin(&field.value, state, visited)),
+        Term::Arrow(arrow) => match &arrow.parameter {
+            neco_rs_parser::ArrowParameter::Binder(binder) => {
+                term_uses_io_builtin(&binder.ty, state, visited)
+                    || term_uses_io_builtin(&arrow.result, state, visited)
+            }
+            neco_rs_parser::ArrowParameter::Domain(domain) => {
+                term_uses_io_builtin(domain, state, visited)
+                    || term_uses_io_builtin(&arrow.result, state, visited)
+            }
+        },
+        Term::Forall(forall) => {
+            term_uses_io_builtin(&forall.binder.ty, state, visited)
+                || term_uses_io_builtin(&forall.body, state, visited)
+        }
+        Term::Block(block) => block_uses_io_builtin(block, state, visited),
+        Term::Match(match_expr) => {
+            term_uses_io_builtin(match_expr.scrutinee.as_ref(), state, visited)
+                || match_expr
+                    .arms
+                    .iter()
+                    .any(|arm| term_uses_io_builtin(arm.result.as_ref(), state, visited))
+        }
+        Term::Unit
+        | Term::StringLiteral(_)
+        | Term::CharLiteral(_)
+        | Term::IntegerLiteral(_)
+        | Term::TypedBinder(_) => false,
+    }
 }
 
 fn ensure_no_io_effects(term: &Term, state: &LoweringState) -> Result<()> {

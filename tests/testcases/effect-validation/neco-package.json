@@ -1,6 +1,7 @@
 {
     "name": "effect-validation",
     "felis-bin-entrypoints": [
+        "src/effectful-call-equals.fe",
         "src/unknown-function-effect.fe"
     ]
 }

@@ -1,0 +1,4 @@
+{
+    "name": "effectful-call-bind",
+    "felis-bin-entrypoints": ["src/effectful-call-bind.fe"]
+}

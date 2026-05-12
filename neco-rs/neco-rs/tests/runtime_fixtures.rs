@@ -346,6 +346,13 @@ fn rejects_unknown_function_effect_fixture() {
 }
 
 #[test]
+fn rejects_effectful_call_bound_with_equals_fixture() {
+    let root = repo_root().join("tests/testcases/effect-validation");
+    let error = compile_fixture_error(&root, "effectful-call-equals");
+    assert!(error.contains("`read_status` is effectful and must be bound with `<-`"));
+}
+
+#[test]
 fn rejects_invalid_struct_kind_fixture() {
     let root = repo_root().join("tests/testcases/type-kind-validation");
     let error = compile_fixture_error(&root, "invalid-struct-kind");
