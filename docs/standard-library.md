@@ -10,7 +10,7 @@ The standard library is now split into two workspace packages:
 - [`std/std_core/`](../std/std_core/)
 - [`std/std_math/`](../std/std_math/)
 
-`std_core` exposes `primitive`, `io`, `string`, `option`, and `result`.
+`std_core` exposes `primitive`, `io`, `path`, `string`, `option`, and `result`.
 
 `std_math` exposes `math`.
 
@@ -23,6 +23,48 @@ source-level symbols.
 currently re-exports:
 
 - `Array`
+- `ArrayVL`
+- `array_get`
+- `array_set`
+- `array_len`
+- `DynArray`
+- `dyn_array_arrayvl`
+- `dyn_array_capacity`
+- `dyn_array_len`
+- `dyn_array_get`
+- `dyn_array_set`
+- `dyn_array_push`
+- `append_u8`
+- `append_nul_terminated_u8`
+- `append_dyn_nul_terminated_u8`
+- `fill_u8`
+
+[`std/std_core/src/primitive/bool.fe`](../std/std_core/src/primitive/bool.fe)
+currently re-exports:
+
+- `bool`
+- `true`
+- `false`
+- `bool_and`
+- `bool_or`
+- `bool_not`
+
+[`std/std_core/src/primitive/f32.fe`](../std/std_core/src/primitive/f32.fe)
+currently re-exports:
+
+- `f32`
+- `f32_add`
+- `f32_sub`
+- `f32_mul`
+- `f32_div`
+- `f32_eq`
+- `f32_lte`
+- `f32_lt`
+- `f32_gte`
+- `f32_gt`
+- `f32_from_i32`
+- `f32_from_i64`
+- `f32_from_u8`
 
 [`std/std_core/src/primitive/i32.fe`](../std/std_core/src/primitive/i32.fe)
 currently re-exports:
@@ -33,6 +75,38 @@ currently re-exports:
 - `i32_mul`
 - `i32_div`
 - `i32_mod`
+- `i32_eq`
+- `i32_lte`
+- `i32_lt`
+- `i32_gte`
+- `i32_gt`
+- `i32_from_u8`
+- `i32_from_i64`
+- `i32_from_f32`
+
+[`std/std_core/src/primitive/i64.fe`](../std/std_core/src/primitive/i64.fe)
+currently re-exports:
+
+- `i64`
+- `i64_add`
+- `i64_sub`
+- `i64_mul`
+- `i64_div`
+- `i64_mod`
+- `i64_eq`
+- `i64_lte`
+- `i64_lt`
+- `i64_gte`
+- `i64_gt`
+- `i64_from_i32`
+- `i64_from_u8`
+- `i64_from_f32`
+
+[`std/std_core/src/primitive/reference.fe`](../std/std_core/src/primitive/reference.fe)
+currently re-exports:
+
+- `ref_get`
+- `ref_set`
 
 [`std/std_core/src/primitive/u8.fe`](../std/std_core/src/primitive/u8.fe)
 currently re-exports:
@@ -43,6 +117,14 @@ currently re-exports:
 - `u8_mul`
 - `u8_div`
 - `u8_mod`
+- `u8_eq`
+- `u8_lte`
+- `u8_lt`
+- `u8_gte`
+- `u8_gt`
+- `u8_from_i32`
+- `u8_from_i64`
+- `u8_from_f32`
 
 ## IO Module
 
