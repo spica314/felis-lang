@@ -249,6 +249,17 @@ pub(crate) enum Operation {
         flags: I32Expr,
         result_slot: usize,
     },
+    CuDeviceGet {
+        device_slot: usize,
+        ordinal: I32Expr,
+        result_slot: usize,
+    },
+    CuCtxCreateV2 {
+        ctx_slot: usize,
+        flags: I32Expr,
+        device: I32Expr,
+        result_slot: usize,
+    },
     ArraySetI32 {
         array_slot: usize,
         index: I64Expr,

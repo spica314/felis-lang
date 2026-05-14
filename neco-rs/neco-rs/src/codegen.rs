@@ -352,6 +352,47 @@ fn emit_operations(
                 code.extend_from_slice(&[0x89, 0x85]);
                 code.extend_from_slice(&result_offset.to_le_bytes());
             }
+            Operation::CuDeviceGet {
+                device_slot,
+                ordinal,
+                result_slot,
+            } => {
+                let device_offset = i32_slot_offset(program, *device_slot);
+                code.extend_from_slice(&[0x48, 0x8d, 0xbd]);
+                code.extend_from_slice(&device_offset.to_le_bytes());
+                emit_i32_expr_to_eax(ordinal, code, program);
+                code.extend_from_slice(&[0x89, 0xc6]);
+                external_calls.push(ExternalCall {
+                    offset: code.len(),
+                    symbol: "cuDeviceGet",
+                });
+                code.extend_from_slice(&[0xe8, 0x00, 0x00, 0x00, 0x00]);
+                let result_offset = i32_slot_offset(program, *result_slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&result_offset.to_le_bytes());
+            }
+            Operation::CuCtxCreateV2 {
+                ctx_slot,
+                flags,
+                device,
+                result_slot,
+            } => {
+                let ctx_offset = i64_slot_offset(program, *ctx_slot);
+                code.extend_from_slice(&[0x48, 0x8d, 0xbd]);
+                code.extend_from_slice(&ctx_offset.to_le_bytes());
+                emit_i32_expr_to_eax(flags, code, program);
+                code.extend_from_slice(&[0x89, 0xc6]);
+                emit_i32_expr_to_eax(device, code, program);
+                code.extend_from_slice(&[0x89, 0xc2]);
+                external_calls.push(ExternalCall {
+                    offset: code.len(),
+                    symbol: "cuCtxCreate_v2",
+                });
+                code.extend_from_slice(&[0xe8, 0x00, 0x00, 0x00, 0x00]);
+                let result_offset = i32_slot_offset(program, *result_slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&result_offset.to_le_bytes());
+            }
             Operation::If {
                 condition,
                 then_operations,

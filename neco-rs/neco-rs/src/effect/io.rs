@@ -205,6 +205,51 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(false))
         }
+        ["IO", "cu_device_get"] => {
+            let (device_slot, ordinal, result_slot) =
+                match parse_cu_device_get_arguments(arguments, state) {
+                    Ok(value) => value,
+                    Err(err) => return Some(Err(err)),
+                };
+            program.operations.push(Operation::CuDeviceGet {
+                device_slot,
+                ordinal,
+                result_slot,
+            });
+            if let Err(error) = bind_checked_pattern(
+                binder,
+                Value::I32(I32Expr::Local(result_slot)),
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
+        ["IO", "cu_ctx_create_v2"] => {
+            let (ctx_slot, flags, device, result_slot) =
+                match parse_cu_ctx_create_v2_arguments(arguments, state) {
+                    Ok(value) => value,
+                    Err(err) => return Some(Err(err)),
+                };
+            program.operations.push(Operation::CuCtxCreateV2 {
+                ctx_slot,
+                flags,
+                device,
+                result_slot,
+            });
+            if let Err(error) = bind_checked_pattern(
+                binder,
+                Value::I32(I32Expr::Local(result_slot)),
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
         ["IO", "exit"] => {
             let exit_code = match parse_exit_code_arguments(arguments, state) {
                 Ok(value) => value,
@@ -550,6 +595,69 @@ fn parse_cu_init_arguments(
     })?;
     let result_slot = state.allocate_i32_slot();
     Ok((flags, result_slot))
+}
+
+fn parse_cu_device_get_arguments(
+    arguments: &[Term],
+    state: &mut LoweringState,
+) -> Result<(usize, I32Expr, usize)> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [device_term, ordinal_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::cu_device_get` must receive an exclusive `i32` reference and an `i32` ordinal"
+                .to_string(),
+        ));
+    };
+
+    let device_slot = match resolve_value(device_term, &state.environment)? {
+        Value::I32Reference {
+            slot,
+            exclusive: true,
+        } => slot,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`IO::cu_device_get` expects an exclusive `i32` reference as its first argument, got {other:?}"
+            )));
+        }
+    };
+    let ordinal = lower_i32_expr(ordinal_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_device_get` expects an `i32` ordinal".to_string())
+    })?;
+    let result_slot = state.allocate_i32_slot();
+    Ok((device_slot, ordinal, result_slot))
+}
+
+fn parse_cu_ctx_create_v2_arguments(
+    arguments: &[Term],
+    state: &mut LoweringState,
+) -> Result<(usize, I32Expr, I32Expr, usize)> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [ctx_term, flags_term, device_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::cu_ctx_create_v2` must receive an exclusive `i64` reference, `i32` flags, and an `i32` device"
+                .to_string(),
+        ));
+    };
+
+    let ctx_slot = match resolve_value(ctx_term, &state.environment)? {
+        Value::I64Reference {
+            slot,
+            exclusive: true,
+        } => slot,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`IO::cu_ctx_create_v2` expects an exclusive `i64` reference as its first argument, got {other:?}"
+            )));
+        }
+    };
+    let flags = lower_i32_expr(flags_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_ctx_create_v2` expects `i32` flags".to_string())
+    })?;
+    let device = lower_i32_expr(device_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_ctx_create_v2` expects an `i32` device".to_string())
+    })?;
+    let result_slot = state.allocate_i32_slot();
+    Ok((ctx_slot, flags, device, result_slot))
 }
 
 fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {

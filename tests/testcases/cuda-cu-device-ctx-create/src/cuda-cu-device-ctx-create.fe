@@ -1,0 +1,18 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::reference::ref_get;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let init_result : i32 <- IO::cu_init 0i32;
+    #let device : i32 = 0i32;
+    #letref #excl device : &^ i32 #borrow device;
+    #let device_result : i32 <- IO::cu_device_get device 0i32;
+    #let device_value : i32 = ref_get i32 device;
+    #let ctx : i64 = 0i64;
+    #letref #excl ctx : &^ i64 #borrow ctx;
+    #let ctx_result : i32 <- IO::cu_ctx_create_v2 ctx 0i32 device_value;
+    #let _ : () <- IO::exit ctx_result;
+    ()
+}

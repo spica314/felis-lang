@@ -75,6 +75,18 @@ fn compiles_and_runs_cuda_cu_init_fixture() {
     assert_eq!(status.code(), Some(0));
 }
 
+#[test]
+#[ignore = "requires a CUDA driver installation with libcuda.so available to the native linker"]
+fn compiles_and_runs_cuda_cu_device_ctx_create_fixture() {
+    if std::env::var_os("NECO_RS_TEST_CUDA").is_none() {
+        return;
+    }
+
+    let root = repo_root().join("tests/testcases/cuda-cu-device-ctx-create");
+    let status = run_fixture_status(&root, "cuda-cu-device-ctx-create");
+    assert_eq!(status.code(), Some(0));
+}
+
 fn readelf_entry_address(output: &str) -> u64 {
     output
         .lines()

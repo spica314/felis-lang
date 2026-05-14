@@ -1,0 +1,6 @@
+{
+  "name": "cuda-cu-device-ctx-create",
+  "felis-bin-entrypoints": ["src/cuda-cu-device-ctx-create.fe"],
+  "native-link-mode": "libc-start",
+  "native-libraries": ["cuda"]
+}

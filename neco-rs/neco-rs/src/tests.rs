@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 use neco_rs_parser::{NativeLinkMode, ParsedPackage, ParsedRoot, parse_root};
 
 use crate::cli::{default_output_path, select_binary_from_package};
-use crate::codegen::build_linux_x86_64_program_executable;
+use crate::codegen::{
+    EntryAbi, build_linux_x86_64_program_executable, build_linux_x86_64_program_image,
+};
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
     F32Expr, I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, PathBufSource, U8Expr,
@@ -2446,6 +2448,57 @@ fn lowers_cuda_cu_init_fixture_to_runtime_io_operations() {
         ]
     );
     assert_eq!(program.i32_slots, 1);
+}
+
+#[test]
+fn lowers_cuda_device_ctx_create_fixture_to_runtime_io_operations() {
+    let root = repo_root().join("tests/testcases/cuda-cu-device-ctx-create");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::CuInit {
+                flags: I32Expr::Literal(0),
+                result_slot: 0,
+            },
+            Operation::StoreI32 {
+                slot: 1,
+                value: I32Expr::Literal(0),
+            },
+            Operation::CuDeviceGet {
+                device_slot: 1,
+                ordinal: I32Expr::Literal(0),
+                result_slot: 2,
+            },
+            Operation::StoreI64 {
+                slot: 0,
+                value: I64Expr::Literal(0),
+            },
+            Operation::CuCtxCreateV2 {
+                ctx_slot: 0,
+                flags: I32Expr::Literal(0),
+                device: I32Expr::Local(1),
+                result_slot: 3,
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(3))),
+        ]
+    );
+    assert_eq!(program.i32_slots, 4);
+    assert_eq!(program.i64_slots, 1);
+
+    let image = build_linux_x86_64_program_image(&program, EntryAbi::LibcMain);
+    assert_eq!(
+        image
+            .external_calls
+            .iter()
+            .map(|call| call.symbol)
+            .collect::<Vec<_>>(),
+        vec!["cuInit", "cuDeviceGet", "cuCtxCreate_v2"]
+    );
 }
 
 #[test]
