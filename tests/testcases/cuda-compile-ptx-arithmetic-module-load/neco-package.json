@@ -1,0 +1,4 @@
+{
+    "name": "cuda-compile-ptx-arithmetic-module-load",
+    "felis-bin-entrypoints": ["src/cuda-compile-ptx-arithmetic-module-load.fe"]
+}

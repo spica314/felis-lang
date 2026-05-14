@@ -321,15 +321,20 @@ fn compile_empty_ptx_function(function: &neco_rs_parser::FunctionDeclaration) ->
     }
 
     let body = compile_ptx_body(function)?;
-    let u64_regs = if body.loads_array_parameter {
-        "    .reg .u64 %rd<2>;\n"
+    let u64_regs = if body.next_u64_register == 1 {
+        String::new()
     } else {
-        ""
+        format!("    .reg .u64 %rd<{}>;\n", body.next_u64_register)
     };
     let u32_regs = if body.next_u32_register == 1 {
         String::new()
     } else {
         format!("    .reg .u32 %r<{}>;\n", body.next_u32_register)
+    };
+    let f32_regs = if body.next_f32_register == 1 {
+        String::new()
+    } else {
+        format!("    .reg .f32 %f<{}>;\n", body.next_f32_register)
     };
     let parameter_load = if body.loads_array_parameter {
         "    ld.param.u64 %rd1, [arg0];\n"
@@ -337,11 +342,12 @@ fn compile_empty_ptx_function(function: &neco_rs_parser::FunctionDeclaration) ->
         ""
     };
     let mut ptx = format!(
-        ".version 7.0\n.target sm_52\n.address_size 64\n\n.visible .entry {}(\n    .param {} arg0\n)\n{{\n{}{}{}{}    ret;\n}}\n",
+        ".version 7.0\n.target sm_52\n.address_size 64\n\n.visible .entry {}(\n    .param {} arg0\n)\n{{\n{}{}{}{}{}    ret;\n}}\n",
         function.name.name,
         ptx_parameter_type(function)?,
         u64_regs,
         u32_regs,
+        f32_regs,
         parameter_load,
         body.instructions
     )
@@ -353,6 +359,8 @@ fn compile_empty_ptx_function(function: &neco_rs_parser::FunctionDeclaration) ->
 struct CompiledPtxBody {
     instructions: String,
     next_u32_register: usize,
+    next_u64_register: usize,
+    next_f32_register: usize,
     loads_array_parameter: bool,
 }
 
@@ -361,6 +369,8 @@ fn compile_ptx_body(function: &neco_rs_parser::FunctionDeclaration) -> Result<Co
         return Ok(CompiledPtxBody {
             instructions: String::new(),
             next_u32_register: 1,
+            next_u64_register: 1,
+            next_f32_register: 1,
             loads_array_parameter: false,
         });
     }
@@ -373,6 +383,8 @@ fn compile_ptx_body(function: &neco_rs_parser::FunctionDeclaration) -> Result<Co
         locals: HashMap::new(),
         instructions: String::new(),
         next_u32_register: 1,
+        next_u64_register: 2,
+        next_f32_register: 1,
     };
     for statement in &function.body.statements {
         compiler.compile_statement(statement)?;
@@ -380,38 +392,40 @@ fn compile_ptx_body(function: &neco_rs_parser::FunctionDeclaration) -> Result<Co
     Ok(CompiledPtxBody {
         instructions: compiler.instructions,
         next_u32_register: compiler.next_u32_register,
+        next_u64_register: compiler.next_u64_register,
+        next_f32_register: compiler.next_f32_register,
         loads_array_parameter: true,
     })
+}
+
+#[derive(Clone)]
+struct PtxValue {
+    ty: ArrayElementType,
+    register: String,
 }
 
 struct PtxBodyCompiler<'a> {
     function_name: &'a str,
     parameter: &'a str,
     element_type: ArrayElementType,
-    locals: HashMap<String, String>,
+    locals: HashMap<String, PtxValue>,
     instructions: String,
     next_u32_register: usize,
+    next_u64_register: usize,
+    next_f32_register: usize,
 }
 
 impl PtxBodyCompiler<'_> {
     fn compile_statement(&mut self, statement: &Statement) -> Result<()> {
         match statement {
-            Statement::Let(let_statement) if matches!(let_statement.operator, LetOperator::Equals) => {
+            Statement::Let(let_statement)
+                if matches!(let_statement.operator, LetOperator::Equals) =>
+            {
                 let BindingPattern::Name(name) = &let_statement.binder else {
                     return Err(self.unsupported("PTX `#let` currently requires a named binder"));
                 };
-                let Some((array_name, index)) = ptx_ref_get_call_parts(&let_statement.value)? else {
-                    return Err(self.unsupported("PTX `#let` currently supports only `ref_get_ptx`"));
-                };
-                self.ensure_parameter_array(&array_name)?;
-                self.ensure_i32_element()?;
-                let register = self.allocate_u32_register();
-                self.instructions.push_str(&format!(
-                    "    ld.global.u32 {}, [%rd1+{}];\n",
-                    register,
-                    index * 4
-                ));
-                self.locals.insert(name.clone(), register);
+                let value = self.compile_value(&let_statement.value)?;
+                self.locals.insert(name.clone(), value);
                 Ok(())
             }
             Statement::Expression(term) => {
@@ -421,19 +435,115 @@ impl PtxBodyCompiler<'_> {
                     ));
                 };
                 self.ensure_parameter_array(&array_name)?;
-                self.ensure_i32_element()?;
-                let value = self.value_register_or_immediate(&value)?;
+                let value = self.compile_value(&value)?;
+                self.ensure_element_type(value.ty)?;
                 self.instructions.push_str(&format!(
-                    "    st.global.u32 [%rd1+{}], {};\n",
-                    index * 4,
-                    value
+                    "    st.global.{} [%rd1+{}], {};\n",
+                    ptx_memory_type(value.ty),
+                    index * ptx_element_size(value.ty),
+                    value.register
                 ));
                 Ok(())
             }
             _ => Err(self.unsupported(
-                "PTX bodies currently support only `#let` from `ref_get_ptx` and expression `ref_set_ptx`",
+                "PTX bodies currently support only `#let` values and expression `ref_set_ptx`",
             )),
         }
+    }
+
+    fn compile_value(&mut self, term: &Term) -> Result<PtxValue> {
+        if let Some((array_name, index)) = ptx_ref_get_call_parts(term)? {
+            self.ensure_parameter_array(&array_name)?;
+            let register = self.allocate_register(self.element_type);
+            self.instructions.push_str(&format!(
+                "    ld.global.{} {}, [%rd1+{}];\n",
+                ptx_memory_type(self.element_type),
+                register,
+                index * ptx_element_size(self.element_type)
+            ));
+            return Ok(PtxValue {
+                ty: self.element_type,
+                register,
+            });
+        }
+
+        if let Some(value) = self.compile_literal(term)? {
+            return Ok(value);
+        }
+
+        if let Some(value) = self.compile_primitive_call(term)? {
+            return Ok(value);
+        }
+
+        let Some(name) = simple_path_name(term) else {
+            return Err(self.unsupported(
+                "PTX value must be a literal, local, primitive call, or ref_get_ptx",
+            ));
+        };
+        self.locals
+            .get(name)
+            .cloned()
+            .ok_or_else(|| self.unsupported("PTX value must refer to a previously bound local"))
+    }
+
+    fn compile_literal(&mut self, term: &Term) -> Result<Option<PtxValue>> {
+        if let Some(value) = parse_ptx_i32_literal(term)? {
+            let register = self.allocate_u32_register();
+            self.instructions
+                .push_str(&format!("    mov.u32 {}, {};\n", register, value));
+            return Ok(Some(PtxValue {
+                ty: ArrayElementType::I32,
+                register,
+            }));
+        }
+        if let Some(value) = parse_ptx_i64_literal(term)? {
+            let register = self.allocate_u64_register();
+            self.instructions
+                .push_str(&format!("    mov.u64 {}, {};\n", register, value));
+            return Ok(Some(PtxValue {
+                ty: ArrayElementType::I64,
+                register,
+            }));
+        }
+        if let Some(bits) = parse_ptx_f32_literal_bits(term)? {
+            let register = self.allocate_f32_register();
+            self.instructions
+                .push_str(&format!("    mov.b32 {}, 0f{bits:08x};\n", register));
+            return Ok(Some(PtxValue {
+                ty: ArrayElementType::F32,
+                register,
+            }));
+        }
+        Ok(None)
+    }
+
+    fn compile_primitive_call(&mut self, term: &Term) -> Result<Option<PtxValue>> {
+        let Term::Application { callee, arguments } = term else {
+            return Ok(None);
+        };
+        let Some(primitive) = simple_path_name(callee) else {
+            return Ok(None);
+        };
+        let Some((ty, instruction)) = ptx_binary_primitive(primitive) else {
+            return Ok(None);
+        };
+        let normalized = normalize_numeric_literal_arguments(arguments);
+        let [lhs, rhs] = normalized.as_slice() else {
+            return Err(
+                self.unsupported("PTX arithmetic primitive must receive exactly two arguments")
+            );
+        };
+        let lhs = self.compile_value(lhs)?;
+        let rhs = self.compile_value(rhs)?;
+        if lhs.ty != ty || rhs.ty != ty {
+            return Err(self.unsupported("PTX arithmetic primitive arguments must match its type"));
+        }
+        let register = self.allocate_register(ty);
+        self.instructions.push_str(&format!(
+            "    {instruction} {}, {}, {};\n",
+            register, lhs.register, rhs.register
+        ));
+        Ok(Some(PtxValue { ty, register }))
     }
 
     fn allocate_u32_register(&mut self) -> String {
@@ -442,19 +552,24 @@ impl PtxBodyCompiler<'_> {
         register
     }
 
-    fn value_register_or_immediate(&mut self, term: &Term) -> Result<String> {
-        if let Some(value) = parse_ptx_i32_literal(term)? {
-            let register = self.allocate_u32_register();
-            self.instructions
-                .push_str(&format!("    mov.u32 {}, {};\n", register, value));
-            return Ok(register);
+    fn allocate_u64_register(&mut self) -> String {
+        let register = format!("%rd{}", self.next_u64_register);
+        self.next_u64_register += 1;
+        register
+    }
+
+    fn allocate_f32_register(&mut self) -> String {
+        let register = format!("%f{}", self.next_f32_register);
+        self.next_f32_register += 1;
+        register
+    }
+
+    fn allocate_register(&mut self, ty: ArrayElementType) -> String {
+        match ty {
+            ArrayElementType::I32 | ArrayElementType::U8 => self.allocate_u32_register(),
+            ArrayElementType::I64 => self.allocate_u64_register(),
+            ArrayElementType::F32 => self.allocate_f32_register(),
         }
-        let Some(name) = simple_path_name(term) else {
-            return Err(self.unsupported("PTX `ref_set_ptx` value must be an i32 literal or local"));
-        };
-        self.locals.get(name).cloned().ok_or_else(|| {
-            self.unsupported("PTX `ref_set_ptx` value must refer to a local from `ref_get_ptx`")
-        })
     }
 
     fn ensure_parameter_array(&self, array_name: &str) -> Result<()> {
@@ -465,11 +580,12 @@ impl PtxBodyCompiler<'_> {
         }
     }
 
-    fn ensure_i32_element(&self) -> Result<()> {
-        if self.element_type == ArrayElementType::I32 {
+    fn ensure_element_type(&self, ty: ArrayElementType) -> Result<()> {
+        if self.element_type == ty {
             Ok(())
         } else {
-            Err(self.unsupported("PTX ref_get_ptx/ref_set_ptx currently support only i32 arrays"))
+            Err(self
+                .unsupported("PTX ref_set_ptx value type must match the ArrayVLPTX element type"))
         }
     }
 
@@ -651,6 +767,41 @@ fn is_simple_callee(term: &Term, expected: &str) -> bool {
     simple_path_name(term) == Some(expected)
 }
 
+fn ptx_element_size(ty: ArrayElementType) -> i32 {
+    match ty {
+        ArrayElementType::I32 | ArrayElementType::F32 => 4,
+        ArrayElementType::I64 => 8,
+        ArrayElementType::U8 => 1,
+    }
+}
+
+fn ptx_memory_type(ty: ArrayElementType) -> &'static str {
+    match ty {
+        ArrayElementType::I32 => "u32",
+        ArrayElementType::I64 => "u64",
+        ArrayElementType::F32 => "f32",
+        ArrayElementType::U8 => "u8",
+    }
+}
+
+fn ptx_binary_primitive(name: &str) -> Option<(ArrayElementType, &'static str)> {
+    match name {
+        "i32_add" => Some((ArrayElementType::I32, "add.s32")),
+        "i32_sub" => Some((ArrayElementType::I32, "sub.s32")),
+        "i32_mul" => Some((ArrayElementType::I32, "mul.lo.s32")),
+        "i32_div" => Some((ArrayElementType::I32, "div.s32")),
+        "i64_add" => Some((ArrayElementType::I64, "add.s64")),
+        "i64_sub" => Some((ArrayElementType::I64, "sub.s64")),
+        "i64_mul" => Some((ArrayElementType::I64, "mul.lo.s64")),
+        "i64_div" => Some((ArrayElementType::I64, "div.s64")),
+        "f32_add" => Some((ArrayElementType::F32, "add.rn.f32")),
+        "f32_sub" => Some((ArrayElementType::F32, "sub.rn.f32")),
+        "f32_mul" => Some((ArrayElementType::F32, "mul.rn.f32")),
+        "f32_div" => Some((ArrayElementType::F32, "div.rn.f32")),
+        _ => None,
+    }
+}
+
 fn simple_path_name(term: &Term) -> Option<&str> {
     let Term::Path(path) = term else {
         return None;
@@ -685,6 +836,46 @@ fn parse_ptx_i32_literal(term: &Term) -> Result<Option<i32>> {
             .map_err(|_| Error::Unsupported("PTX i32 literal is out of range".to_string())),
         _ => Ok(None),
     }
+}
+
+fn parse_ptx_i64_literal(term: &Term) -> Result<Option<i64>> {
+    match term {
+        Term::Application { callee, arguments } => {
+            let [suffix] = arguments.as_slice() else {
+                return Ok(None);
+            };
+            if simple_path_name(suffix) != Some("i64") {
+                return Ok(None);
+            }
+            let Term::IntegerLiteral(literal) = callee.as_ref() else {
+                return Ok(None);
+            };
+            literal
+                .parse::<i64>()
+                .map(Some)
+                .map_err(|_| Error::Unsupported("PTX i64 literal is out of range".to_string()))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn parse_ptx_f32_literal_bits(term: &Term) -> Result<Option<u32>> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(None);
+    };
+    let [suffix] = arguments.as_slice() else {
+        return Ok(None);
+    };
+    if simple_path_name(suffix) != Some("f32") {
+        return Ok(None);
+    }
+    let Term::IntegerLiteral(literal) = callee.as_ref() else {
+        return Ok(None);
+    };
+    let value = literal
+        .parse::<f32>()
+        .map_err(|_| Error::Unsupported("PTX f32 literal could not be parsed".to_string()))?;
+    Ok(Some(value.to_bits()))
 }
 
 fn simple_type_name(ty: &Term) -> Option<&str> {

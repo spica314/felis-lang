@@ -1,0 +1,30 @@
+#fn i64_kernel : (array : ArrayVLPTX i64) -> () #with PTX {
+    #let a : i64 = ref_get_ptx i64 array 0i32;
+    #let b : i64 = ref_get_ptx i64 array 1i32;
+    #let sum : i64 = i64_add a b;
+    #let diff : i64 = i64_sub sum 3i64;
+    #let product : i64 = i64_mul diff 2i64;
+    #let quotient : i64 = i64_div product b;
+    ref_set_ptx i64 array 2i32 quotient;
+    ()
+}
+
+#fn f32_kernel : (array : ArrayVLPTX f32) -> () #with PTX {
+    #let a : f32 = ref_get_ptx f32 array 0i32;
+    #let b : f32 = ref_get_ptx f32 array 1i32;
+    #let sum : f32 = f32_add a b;
+    #let diff : f32 = f32_sub sum 1.5f32;
+    #let product : f32 = f32_mul diff 2.0f32;
+    #let quotient : f32 = f32_div product b;
+    ref_set_ptx f32 array 2i32 quotient;
+    ()
+}
+
+#compile_ptx i64_kernel #to i64_kernel_ptx;
+#compile_ptx f32_kernel #to f32_kernel_ptx;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    ()
+}

@@ -1,0 +1,4 @@
+{
+    "name": "compile-ptx-arithmetic",
+    "felis-bin-entrypoints": ["src/compile-ptx-arithmetic.fe"]
+}

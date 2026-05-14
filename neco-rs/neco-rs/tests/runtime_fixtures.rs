@@ -99,6 +99,18 @@ fn compiles_and_runs_cuda_compile_ptx_module_load_fixture() {
     assert_eq!(status.code(), Some(0));
 }
 
+#[test]
+#[ignore = "requires a CUDA driver installation with libcuda.so available to the native linker"]
+fn compiles_and_runs_cuda_compile_ptx_arithmetic_module_load_fixture() {
+    if std::env::var_os("NECO_RS_TEST_CUDA").is_none() {
+        return;
+    }
+
+    let root = repo_root().join("tests/testcases/cuda-compile-ptx-arithmetic-module-load");
+    let status = run_fixture_status(&root, "cuda-compile-ptx-arithmetic-module-load");
+    assert_eq!(status.code(), Some(0));
+}
+
 fn readelf_entry_address(output: &str) -> u64 {
     output
         .lines()

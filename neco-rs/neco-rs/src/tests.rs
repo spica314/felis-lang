@@ -2646,6 +2646,44 @@ fn lowers_cuda_compile_ptx_module_load_fixture_to_runtime_io_operations() {
 }
 
 #[test]
+fn compiles_i64_ptx_arithmetic() {
+    let root = repo_root().join("tests/testcases/compile-ptx-arithmetic");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower package");
+    let ptx = String::from_utf8_lossy(&program.data[0]);
+    assert!(ptx.contains(".visible .entry i64_kernel("));
+    assert!(ptx.contains(".reg .u64 %rd<"));
+    assert!(ptx.contains("ld.global.u64"));
+    assert!(ptx.contains("add.s64"));
+    assert!(ptx.contains("sub.s64"));
+    assert!(ptx.contains("mul.lo.s64"));
+    assert!(ptx.contains("div.s64"));
+    assert!(ptx.contains("st.global.u64"));
+}
+
+#[test]
+fn compiles_f32_ptx_arithmetic() {
+    let root = repo_root().join("tests/testcases/compile-ptx-arithmetic");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower package");
+    let ptx = String::from_utf8_lossy(&program.data[2]);
+    assert!(ptx.contains(".visible .entry f32_kernel("));
+    assert!(ptx.contains(".reg .f32 %f<"));
+    assert!(ptx.contains("ld.global.f32"));
+    assert!(ptx.contains("add.rn.f32"));
+    assert!(ptx.contains("sub.rn.f32"));
+    assert!(ptx.contains("mul.rn.f32"));
+    assert!(ptx.contains("div.rn.f32"));
+    assert!(ptx.contains("st.global.f32"));
+}
+
+#[test]
 fn rejects_zero_argument_compile_ptx_target() {
     let package = parse_inline_binary_package(
         "reject-zero-argument-compile-ptx",
