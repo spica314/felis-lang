@@ -63,6 +63,18 @@ fn libc_start_fixture_uses_crt_start_as_elf_entry() {
     assert_ne!(entry, main);
 }
 
+#[test]
+#[ignore = "requires a CUDA driver installation with libcuda.so available to the native linker"]
+fn compiles_and_runs_cuda_cu_init_fixture() {
+    if std::env::var_os("NECO_RS_TEST_CUDA").is_none() {
+        return;
+    }
+
+    let root = repo_root().join("tests/testcases/cuda-cu-init");
+    let status = run_fixture_status(&root, "cuda-cu-init");
+    assert_eq!(status.code(), Some(0));
+}
+
 fn readelf_entry_address(output: &str) -> u64 {
     output
         .lines()

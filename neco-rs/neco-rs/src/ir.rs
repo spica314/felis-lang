@@ -245,6 +245,10 @@ pub(crate) enum Operation {
         array_slot: usize,
         len: I32Expr,
     },
+    CuInit {
+        flags: I32Expr,
+        result_slot: usize,
+    },
     ArraySetI32 {
         array_slot: usize,
         index: I64Expr,

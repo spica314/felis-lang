@@ -71,7 +71,7 @@ fn program_assembly(image: &ProgramImage) -> String {
     assembly.push_str(".type main,@function\n");
     assembly.push_str(".section .text.neco,\"ax\",@progbits\n");
     assembly.push_str("main:\n");
-    push_byte_directives(&mut assembly, &image.code);
+    push_code_directives(&mut assembly, image);
     assembly.push_str(".size main, .-main\n");
 
     if !image.data.is_empty() {
@@ -88,6 +88,26 @@ fn program_assembly(image: &ProgramImage) -> String {
 
     assembly.push_str(".section .note.GNU-stack,\"\",@progbits\n");
     assembly
+}
+
+fn push_code_directives(assembly: &mut String, image: &ProgramImage) {
+    let mut offset = 0;
+    let mut external_calls = image.external_calls.clone();
+    external_calls.sort_by_key(|call| call.offset);
+
+    for call in external_calls {
+        if call.offset > offset {
+            push_byte_directives(assembly, &image.code[offset..call.offset]);
+        }
+        assembly.push_str("call ");
+        assembly.push_str(call.symbol);
+        assembly.push_str("@PLT\n");
+        offset = call.offset + 5;
+    }
+
+    if offset < image.code.len() {
+        push_byte_directives(assembly, &image.code[offset..]);
+    }
 }
 
 fn push_byte_directives(assembly: &mut String, bytes: &[u8]) {

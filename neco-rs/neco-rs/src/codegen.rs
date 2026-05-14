@@ -18,6 +18,13 @@ pub(crate) struct ProgramImage {
     pub(crate) code: Vec<u8>,
     pub(crate) data: Vec<u8>,
     pub(crate) requires_argv: bool,
+    pub(crate) external_calls: Vec<ExternalCall>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ExternalCall {
+    pub(crate) offset: usize,
+    pub(crate) symbol: &'static str,
 }
 
 pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) -> Elf64Executable {
@@ -53,15 +60,19 @@ pub(crate) fn build_linux_x86_64_program_image(
     program: &LoweredProgram,
     entry_abi: EntryAbi,
 ) -> ProgramImage {
+    let mut external_calls = Vec::new();
+    let code = program_syscall_code(
+        program,
+        DATA_VIRTUAL_ADDRESS,
+        program.requires_argv.then_some(ARGV_GLOBAL_ADDRESS),
+        entry_abi,
+        &mut external_calls,
+    );
     ProgramImage {
-        code: program_syscall_code(
-            program,
-            DATA_VIRTUAL_ADDRESS,
-            program.requires_argv.then_some(ARGV_GLOBAL_ADDRESS),
-            entry_abi,
-        ),
+        code,
         data: flatten_data(program),
         requires_argv: program.requires_argv,
+        external_calls,
     }
 }
 
@@ -89,6 +100,7 @@ fn program_syscall_code(
     data_virtual_address: u64,
     argv_global_address: Option<u64>,
     entry_abi: EntryAbi,
+    external_calls: &mut Vec<ExternalCall>,
 ) -> Vec<u8> {
     let addresses = data_addresses(program, data_virtual_address);
     let mut code = Vec::new();
@@ -111,8 +123,10 @@ fn program_syscall_code(
         &mut code,
         program,
         &addresses,
+        entry_abi,
         None,
         None,
+        external_calls,
     );
 
     code
@@ -123,8 +137,10 @@ fn emit_operations(
     code: &mut Vec<u8>,
     program: &LoweredProgram,
     addresses: &[u64],
+    entry_abi: EntryAbi,
     mut break_patches: Option<&mut Vec<usize>>,
     mut continue_patches: Option<&mut Vec<usize>>,
+    external_calls: &mut Vec<ExternalCall>,
 ) {
     for operation in operations {
         match operation {
@@ -324,6 +340,18 @@ fn emit_operations(
                 code.extend_from_slice(&[0xb8, 0x01, 0x00, 0x00, 0x00]);
                 code.extend_from_slice(&[0x0f, 0x05]);
             }
+            Operation::CuInit { flags, result_slot } => {
+                emit_i32_expr_to_eax(flags, code, program);
+                code.extend_from_slice(&[0x89, 0xc7]);
+                external_calls.push(ExternalCall {
+                    offset: code.len(),
+                    symbol: "cuInit",
+                });
+                code.extend_from_slice(&[0xe8, 0x00, 0x00, 0x00, 0x00]);
+                let result_offset = i32_slot_offset(program, *result_slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&result_offset.to_le_bytes());
+            }
             Operation::If {
                 condition,
                 then_operations,
@@ -335,8 +363,10 @@ fn emit_operations(
                     code,
                     program,
                     addresses,
+                    entry_abi,
                     break_patches.as_deref_mut(),
                     continue_patches.as_deref_mut(),
+                    external_calls,
                 );
                 if else_operations.is_empty() {
                     let end = code.len();
@@ -351,8 +381,10 @@ fn emit_operations(
                         code,
                         program,
                         addresses,
+                        entry_abi,
                         break_patches.as_deref_mut(),
                         continue_patches.as_deref_mut(),
+                        external_calls,
                     );
                     let end = code.len();
                     patch_jumps_to(&false_patch_ats, else_start, code);
@@ -390,8 +422,10 @@ fn emit_operations(
                     code,
                     program,
                     addresses,
+                    entry_abi,
                     Some(&mut loop_break_patches),
                     Some(&mut loop_continue_patches),
+                    external_calls,
                 );
                 code.push(0xe9);
                 let back_patch_at = code.len();
@@ -429,9 +463,14 @@ fn emit_operations(
             }
             Operation::Exit(exit_code) => {
                 emit_exit_code_expr_to_eax(exit_code, code, program);
-                code.extend_from_slice(&[0x89, 0xc7]);
-                code.extend_from_slice(&[0xb8, 0x3c, 0x00, 0x00, 0x00]);
-                code.extend_from_slice(&[0x0f, 0x05]);
+                match entry_abi {
+                    EntryAbi::KernelStart => {
+                        code.extend_from_slice(&[0x89, 0xc7]);
+                        code.extend_from_slice(&[0xb8, 0x3c, 0x00, 0x00, 0x00]);
+                        code.extend_from_slice(&[0x0f, 0x05]);
+                    }
+                    EntryAbi::LibcMain => emit_main_return(code, program),
+                }
             }
         }
     }
@@ -618,6 +657,13 @@ fn emit_exit_code_expr_to_eax(expr: &ExitCodeExpr, code: &mut Vec<u8>, program: 
         ExitCodeExpr::I64(expr) => emit_i64_expr_to_rax(expr, code, program),
         ExitCodeExpr::U8(expr) => emit_u8_expr_to_eax(expr, code, program),
     }
+}
+
+fn emit_main_return(code: &mut Vec<u8>, program: &LoweredProgram) {
+    if stack_frame_size(program) > 0 {
+        code.push(0xc9);
+    }
+    code.push(0xc3);
 }
 
 fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>, program: &LoweredProgram) {
@@ -1003,7 +1049,8 @@ fn stack_frame_size(program: &LoweredProgram) -> usize {
     let i64_slot_bytes = program.i64_slots * 8;
     let f32_slot_bytes = program.f32_slots * 4;
     let array_bytes: usize = program.arrays.iter().map(array_storage_size).sum();
-    pointer_bytes + i32_slot_bytes + i64_slot_bytes + f32_slot_bytes + array_bytes
+    let size = pointer_bytes + i32_slot_bytes + i64_slot_bytes + f32_slot_bytes + array_bytes;
+    size.next_multiple_of(16)
 }
 
 fn heap_slot_offset(slot: usize) -> i32 {

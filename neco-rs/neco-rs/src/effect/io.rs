@@ -186,6 +186,25 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(false))
         }
+        ["IO", "cu_init"] => {
+            let (flags, result_slot) = match parse_cu_init_arguments(arguments, state) {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            program
+                .operations
+                .push(Operation::CuInit { flags, result_slot });
+            if let Err(error) = bind_checked_pattern(
+                binder,
+                Value::I32(I32Expr::Local(result_slot)),
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
         ["IO", "exit"] => {
             let exit_code = match parse_exit_code_arguments(arguments, state) {
                 Ok(value) => value,
@@ -513,6 +532,24 @@ fn parse_close_arguments(arguments: &[Term], state: &LoweringState) -> Result<I3
             "`IO::close` expects a file descriptor, got {other:?}"
         ))),
     }
+}
+
+fn parse_cu_init_arguments(
+    arguments: &[Term],
+    state: &mut LoweringState,
+) -> Result<(I32Expr, usize)> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [flags_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::cu_init` must receive a single `i32` flags argument".to_string(),
+        ));
+    };
+
+    let flags = lower_i32_expr(flags_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_init` expects an `i32` flags argument".to_string())
+    })?;
+    let result_slot = state.allocate_i32_slot();
+    Ok((flags, result_slot))
 }
 
 fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {

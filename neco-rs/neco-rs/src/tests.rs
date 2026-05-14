@@ -2428,6 +2428,27 @@ fn lowers_stdin_to_stdout_fixture_to_runtime_io_operations() {
 }
 
 #[test]
+fn lowers_cuda_cu_init_fixture_to_runtime_io_operations() {
+    let root = repo_root().join("tests/testcases/cuda-cu-init");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::CuInit {
+                flags: I32Expr::Literal(0),
+                result_slot: 0,
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(0))),
+        ]
+    );
+    assert_eq!(program.i32_slots, 1);
+}
+
+#[test]
 fn lowers_open_read_close_fixture_to_runtime_io_operations() {
     let root = repo_root().join("tests/testcases/open-read-close");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

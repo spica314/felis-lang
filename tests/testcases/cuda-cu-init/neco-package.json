@@ -1,0 +1,6 @@
+{
+  "name": "cuda-cu-init",
+  "felis-bin-entrypoints": ["src/cuda-cu-init.fe"],
+  "native-link-mode": "libc-start",
+  "native-libraries": ["cuda"]
+}
