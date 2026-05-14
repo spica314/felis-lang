@@ -6,6 +6,7 @@ mod cli;
 mod codegen;
 mod effect;
 mod ir;
+mod linker;
 mod lowering;
 #[cfg(test)]
 mod tests;
@@ -22,6 +23,10 @@ pub enum Error {
     },
     Elf(neco_rs_elf::Error),
     Parse(neco_rs_parser::Error),
+    Link {
+        status: Option<i32>,
+        stderr: String,
+    },
     Unsupported(String),
 }
 
@@ -36,6 +41,17 @@ impl fmt::Display for Error {
             Self::Io { path: None, source } => source.fmt(f),
             Self::Elf(source) => source.fmt(f),
             Self::Parse(source) => source.fmt(f),
+            Self::Link { status, stderr } => {
+                write!(f, "native linker failed")?;
+                if let Some(status) = status {
+                    write!(f, " with status {status}")?;
+                }
+                let stderr = stderr.trim();
+                if !stderr.is_empty() {
+                    write!(f, ": {stderr}")?;
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -81,17 +97,30 @@ pub fn compile_path_to_elf(input: &Path, output: &Path) -> Result<()> {
 
 fn compile_package_to_elf(package: &neco_rs_parser::ParsedPackage, output: &Path) -> Result<()> {
     let program = lower_package_to_program(package)?;
-    let elf = codegen::build_linux_x86_64_program_executable(&program).to_bytes()?;
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent).map_err(|source| Error::Io {
             path: Some(parent.to_path_buf()),
             source,
         })?;
     }
-    fs::write(output, elf).map_err(|source| Error::Io {
-        path: Some(output.to_path_buf()),
-        source,
-    })?;
+    match package.manifest.native_link_mode {
+        neco_rs_parser::NativeLinkMode::KernelStart => {
+            let elf = codegen::build_linux_x86_64_program_executable(&program).to_bytes()?;
+            fs::write(output, elf).map_err(|source| Error::Io {
+                path: Some(output.to_path_buf()),
+                source,
+            })?;
+        }
+        neco_rs_parser::NativeLinkMode::LibcStart => {
+            let image =
+                codegen::build_linux_x86_64_program_image(&program, codegen::EntryAbi::LibcMain);
+            linker::link_linux_x86_64_libc_start_executable(
+                &image,
+                &package.manifest.native_libraries,
+                output,
+            )?;
+        }
+    }
     cli::set_output_executable(output)?;
     Ok(())
 }

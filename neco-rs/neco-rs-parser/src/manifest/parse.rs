@@ -4,7 +4,9 @@ use neco_rs_json::{JsonEntry, JsonValue};
 
 use crate::{Error, FilePos, Result, Span};
 
-use super::model::{Dependency, DependencySource, Manifest, PackageManifest, WorkspaceManifest};
+use super::model::{
+    Dependency, DependencySource, Manifest, NativeLinkMode, PackageManifest, WorkspaceManifest,
+};
 
 pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
     let (_, value) =
@@ -16,12 +18,16 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
     let dependencies = optional_field(object, "dependencies")?;
     let felis_lib_entrypoint = optional_string_field(object, "felis-lib-entrypoint")?;
     let felis_bin_entrypoints = optional_string_array_field(object, "felis-bin-entrypoints")?;
+    let native_link_mode = optional_string_field(object, "native-link-mode")?;
+    let native_libraries = optional_string_array_field(object, "native-libraries")?;
 
     match (workspace, name) {
         (Some(workspace), None) => {
             if felis_lib_entrypoint.is_some()
                 || !felis_bin_entrypoints.is_empty()
                 || dependencies.is_some()
+                || native_link_mode.is_some()
+                || !native_libraries.is_empty()
             {
                 return Err(
                     Error::new("workspace manifest cannot contain package-only fields")
@@ -47,6 +53,8 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
                 .into_iter()
                 .map(|entrypoint| parse_manifest_path(path, &entrypoint, "binary entrypoint"))
                 .collect::<Result<Vec<_>>>()?,
+            native_link_mode: parse_native_link_mode(path, native_link_mode)?,
+            native_libraries: parse_native_libraries(path, native_libraries)?,
         })),
         (Some(_), Some(_)) => Err(
             Error::new("manifest cannot be both a workspace and a package")
@@ -57,6 +65,34 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
                 .with_path(path.to_path_buf()),
         ),
     }
+}
+
+fn parse_native_link_mode(path: &Path, value: Option<String>) -> Result<NativeLinkMode> {
+    match value.as_deref() {
+        None | Some("kernel-start") => Ok(NativeLinkMode::KernelStart),
+        Some("libc-start") => Ok(NativeLinkMode::LibcStart),
+        Some(value) => Err(Error::new(format!(
+            "`native-link-mode` must be `kernel-start` or `libc-start`, found `{value}`"
+        ))
+        .with_path(path.to_path_buf())),
+    }
+}
+
+fn parse_native_libraries(path: &Path, libraries: Vec<String>) -> Result<Vec<String>> {
+    for library in &libraries {
+        if library.is_empty()
+            || library.starts_with('-')
+            || library.contains('/')
+            || library.contains('\\')
+            || library.contains(char::is_whitespace)
+        {
+            return Err(Error::new(format!(
+                "native library `{library}` must be a bare linker library name"
+            ))
+            .with_path(path.to_path_buf()));
+        }
+    }
+    Ok(libraries)
 }
 
 fn parse_dependencies(path: &Path, value: Option<&JsonValue>) -> Result<Vec<Dependency>> {

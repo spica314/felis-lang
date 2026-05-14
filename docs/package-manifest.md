@@ -29,6 +29,12 @@ The current manifest design covers these manifest fields:
 - `dependencies`: identifies other packages required by the package.
 - `felis-bin-entrypoints`: identifies one or more Felis binary entrypoint files
   for the package.
+- `native-link-mode`: selects how native executables are linked. The default
+  `kernel-start` mode keeps the existing standalone ELF entry path. `libc-start`
+  links through the system C toolchain so the executable starts in libc's
+  `_start` and calls the generated `main`.
+- `native-libraries`: lists additional shared libraries to pass to the native
+  linker as `-l<name>` entries when `native-link-mode` is `libc-start`.
 
 Binary entrypoint source files can then mark the selected function with an
 `#entrypoint` declaration ending with `;`, for example
@@ -54,7 +60,9 @@ package:
       "workspace": true
     }
   },
-  "felis-bin-entrypoints": ["src/main.fe"]
+  "felis-bin-entrypoints": ["src/main.fe"],
+  "native-link-mode": "libc-start",
+  "native-libraries": ["m"]
 }
 ```
 
@@ -108,4 +116,5 @@ constrains only:
 
 - package name and Felis entrypoint fields,
 - workspace member enumeration, and
-- package dependencies on workspace members.
+- package dependencies on workspace members,
+- native link mode and native shared library names.

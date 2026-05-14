@@ -1,5 +1,5 @@
 use super::DependencySource;
-use super::model::Manifest;
+use super::model::{Manifest, NativeLinkMode};
 use super::parse::parse_manifest;
 use std::path::{Path, PathBuf};
 
@@ -28,6 +28,29 @@ fn parses_package_manifest_without_serde() {
     );
     assert_eq!(package.dependencies.len(), 1);
     assert_eq!(package.dependencies[0].source, DependencySource::Workspace);
+    assert_eq!(package.native_link_mode, NativeLinkMode::KernelStart);
+    assert!(package.native_libraries.is_empty());
+}
+
+#[test]
+fn parses_native_link_fields() {
+    let manifest = parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "name": "hello-world",
+                "felis-bin-entrypoints": ["src/main.fe"],
+                "native-link-mode": "libc-start",
+                "native-libraries": ["m", "pthread"]
+            }"#,
+    )
+    .expect("manifest parses");
+
+    let Manifest::Package(package) = manifest else {
+        panic!("expected package");
+    };
+
+    assert_eq!(package.native_link_mode, NativeLinkMode::LibcStart);
+    assert_eq!(package.native_libraries, vec!["m", "pthread"]);
 }
 
 #[test]

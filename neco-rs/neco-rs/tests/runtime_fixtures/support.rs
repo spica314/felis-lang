@@ -15,7 +15,7 @@ pub(super) fn repo_root() -> PathBuf {
         .expect("repo root")
 }
 
-fn compile_fixture(root: &Path, name: &str) -> PathBuf {
+pub(super) fn compile_fixture(root: &Path, name: &str) -> PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time")

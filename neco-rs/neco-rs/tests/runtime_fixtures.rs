@@ -7,6 +7,7 @@ mod neco_felis;
 #[path = "runtime_fixtures/support.rs"]
 mod support;
 
+use std::process::Command;
 use support::*;
 
 #[test]
@@ -14,6 +15,77 @@ fn compiles_and_runs_i32_ops_fixture() {
     let root = repo_root().join("tests/testcases/i32-ops");
     let status = run_fixture_status(&root, "i32-ops");
     assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_libc_start_fixture() {
+    let root = repo_root().join("tests/testcases/libc-start-hello");
+    let output = run_fixture_output(&root, "libc-start-hello");
+    assert!(output.status.success());
+    assert_eq!(output.stdout, b"Hello from libc start\n");
+}
+
+#[test]
+fn libc_start_fixture_links_requested_shared_libraries() {
+    let root = repo_root().join("tests/testcases/libc-start-hello");
+    let output = compile_fixture(&root, "libc-start-hello");
+    let dynamic = Command::new("readelf")
+        .arg("-d")
+        .arg(&output)
+        .output()
+        .expect("run readelf");
+    cleanup_fixture_binary(&output);
+
+    assert!(dynamic.status.success());
+    let dynamic = String::from_utf8_lossy(&dynamic.stdout);
+    assert!(dynamic.contains("Shared library: [libc.so.6]"));
+    assert!(dynamic.contains("Shared library: [libm.so.6]"));
+}
+
+#[test]
+fn libc_start_fixture_uses_crt_start_as_elf_entry() {
+    let root = repo_root().join("tests/testcases/libc-start-hello");
+    let output = compile_fixture(&root, "libc-start-hello");
+    let headers_and_symbols = Command::new("readelf")
+        .arg("-h")
+        .arg("-s")
+        .arg(&output)
+        .output()
+        .expect("run readelf");
+    cleanup_fixture_binary(&output);
+
+    assert!(headers_and_symbols.status.success());
+    let headers_and_symbols = String::from_utf8_lossy(&headers_and_symbols.stdout);
+    let entry = readelf_entry_address(&headers_and_symbols);
+    let start = readelf_symbol_address(&headers_and_symbols, "_start");
+    let main = readelf_symbol_address(&headers_and_symbols, "main");
+    assert_eq!(entry, start);
+    assert_ne!(entry, main);
+}
+
+fn readelf_entry_address(output: &str) -> u64 {
+    output
+        .lines()
+        .find_map(|line| {
+            line.trim()
+                .strip_prefix("Entry point address:")
+                .and_then(|value| {
+                    u64::from_str_radix(value.trim().trim_start_matches("0x"), 16).ok()
+                })
+        })
+        .expect("readelf entry address")
+}
+
+fn readelf_symbol_address(output: &str, symbol: &str) -> u64 {
+    output
+        .lines()
+        .find_map(|line| {
+            let parts = line.split_whitespace().collect::<Vec<_>>();
+            (parts.last() == Some(&symbol))
+                .then(|| u64::from_str_radix(parts.get(1).copied().unwrap_or_default(), 16).ok())
+                .flatten()
+        })
+        .expect("readelf symbol address")
 }
 
 #[test]

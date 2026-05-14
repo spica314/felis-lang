@@ -1,0 +1,6 @@
+{
+  "name": "libc-start-hello",
+  "felis-bin-entrypoints": ["src/libc-start-hello.fe"],
+  "native-link-mode": "libc-start",
+  "native-libraries": ["m"]
+}

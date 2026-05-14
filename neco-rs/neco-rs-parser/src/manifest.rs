@@ -5,5 +5,5 @@ pub(crate) mod parse;
 mod tests;
 
 pub(crate) use model::Manifest;
-pub use model::{Dependency, DependencySource, PackageManifest, WorkspaceManifest};
+pub use model::{Dependency, DependencySource, NativeLinkMode, PackageManifest, WorkspaceManifest};
 pub(crate) use parse::parse_manifest;

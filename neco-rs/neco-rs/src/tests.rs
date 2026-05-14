@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use neco_rs_parser::{ParsedPackage, ParsedRoot, parse_root};
+use neco_rs_parser::{NativeLinkMode, ParsedPackage, ParsedRoot, parse_root};
 
 use crate::cli::{default_output_path, select_binary_from_package};
 use crate::codegen::build_linux_x86_64_program_executable;
@@ -54,6 +54,8 @@ fn parse_inline_binary_package(name: &str, source: &str) -> ParsedPackage {
             dependencies: Vec::new(),
             felis_lib_entrypoint: None,
             felis_bin_entrypoints: vec![source_path.clone()],
+            native_link_mode: NativeLinkMode::KernelStart,
+            native_libraries: Vec::new(),
         },
         source_files: vec![neco_rs_parser::ParsedSourceFile {
             path: source_path,
@@ -488,6 +490,8 @@ fn rejects_string_literal_as_arrayvl_value() {
             dependencies: Vec::new(),
             felis_lib_entrypoint: None,
             felis_bin_entrypoints: vec![source_path.clone()],
+            native_link_mode: NativeLinkMode::KernelStart,
+            native_libraries: Vec::new(),
         },
         source_files: vec![neco_rs_parser::ParsedSourceFile {
             path: source_path,
@@ -527,6 +531,8 @@ fn rejects_string_literal_as_open_path() {
             dependencies: Vec::new(),
             felis_lib_entrypoint: None,
             felis_bin_entrypoints: vec![source_path.clone()],
+            native_link_mode: NativeLinkMode::KernelStart,
+            native_libraries: Vec::new(),
         },
         source_files: vec![neco_rs_parser::ParsedSourceFile {
             path: source_path,
@@ -563,6 +569,8 @@ fn rejects_arrayvl_as_open_path() {
             dependencies: Vec::new(),
             felis_lib_entrypoint: None,
             felis_bin_entrypoints: vec![source_path.clone()],
+            native_link_mode: NativeLinkMode::KernelStart,
+            native_libraries: Vec::new(),
         },
         source_files: vec![neco_rs_parser::ParsedSourceFile {
             path: source_path,
@@ -601,6 +609,8 @@ fn lowers_pathbuf_pop_to_runtime_operation() {
             dependencies: Vec::new(),
             felis_lib_entrypoint: None,
             felis_bin_entrypoints: vec![source_path.clone()],
+            native_link_mode: NativeLinkMode::KernelStart,
+            native_libraries: Vec::new(),
         },
         source_files: vec![neco_rs_parser::ParsedSourceFile {
             path: source_path,
@@ -1150,6 +1160,8 @@ fn rejects_direct_arrayvl_new_into_arrayvl_reference() {
             dependencies: Vec::new(),
             felis_lib_entrypoint: None,
             felis_bin_entrypoints: vec![source_path.clone()],
+            native_link_mode: NativeLinkMode::KernelStart,
+            native_libraries: Vec::new(),
         },
         source_files: vec![neco_rs_parser::ParsedSourceFile {
             path: source_path,
@@ -1188,6 +1200,8 @@ fn rejects_direct_array_new_into_array_reference() {
             dependencies: Vec::new(),
             felis_lib_entrypoint: None,
             felis_bin_entrypoints: vec![source_path.clone()],
+            native_link_mode: NativeLinkMode::KernelStart,
+            native_libraries: Vec::new(),
         },
         source_files: vec![neco_rs_parser::ParsedSourceFile {
             path: source_path,
@@ -2180,6 +2194,8 @@ fn lowers_if_else_true_fixture_to_program() {
             dependencies: Vec::new(),
             felis_lib_entrypoint: None,
             felis_bin_entrypoints: vec![PathBuf::from("src/if-else-true.fe")],
+            native_link_mode: NativeLinkMode::KernelStart,
+            native_libraries: Vec::new(),
         },
         source_files: vec![neco_rs_parser::ParsedSourceFile {
             path: source_path,
@@ -2221,6 +2237,8 @@ fn lowers_if_else_if_fixture_to_program() {
             dependencies: Vec::new(),
             felis_lib_entrypoint: None,
             felis_bin_entrypoints: vec![PathBuf::from("src/if-else-if-true.fe")],
+            native_link_mode: NativeLinkMode::KernelStart,
+            native_libraries: Vec::new(),
         },
         source_files: vec![neco_rs_parser::ParsedSourceFile {
             path: source_path,

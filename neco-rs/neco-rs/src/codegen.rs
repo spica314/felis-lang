@@ -8,6 +8,18 @@ use crate::ir::{
 const DATA_VIRTUAL_ADDRESS: u64 = 0x410000;
 const ARGV_GLOBAL_ADDRESS: u64 = 0x420000;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EntryAbi {
+    KernelStart,
+    LibcMain,
+}
+
+pub(crate) struct ProgramImage {
+    pub(crate) code: Vec<u8>,
+    pub(crate) data: Vec<u8>,
+    pub(crate) requires_argv: bool,
+}
+
 pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) -> Elf64Executable {
     let code_virtual_address = 0x401000;
     let data_virtual_address = DATA_VIRTUAL_ADDRESS;
@@ -16,11 +28,7 @@ pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) ->
         code_virtual_address,
         0,
         SegmentFlags::READ_EXECUTE,
-        program_syscall_code(
-            program,
-            data_virtual_address,
-            program.requires_argv.then_some(ARGV_GLOBAL_ADDRESS),
-        ),
+        build_linux_x86_64_program_image(program, EntryAbi::KernelStart).code,
     ));
     if !program.data.is_empty() {
         elf.add_load_segment(LoadSegment::new(
@@ -39,6 +47,22 @@ pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) ->
         ));
     }
     elf
+}
+
+pub(crate) fn build_linux_x86_64_program_image(
+    program: &LoweredProgram,
+    entry_abi: EntryAbi,
+) -> ProgramImage {
+    ProgramImage {
+        code: program_syscall_code(
+            program,
+            DATA_VIRTUAL_ADDRESS,
+            program.requires_argv.then_some(ARGV_GLOBAL_ADDRESS),
+            entry_abi,
+        ),
+        data: flatten_data(program),
+        requires_argv: program.requires_argv,
+    }
 }
 
 fn flatten_data(program: &LoweredProgram) -> Vec<u8> {
@@ -64,13 +88,14 @@ fn program_syscall_code(
     program: &LoweredProgram,
     data_virtual_address: u64,
     argv_global_address: Option<u64>,
+    entry_abi: EntryAbi,
 ) -> Vec<u8> {
     let addresses = data_addresses(program, data_virtual_address);
     let mut code = Vec::new();
     let stack_frame_size = stack_frame_size(program);
 
     if let Some(argv_global_address) = argv_global_address {
-        emit_argv_global_init(&mut code, argv_global_address);
+        emit_argv_global_init(&mut code, argv_global_address, entry_abi);
     }
 
     if stack_frame_size > 0 {
@@ -925,10 +950,19 @@ fn emit_static_data_u8_get(
     code.extend_from_slice(&[0x0f, 0xb6, 0x04, 0x03]);
 }
 
-fn emit_argv_global_init(code: &mut Vec<u8>, argv_global_address: u64) {
-    code.extend_from_slice(&[0x48, 0x8d, 0x44, 0x24, 0x08]);
-    code.extend_from_slice(&[0x48, 0xa3]);
-    code.extend_from_slice(&argv_global_address.to_le_bytes());
+fn emit_argv_global_init(code: &mut Vec<u8>, argv_global_address: u64, entry_abi: EntryAbi) {
+    match entry_abi {
+        EntryAbi::KernelStart => {
+            code.extend_from_slice(&[0x48, 0x8d, 0x44, 0x24, 0x08]);
+            code.extend_from_slice(&[0x48, 0xa3]);
+            code.extend_from_slice(&argv_global_address.to_le_bytes());
+        }
+        EntryAbi::LibcMain => {
+            code.extend_from_slice(&[0x48, 0x89, 0xf0]);
+            code.extend_from_slice(&[0x48, 0xa3]);
+            code.extend_from_slice(&argv_global_address.to_le_bytes());
+        }
+    }
 }
 
 fn emit_runtime_arg_ptr_to_rax(
