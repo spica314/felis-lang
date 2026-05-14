@@ -313,23 +313,172 @@ fn compile_empty_ptx_function(function: &neco_rs_parser::FunctionDeclaration) ->
         )));
     }
     validate_empty_ptx_signature(function)?;
-    if !function.body.statements.is_empty()
-        || !matches!(function.body.tail.as_deref(), Some(Term::Unit))
-    {
+    if !matches!(function.body.tail.as_deref(), Some(Term::Unit)) {
         return Err(Error::Unsupported(format!(
-            "`#compile_ptx` currently supports only empty PTX function bodies for `{}`",
+            "`#compile_ptx` currently supports only PTX function bodies ending in `()` for `{}`",
             function.name.name
         )));
     }
 
+    let body = compile_ptx_body(function)?;
+    let u64_regs = if body.loads_array_parameter {
+        "    .reg .u64 %rd<2>;\n"
+    } else {
+        ""
+    };
+    let u32_regs = if body.next_u32_register == 1 {
+        String::new()
+    } else {
+        format!("    .reg .u32 %r<{}>;\n", body.next_u32_register)
+    };
+    let parameter_load = if body.loads_array_parameter {
+        "    ld.param.u64 %rd1, [arg0];\n"
+    } else {
+        ""
+    };
     let mut ptx = format!(
-        ".version 7.0\n.target sm_52\n.address_size 64\n\n.visible .entry {}(\n    .param {} arg0\n)\n{{\n    ret;\n}}\n",
+        ".version 7.0\n.target sm_52\n.address_size 64\n\n.visible .entry {}(\n    .param {} arg0\n)\n{{\n{}{}{}{}    ret;\n}}\n",
         function.name.name,
-        ptx_parameter_type(function)?
+        ptx_parameter_type(function)?,
+        u64_regs,
+        u32_regs,
+        parameter_load,
+        body.instructions
     )
     .into_bytes();
     ptx.push(0);
     Ok(ptx)
+}
+
+struct CompiledPtxBody {
+    instructions: String,
+    next_u32_register: usize,
+    loads_array_parameter: bool,
+}
+
+fn compile_ptx_body(function: &neco_rs_parser::FunctionDeclaration) -> Result<CompiledPtxBody> {
+    if function.body.statements.is_empty() {
+        return Ok(CompiledPtxBody {
+            instructions: String::new(),
+            next_u32_register: 1,
+            loads_array_parameter: false,
+        });
+    }
+    let parameter = ptx_parameter_name(function)?;
+    let element_type = ptx_array_parameter_element_type(function)?;
+    let mut compiler = PtxBodyCompiler {
+        function_name: &function.name.name,
+        parameter,
+        element_type,
+        locals: HashMap::new(),
+        instructions: String::new(),
+        next_u32_register: 1,
+    };
+    for statement in &function.body.statements {
+        compiler.compile_statement(statement)?;
+    }
+    Ok(CompiledPtxBody {
+        instructions: compiler.instructions,
+        next_u32_register: compiler.next_u32_register,
+        loads_array_parameter: true,
+    })
+}
+
+struct PtxBodyCompiler<'a> {
+    function_name: &'a str,
+    parameter: &'a str,
+    element_type: ArrayElementType,
+    locals: HashMap<String, String>,
+    instructions: String,
+    next_u32_register: usize,
+}
+
+impl PtxBodyCompiler<'_> {
+    fn compile_statement(&mut self, statement: &Statement) -> Result<()> {
+        match statement {
+            Statement::Let(let_statement) if matches!(let_statement.operator, LetOperator::Equals) => {
+                let BindingPattern::Name(name) = &let_statement.binder else {
+                    return Err(self.unsupported("PTX `#let` currently requires a named binder"));
+                };
+                let Some((array_name, index)) = ptx_ref_get_call_parts(&let_statement.value)? else {
+                    return Err(self.unsupported("PTX `#let` currently supports only `ref_get_ptx`"));
+                };
+                self.ensure_parameter_array(&array_name)?;
+                self.ensure_i32_element()?;
+                let register = self.allocate_u32_register();
+                self.instructions.push_str(&format!(
+                    "    ld.global.u32 {}, [%rd1+{}];\n",
+                    register,
+                    index * 4
+                ));
+                self.locals.insert(name.clone(), register);
+                Ok(())
+            }
+            Statement::Expression(term) => {
+                let Some((array_name, index, value)) = ptx_ref_set_call_parts(term)? else {
+                    return Err(self.unsupported(
+                        "PTX expression statements currently support only `ref_set_ptx`",
+                    ));
+                };
+                self.ensure_parameter_array(&array_name)?;
+                self.ensure_i32_element()?;
+                let value = self.value_register_or_immediate(&value)?;
+                self.instructions.push_str(&format!(
+                    "    st.global.u32 [%rd1+{}], {};\n",
+                    index * 4,
+                    value
+                ));
+                Ok(())
+            }
+            _ => Err(self.unsupported(
+                "PTX bodies currently support only `#let` from `ref_get_ptx` and expression `ref_set_ptx`",
+            )),
+        }
+    }
+
+    fn allocate_u32_register(&mut self) -> String {
+        let register = format!("%r{}", self.next_u32_register);
+        self.next_u32_register += 1;
+        register
+    }
+
+    fn value_register_or_immediate(&mut self, term: &Term) -> Result<String> {
+        if let Some(value) = parse_ptx_i32_literal(term)? {
+            let register = self.allocate_u32_register();
+            self.instructions
+                .push_str(&format!("    mov.u32 {}, {};\n", register, value));
+            return Ok(register);
+        }
+        let Some(name) = simple_path_name(term) else {
+            return Err(self.unsupported("PTX `ref_set_ptx` value must be an i32 literal or local"));
+        };
+        self.locals.get(name).cloned().ok_or_else(|| {
+            self.unsupported("PTX `ref_set_ptx` value must refer to a local from `ref_get_ptx`")
+        })
+    }
+
+    fn ensure_parameter_array(&self, array_name: &str) -> Result<()> {
+        if array_name == self.parameter {
+            Ok(())
+        } else {
+            Err(self.unsupported("PTX array access currently supports only the kernel parameter"))
+        }
+    }
+
+    fn ensure_i32_element(&self) -> Result<()> {
+        if self.element_type == ArrayElementType::I32 {
+            Ok(())
+        } else {
+            Err(self.unsupported("PTX ref_get_ptx/ref_set_ptx currently support only i32 arrays"))
+        }
+    }
+
+    fn unsupported(&self, message: &str) -> Error {
+        Error::Unsupported(format!(
+            "`#compile_ptx` for `{}`: {message}",
+            self.function_name
+        ))
+    }
 }
 
 fn validate_empty_ptx_signature(function: &neco_rs_parser::FunctionDeclaration) -> Result<()> {
@@ -376,6 +525,9 @@ fn ptx_parameter_type_for_arrow_parameter(
         ArrowParameter::Binder(binder) => binder.ty.as_ref(),
         ArrowParameter::Domain(ty) => ty.as_ref(),
     };
+    if ptx_array_element_type(ty)?.is_some() {
+        return Ok(".u64");
+    }
     match simple_type_name(ty) {
         Some("i32") => Ok(".u32"),
         Some("i64") => Ok(".u64"),
@@ -384,6 +536,154 @@ fn ptx_parameter_type_for_arrow_parameter(
         _ => Err(Error::Unsupported(format!(
             "`#compile_ptx` currently supports only primitive i32/i64/f32/u8 parameters for `{function_name}`"
         ))),
+    }
+}
+
+fn ptx_parameter_name(function: &neco_rs_parser::FunctionDeclaration) -> Result<&str> {
+    let Term::Arrow(arrow) = &function.ty else {
+        unreachable!("validated PTX functions always have one parameter");
+    };
+    match &arrow.parameter {
+        ArrowParameter::Binder(binder) => Ok(&binder.name),
+        ArrowParameter::Domain(_) => Err(Error::Unsupported(format!(
+            "`#compile_ptx` target `{}` must name its PTX parameter",
+            function.name.name
+        ))),
+    }
+}
+
+fn ptx_array_parameter_element_type(
+    function: &neco_rs_parser::FunctionDeclaration,
+) -> Result<ArrayElementType> {
+    let Term::Arrow(arrow) = &function.ty else {
+        unreachable!("validated PTX functions always have one parameter");
+    };
+    let ty = match &arrow.parameter {
+        ArrowParameter::Binder(binder) => binder.ty.as_ref(),
+        ArrowParameter::Domain(ty) => ty.as_ref(),
+    };
+    ptx_array_element_type(ty)?.ok_or_else(|| {
+        Error::Unsupported(format!(
+            "`#compile_ptx` target `{}` must receive an `ArrayVLPTX` parameter to use PTX array operations",
+            function.name.name
+        ))
+    })
+}
+
+fn ptx_array_element_type(ty: &Term) -> Result<Option<ArrayElementType>> {
+    let Term::Application { callee, arguments } = ty else {
+        return Ok(None);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(None);
+    };
+    if path.token_keyword_package.is_some()
+        || path.segments.len() != 1
+        || path.segments[0].lexeme != "ArrayVLPTX"
+    {
+        return Ok(None);
+    }
+    let [element_type] = arguments.as_slice() else {
+        return Err(Error::Unsupported(
+            "`ArrayVLPTX` PTX parameter must receive exactly one element type".to_string(),
+        ));
+    };
+    match simple_type_name(element_type) {
+        Some("i32") => Ok(Some(ArrayElementType::I32)),
+        Some("i64") => Ok(Some(ArrayElementType::I64)),
+        Some("f32") => Ok(Some(ArrayElementType::F32)),
+        Some("u8") => Ok(Some(ArrayElementType::U8)),
+        _ => Err(Error::Unsupported(
+            "`ArrayVLPTX` PTX parameter supports only i32/i64/f32/u8 elements".to_string(),
+        )),
+    }
+}
+
+fn ptx_ref_get_call_parts(term: &Term) -> Result<Option<(String, i32)>> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(None);
+    };
+    if !is_simple_callee(callee, "ref_get_ptx") {
+        return Ok(None);
+    }
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [_ty, array, index] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`ref_get_ptx` must receive a type, an `ArrayVLPTX`, and an index".to_string(),
+        ));
+    };
+    let Some(array_name) = simple_path_name(array) else {
+        return Err(Error::Unsupported(
+            "`ref_get_ptx` currently requires a simple array parameter".to_string(),
+        ));
+    };
+    let index = parse_ptx_i32_literal(index)?.ok_or_else(|| {
+        Error::Unsupported("`ref_get_ptx` currently requires an i32 literal index".to_string())
+    })?;
+    Ok(Some((array_name.to_string(), index)))
+}
+
+fn ptx_ref_set_call_parts(term: &Term) -> Result<Option<(String, i32, Term)>> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(None);
+    };
+    if !is_simple_callee(callee, "ref_set_ptx") {
+        return Ok(None);
+    }
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [_ty, array, index, value] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`ref_set_ptx` must receive a type, an `ArrayVLPTX`, an index, and a value".to_string(),
+        ));
+    };
+    let Some(array_name) = simple_path_name(array) else {
+        return Err(Error::Unsupported(
+            "`ref_set_ptx` currently requires a simple array parameter".to_string(),
+        ));
+    };
+    let index = parse_ptx_i32_literal(index)?.ok_or_else(|| {
+        Error::Unsupported("`ref_set_ptx` currently requires an i32 literal index".to_string())
+    })?;
+    Ok(Some((array_name.to_string(), index, value.clone())))
+}
+
+fn is_simple_callee(term: &Term, expected: &str) -> bool {
+    simple_path_name(term) == Some(expected)
+}
+
+fn simple_path_name(term: &Term) -> Option<&str> {
+    let Term::Path(path) = term else {
+        return None;
+    };
+    if path.token_keyword_package.is_none() && path.segments.len() == 1 {
+        Some(path.segments[0].lexeme.as_str())
+    } else {
+        None
+    }
+}
+
+fn parse_ptx_i32_literal(term: &Term) -> Result<Option<i32>> {
+    match term {
+        Term::Application { callee, arguments } => {
+            let [suffix] = arguments.as_slice() else {
+                return Ok(None);
+            };
+            if simple_path_name(suffix) != Some("i32") {
+                return Ok(None);
+            }
+            let Term::IntegerLiteral(literal) = callee.as_ref() else {
+                return Ok(None);
+            };
+            literal
+                .parse::<i32>()
+                .map(Some)
+                .map_err(|_| Error::Unsupported("PTX i32 literal is out of range".to_string()))
+        }
+        Term::IntegerLiteral(literal) => literal
+            .parse::<i32>()
+            .map(Some)
+            .map_err(|_| Error::Unsupported("PTX i32 literal is out of range".to_string())),
+        _ => Ok(None),
     }
 }
 

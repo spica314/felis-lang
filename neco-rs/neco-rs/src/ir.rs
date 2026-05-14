@@ -27,6 +27,7 @@ pub(crate) enum KernelArgumentRef {
     I32(usize),
     I64(usize),
     F32(usize),
+    ArrayPtx(usize),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -169,6 +170,7 @@ pub(crate) enum ArrayElementType {
 pub(crate) enum ArrayKind {
     Fixed,
     Dynamic,
+    DeviceDynamic,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -289,6 +291,23 @@ pub(crate) enum Operation {
         block_dim_z: I32Expr,
         shared_mem_bytes: I32Expr,
         stream: I64Expr,
+        result_slot: usize,
+    },
+    CuMemAllocV2 {
+        array_slot: usize,
+        len: I32Expr,
+        result_slot: usize,
+    },
+    CuMemcpyHtoDV2 {
+        dest_slot: usize,
+        source_slot: usize,
+        len: I32Expr,
+        result_slot: usize,
+    },
+    CuMemcpyDtoHV2 {
+        dest_slot: usize,
+        source_slot: usize,
+        len: I32Expr,
         result_slot: usize,
     },
     ArraySetI32 {

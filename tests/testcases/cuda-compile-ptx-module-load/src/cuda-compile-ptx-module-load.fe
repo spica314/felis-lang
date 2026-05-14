@@ -1,12 +1,20 @@
 #use std_core::io::IO;
 #use std_core::ptx::PTX;
 #use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::array::ArrayVLPTX;
+#use std_core::primitive::array::array_get;
+#use std_core::primitive::array::array_set;
 #use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::i64::i64;
 #use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_get_ptx;
+#use std_core::primitive::reference::ref_set_ptx;
 #use std_core::primitive::u8::u8;
 
-#fn empty_kernel : (arg : i32) -> () #with PTX {
+#fn empty_kernel : (array : ArrayVLPTX i32) -> () #with PTX {
+    #let value : i32 = ref_get_ptx i32 array 0i32;
+    ref_set_ptx i32 array 1i32 value;
     ()
 }
 
@@ -32,9 +40,18 @@
     #letref #excl function : &^ i64 #borrow function;
     #let function_result : i32 <- IO::cu_module_get_function function module_value ptx;
     #let function_value : i64 = ref_get i64 function;
-    #let arg : i32 = 0i32;
-    #letref arg : & i32 #borrow arg;
-    #let launch_result : i32 <- IO::cu_launch_kernel function_value arg 1i32 1i32 1i32 1i32 1i32 1i32 0i32 0i64;
-    #let _ : () <- IO::exit launch_result;
+    #let host_array : ArrayVL i32 <- IO::arrayvl_new i32 2i32;
+    array_set host_array 0i32 7i32;
+    array_set host_array 1i32 0i32;
+    #let device_array : ArrayVLPTX i32 <- IO::arrayvlptx_new i32 2i32;
+    #let copy_to_result : i32 <- IO::arrayvl_to_ptx i32 host_array device_array 2i32;
+    #let launch_result : i32 <- IO::cu_launch_kernel function_value device_array 1i32 1i32 1i32 1i32 1i32 1i32 0i32 0i64;
+    #let copy_from_result : i32 <- IO::arrayvl_from_ptx i32 device_array host_array 2i32;
+    #let result : i32 = array_get host_array 1i32;
+    #if i32_eq result 7i32 {
+        #let _ : () <- IO::exit 0i32;
+    } #else {
+        #let _ : () <- IO::exit result;
+    };
     ()
 }

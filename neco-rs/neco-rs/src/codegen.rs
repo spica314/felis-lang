@@ -487,6 +487,78 @@ fn emit_operations(
                 code.extend_from_slice(&[0x89, 0x85]);
                 code.extend_from_slice(&result_offset.to_le_bytes());
             }
+            Operation::CuMemAllocV2 {
+                array_slot,
+                len,
+                result_slot,
+            } => {
+                let slot_offset = array_slot_offset(program, *array_slot);
+                code.extend_from_slice(&[0x48, 0x8d, 0xbd]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+                emit_i32_expr_to_eax(len, code, program);
+                let element_size = array_element_size(array_allocation(program, *array_slot));
+                if element_size != 1 {
+                    code.extend_from_slice(&[0x6b, 0xc0, element_size as u8]);
+                }
+                code.extend_from_slice(&[0x48, 0x98]);
+                code.extend_from_slice(&[0x48, 0x89, 0xc6]);
+                external_calls.push(ExternalCall {
+                    offset: code.len(),
+                    symbol: "cuMemAlloc_v2",
+                });
+                code.extend_from_slice(&[0xe8, 0x00, 0x00, 0x00, 0x00]);
+                let result_offset = i32_slot_offset(program, *result_slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&result_offset.to_le_bytes());
+                emit_i32_expr_to_eax(len, code, program);
+                let len_offset = array_len_offset(program, *array_slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&len_offset.to_le_bytes());
+            }
+            Operation::CuMemcpyHtoDV2 {
+                dest_slot,
+                source_slot,
+                len,
+                result_slot,
+            } => {
+                let dest_offset = array_slot_offset(program, *dest_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0xbd]);
+                code.extend_from_slice(&dest_offset.to_le_bytes());
+                let source_offset = array_slot_offset(program, *source_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
+                code.extend_from_slice(&source_offset.to_le_bytes());
+                emit_array_copy_byte_len_to_rdx(*source_slot, len, code, program);
+                external_calls.push(ExternalCall {
+                    offset: code.len(),
+                    symbol: "cuMemcpyHtoD_v2",
+                });
+                code.extend_from_slice(&[0xe8, 0x00, 0x00, 0x00, 0x00]);
+                let result_offset = i32_slot_offset(program, *result_slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&result_offset.to_le_bytes());
+            }
+            Operation::CuMemcpyDtoHV2 {
+                dest_slot,
+                source_slot,
+                len,
+                result_slot,
+            } => {
+                let dest_offset = array_slot_offset(program, *dest_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0xbd]);
+                code.extend_from_slice(&dest_offset.to_le_bytes());
+                let source_offset = array_slot_offset(program, *source_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
+                code.extend_from_slice(&source_offset.to_le_bytes());
+                emit_array_copy_byte_len_to_rdx(*source_slot, len, code, program);
+                external_calls.push(ExternalCall {
+                    offset: code.len(),
+                    symbol: "cuMemcpyDtoH_v2",
+                });
+                code.extend_from_slice(&[0xe8, 0x00, 0x00, 0x00, 0x00]);
+                let result_offset = i32_slot_offset(program, *result_slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&result_offset.to_le_bytes());
+            }
             Operation::If {
                 condition,
                 then_operations,
@@ -1250,17 +1322,24 @@ fn kernel_argument_ref_offset(program: &LoweredProgram, arg: KernelArgumentRef) 
         KernelArgumentRef::I32(slot) => i32_slot_offset(program, slot),
         KernelArgumentRef::I64(slot) => i64_slot_offset(program, slot),
         KernelArgumentRef::F32(slot) => f32_slot_offset(program, slot),
+        KernelArgumentRef::ArrayPtx(slot) => array_slot_offset(program, slot),
     }
 }
 
 fn emit_array_initializers(program: &LoweredProgram, code: &mut Vec<u8>) {
     for array in &program.arrays {
         let slot_offset = array_slot_offset(program, array.slot);
-        let data_offset = array_data_offset(program, array.slot);
-        code.extend_from_slice(&[0x48, 0x8d, 0x85]);
-        code.extend_from_slice(&data_offset.to_le_bytes());
-        code.extend_from_slice(&[0x48, 0x89, 0x85]);
-        code.extend_from_slice(&slot_offset.to_le_bytes());
+        if matches!(array.kind, ArrayKind::DeviceDynamic) {
+            code.extend_from_slice(&[0x48, 0xc7, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
+            code.extend_from_slice(&0u32.to_le_bytes());
+        } else {
+            let data_offset = array_data_offset(program, array.slot);
+            code.extend_from_slice(&[0x48, 0x8d, 0x85]);
+            code.extend_from_slice(&data_offset.to_le_bytes());
+            code.extend_from_slice(&[0x48, 0x89, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
+        }
         let len_offset = array_len_offset(program, array.slot);
         code.extend_from_slice(&[0x48, 0xc7, 0x85]);
         code.extend_from_slice(&len_offset.to_le_bytes());
@@ -1272,6 +1351,7 @@ fn array_descriptor_size(array: &ArrayAllocation) -> usize {
     match array.kind {
         ArrayKind::Fixed => 16,
         ArrayKind::Dynamic => 16,
+        ArrayKind::DeviceDynamic => 16,
     }
 }
 
@@ -1284,6 +1364,9 @@ fn pointer_bytes(program: &LoweredProgram) -> i32 {
 }
 
 fn array_storage_size(array: &ArrayAllocation) -> usize {
+    if matches!(array.kind, ArrayKind::DeviceDynamic) {
+        return 0;
+    }
     let element_size = array_element_size(array);
     array.len * element_size
 }
@@ -1323,6 +1406,21 @@ fn emit_i32_array_set(
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());
     code.extend_from_slice(&[0x89, 0x14, 0x0b]);
+}
+
+fn emit_array_copy_byte_len_to_rdx(
+    array_slot: usize,
+    len: &I32Expr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    emit_i32_expr_to_eax(len, code, program);
+    let element_size = array_element_size(array_allocation(program, array_slot));
+    if element_size != 1 {
+        code.extend_from_slice(&[0x6b, 0xc0, element_size as u8]);
+    }
+    code.extend_from_slice(&[0x48, 0x98]);
+    code.extend_from_slice(&[0x48, 0x89, 0xc2]);
 }
 
 fn emit_i64_array_set(

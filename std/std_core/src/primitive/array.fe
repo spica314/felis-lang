@@ -9,6 +9,7 @@
 
 #bind_builtin "Array" #as Array;
 #bind_builtin "ArrayVL" #as ArrayVL;
+#bind_builtin "ArrayVLPTX" #as ArrayVLPTX;
 #bind_builtin "array_get" #as array_get;
 #bind_builtin "array_set" #as array_set;
 #bind_builtin "array_len" #as array_len;
@@ -145,6 +146,7 @@
 
 #pub #use Array;
 #pub #use ArrayVL;
+#pub #use ArrayVLPTX;
 #pub #use array_get;
 #pub #use array_set;
 #pub #use array_len;

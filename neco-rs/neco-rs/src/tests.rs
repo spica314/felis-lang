@@ -2513,7 +2513,9 @@ fn lowers_cuda_compile_ptx_module_load_fixture_to_runtime_io_operations() {
     assert_eq!(program.data.len(), 2);
     let ptx = String::from_utf8_lossy(&program.data[0]);
     assert!(ptx.contains(".visible .entry empty_kernel("));
-    assert!(ptx.contains(".param .u32 arg0"));
+    assert!(ptx.contains(".param .u64 arg0"));
+    assert!(ptx.contains("ld.global.u32"));
+    assert!(ptx.contains("st.global.u32"));
     assert!(program.data[0].ends_with(&[0]));
     assert_eq!(program.data[1], b"empty_kernel\0");
     assert_eq!(
@@ -2561,13 +2563,30 @@ fn lowers_cuda_compile_ptx_module_load_fixture_to_runtime_io_operations() {
                 name_data_index: 1,
                 result_slot: 5,
             },
-            Operation::StoreI32 {
-                slot: 6,
+            Operation::ArraySetI32 {
+                array_slot: 0,
+                index: I64Expr::Literal(0),
+                value: I32Expr::Literal(7),
+            },
+            Operation::ArraySetI32 {
+                array_slot: 0,
+                index: I64Expr::Literal(1),
                 value: I32Expr::Literal(0),
+            },
+            Operation::CuMemAllocV2 {
+                array_slot: 1,
+                len: I32Expr::Literal(2),
+                result_slot: 6,
+            },
+            Operation::CuMemcpyHtoDV2 {
+                dest_slot: 1,
+                source_slot: 0,
+                len: I32Expr::Literal(2),
+                result_slot: 7,
             },
             Operation::CuLaunchKernel {
                 function: I64Expr::Local(2),
-                arg: KernelArgumentRef::I32(6),
+                arg: KernelArgumentRef::ArrayPtx(1),
                 grid_dim_x: I32Expr::Literal(1),
                 grid_dim_y: I32Expr::Literal(1),
                 grid_dim_z: I32Expr::Literal(1),
@@ -2576,12 +2595,33 @@ fn lowers_cuda_compile_ptx_module_load_fixture_to_runtime_io_operations() {
                 block_dim_z: I32Expr::Literal(1),
                 shared_mem_bytes: I32Expr::Literal(0),
                 stream: I64Expr::Literal(0),
-                result_slot: 7,
+                result_slot: 8,
             },
-            Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(7))),
+            Operation::CuMemcpyDtoHV2 {
+                dest_slot: 0,
+                source_slot: 1,
+                len: I32Expr::Literal(2),
+                result_slot: 9,
+            },
+            Operation::If {
+                condition: ConditionExpr::I32 {
+                    kind: ComparisonKind::Eq,
+                    lhs: I32Expr::ArrayGet {
+                        array_slot: 0,
+                        index: Box::new(I64Expr::Literal(1)),
+                    },
+                    rhs: I32Expr::Literal(7),
+                },
+                then_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0)))],
+                else_operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::ArrayGet {
+                    array_slot: 0,
+                    index: Box::new(I64Expr::Literal(1)),
+                }))],
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
         ]
     );
-    assert_eq!(program.i32_slots, 8);
+    assert_eq!(program.i32_slots, 10);
     assert_eq!(program.i64_slots, 3);
 
     let image = build_linux_x86_64_program_image(&program, EntryAbi::LibcMain);
@@ -2597,7 +2637,10 @@ fn lowers_cuda_compile_ptx_module_load_fixture_to_runtime_io_operations() {
             "cuCtxCreate_v2",
             "cuModuleLoadData",
             "cuModuleGetFunction",
-            "cuLaunchKernel"
+            "cuMemAlloc_v2",
+            "cuMemcpyHtoD_v2",
+            "cuLaunchKernel",
+            "cuMemcpyDtoH_v2"
         ]
     );
 }

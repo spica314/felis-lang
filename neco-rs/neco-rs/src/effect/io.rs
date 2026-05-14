@@ -336,6 +336,86 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(false))
         }
+        ["IO", "arrayvlptx_new"] => {
+            let (element_type, length, result_slot) =
+                match parse_arrayvlptx_new_arguments(arguments, state) {
+                    Ok(value) => value,
+                    Err(err) => return Some(Err(err)),
+                };
+            if matches!(ty, Term::Reference { .. }) {
+                return Some(Err(Error::Unsupported(
+                    "`IO::arrayvlptx_new` returns an `ArrayVLPTX T` value; use `#let` for the value"
+                        .to_string(),
+                )));
+            }
+            let array_slot =
+                state.allocate_array(element_type, ArrayKind::DeviceDynamic, 0, program);
+            program.operations.push(Operation::CuMemAllocV2 {
+                array_slot,
+                len: length,
+                result_slot,
+            });
+            if let Err(error) = bind_checked_pattern(
+                binder,
+                Value::Array {
+                    slot: array_slot,
+                    element_type,
+                    kind: ArrayKind::DeviceDynamic,
+                },
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
+        ["IO", "arrayvl_to_ptx"] => {
+            let (source_slot, dest_slot, len, result_slot) =
+                match parse_arrayvl_copy_arguments(path[1], arguments, state, false) {
+                    Ok(value) => value,
+                    Err(err) => return Some(Err(err)),
+                };
+            program.operations.push(Operation::CuMemcpyHtoDV2 {
+                dest_slot,
+                source_slot,
+                len,
+                result_slot,
+            });
+            if let Err(error) = bind_checked_pattern(
+                binder,
+                Value::I32(I32Expr::Local(result_slot)),
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
+        ["IO", "arrayvl_from_ptx"] => {
+            let (source_slot, dest_slot, len, result_slot) =
+                match parse_arrayvl_copy_arguments(path[1], arguments, state, true) {
+                    Ok(value) => value,
+                    Err(err) => return Some(Err(err)),
+                };
+            program.operations.push(Operation::CuMemcpyDtoHV2 {
+                dest_slot,
+                source_slot,
+                len,
+                result_slot,
+            });
+            if let Err(error) = bind_checked_pattern(
+                binder,
+                Value::I32(I32Expr::Local(result_slot)),
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
         ["IO", "exit"] => {
             let exit_code = match parse_exit_code_arguments(arguments, state) {
                 Ok(value) => value,
@@ -870,9 +950,14 @@ fn parse_cu_launch_kernel_arguments(
         Value::I32Reference { slot, .. } => KernelArgumentRef::I32(slot),
         Value::I64Reference { slot, .. } => KernelArgumentRef::I64(slot),
         Value::F32Reference { slot, .. } => KernelArgumentRef::F32(slot),
+        Value::Array {
+            slot,
+            kind: ArrayKind::DeviceDynamic,
+            ..
+        } => KernelArgumentRef::ArrayPtx(slot),
         other => {
             return Err(Error::Unsupported(format!(
-                "`IO::cu_launch_kernel` expects a primitive reference as its kernel argument, got {other:?}"
+                "`IO::cu_launch_kernel` expects a primitive reference or `ArrayVLPTX` value as its kernel argument, got {other:?}"
             )));
         }
     };
@@ -914,6 +999,74 @@ fn parse_cu_launch_kernel_arguments(
         stream,
         result_slot,
     ))
+}
+
+fn parse_arrayvlptx_new_arguments(
+    arguments: &[Term],
+    state: &mut LoweringState,
+) -> Result<(ArrayElementType, I32Expr, usize)> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [element_type_term, length_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`IO::arrayvlptx_new` must receive an element type and an i32 length".to_string(),
+        ));
+    };
+    let element_type = parse_array_element_type(element_type_term, "arrayvlptx_new", state)?;
+    let length = lower_i32_expr(length_term, state).map_err(|_| {
+        Error::Unsupported("`IO::arrayvlptx_new` length must be an i32 expression".to_string())
+    })?;
+    let result_slot = state.allocate_i32_slot();
+    Ok((element_type, length, result_slot))
+}
+
+fn parse_arrayvl_copy_arguments(
+    builtin_name: &str,
+    arguments: &[Term],
+    state: &mut LoweringState,
+    from_ptx: bool,
+) -> Result<(usize, usize, I32Expr, usize)> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [element_type_term, source_term, dest_term, len_term] = normalized.as_slice() else {
+        return Err(Error::Unsupported(format!(
+            "`IO::{builtin_name}` must receive an element type, source array, destination array, and i32 length"
+        )));
+    };
+    let element_type = parse_array_element_type(element_type_term, builtin_name, state)?;
+    let source_slot = if from_ptx {
+        parse_device_array_slot(source_term, element_type, state, builtin_name)?
+    } else {
+        parse_dynamic_array_slot(source_term, element_type, state, builtin_name)?
+    };
+    let dest_slot = if from_ptx {
+        parse_dynamic_array_slot(dest_term, element_type, state, builtin_name)?
+    } else {
+        parse_device_array_slot(dest_term, element_type, state, builtin_name)?
+    };
+    let len = lower_i32_expr(len_term, state).map_err(|_| {
+        Error::Unsupported(format!(
+            "`IO::{builtin_name}` length must be an i32 expression"
+        ))
+    })?;
+    let result_slot = state.allocate_i32_slot();
+    Ok((source_slot, dest_slot, len, result_slot))
+}
+
+fn parse_device_array_slot(
+    term: &Term,
+    element_type: ArrayElementType,
+    state: &LoweringState,
+    builtin_name: &str,
+) -> Result<usize> {
+    match resolve_value(term, &state.environment)? {
+        Value::Array {
+            slot,
+            element_type: actual_element_type,
+            kind: ArrayKind::DeviceDynamic,
+        } if actual_element_type == element_type => Ok(slot),
+        other => Err(Error::Unsupported(format!(
+            "`IO::{builtin_name}` expects matching dynamic `ArrayVLPTX` values, got {other:?}"
+        ))),
+    }
 }
 
 fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {

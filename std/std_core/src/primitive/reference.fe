@@ -1,5 +1,9 @@
 #bind_builtin "ref_get" #as ref_get;
 #bind_builtin "ref_set" #as ref_set;
+#bind_builtin "ref_get_ptx" #as ref_get_ptx;
+#bind_builtin "ref_set_ptx" #as ref_set_ptx;
 
 #pub #use ref_get;
 #pub #use ref_set;
+#pub #use ref_get_ptx;
+#pub #use ref_set_ptx;

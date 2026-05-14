@@ -43,6 +43,20 @@ pub(crate) fn validate_value_against_type(
         };
     }
 
+    if let Some(element_type) = parse_ptx_slice_type_annotation(ty)? {
+        return match value {
+            Value::Array {
+                element_type: actual_element_type,
+                kind: ArrayKind::DeviceDynamic,
+                ..
+            } if *actual_element_type == element_type => Ok(()),
+            _ => Err(Error::Unsupported(format!(
+                "expected a value of type `{}` but got {value:?}",
+                render_term(ty)
+            ))),
+        };
+    }
+
     if let Some((element_type, len)) = parse_array_type_annotation(ty)? {
         let Value::Array {
             slot,
@@ -201,6 +215,20 @@ fn validate_reference_value_against_type(
                 ..
             } if *actual_element_type == element_type => Ok(()),
             Value::RuntimeArg(_) if element_type == ArrayElementType::U8 => Ok(()),
+            _ => Err(Error::Unsupported(format!(
+                "expected a value of type `{}` but got {value:?}",
+                render_reference_term(referent, exclusive)
+            ))),
+        };
+    }
+
+    if let Some(element_type) = parse_ptx_slice_type_annotation(referent)? {
+        return match value {
+            Value::Array {
+                element_type: actual_element_type,
+                kind: ArrayKind::DeviceDynamic,
+                ..
+            } if *actual_element_type == element_type => Ok(()),
             _ => Err(Error::Unsupported(format!(
                 "expected a value of type `{}` but got {value:?}",
                 render_reference_term(referent, exclusive)
@@ -394,6 +422,27 @@ fn parse_slice_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
         return Ok(None);
     }
     let type_name = "ArrayVL";
+
+    let [element_type_term] = arguments.as_slice() else {
+        return Err(Error::Unsupported(format!(
+            "`{type_name}` type annotation must receive exactly one element type"
+        )));
+    };
+
+    parse_array_element_type(element_type_term, type_name).map(Some)
+}
+
+fn parse_ptx_slice_type_annotation(ty: &Term) -> Result<Option<ArrayElementType>> {
+    let Term::Application { callee, arguments } = ty else {
+        return Ok(None);
+    };
+    let Term::Path(path) = callee.as_ref() else {
+        return Ok(None);
+    };
+    if !is_simple_type_path(path, "ArrayVLPTX") {
+        return Ok(None);
+    }
+    let type_name = "ArrayVLPTX";
 
     let [element_type_term] = arguments.as_slice() else {
         return Err(Error::Unsupported(format!(
