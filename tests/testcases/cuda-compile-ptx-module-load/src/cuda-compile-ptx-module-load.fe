@@ -6,7 +6,7 @@
 #use std_core::primitive::reference::ref_get;
 #use std_core::primitive::u8::u8;
 
-#fn empty_kernel : () #with PTX {
+#fn empty_kernel : (arg : i32) -> () #with PTX {
     ()
 }
 
@@ -27,6 +27,14 @@
     #letref #excl module : &^ i64 #borrow module;
     #let ptx : & ArrayVL u8 = empty_kernel_ptx;
     #let module_result : i32 <- IO::cu_module_load_data module ptx;
-    #let _ : () <- IO::exit module_result;
+    #let module_value : i64 = ref_get i64 module;
+    #let function : i64 = 0i64;
+    #letref #excl function : &^ i64 #borrow function;
+    #let function_result : i32 <- IO::cu_module_get_function function module_value ptx;
+    #let function_value : i64 = ref_get i64 function;
+    #let arg : i32 = 0i32;
+    #letref arg : & i32 #borrow arg;
+    #let launch_result : i32 <- IO::cu_launch_kernel function_value arg 1i32 1i32 1i32 1i32 1i32 1i32 0i32 0i64;
+    #let _ : () <- IO::exit launch_result;
     ()
 }

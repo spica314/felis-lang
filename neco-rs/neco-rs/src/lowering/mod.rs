@@ -7,8 +7,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use neco_rs_parser::{
-    BindingPattern, ElseBranch, Item, LetOperator, MatchExpression, ParsedPackage, ParsedRoot,
-    ParsedWorkspace, Statement, Term, parse_root,
+    ArrowParameter, BindingPattern, ElseBranch, Item, LetOperator, MatchExpression, ParsedPackage,
+    ParsedRoot, ParsedWorkspace, Statement, Term, parse_root,
 };
 
 use crate::effect::{Value, bind_pattern, lower_effect, resolve_value};
@@ -42,6 +42,7 @@ pub(crate) struct LoweringState {
     pub(crate) next_i64_slot: usize,
     pub(crate) next_f32_slot: usize,
     pub(crate) io_effect_allowed: bool,
+    pub(crate) compiled_ptx_function_names: HashMap<usize, usize>,
     functions: HashMap<String, PureFunction>,
     statement_functions: HashMap<String, StatementFunction>,
     constructors: HashMap<String, ConstructorSignature>,
@@ -58,6 +59,7 @@ impl LoweringState {
             next_i64_slot: 0,
             next_f32_slot: 0,
             io_effect_allowed: false,
+            compiled_ptx_function_names: HashMap::new(),
             functions: HashMap::new(),
             statement_functions: HashMap::new(),
             constructors: HashMap::new(),
@@ -281,6 +283,10 @@ fn initialize_compile_ptx_bindings(
             ))
         })?;
         let data_index = intern_data(program, ptx);
+        let name_data_index = intern_data(program, nul_terminated_identifier(&function.name.name));
+        state
+            .compiled_ptx_function_names
+            .insert(data_index, name_data_index);
         let previous = state.environment.insert(
             compile_ptx.value_name.clone(),
             Value::StaticSlice { data_index, len },
@@ -317,8 +323,9 @@ fn compile_empty_ptx_function(function: &neco_rs_parser::FunctionDeclaration) ->
     }
 
     let mut ptx = format!(
-        ".version 7.0\n.target sm_52\n.address_size 64\n\n.visible .entry {}()\n{{\n    ret;\n}}\n",
-        function.name.name
+        ".version 7.0\n.target sm_52\n.address_size 64\n\n.visible .entry {}(\n    .param {} arg0\n)\n{{\n    ret;\n}}\n",
+        function.name.name,
+        ptx_parameter_type(function)?
     )
     .into_bytes();
     ptx.push(0);
@@ -327,9 +334,17 @@ fn compile_empty_ptx_function(function: &neco_rs_parser::FunctionDeclaration) ->
 
 fn validate_empty_ptx_signature(function: &neco_rs_parser::FunctionDeclaration) -> Result<()> {
     let current = &function.ty;
-    while let Term::Arrow(_) = current {
+    let Term::Arrow(arrow) = current else {
         return Err(Error::Unsupported(format!(
-            "`#compile_ptx` currently supports only zero-argument PTX functions for `{}`",
+            "`#compile_ptx` currently supports only one-argument PTX functions for `{}`",
+            function.name.name
+        )));
+    };
+    validate_ptx_parameter_type(&arrow.parameter, &function.name.name)?;
+    let current = arrow.result.as_ref();
+    if matches!(current, Term::Arrow(_)) {
+        return Err(Error::Unsupported(format!(
+            "`#compile_ptx` currently supports only one-argument PTX functions for `{}`",
             function.name.name
         )));
     }
@@ -340,6 +355,53 @@ fn validate_empty_ptx_signature(function: &neco_rs_parser::FunctionDeclaration) 
         )));
     }
     Ok(())
+}
+
+fn ptx_parameter_type(function: &neco_rs_parser::FunctionDeclaration) -> Result<&'static str> {
+    let Term::Arrow(arrow) = &function.ty else {
+        unreachable!("validated PTX functions always have one parameter");
+    };
+    ptx_parameter_type_for_arrow_parameter(&arrow.parameter, &function.name.name)
+}
+
+fn validate_ptx_parameter_type(parameter: &ArrowParameter, function_name: &str) -> Result<()> {
+    ptx_parameter_type_for_arrow_parameter(parameter, function_name).map(|_| ())
+}
+
+fn ptx_parameter_type_for_arrow_parameter(
+    parameter: &ArrowParameter,
+    function_name: &str,
+) -> Result<&'static str> {
+    let ty = match parameter {
+        ArrowParameter::Binder(binder) => binder.ty.as_ref(),
+        ArrowParameter::Domain(ty) => ty.as_ref(),
+    };
+    match simple_type_name(ty) {
+        Some("i32") => Ok(".u32"),
+        Some("i64") => Ok(".u64"),
+        Some("f32") => Ok(".f32"),
+        Some("u8") => Ok(".u8"),
+        _ => Err(Error::Unsupported(format!(
+            "`#compile_ptx` currently supports only primitive i32/i64/f32/u8 parameters for `{function_name}`"
+        ))),
+    }
+}
+
+fn simple_type_name(ty: &Term) -> Option<&str> {
+    let Term::Path(path) = ty else {
+        return None;
+    };
+    if path.token_keyword_package.is_none() && path.segments.len() == 1 {
+        Some(path.segments[0].lexeme.as_str())
+    } else {
+        None
+    }
+}
+
+fn nul_terminated_identifier(name: &str) -> Vec<u8> {
+    let mut bytes = name.as_bytes().to_vec();
+    bytes.push(0);
+    bytes
 }
 
 fn initialize_zero_arg_use_bindings(

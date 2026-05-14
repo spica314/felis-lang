@@ -22,6 +22,13 @@ pub(crate) enum PathBufSource {
     Array(usize),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KernelArgumentRef {
+    I32(usize),
+    I64(usize),
+    F32(usize),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum I32Expr {
     Literal(i32),
@@ -263,6 +270,25 @@ pub(crate) enum Operation {
     CuModuleLoadData {
         module_slot: usize,
         data_index: usize,
+        result_slot: usize,
+    },
+    CuModuleGetFunction {
+        function_slot: usize,
+        module: I64Expr,
+        name_data_index: usize,
+        result_slot: usize,
+    },
+    CuLaunchKernel {
+        function: I64Expr,
+        arg: KernelArgumentRef,
+        grid_dim_x: I32Expr,
+        grid_dim_y: I32Expr,
+        grid_dim_z: I32Expr,
+        block_dim_x: I32Expr,
+        block_dim_y: I32Expr,
+        block_dim_z: I32Expr,
+        shared_mem_bytes: I32Expr,
+        stream: I64Expr,
         result_slot: usize,
     },
     ArraySetI32 {

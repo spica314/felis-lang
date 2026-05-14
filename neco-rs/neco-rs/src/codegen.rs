@@ -2,7 +2,8 @@ use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
 
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
-    F32Expr, I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, PathBufSource, U8Expr,
+    F32Expr, I32Expr, I64Expr, KernelArgumentRef, LoweredProgram, OpenPath, Operation,
+    PathBufSource, U8Expr,
 };
 
 const DATA_VIRTUAL_ADDRESS: u64 = 0x410000;
@@ -408,6 +409,80 @@ fn emit_operations(
                     symbol: "cuModuleLoadData",
                 });
                 code.extend_from_slice(&[0xe8, 0x00, 0x00, 0x00, 0x00]);
+                let result_offset = i32_slot_offset(program, *result_slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&result_offset.to_le_bytes());
+            }
+            Operation::CuModuleGetFunction {
+                function_slot,
+                module,
+                name_data_index,
+                result_slot,
+            } => {
+                let function_offset = i64_slot_offset(program, *function_slot);
+                code.extend_from_slice(&[0x48, 0x8d, 0xbd]);
+                code.extend_from_slice(&function_offset.to_le_bytes());
+                emit_i64_expr_to_rax(module, code, program);
+                code.extend_from_slice(&[0x48, 0x89, 0xc6]);
+                code.extend_from_slice(&[0x48, 0xba]);
+                code.extend_from_slice(&addresses[*name_data_index].to_le_bytes());
+                external_calls.push(ExternalCall {
+                    offset: code.len(),
+                    symbol: "cuModuleGetFunction",
+                });
+                code.extend_from_slice(&[0xe8, 0x00, 0x00, 0x00, 0x00]);
+                let result_offset = i32_slot_offset(program, *result_slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&result_offset.to_le_bytes());
+            }
+            Operation::CuLaunchKernel {
+                function,
+                arg,
+                grid_dim_x,
+                grid_dim_y,
+                grid_dim_z,
+                block_dim_x,
+                block_dim_y,
+                block_dim_z,
+                shared_mem_bytes,
+                stream,
+                result_slot,
+            } => {
+                emit_i64_expr_to_rax(function, code, program);
+                code.extend_from_slice(&[0x48, 0x89, 0xc7]);
+                emit_i32_expr_to_eax(grid_dim_x, code, program);
+                code.extend_from_slice(&[0x89, 0xc6]);
+                emit_i32_expr_to_eax(grid_dim_y, code, program);
+                code.extend_from_slice(&[0x89, 0xc2]);
+                emit_i32_expr_to_eax(grid_dim_z, code, program);
+                code.extend_from_slice(&[0x89, 0xc1]);
+                emit_i32_expr_to_eax(block_dim_x, code, program);
+                code.extend_from_slice(&[0x41, 0x89, 0xc0]);
+                emit_i32_expr_to_eax(block_dim_y, code, program);
+                code.extend_from_slice(&[0x41, 0x89, 0xc1]);
+
+                code.extend_from_slice(&[0x48, 0x83, 0xec, 0x10]);
+                let arg_offset = kernel_argument_ref_offset(program, *arg);
+                code.extend_from_slice(&[0x48, 0x8d, 0x85]);
+                code.extend_from_slice(&arg_offset.to_le_bytes());
+                code.extend_from_slice(&[0x48, 0x89, 0x04, 0x24]);
+                code.extend_from_slice(&[0x48, 0x89, 0xe3]);
+
+                code.extend_from_slice(&[0x48, 0x83, 0xec, 0x08]);
+                code.extend_from_slice(&[0x6a, 0x00]);
+                code.push(0x53);
+                emit_i64_expr_to_rax(stream, code, program);
+                code.push(0x50);
+                emit_i32_expr_to_eax(shared_mem_bytes, code, program);
+                code.push(0x50);
+                emit_i32_expr_to_eax(block_dim_z, code, program);
+                code.push(0x50);
+                external_calls.push(ExternalCall {
+                    offset: code.len(),
+                    symbol: "cuLaunchKernel",
+                });
+                code.extend_from_slice(&[0xe8, 0x00, 0x00, 0x00, 0x00]);
+                code.extend_from_slice(&[0x48, 0x83, 0xc4, 0x40]);
                 let result_offset = i32_slot_offset(program, *result_slot);
                 code.extend_from_slice(&[0x89, 0x85]);
                 code.extend_from_slice(&result_offset.to_le_bytes());
@@ -1168,6 +1243,14 @@ fn f32_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
     let i32_slot_bytes = (program.i32_slots * 4) as i32;
     let i64_slot_bytes = (program.i64_slots * 8) as i32;
     -(pointer_bytes(program) + i32_slot_bytes + i64_slot_bytes + 4 * (slot as i32 + 1))
+}
+
+fn kernel_argument_ref_offset(program: &LoweredProgram, arg: KernelArgumentRef) -> i32 {
+    match arg {
+        KernelArgumentRef::I32(slot) => i32_slot_offset(program, slot),
+        KernelArgumentRef::I64(slot) => i64_slot_offset(program, slot),
+        KernelArgumentRef::F32(slot) => f32_slot_offset(program, slot),
+    }
 }
 
 fn emit_array_initializers(program: &LoweredProgram, code: &mut Vec<u8>) {

@@ -8,7 +8,8 @@ use crate::codegen::{
 };
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
-    F32Expr, I32Expr, I64Expr, LoweredProgram, OpenPath, Operation, PathBufSource, U8Expr,
+    F32Expr, I32Expr, I64Expr, KernelArgumentRef, LoweredProgram, OpenPath, Operation,
+    PathBufSource, U8Expr,
 };
 use crate::lowering::lower_package_to_program;
 
@@ -2509,10 +2510,12 @@ fn lowers_cuda_compile_ptx_module_load_fixture_to_runtime_io_operations() {
     };
 
     let program = lower_package_to_program(&package).expect("lower fixture");
-    assert_eq!(program.data.len(), 1);
+    assert_eq!(program.data.len(), 2);
     let ptx = String::from_utf8_lossy(&program.data[0]);
-    assert!(ptx.contains(".visible .entry empty_kernel()"));
+    assert!(ptx.contains(".visible .entry empty_kernel("));
+    assert!(ptx.contains(".param .u32 arg0"));
     assert!(program.data[0].ends_with(&[0]));
+    assert_eq!(program.data[1], b"empty_kernel\0");
     assert_eq!(
         program.operations,
         vec![
@@ -2548,11 +2551,38 @@ fn lowers_cuda_compile_ptx_module_load_fixture_to_runtime_io_operations() {
                 data_index: 0,
                 result_slot: 4,
             },
-            Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(4))),
+            Operation::StoreI64 {
+                slot: 2,
+                value: I64Expr::Literal(0),
+            },
+            Operation::CuModuleGetFunction {
+                function_slot: 2,
+                module: I64Expr::Local(1),
+                name_data_index: 1,
+                result_slot: 5,
+            },
+            Operation::StoreI32 {
+                slot: 6,
+                value: I32Expr::Literal(0),
+            },
+            Operation::CuLaunchKernel {
+                function: I64Expr::Local(2),
+                arg: KernelArgumentRef::I32(6),
+                grid_dim_x: I32Expr::Literal(1),
+                grid_dim_y: I32Expr::Literal(1),
+                grid_dim_z: I32Expr::Literal(1),
+                block_dim_x: I32Expr::Literal(1),
+                block_dim_y: I32Expr::Literal(1),
+                block_dim_z: I32Expr::Literal(1),
+                shared_mem_bytes: I32Expr::Literal(0),
+                stream: I64Expr::Literal(0),
+                result_slot: 7,
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(7))),
         ]
     );
-    assert_eq!(program.i32_slots, 5);
-    assert_eq!(program.i64_slots, 2);
+    assert_eq!(program.i32_slots, 8);
+    assert_eq!(program.i64_slots, 3);
 
     let image = build_linux_x86_64_program_image(&program, EntryAbi::LibcMain);
     assert_eq!(
@@ -2565,8 +2595,38 @@ fn lowers_cuda_compile_ptx_module_load_fixture_to_runtime_io_operations() {
             "cuInit",
             "cuDeviceGet",
             "cuCtxCreate_v2",
-            "cuModuleLoadData"
+            "cuModuleLoadData",
+            "cuModuleGetFunction",
+            "cuLaunchKernel"
         ]
+    );
+}
+
+#[test]
+fn rejects_zero_argument_compile_ptx_target() {
+    let package = parse_inline_binary_package(
+        "reject-zero-argument-compile-ptx",
+        r#"
+#fn empty_kernel : () #with PTX {
+    ()
+}
+
+#compile_ptx empty_kernel #to empty_kernel_ptx;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject zero-argument PTX");
+    assert!(
+        error
+            .to_string()
+            .contains("supports only one-argument PTX functions")
     );
 }
 

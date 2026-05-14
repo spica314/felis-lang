@@ -2,8 +2,8 @@ use neco_rs_parser::{BindingPattern, Term};
 
 use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::ir::{
-    ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, I64Expr, LoweredProgram, OpenPath,
-    Operation, PathBufSource, U8Expr, intern_data,
+    ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, I64Expr, KernelArgumentRef, LoweredProgram,
+    OpenPath, Operation, PathBufSource, U8Expr, intern_data,
 };
 use crate::lowering::{
     LoweringState, lower_i32_expr, lower_i64_expr, lower_u8_expr, validate_value_against_type,
@@ -259,6 +259,70 @@ pub(crate) fn lower_io_call(
             program.operations.push(Operation::CuModuleLoadData {
                 module_slot,
                 data_index,
+                result_slot,
+            });
+            if let Err(error) = bind_checked_pattern(
+                binder,
+                Value::I32(I32Expr::Local(result_slot)),
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
+        ["IO", "cu_module_get_function"] => {
+            let (function_slot, module, name_data_index, result_slot) =
+                match parse_cu_module_get_function_arguments(arguments, state) {
+                    Ok(value) => value,
+                    Err(err) => return Some(Err(err)),
+                };
+            program.operations.push(Operation::CuModuleGetFunction {
+                function_slot,
+                module,
+                name_data_index,
+                result_slot,
+            });
+            if let Err(error) = bind_checked_pattern(
+                binder,
+                Value::I32(I32Expr::Local(result_slot)),
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
+        ["IO", "cu_launch_kernel"] => {
+            let (
+                function,
+                arg,
+                grid_dim_x,
+                grid_dim_y,
+                grid_dim_z,
+                block_dim_x,
+                block_dim_y,
+                block_dim_z,
+                shared_mem_bytes,
+                stream,
+                result_slot,
+            ) = match parse_cu_launch_kernel_arguments(arguments, state) {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            program.operations.push(Operation::CuLaunchKernel {
+                function,
+                arg,
+                grid_dim_x,
+                grid_dim_y,
+                grid_dim_z,
+                block_dim_x,
+                block_dim_y,
+                block_dim_z,
+                shared_mem_bytes,
+                stream,
                 result_slot,
             });
             if let Err(error) = bind_checked_pattern(
@@ -714,6 +778,142 @@ fn parse_cu_module_load_data_arguments(
     };
     let result_slot = state.allocate_i32_slot();
     Ok((module_slot, data_index, result_slot))
+}
+
+fn parse_cu_module_get_function_arguments(
+    arguments: &[Term],
+    state: &mut LoweringState,
+) -> Result<(usize, I64Expr, usize, usize)> {
+    let [function_term, module_term, ptx_term] = arguments else {
+        return Err(Error::Unsupported(
+            "`IO::cu_module_get_function` must receive an exclusive `i64` reference, an `i64` module, and a compiled PTX value"
+                .to_string(),
+        ));
+    };
+
+    let function_slot = match resolve_value(function_term, &state.environment)? {
+        Value::I64Reference {
+            slot,
+            exclusive: true,
+        } => slot,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`IO::cu_module_get_function` expects an exclusive `i64` reference as its first argument, got {other:?}"
+            )));
+        }
+    };
+    let module = lower_i64_expr(module_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_module_get_function` expects an `i64` module".to_string())
+    })?;
+    let data_index = match resolve_value(ptx_term, &state.environment)? {
+        Value::StaticSlice { data_index, .. } => data_index,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`IO::cu_module_get_function` expects a compiled PTX value as its third argument, got {other:?}"
+            )));
+        }
+    };
+    let name_data_index = state
+        .compiled_ptx_function_names
+        .get(&data_index)
+        .copied()
+        .ok_or_else(|| {
+            Error::Unsupported(
+                "`IO::cu_module_get_function` expects a value produced by `#compile_ptx`"
+                    .to_string(),
+            )
+        })?;
+    let result_slot = state.allocate_i32_slot();
+    Ok((function_slot, module, name_data_index, result_slot))
+}
+
+fn parse_cu_launch_kernel_arguments(
+    arguments: &[Term],
+    state: &mut LoweringState,
+) -> Result<(
+    I64Expr,
+    KernelArgumentRef,
+    I32Expr,
+    I32Expr,
+    I32Expr,
+    I32Expr,
+    I32Expr,
+    I32Expr,
+    I32Expr,
+    I64Expr,
+    usize,
+)> {
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [
+        function_term,
+        arg_term,
+        grid_dim_x_term,
+        grid_dim_y_term,
+        grid_dim_z_term,
+        block_dim_x_term,
+        block_dim_y_term,
+        block_dim_z_term,
+        shared_mem_bytes_term,
+        stream_term,
+    ] = normalized.as_slice()
+    else {
+        return Err(Error::Unsupported(
+            "`IO::cu_launch_kernel` must receive a function, one argument reference, grid dims, block dims, shared memory bytes, and stream"
+                .to_string(),
+        ));
+    };
+
+    let function = lower_i64_expr(function_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_launch_kernel` expects an `i64` function".to_string())
+    })?;
+    let arg = match resolve_value(arg_term, &state.environment)? {
+        Value::I32Reference { slot, .. } => KernelArgumentRef::I32(slot),
+        Value::I64Reference { slot, .. } => KernelArgumentRef::I64(slot),
+        Value::F32Reference { slot, .. } => KernelArgumentRef::F32(slot),
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`IO::cu_launch_kernel` expects a primitive reference as its kernel argument, got {other:?}"
+            )));
+        }
+    };
+    let grid_dim_x = lower_i32_expr(grid_dim_x_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_launch_kernel` expects `i32` grid_dim_x".to_string())
+    })?;
+    let grid_dim_y = lower_i32_expr(grid_dim_y_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_launch_kernel` expects `i32` grid_dim_y".to_string())
+    })?;
+    let grid_dim_z = lower_i32_expr(grid_dim_z_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_launch_kernel` expects `i32` grid_dim_z".to_string())
+    })?;
+    let block_dim_x = lower_i32_expr(block_dim_x_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_launch_kernel` expects `i32` block_dim_x".to_string())
+    })?;
+    let block_dim_y = lower_i32_expr(block_dim_y_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_launch_kernel` expects `i32` block_dim_y".to_string())
+    })?;
+    let block_dim_z = lower_i32_expr(block_dim_z_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_launch_kernel` expects `i32` block_dim_z".to_string())
+    })?;
+    let shared_mem_bytes = lower_i32_expr(shared_mem_bytes_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_launch_kernel` expects `i32` shared memory bytes".to_string())
+    })?;
+    let stream = lower_i64_expr(stream_term, state).map_err(|_| {
+        Error::Unsupported("`IO::cu_launch_kernel` expects an `i64` stream".to_string())
+    })?;
+    let result_slot = state.allocate_i32_slot();
+    Ok((
+        function,
+        arg,
+        grid_dim_x,
+        grid_dim_y,
+        grid_dim_z,
+        block_dim_x,
+        block_dim_y,
+        block_dim_z,
+        shared_mem_bytes,
+        stream,
+        result_slot,
+    ))
 }
 
 fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {
