@@ -13,11 +13,55 @@ pub enum Item {
     Use(UseDeclaration),
     Mod(ModuleDeclaration),
     BindBuiltin(BindBuiltinDeclaration),
+    CompilePtx(CompilePtxDeclaration),
     Function(FunctionDeclaration),
     Struct(StructDeclaration),
     Type(TypeDeclaration),
     Prop(PropDeclaration),
     Theorem(TheoremDeclaration),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompilePtxDeclaration {
+    pub function_name: String,
+    pub value_name: String,
+}
+
+impl Parse for CompilePtxDeclaration {
+    type ParseOption = ();
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        _: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        let mut k = *i;
+
+        let Some(_) =
+            TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::CompilePtx))?
+        else {
+            return Ok(None);
+        };
+        let Some(function_name) = TokenIdentifier::parse(tokens, &mut k)? else {
+            return Err(expected("PTX function name after `#compile_ptx`"));
+        };
+        let Some(_) = TokenKeyword::parse_with_option(tokens, &mut k, Some(TokenKeywordKind::To))?
+        else {
+            return Err(expected("`#to` after PTX function name"));
+        };
+        let Some(value_name) = TokenIdentifier::parse(tokens, &mut k)? else {
+            return Err(expected("PTX value name after `#to`"));
+        };
+        let Some(_) = TokenSemicolon::parse(tokens, &mut k)? else {
+            return Err(expected("`;` after compile_ptx declaration"));
+        };
+
+        *i = k;
+        Ok(Some(Self {
+            function_name: function_name.lexeme,
+            value_name: value_name.lexeme,
+        }))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -527,6 +571,10 @@ impl Parse for Item {
         if let Some(bind_builtin) = BindBuiltinDeclaration::parse(tokens, &mut k)? {
             *i = k;
             return Ok(Some(Self::BindBuiltin(bind_builtin)));
+        }
+        if let Some(compile_ptx) = CompilePtxDeclaration::parse(tokens, &mut k)? {
+            *i = k;
+            return Ok(Some(Self::CompilePtx(compile_ptx)));
         }
         if let Some(function) = FunctionDeclaration::parse(tokens, &mut k)? {
             *i = k;

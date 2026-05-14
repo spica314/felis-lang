@@ -14,6 +14,7 @@ use neco_rs_parser::{
 use crate::effect::{Value, bind_pattern, lower_effect, resolve_value};
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, LoweredProgram, Operation,
+    intern_data,
 };
 use crate::{Error, Result};
 
@@ -172,6 +173,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     state.statement_functions = collect_statement_functions(&callable_packages)?;
     state.constructors = collect_constructors(&callable_packages)?;
     state.structs = collect_structs(&callable_packages)?;
+    initialize_compile_ptx_bindings(package, &mut state, &mut program)?;
     initialize_zero_arg_use_bindings(package, &callable_packages, &mut state, &mut program)?;
     state.io_effect_allowed = function_has_io_effect(main_fn);
     let mut terminated = false;
@@ -240,6 +242,104 @@ fn function_has_io_effect(function: &neco_rs_parser::FunctionDeclaration) -> boo
         .effect
         .as_ref()
         .is_some_and(|effect| effect.lexeme == "IO")
+}
+
+fn initialize_compile_ptx_bindings(
+    package: &ParsedPackage,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<()> {
+    for item in package
+        .source_files
+        .iter()
+        .flat_map(|file| file.syntax.items.iter())
+    {
+        let Item::CompilePtx(compile_ptx) = item else {
+            continue;
+        };
+        let function = package
+            .source_files
+            .iter()
+            .flat_map(|file| file.syntax.items.iter())
+            .find_map(|item| match item {
+                Item::Function(function) if function.name.name == compile_ptx.function_name => {
+                    Some(function)
+                }
+                _ => None,
+            })
+            .ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "`#compile_ptx` target `{}` was not found",
+                    compile_ptx.function_name
+                ))
+            })?;
+        let ptx = compile_empty_ptx_function(function)?;
+        let len = i32::try_from(ptx.len()).map_err(|_| {
+            Error::Unsupported(format!(
+                "compiled PTX for `{}` is too large",
+                compile_ptx.function_name
+            ))
+        })?;
+        let data_index = intern_data(program, ptx);
+        let previous = state.environment.insert(
+            compile_ptx.value_name.clone(),
+            Value::StaticSlice { data_index, len },
+        );
+        if previous.is_some() {
+            return Err(Error::Unsupported(format!(
+                "duplicate compiled PTX value `{}`",
+                compile_ptx.value_name
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn compile_empty_ptx_function(function: &neco_rs_parser::FunctionDeclaration) -> Result<Vec<u8>> {
+    if !function
+        .effect
+        .as_ref()
+        .is_some_and(|effect| effect.lexeme == "PTX")
+    {
+        return Err(Error::Unsupported(format!(
+            "`#compile_ptx` target `{}` must use `#with PTX`",
+            function.name.name
+        )));
+    }
+    validate_empty_ptx_signature(function)?;
+    if !function.body.statements.is_empty()
+        || !matches!(function.body.tail.as_deref(), Some(Term::Unit))
+    {
+        return Err(Error::Unsupported(format!(
+            "`#compile_ptx` currently supports only empty PTX function bodies for `{}`",
+            function.name.name
+        )));
+    }
+
+    let mut ptx = format!(
+        ".version 7.0\n.target sm_52\n.address_size 64\n\n.visible .entry {}()\n{{\n    ret;\n}}\n",
+        function.name.name
+    )
+    .into_bytes();
+    ptx.push(0);
+    Ok(ptx)
+}
+
+fn validate_empty_ptx_signature(function: &neco_rs_parser::FunctionDeclaration) -> Result<()> {
+    let current = &function.ty;
+    while let Term::Arrow(_) = current {
+        return Err(Error::Unsupported(format!(
+            "`#compile_ptx` currently supports only zero-argument PTX functions for `{}`",
+            function.name.name
+        )));
+    }
+    if !matches!(current, Term::Unit) {
+        return Err(Error::Unsupported(format!(
+            "`#compile_ptx` currently supports only PTX functions returning `()` for `{}`",
+            function.name.name
+        )));
+    }
+    Ok(())
 }
 
 fn initialize_zero_arg_use_bindings(

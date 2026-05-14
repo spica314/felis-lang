@@ -2502,6 +2502,75 @@ fn lowers_cuda_device_ctx_create_fixture_to_runtime_io_operations() {
 }
 
 #[test]
+fn lowers_cuda_compile_ptx_module_load_fixture_to_runtime_io_operations() {
+    let root = repo_root().join("tests/testcases/cuda-compile-ptx-module-load");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert_eq!(program.data.len(), 1);
+    let ptx = String::from_utf8_lossy(&program.data[0]);
+    assert!(ptx.contains(".visible .entry empty_kernel()"));
+    assert!(program.data[0].ends_with(&[0]));
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::CuInit {
+                flags: I32Expr::Literal(0),
+                result_slot: 0,
+            },
+            Operation::StoreI32 {
+                slot: 1,
+                value: I32Expr::Literal(0),
+            },
+            Operation::CuDeviceGet {
+                device_slot: 1,
+                ordinal: I32Expr::Literal(0),
+                result_slot: 2,
+            },
+            Operation::StoreI64 {
+                slot: 0,
+                value: I64Expr::Literal(0),
+            },
+            Operation::CuCtxCreateV2 {
+                ctx_slot: 0,
+                flags: I32Expr::Literal(0),
+                device: I32Expr::Local(1),
+                result_slot: 3,
+            },
+            Operation::StoreI64 {
+                slot: 1,
+                value: I64Expr::Literal(0),
+            },
+            Operation::CuModuleLoadData {
+                module_slot: 1,
+                data_index: 0,
+                result_slot: 4,
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(4))),
+        ]
+    );
+    assert_eq!(program.i32_slots, 5);
+    assert_eq!(program.i64_slots, 2);
+
+    let image = build_linux_x86_64_program_image(&program, EntryAbi::LibcMain);
+    assert_eq!(
+        image
+            .external_calls
+            .iter()
+            .map(|call| call.symbol)
+            .collect::<Vec<_>>(),
+        vec![
+            "cuInit",
+            "cuDeviceGet",
+            "cuCtxCreate_v2",
+            "cuModuleLoadData"
+        ]
+    );
+}
+
+#[test]
 fn lowers_open_read_close_fixture_to_runtime_io_operations() {
     let root = repo_root().join("tests/testcases/open-read-close");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

@@ -5,9 +5,9 @@ mod source_file;
 mod term;
 
 pub use item::{
-    BindBuiltinDeclaration, ConstructorDeclaration, DeclaredName, EntryPointDeclaration,
-    FunctionDeclaration, Item, ModuleDeclaration, PropDeclaration, StructDeclaration,
-    StructFieldDeclaration, TheoremDeclaration, TypeDeclaration, UseDeclaration,
+    BindBuiltinDeclaration, CompilePtxDeclaration, ConstructorDeclaration, DeclaredName,
+    EntryPointDeclaration, FunctionDeclaration, Item, ModuleDeclaration, PropDeclaration,
+    StructDeclaration, StructFieldDeclaration, TheoremDeclaration, TypeDeclaration, UseDeclaration,
 };
 pub use path::{PathExpression, PathSegment};
 pub use pattern::Pattern;

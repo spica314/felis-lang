@@ -250,6 +250,28 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(false))
         }
+        ["IO", "cu_module_load_data"] => {
+            let (module_slot, data_index, result_slot) =
+                match parse_cu_module_load_data_arguments(arguments, state) {
+                    Ok(value) => value,
+                    Err(err) => return Some(Err(err)),
+                };
+            program.operations.push(Operation::CuModuleLoadData {
+                module_slot,
+                data_index,
+                result_slot,
+            });
+            if let Err(error) = bind_checked_pattern(
+                binder,
+                Value::I32(I32Expr::Local(result_slot)),
+                ty,
+                state,
+                program,
+            ) {
+                return Some(Err(error));
+            }
+            Some(Ok(false))
+        }
         ["IO", "exit"] => {
             let exit_code = match parse_exit_code_arguments(arguments, state) {
                 Ok(value) => value,
@@ -658,6 +680,40 @@ fn parse_cu_ctx_create_v2_arguments(
     })?;
     let result_slot = state.allocate_i32_slot();
     Ok((ctx_slot, flags, device, result_slot))
+}
+
+fn parse_cu_module_load_data_arguments(
+    arguments: &[Term],
+    state: &mut LoweringState,
+) -> Result<(usize, usize, usize)> {
+    let [module_term, ptx_term] = arguments else {
+        return Err(Error::Unsupported(
+            "`IO::cu_module_load_data` must receive an exclusive `i64` reference and a PTX string"
+                .to_string(),
+        ));
+    };
+
+    let module_slot = match resolve_value(module_term, &state.environment)? {
+        Value::I64Reference {
+            slot,
+            exclusive: true,
+        } => slot,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`IO::cu_module_load_data` expects an exclusive `i64` reference as its first argument, got {other:?}"
+            )));
+        }
+    };
+    let data_index = match resolve_value(ptx_term, &state.environment)? {
+        Value::StaticSlice { data_index, .. } => data_index,
+        other => {
+            return Err(Error::Unsupported(format!(
+                "`IO::cu_module_load_data` expects a static PTX string as its second argument, got {other:?}"
+            )));
+        }
+    };
+    let result_slot = state.allocate_i32_slot();
+    Ok((module_slot, data_index, result_slot))
 }
 
 fn normalize_numeric_literal_arguments(arguments: &[Term]) -> Vec<Term> {

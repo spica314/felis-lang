@@ -260,6 +260,11 @@ pub(crate) enum Operation {
         device: I32Expr,
         result_slot: usize,
     },
+    CuModuleLoadData {
+        module_slot: usize,
+        data_index: usize,
+        result_slot: usize,
+    },
     ArraySetI32 {
         array_slot: usize,
         index: I64Expr,

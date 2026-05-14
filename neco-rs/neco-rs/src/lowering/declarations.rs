@@ -103,6 +103,13 @@ pub(super) fn collect_statement_functions(
             let Item::Function(function) = item else {
                 continue;
             };
+            if function
+                .effect
+                .as_ref()
+                .is_some_and(|effect| effect.lexeme == "PTX")
+            {
+                continue;
+            }
             let name = function.name.name.clone();
             let value = statement_function_from_decl(function)?;
             if functions.insert(name.clone(), value).is_some() {
@@ -434,10 +441,10 @@ fn validate_function_effect(function: &FunctionDeclaration) -> Result<()> {
     if function
         .effect
         .as_ref()
-        .is_some_and(|effect| effect.lexeme != "IO")
+        .is_some_and(|effect| !matches!(effect.lexeme.as_str(), "IO" | "PTX"))
     {
         return Err(Error::Unsupported(format!(
-            "function `{}` effect must be `IO`",
+            "function `{}` effect must be `IO` or `PTX`",
             function.name.name
         )));
     }

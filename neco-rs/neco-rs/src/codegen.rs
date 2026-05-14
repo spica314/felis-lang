@@ -393,6 +393,25 @@ fn emit_operations(
                 code.extend_from_slice(&[0x89, 0x85]);
                 code.extend_from_slice(&result_offset.to_le_bytes());
             }
+            Operation::CuModuleLoadData {
+                module_slot,
+                data_index,
+                result_slot,
+            } => {
+                let module_offset = i64_slot_offset(program, *module_slot);
+                code.extend_from_slice(&[0x48, 0x8d, 0xbd]);
+                code.extend_from_slice(&module_offset.to_le_bytes());
+                code.extend_from_slice(&[0x48, 0xbe]);
+                code.extend_from_slice(&addresses[*data_index].to_le_bytes());
+                external_calls.push(ExternalCall {
+                    offset: code.len(),
+                    symbol: "cuModuleLoadData",
+                });
+                code.extend_from_slice(&[0xe8, 0x00, 0x00, 0x00, 0x00]);
+                let result_offset = i32_slot_offset(program, *result_slot);
+                code.extend_from_slice(&[0x89, 0x85]);
+                code.extend_from_slice(&result_offset.to_le_bytes());
+            }
             Operation::If {
                 condition,
                 then_operations,
