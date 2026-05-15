@@ -1,0 +1,7 @@
+{
+    "workspace": {
+        "members": [
+            "ray-tracing-in-one-weekend-using-ptx-bin"
+        ]
+    }
+}

@@ -1,0 +1,15 @@
+#use std_core::io::IO;
+#use std_core::ptx::PTX;
+#use std_core::primitive::array::ArrayVLPTX;
+
+#fn render_kernel : (framebuffer : ArrayVLPTX i32) -> () #with PTX {
+    ()
+}
+
+#compile_ptx render_kernel #to render_kernel_ptx;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    ()
+}

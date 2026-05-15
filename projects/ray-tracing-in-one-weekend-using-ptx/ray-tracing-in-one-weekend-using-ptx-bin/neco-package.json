@@ -1,0 +1,4 @@
+{
+    "name": "ray-tracing-in-one-weekend-using-ptx-bin",
+    "felis-bin-entrypoints": ["src/main.fe"]
+}
