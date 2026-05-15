@@ -1,8 +1,21 @@
 #use std_core::io::IO;
+#use std_core::io::FileDescriptor;
 #use std_core::ptx::PTX;
+#use std_core::primitive::array::ArrayVL;
 #use std_core::primitive::array::ArrayVLPTX;
+#use std_core::primitive::array::array_set;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_div;
+#use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_mod;
+#use std_core::primitive::i32::i32_mul;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
+#use std_core::primitive::reference::ref_set_ptx;
+#use std_core::primitive::u8::u8_from_i32;
 
 #fn render_kernel : (framebuffer : ArrayVLPTX i32) -> () #with PTX {
+    ref_set_ptx i32 framebuffer 0i32 0i32;
     ()
 }
 
@@ -10,6 +23,82 @@
 
 #entrypoint main;
 
+#fn append_byte : (buffer_ref : &^ ArrayVL u8) -> (len_ref : &^ i32) -> (byte : u8) -> () #with IO {
+    #let len : i32 = ref_get i32 len_ref;
+    array_set buffer_ref len byte;
+    ref_set i32 len_ref (i32_add len 1i32);
+    ()
+}
+
+#fn append_digit : (buffer_ref : &^ ArrayVL u8) -> (len_ref : &^ i32) -> (digit : i32) -> () #with IO {
+    append_byte buffer_ref len_ref (u8_from_i32 (i32_add 48i32 digit));
+    ()
+}
+
+#fn append_i32_decimal : (buffer_ref : &^ ArrayVL u8) -> (len_ref : &^ i32) -> (value : i32) -> () #with IO {
+    #if i32_gte value 100i32 {
+        #let hundreds : i32 = i32_div value 100i32;
+        #let rest : i32 = i32_mod value 100i32;
+        #let tens : i32 = i32_div rest 10i32;
+        #let ones : i32 = i32_mod rest 10i32;
+        append_digit buffer_ref len_ref hundreds;
+        append_digit buffer_ref len_ref tens;
+        append_digit buffer_ref len_ref ones;
+    } #else #if i32_gte value 10i32 {
+        #let tens : i32 = i32_div value 10i32;
+        #let ones : i32 = i32_mod value 10i32;
+        append_digit buffer_ref len_ref tens;
+        append_digit buffer_ref len_ref ones;
+    } #else {
+        append_digit buffer_ref len_ref value;
+    };
+    ()
+}
+
+#fn write_pixel : (stdout : FileDescriptor) -> (buffer_ref : &^ ArrayVL u8) -> (red : i32) -> (green : i32) -> (blue : i32) -> () #with IO {
+    #let len : i32 = 0i32;
+    #letref #excl len_ref : &^ i32 #borrow len;
+    append_i32_decimal buffer_ref len_ref red;
+    append_byte buffer_ref len_ref ' ';
+    append_i32_decimal buffer_ref len_ref green;
+    append_byte buffer_ref len_ref ' ';
+    append_i32_decimal buffer_ref len_ref blue;
+    append_byte buffer_ref len_ref '\n';
+    #let len : i32 = ref_get i32 len_ref;
+    #let _ : () <- IO::write stdout buffer_ref len;
+    ()
+}
+
 #fn main : () #with IO {
+    #let image_width : i32 = 256i32;
+    #let image_height : i32 = 256i32;
+
+    #let stdout : FileDescriptor <- IO::stdout;
+    #let header_ref : & ArrayVL u8 = "P3\n256 256\n255\n";
+    #let _ : () <- IO::write stdout header_ref 15i32;
+    #let line_buffer : ArrayVL u8 <- IO::arrayvl_new u8 16i32;
+    #letref #excl line_buffer_ref : &^ ArrayVL u8 #borrow line_buffer;
+
+    #let y : i32 = 0i32;
+    #letref #excl y_ref : &^ i32 #borrow y;
+    #loop {
+        #let y : i32 = ref_get i32 y_ref;
+        #if i32_gte y image_height {
+            #break;
+        };
+        #let x : i32 = 0i32;
+        #letref #excl x_ref : &^ i32 #borrow x;
+        #loop {
+            #let x : i32 = ref_get i32 x_ref;
+            #if i32_gte x image_width {
+                #break;
+            };
+            #let red : i32 = i32_div (i32_mul x 255i32) (i32_add image_width -1i32);
+            #let green : i32 = i32_div (i32_mul y 255i32) (i32_add image_height -1i32);
+            write_pixel stdout line_buffer_ref red green 0i32;
+            ref_set i32 x_ref (i32_add x 1i32);
+        };
+        ref_set i32 y_ref (i32_add y 1i32);
+    };
     ()
 }
