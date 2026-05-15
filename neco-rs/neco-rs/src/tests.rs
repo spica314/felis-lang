@@ -2699,6 +2699,28 @@ fn compiles_ptx_struct_field_access() {
 }
 
 #[test]
+fn compiles_ptx_special_registers() {
+    let root = repo_root().join("tests/testcases/cuda-compile-ptx-special-registers-module-load");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower package");
+    let ptx = String::from_utf8_lossy(&program.data[0]);
+    assert!(ptx.contains(".visible .entry special_registers_kernel("));
+    assert!(ptx.contains("mov.u32 %r1, %ctaid.x;"));
+    assert!(ptx.contains("mov.u32 %r2, %ctaid.y;"));
+    assert!(ptx.contains("mov.u32 %r4, %ctaid.z;"));
+    assert!(ptx.contains("mov.u32 %r6, %ntid.x;"));
+    assert!(ptx.contains("mov.u32 %r7, %ntid.y;"));
+    assert!(ptx.contains("mov.u32 %r9, %ntid.z;"));
+    assert!(ptx.contains("mov.u32 %r11, %tid.x;"));
+    assert!(ptx.contains("mov.u32 %r12, %tid.y;"));
+    assert!(ptx.contains("mov.u32 %r14, %tid.z;"));
+    assert!(ptx.contains("st.global.u32 [%rd1+0]"));
+}
+
+#[test]
 fn rejects_ptx_struct_rc_values() {
     let package = parse_inline_binary_package(
         "reject-ptx-struct-rc-values",

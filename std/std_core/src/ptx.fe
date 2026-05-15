@@ -1,3 +1,21 @@
 #bind_builtin "PTX" #as PTX;
+#bind_builtin "ctaid_x" #as ctaid_x;
+#bind_builtin "ctaid_y" #as ctaid_y;
+#bind_builtin "ctaid_z" #as ctaid_z;
+#bind_builtin "ntid_x" #as ntid_x;
+#bind_builtin "ntid_y" #as ntid_y;
+#bind_builtin "ntid_z" #as ntid_z;
+#bind_builtin "tid_x" #as tid_x;
+#bind_builtin "tid_y" #as tid_y;
+#bind_builtin "tid_z" #as tid_z;
 
 #pub #use PTX;
+#pub #use ctaid_x;
+#pub #use ctaid_y;
+#pub #use ctaid_z;
+#pub #use ntid_x;
+#pub #use ntid_y;
+#pub #use ntid_z;
+#pub #use tid_x;
+#pub #use tid_y;
+#pub #use tid_z;

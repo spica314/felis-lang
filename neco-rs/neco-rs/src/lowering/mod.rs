@@ -509,9 +509,13 @@ impl PtxBodyCompiler<'_> {
             return Ok(value);
         }
 
+        if let Some(value) = self.compile_special_register(term) {
+            return Ok(PtxValue::Scalar(value));
+        }
+
         let Some(name) = simple_path_name(term) else {
             return Err(self.unsupported(
-                "PTX value must be a literal, local, primitive call, or ref_get_ptx",
+                "PTX value must be a literal, local, primitive call, special register, or ref_get_ptx",
             ));
         };
         self.locals
@@ -652,6 +656,17 @@ impl PtxBodyCompiler<'_> {
             return Err(self.unsupported("PTX field access refers to an unknown field"));
         };
         Ok(Some(field_value.value.clone()))
+    }
+
+    fn compile_special_register(&mut self, term: &Term) -> Option<PtxScalarValue> {
+        let register_name = ptx_special_register(simple_path_name(term)?)?;
+        let register = self.allocate_u32_register();
+        self.instructions
+            .push_str(&format!("    mov.u32 {}, {};\n", register, register_name));
+        Some(PtxScalarValue {
+            ty: ArrayElementType::I32,
+            register,
+        })
     }
 
     fn validate_struct_field_value(&self, value: &PtxValue, ty: &Term) -> Result<()> {
@@ -941,6 +956,21 @@ fn ptx_binary_primitive(name: &str) -> Option<(ArrayElementType, &'static str)> 
         "f32_sub" => Some((ArrayElementType::F32, "sub.rn.f32")),
         "f32_mul" => Some((ArrayElementType::F32, "mul.rn.f32")),
         "f32_div" => Some((ArrayElementType::F32, "div.rn.f32")),
+        _ => None,
+    }
+}
+
+fn ptx_special_register(name: &str) -> Option<&'static str> {
+    match name {
+        "ctaid_x" => Some("%ctaid.x"),
+        "ctaid_y" => Some("%ctaid.y"),
+        "ctaid_z" => Some("%ctaid.z"),
+        "ntid_x" => Some("%ntid.x"),
+        "ntid_y" => Some("%ntid.y"),
+        "ntid_z" => Some("%ntid.z"),
+        "tid_x" => Some("%tid.x"),
+        "tid_y" => Some("%tid.y"),
+        "tid_z" => Some("%tid.z"),
         _ => None,
     }
 }

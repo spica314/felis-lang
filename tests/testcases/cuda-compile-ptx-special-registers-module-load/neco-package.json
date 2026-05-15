@@ -1,0 +1,6 @@
+{
+    "name": "cuda-compile-ptx-special-registers-module-load",
+    "felis-bin-entrypoints": ["src/cuda-compile-ptx-special-registers-module-load.fe"],
+    "native-link-mode": "libc-start",
+    "native-libraries": ["cuda"]
+}
