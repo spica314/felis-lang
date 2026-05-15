@@ -1,0 +1,6 @@
+{
+    "name": "cuda-compile-ptx-struct-module-load",
+    "felis-bin-entrypoints": ["src/cuda-compile-ptx-struct-module-load.fe"],
+    "native-link-mode": "libc-start",
+    "native-libraries": ["cuda"]
+}

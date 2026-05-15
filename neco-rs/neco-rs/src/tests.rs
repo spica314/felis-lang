@@ -2684,6 +2684,60 @@ fn compiles_f32_ptx_arithmetic() {
 }
 
 #[test]
+fn compiles_ptx_struct_field_access() {
+    let root = repo_root().join("tests/testcases/cuda-compile-ptx-struct-module-load");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower package");
+    let ptx = String::from_utf8_lossy(&program.data[0]);
+    assert!(ptx.contains(".visible .entry vec3_sum_kernel("));
+    assert!(ptx.contains("ld.global.u32"));
+    assert!(ptx.contains("add.s32"));
+    assert!(ptx.contains("st.global.u32 [%rd1+12]"));
+}
+
+#[test]
+fn rejects_ptx_struct_rc_values() {
+    let package = parse_inline_binary_package(
+        "reject-ptx-struct-rc-values",
+        r#"
+#use std_core::io::IO;
+#use std_core::ptx::PTX;
+#use std_core::primitive::array::ArrayVLPTX;
+#use std_core::primitive::f32::f32;
+#use std_core::primitive::reference::ref_get_ptx;
+#use std_core::primitive::reference::ref_set_ptx;
+
+#struct(rc) Vec3 : Type[0] {
+    x : f32,
+    y : f32,
+    z : f32,
+}
+
+#fn kernel : (array : ArrayVLPTX f32) -> () #with PTX {
+    #let x : f32 = ref_get_ptx f32 array 0i32;
+    #let v : Vec3 = Vec3 { x = x, y = x, z = x };
+    ref_set_ptx f32 array 1i32 v.x;
+    ()
+}
+
+#compile_ptx kernel #to kernel_ptx;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package).expect_err("lowering must reject struct(rc)");
+    assert!(error.to_string().contains("struct(rc)"));
+}
+
+#[test]
 fn rejects_zero_argument_compile_ptx_target() {
     let package = parse_inline_binary_package(
         "reject-zero-argument-compile-ptx",

@@ -275,7 +275,7 @@ fn initialize_compile_ptx_bindings(
                     compile_ptx.function_name
                 ))
             })?;
-        let ptx = compile_empty_ptx_function(function)?;
+        let ptx = compile_empty_ptx_function(function, &state.structs)?;
         let len = i32::try_from(ptx.len()).map_err(|_| {
             Error::Unsupported(format!(
                 "compiled PTX for `{}` is too large",
@@ -301,7 +301,10 @@ fn initialize_compile_ptx_bindings(
     Ok(())
 }
 
-fn compile_empty_ptx_function(function: &neco_rs_parser::FunctionDeclaration) -> Result<Vec<u8>> {
+fn compile_empty_ptx_function(
+    function: &neco_rs_parser::FunctionDeclaration,
+    structs: &HashMap<String, StructSignature>,
+) -> Result<Vec<u8>> {
     if !function
         .effect
         .as_ref()
@@ -320,7 +323,7 @@ fn compile_empty_ptx_function(function: &neco_rs_parser::FunctionDeclaration) ->
         )));
     }
 
-    let body = compile_ptx_body(function)?;
+    let body = compile_ptx_body(function, structs)?;
     let u64_regs = if body.next_u64_register == 1 {
         String::new()
     } else {
@@ -364,7 +367,10 @@ struct CompiledPtxBody {
     loads_array_parameter: bool,
 }
 
-fn compile_ptx_body(function: &neco_rs_parser::FunctionDeclaration) -> Result<CompiledPtxBody> {
+fn compile_ptx_body(
+    function: &neco_rs_parser::FunctionDeclaration,
+    structs: &HashMap<String, StructSignature>,
+) -> Result<CompiledPtxBody> {
     if function.body.statements.is_empty() {
         return Ok(CompiledPtxBody {
             instructions: String::new(),
@@ -380,6 +386,7 @@ fn compile_ptx_body(function: &neco_rs_parser::FunctionDeclaration) -> Result<Co
         function_name: &function.name.name,
         parameter,
         element_type,
+        structs,
         locals: HashMap::new(),
         instructions: String::new(),
         next_u32_register: 1,
@@ -399,15 +406,34 @@ fn compile_ptx_body(function: &neco_rs_parser::FunctionDeclaration) -> Result<Co
 }
 
 #[derive(Clone)]
-struct PtxValue {
+enum PtxValue {
+    Scalar(PtxScalarValue),
+    Struct(PtxStructValue),
+}
+
+#[derive(Clone)]
+struct PtxScalarValue {
     ty: ArrayElementType,
     register: String,
+}
+
+#[derive(Clone)]
+struct PtxStructValue {
+    type_name: String,
+    fields: Vec<PtxStructFieldValue>,
+}
+
+#[derive(Clone)]
+struct PtxStructFieldValue {
+    name: String,
+    value: PtxValue,
 }
 
 struct PtxBodyCompiler<'a> {
     function_name: &'a str,
     parameter: &'a str,
     element_type: ArrayElementType,
+    structs: &'a HashMap<String, StructSignature>,
     locals: HashMap<String, PtxValue>,
     instructions: String,
     next_u32_register: usize,
@@ -435,7 +461,7 @@ impl PtxBodyCompiler<'_> {
                     ));
                 };
                 self.ensure_parameter_array(&array_name)?;
-                let value = self.compile_value(&value)?;
+                let value = self.compile_scalar_value(&value)?;
                 self.ensure_element_type(value.ty)?;
                 self.instructions.push_str(&format!(
                     "    st.global.{} [%rd1+{}], {};\n",
@@ -461,17 +487,25 @@ impl PtxBodyCompiler<'_> {
                 register,
                 index * ptx_element_size(self.element_type)
             ));
-            return Ok(PtxValue {
+            return Ok(PtxValue::Scalar(PtxScalarValue {
                 ty: self.element_type,
                 register,
-            });
+            }));
         }
 
         if let Some(value) = self.compile_literal(term)? {
-            return Ok(value);
+            return Ok(PtxValue::Scalar(value));
         }
 
         if let Some(value) = self.compile_primitive_call(term)? {
+            return Ok(PtxValue::Scalar(value));
+        }
+
+        if let Some(value) = self.compile_struct_literal(term)? {
+            return Ok(PtxValue::Struct(value));
+        }
+
+        if let Some(value) = self.compile_field_access(term)? {
             return Ok(value);
         }
 
@@ -486,12 +520,19 @@ impl PtxBodyCompiler<'_> {
             .ok_or_else(|| self.unsupported("PTX value must refer to a previously bound local"))
     }
 
-    fn compile_literal(&mut self, term: &Term) -> Result<Option<PtxValue>> {
+    fn compile_scalar_value(&mut self, term: &Term) -> Result<PtxScalarValue> {
+        match self.compile_value(term)? {
+            PtxValue::Scalar(value) => Ok(value),
+            PtxValue::Struct(_) => Err(self.unsupported("PTX expression requires a scalar value")),
+        }
+    }
+
+    fn compile_literal(&mut self, term: &Term) -> Result<Option<PtxScalarValue>> {
         if let Some(value) = parse_ptx_i32_literal(term)? {
             let register = self.allocate_u32_register();
             self.instructions
                 .push_str(&format!("    mov.u32 {}, {};\n", register, value));
-            return Ok(Some(PtxValue {
+            return Ok(Some(PtxScalarValue {
                 ty: ArrayElementType::I32,
                 register,
             }));
@@ -500,7 +541,7 @@ impl PtxBodyCompiler<'_> {
             let register = self.allocate_u64_register();
             self.instructions
                 .push_str(&format!("    mov.u64 {}, {};\n", register, value));
-            return Ok(Some(PtxValue {
+            return Ok(Some(PtxScalarValue {
                 ty: ArrayElementType::I64,
                 register,
             }));
@@ -509,7 +550,7 @@ impl PtxBodyCompiler<'_> {
             let register = self.allocate_f32_register();
             self.instructions
                 .push_str(&format!("    mov.b32 {}, 0f{bits:08x};\n", register));
-            return Ok(Some(PtxValue {
+            return Ok(Some(PtxScalarValue {
                 ty: ArrayElementType::F32,
                 register,
             }));
@@ -517,7 +558,7 @@ impl PtxBodyCompiler<'_> {
         Ok(None)
     }
 
-    fn compile_primitive_call(&mut self, term: &Term) -> Result<Option<PtxValue>> {
+    fn compile_primitive_call(&mut self, term: &Term) -> Result<Option<PtxScalarValue>> {
         let Term::Application { callee, arguments } = term else {
             return Ok(None);
         };
@@ -533,8 +574,8 @@ impl PtxBodyCompiler<'_> {
                 self.unsupported("PTX arithmetic primitive must receive exactly two arguments")
             );
         };
-        let lhs = self.compile_value(lhs)?;
-        let rhs = self.compile_value(rhs)?;
+        let lhs = self.compile_scalar_value(lhs)?;
+        let rhs = self.compile_scalar_value(rhs)?;
         if lhs.ty != ty || rhs.ty != ty {
             return Err(self.unsupported("PTX arithmetic primitive arguments must match its type"));
         }
@@ -543,7 +584,99 @@ impl PtxBodyCompiler<'_> {
             "    {instruction} {}, {}, {};\n",
             register, lhs.register, rhs.register
         ));
-        Ok(Some(PtxValue { ty, register }))
+        Ok(Some(PtxScalarValue { ty, register }))
+    }
+
+    fn compile_struct_literal(&mut self, term: &Term) -> Result<Option<PtxStructValue>> {
+        let Term::StructLiteral { path, fields } = term else {
+            return Ok(None);
+        };
+        if path.token_keyword_package.is_some() || path.segments.len() != 1 {
+            return Err(
+                self.unsupported("PTX struct literal currently requires a simple type name")
+            );
+        }
+        let type_name = &path.segments[0].lexeme;
+        let Some(signature) = self.structs.get(type_name) else {
+            return Err(self.unsupported("PTX struct literal refers to an unknown struct"));
+        };
+        if signature.is_rc {
+            return Err(self.unsupported("PTX does not support `struct(rc)` values"));
+        }
+
+        let mut literal_fields = HashMap::new();
+        for field in fields {
+            if literal_fields
+                .insert(field.name.as_str(), field.value.clone())
+                .is_some()
+            {
+                return Err(self.unsupported("PTX struct literal contains a duplicate field"));
+            }
+        }
+
+        let mut compiled_fields = Vec::with_capacity(signature.fields.len());
+        for field in &signature.fields {
+            let Some(value_term) = literal_fields.remove(field.name.as_str()) else {
+                return Err(self.unsupported("PTX struct literal is missing a field"));
+            };
+            let value = self.compile_value(&value_term)?;
+            self.validate_struct_field_value(&value, &field.ty)?;
+            compiled_fields.push(PtxStructFieldValue {
+                name: field.name.clone(),
+                value,
+            });
+        }
+        if !literal_fields.is_empty() {
+            return Err(self.unsupported("PTX struct literal contains an unknown field"));
+        }
+
+        Ok(Some(PtxStructValue {
+            type_name: type_name.clone(),
+            fields: compiled_fields,
+        }))
+    }
+
+    fn compile_field_access(&mut self, term: &Term) -> Result<Option<PtxValue>> {
+        let Term::FieldAccess { receiver, field } = term else {
+            return Ok(None);
+        };
+        let receiver = self.compile_value(receiver)?;
+        let PtxValue::Struct(struct_value) = receiver else {
+            return Err(self.unsupported("PTX field access requires a struct value"));
+        };
+        let Some(field_value) = struct_value
+            .fields
+            .iter()
+            .find(|field_value| field_value.name == *field)
+        else {
+            return Err(self.unsupported("PTX field access refers to an unknown field"));
+        };
+        Ok(Some(field_value.value.clone()))
+    }
+
+    fn validate_struct_field_value(&self, value: &PtxValue, ty: &Term) -> Result<()> {
+        match (value, ptx_scalar_type(ty)) {
+            (PtxValue::Scalar(value), Some(expected)) if value.ty == expected => return Ok(()),
+            (PtxValue::Scalar(_), Some(_)) => {
+                return Err(self.unsupported("PTX struct field value does not match its type"));
+            }
+            _ => {}
+        }
+
+        if let (PtxValue::Struct(value), Some(expected)) = (value, simple_type_name(ty)) {
+            let Some(signature) = self.structs.get(expected) else {
+                return Err(self.unsupported("PTX struct field has an unknown struct type"));
+            };
+            if signature.is_rc {
+                return Err(self.unsupported("PTX does not support `struct(rc)` values"));
+            }
+            if value.type_name == expected {
+                return Ok(());
+            }
+            return Err(self.unsupported("PTX struct field value does not match its type"));
+        }
+
+        Err(self.unsupported("PTX struct fields currently support only scalar or struct values"))
     }
 
     fn allocate_u32_register(&mut self) -> String {
@@ -765,6 +898,16 @@ fn ptx_ref_set_call_parts(term: &Term) -> Result<Option<(String, i32, Term)>> {
 
 fn is_simple_callee(term: &Term, expected: &str) -> bool {
     simple_path_name(term) == Some(expected)
+}
+
+fn ptx_scalar_type(ty: &Term) -> Option<ArrayElementType> {
+    match simple_type_name(ty) {
+        Some("i32") => Some(ArrayElementType::I32),
+        Some("i64") => Some(ArrayElementType::I64),
+        Some("f32") => Some(ArrayElementType::F32),
+        Some("u8") => Some(ArrayElementType::U8),
+        _ => None,
+    }
 }
 
 fn ptx_element_size(ty: ArrayElementType) -> i32 {
