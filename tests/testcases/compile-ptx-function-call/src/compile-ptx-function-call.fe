@@ -1,0 +1,46 @@
+#use std_core::io::IO;
+#use std_core::ptx::PTX;
+#use std_core::primitive::array::ArrayVLPTX;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_mul;
+#use std_core::primitive::reference::ref_get_ptx;
+#use std_core::primitive::reference::ref_set_ptx;
+
+#struct Pair : Type[0] {
+    lhs : i32,
+    rhs : i32,
+}
+
+#fn add_one : (value : i32) -> i32 #with PTX {
+    #let result : i32 = i32_add value 1i32;
+    result
+}
+
+#fn scale_pair : (pair : Pair) -> i32 #with PTX {
+    #let lhs : i32 = pair.lhs;
+    #let rhs : i32 = pair.rhs;
+    #let product : i32 = i32_mul lhs rhs;
+    add_one product
+}
+
+#fn store_scaled : (array : ArrayVLPTX i32) -> () #with PTX {
+    #let source : i32 = ref_get_ptx i32 array 0i32;
+    #let pair : Pair = Pair { lhs = source, rhs = 4i32 };
+    #let scaled : i32 = scale_pair pair;
+    ref_set_ptx i32 array 1i32 scaled;
+    ()
+}
+
+#fn kernel : (array : ArrayVLPTX i32) -> () #with PTX {
+    store_scaled array;
+    ()
+}
+
+#compile_ptx kernel #to kernel_ptx;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    ()
+}

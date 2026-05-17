@@ -175,7 +175,8 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     state.statement_functions = collect_statement_functions(&callable_packages)?;
     state.constructors = collect_constructors(&callable_packages)?;
     state.structs = collect_structs(&callable_packages)?;
-    initialize_compile_ptx_bindings(package, &mut state, &mut program)?;
+    let ptx_functions = collect_ptx_functions(&callable_packages)?;
+    initialize_compile_ptx_bindings(package, &ptx_functions, &mut state, &mut program)?;
     initialize_zero_arg_use_bindings(package, &callable_packages, &mut state, &mut program)?;
     state.io_effect_allowed = function_has_io_effect(main_fn);
     let mut terminated = false;
@@ -248,6 +249,7 @@ fn function_has_io_effect(function: &neco_rs_parser::FunctionDeclaration) -> boo
 
 fn initialize_compile_ptx_bindings(
     package: &ParsedPackage,
+    ptx_functions: &HashMap<String, PtxFunction>,
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<()> {
@@ -275,7 +277,7 @@ fn initialize_compile_ptx_bindings(
                     compile_ptx.function_name
                 ))
             })?;
-        let ptx = compile_empty_ptx_function(function, &state.structs)?;
+        let ptx = compile_empty_ptx_function(function, &state.structs, ptx_functions)?;
         let len = i32::try_from(ptx.len()).map_err(|_| {
             Error::Unsupported(format!(
                 "compiled PTX for `{}` is too large",
@@ -304,6 +306,7 @@ fn initialize_compile_ptx_bindings(
 fn compile_empty_ptx_function(
     function: &neco_rs_parser::FunctionDeclaration,
     structs: &HashMap<String, StructSignature>,
+    ptx_functions: &HashMap<String, PtxFunction>,
 ) -> Result<Vec<u8>> {
     if !function
         .effect
@@ -323,7 +326,7 @@ fn compile_empty_ptx_function(
         )));
     }
 
-    let body = compile_ptx_body(function, structs)?;
+    let body = compile_ptx_body(function, structs, ptx_functions)?;
     let u64_regs = if body.next_u64_register == 1 {
         String::new()
     } else {
@@ -367,9 +370,89 @@ struct CompiledPtxBody {
     loads_array_parameter: bool,
 }
 
+#[derive(Clone)]
+struct PtxFunction {
+    parameters: Vec<PtxFunctionParameter>,
+    result_ty: Term,
+    body: neco_rs_parser::Block,
+}
+
+#[derive(Clone)]
+struct PtxFunctionParameter {
+    name: String,
+    ty: Term,
+}
+
+fn collect_ptx_functions(packages: &[ParsedPackage]) -> Result<HashMap<String, PtxFunction>> {
+    let mut functions = HashMap::new();
+    for package in packages {
+        for item in package
+            .source_files
+            .iter()
+            .flat_map(|file| file.syntax.items.iter())
+        {
+            let Item::Function(function) = item else {
+                continue;
+            };
+            if !function
+                .effect
+                .as_ref()
+                .is_some_and(|effect| effect.lexeme == "PTX")
+            {
+                continue;
+            }
+            let name = function.name.name.clone();
+            let value = ptx_function_from_decl(function)?;
+            if functions.insert(name.clone(), value).is_some() {
+                return Err(Error::Unsupported(format!(
+                    "duplicate function `{name}` is not supported"
+                )));
+            }
+        }
+    }
+    Ok(functions)
+}
+
+fn ptx_function_from_decl(function: &neco_rs_parser::FunctionDeclaration) -> Result<PtxFunction> {
+    let mut parameter_names = HashSet::new();
+    let mut parameters = Vec::new();
+    let mut current = &function.ty;
+    while let Term::Arrow(arrow) = current {
+        let ArrowParameter::Binder(binder) = &arrow.parameter else {
+            return Err(Error::Unsupported(format!(
+                "PTX function `{}` must use named parameters",
+                function.name.name
+            )));
+        };
+        if !parameter_names.insert(binder.name.clone()) {
+            return Err(Error::Unsupported(format!(
+                "duplicate parameter `{}` in PTX function `{}`",
+                binder.name, function.name.name
+            )));
+        }
+        parameters.push(PtxFunctionParameter {
+            name: binder.name.clone(),
+            ty: binder.ty.as_ref().clone(),
+        });
+        current = arrow.result.as_ref();
+    }
+    if function.body.tail.is_none() {
+        return Err(Error::Unsupported(format!(
+            "PTX function `{}` body must end with a value expression",
+            function.name.name
+        )));
+    }
+    Ok(PtxFunction {
+        parameters,
+        result_ty: current.clone(),
+        body: function.body.clone(),
+    })
+}
+
 fn compile_ptx_body(
     function: &neco_rs_parser::FunctionDeclaration,
     structs: &HashMap<String, StructSignature>,
+    ptx_functions: &HashMap<String, PtxFunction>,
 ) -> Result<CompiledPtxBody> {
     if function.body.statements.is_empty() {
         return Ok(CompiledPtxBody {
@@ -387,11 +470,14 @@ fn compile_ptx_body(
         parameter,
         element_type,
         structs,
+        ptx_functions,
         locals: HashMap::new(),
+        array_aliases: HashMap::new(),
         instructions: String::new(),
         next_u32_register: 1,
         next_u64_register: 2,
         next_f32_register: 1,
+        inline_stack: vec![function.name.name.clone()],
     };
     for statement in &function.body.statements {
         compiler.compile_statement(statement)?;
@@ -409,6 +495,7 @@ fn compile_ptx_body(
 enum PtxValue {
     Scalar(PtxScalarValue),
     Struct(PtxStructValue),
+    Unit,
 }
 
 #[derive(Clone)]
@@ -434,11 +521,14 @@ struct PtxBodyCompiler<'a> {
     parameter: &'a str,
     element_type: ArrayElementType,
     structs: &'a HashMap<String, StructSignature>,
+    ptx_functions: &'a HashMap<String, PtxFunction>,
     locals: HashMap<String, PtxValue>,
+    array_aliases: HashMap<String, String>,
     instructions: String,
     next_u32_register: usize,
     next_u64_register: usize,
     next_f32_register: usize,
+    inline_stack: Vec<String>,
 }
 
 impl PtxBodyCompiler<'_> {
@@ -455,21 +545,24 @@ impl PtxBodyCompiler<'_> {
                 Ok(())
             }
             Statement::Expression(term) => {
-                let Some((array_name, index, value)) = ptx_ref_set_call_parts(term)? else {
-                    return Err(self.unsupported(
-                        "PTX expression statements currently support only `ref_set_ptx`",
+                if let Some((array_name, index, value)) = ptx_ref_set_call_parts(term)? {
+                    self.ensure_parameter_array(&array_name)?;
+                    let value = self.compile_scalar_value(&value)?;
+                    self.ensure_element_type(value.ty)?;
+                    self.instructions.push_str(&format!(
+                        "    st.global.{} [%rd1+{}], {};\n",
+                        ptx_memory_type(value.ty),
+                        index * ptx_element_size(value.ty),
+                        value.register
                     ));
-                };
-                self.ensure_parameter_array(&array_name)?;
-                let value = self.compile_scalar_value(&value)?;
-                self.ensure_element_type(value.ty)?;
-                self.instructions.push_str(&format!(
-                    "    st.global.{} [%rd1+{}], {};\n",
-                    ptx_memory_type(value.ty),
-                    index * ptx_element_size(value.ty),
-                    value.register
-                ));
-                Ok(())
+                    return Ok(());
+                }
+                if self.compile_ptx_unit_call(term)? {
+                    return Ok(());
+                }
+                Err(self.unsupported(
+                    "PTX expression statements currently support only `ref_set_ptx` or unit-returning PTX function calls",
+                ))
             }
             _ => Err(self.unsupported(
                 "PTX bodies currently support only `#let` values and expression `ref_set_ptx`",
@@ -501,6 +594,10 @@ impl PtxBodyCompiler<'_> {
             return Ok(PtxValue::Scalar(value));
         }
 
+        if let Some(value) = self.compile_ptx_value_call(term)? {
+            return Ok(value);
+        }
+
         if let Some(value) = self.compile_struct_literal(term)? {
             return Ok(PtxValue::Struct(value));
         }
@@ -528,6 +625,7 @@ impl PtxBodyCompiler<'_> {
         match self.compile_value(term)? {
             PtxValue::Scalar(value) => Ok(value),
             PtxValue::Struct(_) => Err(self.unsupported("PTX expression requires a scalar value")),
+            PtxValue::Unit => Err(self.unsupported("PTX expression requires a scalar value")),
         }
     }
 
@@ -589,6 +687,122 @@ impl PtxBodyCompiler<'_> {
             register, lhs.register, rhs.register
         ));
         Ok(Some(PtxScalarValue { ty, register }))
+    }
+
+    fn compile_ptx_value_call(&mut self, term: &Term) -> Result<Option<PtxValue>> {
+        let Some((function_name, function, arguments)) = self.ptx_call_parts(term)? else {
+            return Ok(None);
+        };
+        if matches!(function.result_ty, Term::Unit) {
+            return Err(self.unsupported("PTX value call must return a value"));
+        }
+        let result = self.inline_ptx_call(function_name, function.clone(), &arguments)?;
+        self.validate_value_against_type(&result, &function.result_ty)?;
+        Ok(Some(result))
+    }
+
+    fn compile_ptx_unit_call(&mut self, term: &Term) -> Result<bool> {
+        let Some((function_name, function, arguments)) = self.ptx_call_parts(term)? else {
+            return Ok(false);
+        };
+        if !matches!(function.result_ty, Term::Unit) {
+            return Err(self.unsupported("PTX expression statement call must return `()`"));
+        }
+        let result = self.inline_ptx_call(function_name, function, &arguments)?;
+        if !matches!(result, PtxValue::Unit) {
+            return Err(self.unsupported("PTX expression statement call must return `()`"));
+        }
+        Ok(true)
+    }
+
+    fn ptx_call_parts(&self, term: &Term) -> Result<Option<(String, PtxFunction, Vec<Term>)>> {
+        let Term::Application { callee, arguments } = term else {
+            return Ok(None);
+        };
+        let Some(function_name) = simple_path_name(callee) else {
+            return Ok(None);
+        };
+        let Some(function) = self.ptx_functions.get(function_name) else {
+            return Ok(None);
+        };
+        Ok(Some((
+            function_name.to_string(),
+            function.clone(),
+            normalize_numeric_literal_arguments(arguments),
+        )))
+    }
+
+    fn inline_ptx_call(
+        &mut self,
+        function_name: String,
+        function: PtxFunction,
+        arguments: &[Term],
+    ) -> Result<PtxValue> {
+        if self.inline_stack.iter().any(|name| name == &function_name) {
+            return Err(self.unsupported("recursive PTX function calls are not supported"));
+        }
+        if arguments.len() != function.parameters.len() {
+            return Err(self.unsupported("PTX function call argument count does not match"));
+        }
+
+        let mut bound_scalars = Vec::new();
+        let mut bound_arrays = Vec::new();
+        for (parameter, argument) in function.parameters.iter().zip(arguments.iter()) {
+            if let Some(element_type) = ptx_array_element_type(&parameter.ty)? {
+                if element_type != self.element_type {
+                    return Err(self.unsupported(
+                        "PTX function ArrayVLPTX parameter element type must match the kernel parameter",
+                    ));
+                }
+                let Some(argument_name) = simple_path_name(argument) else {
+                    return Err(self.unsupported(
+                        "PTX function ArrayVLPTX argument must be a simple array parameter",
+                    ));
+                };
+                self.ensure_parameter_array(argument_name)?;
+                bound_arrays.push((
+                    parameter.name.clone(),
+                    self.canonical_array_name(argument_name),
+                ));
+            } else {
+                let value = self.compile_value(argument)?;
+                self.validate_value_against_type(&value, &parameter.ty)?;
+                bound_scalars.push((parameter.name.clone(), value));
+            }
+        }
+
+        let saved_locals = self.locals.clone();
+        let saved_array_aliases = self.array_aliases.clone();
+        self.inline_stack.push(function_name);
+        for (name, value) in bound_scalars {
+            self.locals.insert(name, value);
+        }
+        for (name, canonical) in bound_arrays {
+            self.array_aliases.insert(name, canonical);
+        }
+
+        let result = (|| {
+            for statement in &function.body.statements {
+                self.compile_statement(statement)?;
+            }
+            let Some(tail) = function.body.tail.as_deref() else {
+                return Err(self.unsupported("PTX function body must end with a value expression"));
+            };
+            if matches!(function.result_ty, Term::Unit) {
+                if matches!(tail, Term::Unit) {
+                    Ok(PtxValue::Unit)
+                } else {
+                    Err(self.unsupported("PTX unit function body must end with `()`"))
+                }
+            } else {
+                self.compile_value(tail)
+            }
+        })();
+
+        self.inline_stack.pop();
+        self.locals = saved_locals;
+        self.array_aliases = saved_array_aliases;
+        result
     }
 
     fn compile_struct_literal(&mut self, term: &Term) -> Result<Option<PtxStructValue>> {
@@ -670,10 +884,14 @@ impl PtxBodyCompiler<'_> {
     }
 
     fn validate_struct_field_value(&self, value: &PtxValue, ty: &Term) -> Result<()> {
+        self.validate_value_against_type(value, ty)
+    }
+
+    fn validate_value_against_type(&self, value: &PtxValue, ty: &Term) -> Result<()> {
         match (value, ptx_scalar_type(ty)) {
             (PtxValue::Scalar(value), Some(expected)) if value.ty == expected => return Ok(()),
             (PtxValue::Scalar(_), Some(_)) => {
-                return Err(self.unsupported("PTX struct field value does not match its type"));
+                return Err(self.unsupported("PTX value does not match its type"));
             }
             _ => {}
         }
@@ -688,10 +906,10 @@ impl PtxBodyCompiler<'_> {
             if value.type_name == expected {
                 return Ok(());
             }
-            return Err(self.unsupported("PTX struct field value does not match its type"));
+            return Err(self.unsupported("PTX value does not match its type"));
         }
 
-        Err(self.unsupported("PTX struct fields currently support only scalar or struct values"))
+        Err(self.unsupported("PTX values currently support only scalar or struct types"))
     }
 
     fn allocate_u32_register(&mut self) -> String {
@@ -721,11 +939,18 @@ impl PtxBodyCompiler<'_> {
     }
 
     fn ensure_parameter_array(&self, array_name: &str) -> Result<()> {
-        if array_name == self.parameter {
+        if self.canonical_array_name(array_name) == self.parameter {
             Ok(())
         } else {
             Err(self.unsupported("PTX array access currently supports only the kernel parameter"))
         }
+    }
+
+    fn canonical_array_name(&self, array_name: &str) -> String {
+        self.array_aliases
+            .get(array_name)
+            .cloned()
+            .unwrap_or_else(|| array_name.to_string())
     }
 
     fn ensure_element_type(&self, ty: ArrayElementType) -> Result<()> {

@@ -135,6 +135,13 @@ fn compiles_and_runs_cuda_compile_ptx_special_registers_module_load_fixture() {
     assert_eq!(status.code(), Some(0));
 }
 
+#[test]
+fn compiles_and_runs_compile_ptx_function_call_fixture() {
+    let root = repo_root().join("tests/testcases/compile-ptx-function-call");
+    let status = run_fixture_status(&root, "compile-ptx-function-call");
+    assert_eq!(status.code(), Some(0));
+}
+
 fn readelf_entry_address(output: &str) -> u64 {
     output
         .lines()

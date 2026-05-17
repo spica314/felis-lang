@@ -1,0 +1,4 @@
+{
+    "name": "compile-ptx-function-call",
+    "felis-bin-entrypoints": ["src/compile-ptx-function-call.fe"]
+}
