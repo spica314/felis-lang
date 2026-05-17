@@ -25,10 +25,12 @@
 }
 
 #fn store_scaled : (array : ArrayVLPTX i32) -> () #with PTX {
-    #let source : i32 = ref_get_ptx i32 array 0i32;
+    #let source_index : i32 = i32_add 0i32 0i32;
+    #let source : i32 = ref_get_ptx i32 array source_index;
     #let pair : Pair = Pair { lhs = source, rhs = 4i32 };
     #let scaled : i32 = scale_pair pair;
-    ref_set_ptx i32 array 1i32 scaled;
+    #let dest_index : i32 = i32_add source_index 1i32;
+    ref_set_ptx i32 array dest_index scaled;
     ()
 }
 

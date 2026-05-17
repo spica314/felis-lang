@@ -1,6 +1,8 @@
 #use std_core::io::IO;
 #use std_core::io::FileDescriptor;
 #use std_core::ptx::PTX;
+#use std_core::ptx::ctaid_x;
+#use std_core::ptx::tid_x;
 #use std_core::primitive::array::ArrayVL;
 #use std_core::primitive::array::ArrayVLPTX;
 #use std_core::primitive::array::array_set;
@@ -9,13 +11,34 @@
 #use std_core::primitive::i32::i32_gte;
 #use std_core::primitive::i32::i32_mod;
 #use std_core::primitive::i32::i32_mul;
+#use std_core::primitive::i32::i32_sub;
 #use std_core::primitive::reference::ref_get;
 #use std_core::primitive::reference::ref_set;
 #use std_core::primitive::reference::ref_set_ptx;
 #use std_core::primitive::u8::u8_from_i32;
 
+#fn gradient_channel_ptx : (position : i32) -> i32 #with PTX {
+    i32_div (i32_mul position 255i32) (i32_sub 256i32 1i32)
+}
+
+#fn pixel_base_ptx : (x : i32) -> (y : i32) -> i32 #with PTX {
+    i32_mul (i32_add (i32_mul y 256i32) x) 3i32
+}
+
+#fn store_pixel_ptx : (framebuffer : ArrayVLPTX i32) -> (base : i32) -> (red : i32) -> (green : i32) -> (blue : i32) -> () #with PTX {
+    ref_set_ptx i32 framebuffer base red;
+    ref_set_ptx i32 framebuffer (i32_add base 1i32) green;
+    ref_set_ptx i32 framebuffer (i32_add base 2i32) blue;
+    ()
+}
+
 #fn render_kernel : (framebuffer : ArrayVLPTX i32) -> () #with PTX {
-    ref_set_ptx i32 framebuffer 0i32 0i32;
+    #let x : i32 = tid_x;
+    #let y : i32 = ctaid_x;
+    #let base : i32 = pixel_base_ptx x y;
+    #let red : i32 = gradient_channel_ptx x;
+    #let green : i32 = gradient_channel_ptx y;
+    store_pixel_ptx framebuffer base red green 0i32;
     ()
 }
 

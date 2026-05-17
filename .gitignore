@@ -6,3 +6,5 @@ target
 .codex
 *.out
 *.core
+
+*.ppm

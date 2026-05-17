@@ -547,12 +547,13 @@ impl PtxBodyCompiler<'_> {
             Statement::Expression(term) => {
                 if let Some((array_name, index, value)) = ptx_ref_set_call_parts(term)? {
                     self.ensure_parameter_array(&array_name)?;
+                    let address = self.compile_array_address(&index)?;
                     let value = self.compile_scalar_value(&value)?;
                     self.ensure_element_type(value.ty)?;
                     self.instructions.push_str(&format!(
-                        "    st.global.{} [%rd1+{}], {};\n",
+                        "    st.global.{} [{}], {};\n",
                         ptx_memory_type(value.ty),
-                        index * ptx_element_size(value.ty),
+                        address,
                         value.register
                     ));
                     return Ok(());
@@ -571,14 +572,19 @@ impl PtxBodyCompiler<'_> {
     }
 
     fn compile_value(&mut self, term: &Term) -> Result<PtxValue> {
+        if let Term::Group(inner) = term {
+            return self.compile_value(inner);
+        }
+
         if let Some((array_name, index)) = ptx_ref_get_call_parts(term)? {
             self.ensure_parameter_array(&array_name)?;
+            let address = self.compile_array_address(&index)?;
             let register = self.allocate_register(self.element_type);
             self.instructions.push_str(&format!(
-                "    ld.global.{} {}, [%rd1+{}];\n",
+                "    ld.global.{} {}, [{}];\n",
                 ptx_memory_type(self.element_type),
                 register,
-                index * ptx_element_size(self.element_type)
+                address
             ));
             return Ok(PtxValue::Scalar(PtxScalarValue {
                 ty: self.element_type,
@@ -629,6 +635,30 @@ impl PtxBodyCompiler<'_> {
         }
     }
 
+    fn compile_array_address(&mut self, index: &Term) -> Result<String> {
+        if let Some(index) = parse_ptx_i32_literal(index)? {
+            return Ok(format!(
+                "%rd1+{}",
+                index * ptx_element_size(self.element_type)
+            ));
+        }
+        let index = self.compile_scalar_value(index)?;
+        if index.ty != ArrayElementType::I32 {
+            return Err(self.unsupported("PTX array index must be an i32 value"));
+        }
+        let offset = self.allocate_u64_register();
+        let address = self.allocate_u64_register();
+        self.instructions.push_str(&format!(
+            "    mul.wide.s32 {}, {}, {};\n",
+            offset,
+            index.register,
+            ptx_element_size(self.element_type)
+        ));
+        self.instructions
+            .push_str(&format!("    add.s64 {}, %rd1, {};\n", address, offset));
+        Ok(address)
+    }
+
     fn compile_literal(&mut self, term: &Term) -> Result<Option<PtxScalarValue>> {
         if let Some(value) = parse_ptx_i32_literal(term)? {
             let register = self.allocate_u32_register();
@@ -661,7 +691,7 @@ impl PtxBodyCompiler<'_> {
     }
 
     fn compile_primitive_call(&mut self, term: &Term) -> Result<Option<PtxScalarValue>> {
-        let Term::Application { callee, arguments } = term else {
+        let Some((callee, arguments)) = flatten_application(term) else {
             return Ok(None);
         };
         let Some(primitive) = simple_path_name(callee) else {
@@ -670,7 +700,7 @@ impl PtxBodyCompiler<'_> {
         let Some((ty, instruction)) = ptx_binary_primitive(primitive) else {
             return Ok(None);
         };
-        let normalized = normalize_numeric_literal_arguments(arguments);
+        let normalized = normalize_numeric_literal_arguments(&arguments);
         let [lhs, rhs] = normalized.as_slice() else {
             return Err(
                 self.unsupported("PTX arithmetic primitive must receive exactly two arguments")
@@ -716,7 +746,7 @@ impl PtxBodyCompiler<'_> {
     }
 
     fn ptx_call_parts(&self, term: &Term) -> Result<Option<(String, PtxFunction, Vec<Term>)>> {
-        let Term::Application { callee, arguments } = term else {
+        let Some((callee, arguments)) = flatten_application(term) else {
             return Ok(None);
         };
         let Some(function_name) = simple_path_name(callee) else {
@@ -728,7 +758,7 @@ impl PtxBodyCompiler<'_> {
         Ok(Some((
             function_name.to_string(),
             function.clone(),
-            normalize_numeric_literal_arguments(arguments),
+            normalize_numeric_literal_arguments(&arguments),
         )))
     }
 
@@ -1088,7 +1118,7 @@ fn ptx_array_element_type(ty: &Term) -> Result<Option<ArrayElementType>> {
     }
 }
 
-fn ptx_ref_get_call_parts(term: &Term) -> Result<Option<(String, i32)>> {
+fn ptx_ref_get_call_parts(term: &Term) -> Result<Option<(String, Term)>> {
     let Term::Application { callee, arguments } = term else {
         return Ok(None);
     };
@@ -1106,13 +1136,10 @@ fn ptx_ref_get_call_parts(term: &Term) -> Result<Option<(String, i32)>> {
             "`ref_get_ptx` currently requires a simple array parameter".to_string(),
         ));
     };
-    let index = parse_ptx_i32_literal(index)?.ok_or_else(|| {
-        Error::Unsupported("`ref_get_ptx` currently requires an i32 literal index".to_string())
-    })?;
-    Ok(Some((array_name.to_string(), index)))
+    Ok(Some((array_name.to_string(), index.clone())))
 }
 
-fn ptx_ref_set_call_parts(term: &Term) -> Result<Option<(String, i32, Term)>> {
+fn ptx_ref_set_call_parts(term: &Term) -> Result<Option<(String, Term, Term)>> {
     let Term::Application { callee, arguments } = term else {
         return Ok(None);
     };
@@ -1130,14 +1157,23 @@ fn ptx_ref_set_call_parts(term: &Term) -> Result<Option<(String, i32, Term)>> {
             "`ref_set_ptx` currently requires a simple array parameter".to_string(),
         ));
     };
-    let index = parse_ptx_i32_literal(index)?.ok_or_else(|| {
-        Error::Unsupported("`ref_set_ptx` currently requires an i32 literal index".to_string())
-    })?;
-    Ok(Some((array_name.to_string(), index, value.clone())))
+    Ok(Some((array_name.to_string(), index.clone(), value.clone())))
 }
 
 fn is_simple_callee(term: &Term, expected: &str) -> bool {
     simple_path_name(term) == Some(expected)
+}
+
+fn flatten_application(term: &Term) -> Option<(&Term, Vec<Term>)> {
+    let Term::Application { callee, arguments } = term else {
+        return None;
+    };
+    if let Some((root, mut flattened)) = flatten_application(callee) {
+        flattened.extend(arguments.iter().cloned());
+        Some((root, flattened))
+    } else {
+        Some((callee, arguments.clone()))
+    }
 }
 
 fn ptx_scalar_type(ty: &Term) -> Option<ArrayElementType> {
