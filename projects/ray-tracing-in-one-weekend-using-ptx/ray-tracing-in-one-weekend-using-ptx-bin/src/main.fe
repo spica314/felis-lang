@@ -73,6 +73,13 @@
     f32_add (f32_add (f32_mul a.x b.x) (f32_mul a.y b.y)) (f32_mul a.z b.z)
 }
 
+#fn vec3_cross : (a : Vec3) -> (b : Vec3) -> Vec3 #with PTX {
+    vec3
+        (f32_sub (f32_mul a.y b.z) (f32_mul a.z b.y))
+        (f32_sub (f32_mul a.z b.x) (f32_mul a.x b.z))
+        (f32_sub (f32_mul a.x b.y) (f32_mul a.y b.x))
+}
+
 #fn vec3_length : (v : Vec3) -> f32 #with PTX {
     f32_sqrt (vec3_dot v v)
 }
@@ -258,6 +265,30 @@
 
 #fn pixel_base : (x : i32) -> (y : i32) -> i32 {
     i32_mul (i32_add (i32_mul y 400i32) x) 3i32
+}
+
+#fn camera_ray : (sample_x : f32) -> (sample_y : f32) -> Ray #with PTX {
+    #let image_width : f32 = 400.0f32;
+    #let image_height : f32 = 225.0f32;
+    #let lookfrom : Vec3 = vec3 -2.0f32 2.0f32 1.0f32;
+    #let lookat : Vec3 = vec3 0.0f32 0.0f32 -1.0f32;
+    #let vup : Vec3 = vec3 0.0f32 1.0f32 0.0f32;
+    #let center : Vec3 = lookfrom;
+    #let focal_length : f32 = vec3_length (vec3_sub lookfrom lookat);
+    #let h : f32 = 0.17632698f32;
+    #let viewport_height : f32 = f32_mul (f32_mul 2.0f32 h) focal_length;
+    #let viewport_width : f32 = f32_mul viewport_height (f32_div image_width image_height);
+    #let w : Vec3 = unit_vector (vec3_sub lookfrom lookat);
+    #let u : Vec3 = unit_vector (vec3_cross vup w);
+    #let v : Vec3 = vec3_cross w u;
+    #let viewport_u : Vec3 = vec3_mul viewport_width u;
+    #let viewport_v : Vec3 = vec3_mul viewport_height (vec3_neg v);
+    #let pixel_delta_u : Vec3 = vec3_div viewport_u image_width;
+    #let pixel_delta_v : Vec3 = vec3_div viewport_v image_height;
+    #let viewport_upper_left : Vec3 = vec3_sub (vec3_sub (vec3_sub center (vec3_mul focal_length w)) (vec3_div viewport_u 2.0f32)) (vec3_div viewport_v 2.0f32);
+    #let pixel00_loc : Vec3 = vec3_add viewport_upper_left (vec3_mul 0.5f32 (vec3_add pixel_delta_u pixel_delta_v));
+    #let pixel_sample : Vec3 = vec3_add pixel00_loc (vec3_add (vec3_mul sample_x pixel_delta_u) (vec3_mul sample_y pixel_delta_v));
+    Ray { origin = center, direction = vec3_sub pixel_sample center }
 }
 
 #fn ray_color_diffuse : (ray : Ray) -> (seed : i32) -> Vec3 #with PTX {
@@ -640,9 +671,7 @@
         #let random_y : f32 = random_unit (xorshift32 seed);
         #let sample_x : f32 = f32_add (f32_from_i32 x) random_x;
         #let sample_y : f32 = f32_add (f32_from_i32 y) random_y;
-        #let dir_x : f32 = f32_add -1.7777778f32 (f32_mul sample_x 0.008910891f32);
-        #let dir_y : f32 = f32_sub 1.0f32 (f32_mul sample_y 0.008928572f32);
-        #let ray : Ray = Ray { origin = vec3 0.0f32 0.0f32 0.0f32, direction = vec3 dir_x dir_y -1.0f32 };
+        #let ray : Ray = camera_ray sample_x sample_y;
         #let color : Vec3 = ray_color_diffuse ray (xorshift32 seed);
         ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
         ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
