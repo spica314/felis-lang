@@ -80,6 +80,10 @@
     f32_sub (f32_mul b b) (f32_mul (f32_mul 4.0f32 a) c)
 }
 
+#fn ray_at : (ray : Ray) -> (t : f32) -> Vec3 #with PTX {
+    vec3_add ray.origin (vec3_mul t ray.direction)
+}
+
 #fn ray_color : (ray : Ray) -> Vec3 #with PTX {
     #let unit_direction : Vec3 = unit_vector ray.direction;
     #let a : f32 = f32_mul 0.5f32 (f32_add unit_direction.y 1.0f32);
@@ -119,11 +123,19 @@
     #let dir_y : f32 = f32_add 0.9955556f32 (f32_mul (f32_from_i32 y) -0.008888889f32);
     #let ray : Ray = Ray { origin = vec3 0.0f32 0.0f32 0.0f32, direction = vec3 dir_x dir_y -1.0f32 };
     #let base : i32 = pixel_base_ptx x y;
-    #let discriminant : f32 = sphere_discriminant (vec3 0.0f32 0.0f32 -1.0f32) 0.5f32 ray;
+    #let sphere_center : Vec3 = vec3 0.0f32 0.0f32 -1.0f32;
+    #let sphere_radius : f32 = 0.5f32;
+    #let discriminant : f32 = sphere_discriminant sphere_center sphere_radius ray;
     #if f32_gte discriminant 0.0f32 {
-        ref_set_ptx i32 framebuffer base 255i32;
-        ref_set_ptx i32 framebuffer (i32_add base 1i32) 0i32;
-        ref_set_ptx i32 framebuffer (i32_add base 2i32) 0i32;
+        #let oc : Vec3 = vec3_sub sphere_center ray.origin;
+        #let a : f32 = vec3_dot ray.direction ray.direction;
+        #let b : f32 = f32_mul -2.0f32 (vec3_dot ray.direction oc);
+        #let t : f32 = f32_div (f32_sub (f32_mul -1.0f32 b) (f32_sqrt discriminant)) (f32_mul 2.0f32 a);
+        #let normal : Vec3 = unit_vector (vec3_sub (ray_at ray t) sphere_center);
+        #let color : Vec3 = vec3_mul 0.5f32 (vec3_add normal (vec3 1.0f32 1.0f32 1.0f32));
+        ref_set_ptx i32 framebuffer base (color_byte color.x);
+        ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte color.y);
+        ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte color.z);
     } #else {
         #let color : Vec3 = ray_color ray;
         ref_set_ptx i32 framebuffer base (color_byte color.x);
