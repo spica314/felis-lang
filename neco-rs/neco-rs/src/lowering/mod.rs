@@ -485,7 +485,9 @@ fn compile_ptx_body(
         structs,
         ptx_functions,
         locals: HashMap::new(),
+        local_refs: HashMap::new(),
         array_aliases: HashMap::new(),
+        loop_stack: Vec::new(),
         instructions: String::new(),
         next_u32_register: 1,
         next_u64_register: 2,
@@ -539,7 +541,9 @@ struct PtxBodyCompiler<'a> {
     structs: &'a HashMap<String, StructSignature>,
     ptx_functions: &'a HashMap<String, PtxFunction>,
     locals: HashMap<String, PtxValue>,
+    local_refs: HashMap<String, String>,
     array_aliases: HashMap<String, String>,
+    loop_stack: Vec<(String, String)>,
     instructions: String,
     next_u32_register: usize,
     next_u64_register: usize,
@@ -562,8 +566,43 @@ impl PtxBodyCompiler<'_> {
                 self.locals.insert(name.clone(), value);
                 Ok(())
             }
+            Statement::LetRef(letref_statement) => {
+                let Some(source_name) = simple_path_name(letref_statement.source.as_ref()) else {
+                    return Err(
+                        self.unsupported("PTX `#letref` currently requires a simple source local")
+                    );
+                };
+                let Some(PtxValue::Scalar(_)) = self.locals.get(source_name) else {
+                    return Err(self.unsupported("PTX `#letref` source must be a scalar local"));
+                };
+                self.local_refs
+                    .insert(letref_statement.reference.clone(), source_name.to_string());
+                Ok(())
+            }
             Statement::If(if_stmt) => self.compile_if_statement(if_stmt),
+            Statement::Loop(loop_stmt) => self.compile_loop_statement(loop_stmt),
+            Statement::Break => {
+                let Some((_, break_label)) = self.loop_stack.last() else {
+                    return Err(self.unsupported("PTX `#break` is only supported inside `#loop`"));
+                };
+                self.instructions.push_str(&format!("    bra {};\n", break_label));
+                Ok(())
+            }
+            Statement::Continue => {
+                let Some((continue_label, _)) = self.loop_stack.last() else {
+                    return Err(
+                        self.unsupported("PTX `#continue` is only supported inside `#loop`")
+                    );
+                };
+                self.instructions
+                    .push_str(&format!("    bra {};\n", continue_label));
+                Ok(())
+            }
             Statement::Expression(term) => {
+                if let Some((ref_name, value)) = ptx_local_ref_set_call_parts(term)? {
+                    self.compile_local_ref_set(&ref_name, &value)?;
+                    return Ok(());
+                }
                 if let Some((array_name, index, value)) = ptx_ref_set_call_parts(term)? {
                     self.ensure_parameter_array(&array_name)?;
                     let address = self.compile_array_address(&index)?;
@@ -585,9 +624,29 @@ impl PtxBodyCompiler<'_> {
                 ))
             }
             _ => Err(self.unsupported(
-                "PTX bodies currently support only `#let` values, `#if`, and expression `ref_set_ptx`",
+                "PTX bodies currently support only `#let`, `#letref`, `#if`, `#loop`, loop control, and ref expression statements",
             )),
         }
+    }
+
+    fn compile_local_ref_set(&mut self, ref_name: &str, value: &Term) -> Result<()> {
+        let Some(local_name) = self.local_refs.get(ref_name).cloned() else {
+            return Err(self.unsupported("PTX `ref_set` must target a local scalar reference"));
+        };
+        let Some(PtxValue::Scalar(target)) = self.locals.get(&local_name).cloned() else {
+            return Err(self.unsupported("PTX `ref_set` target must be a scalar local"));
+        };
+        let value = self.compile_scalar_value(value)?;
+        if value.ty != target.ty {
+            return Err(self.unsupported("PTX `ref_set` value type must match its target"));
+        }
+        self.instructions.push_str(&format!(
+            "    mov.{} {}, {};\n",
+            ptx_register_type(target.ty),
+            target.register,
+            value.register
+        ));
+        Ok(())
     }
 
     fn compile_if_statement(&mut self, if_stmt: &neco_rs_parser::IfStatement) -> Result<()> {
@@ -611,12 +670,28 @@ impl PtxBodyCompiler<'_> {
         Ok(())
     }
 
+    fn compile_loop_statement(&mut self, loop_stmt: &neco_rs_parser::LoopStatement) -> Result<()> {
+        let start_label = self.allocate_label("loop");
+        let end_label = self.allocate_label("endloop");
+        self.instructions.push_str(&format!("{}:\n", start_label));
+        self.loop_stack
+            .push((start_label.clone(), end_label.clone()));
+        self.compile_scoped_statements(&loop_stmt.body.statements)?;
+        self.loop_stack.pop();
+        self.instructions
+            .push_str(&format!("    bra {};\n", start_label));
+        self.instructions.push_str(&format!("{}:\n", end_label));
+        Ok(())
+    }
+
     fn compile_scoped_statements(&mut self, statements: &[Statement]) -> Result<()> {
         let saved_locals = self.locals.clone();
+        let saved_local_refs = self.local_refs.clone();
         for statement in statements {
             self.compile_statement(statement)?;
         }
         self.locals = saved_locals;
+        self.local_refs = saved_local_refs;
         Ok(())
     }
 
@@ -654,6 +729,16 @@ impl PtxBodyCompiler<'_> {
     fn compile_value(&mut self, term: &Term) -> Result<PtxValue> {
         if let Term::Group(inner) = term {
             return self.compile_value(inner);
+        }
+
+        if let Some(ref_name) = ptx_local_ref_get_call_parts(term)? {
+            let Some(local_name) = self.local_refs.get(&ref_name) else {
+                return Err(self.unsupported("PTX `ref_get` must target a local scalar reference"));
+            };
+            let Some(value) = self.locals.get(local_name).cloned() else {
+                return Err(self.unsupported("PTX `ref_get` target must be a scalar local"));
+            };
+            return Ok(value);
         }
 
         if let Some((array_name, index)) = ptx_ref_get_call_parts(term)? {
@@ -941,6 +1026,7 @@ impl PtxBodyCompiler<'_> {
         }
 
         let saved_locals = self.locals.clone();
+        let saved_local_refs = self.local_refs.clone();
         let saved_array_aliases = self.array_aliases.clone();
         self.inline_stack.push(function_name);
         for (name, value) in bound_scalars {
@@ -970,6 +1056,7 @@ impl PtxBodyCompiler<'_> {
 
         self.inline_stack.pop();
         self.locals = saved_locals;
+        self.local_refs = saved_local_refs;
         self.array_aliases = saved_array_aliases;
         result
     }
@@ -1290,6 +1377,27 @@ fn ptx_ref_get_call_parts(term: &Term) -> Result<Option<(String, Term)>> {
     Ok(Some((array_name.to_string(), index.clone())))
 }
 
+fn ptx_local_ref_get_call_parts(term: &Term) -> Result<Option<String>> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(None);
+    };
+    if !is_simple_callee(callee, "ref_get") {
+        return Ok(None);
+    }
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [_ty, reference] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`ref_get` must receive a type and a local reference".to_string(),
+        ));
+    };
+    let Some(ref_name) = simple_path_name(reference) else {
+        return Err(Error::Unsupported(
+            "`ref_get` currently requires a simple local reference".to_string(),
+        ));
+    };
+    Ok(Some(ref_name.to_string()))
+}
+
 fn ptx_ref_set_call_parts(term: &Term) -> Result<Option<(String, Term, Term)>> {
     let Term::Application { callee, arguments } = term else {
         return Ok(None);
@@ -1309,6 +1417,27 @@ fn ptx_ref_set_call_parts(term: &Term) -> Result<Option<(String, Term, Term)>> {
         ));
     };
     Ok(Some((array_name.to_string(), index.clone(), value.clone())))
+}
+
+fn ptx_local_ref_set_call_parts(term: &Term) -> Result<Option<(String, Term)>> {
+    let Term::Application { callee, arguments } = term else {
+        return Ok(None);
+    };
+    if !is_simple_callee(callee, "ref_set") {
+        return Ok(None);
+    }
+    let normalized = normalize_numeric_literal_arguments(arguments);
+    let [_ty, reference, value] = normalized.as_slice() else {
+        return Err(Error::Unsupported(
+            "`ref_set` must receive a type, a local reference, and a value".to_string(),
+        ));
+    };
+    let Some(ref_name) = simple_path_name(reference) else {
+        return Err(Error::Unsupported(
+            "`ref_set` currently requires a simple local reference".to_string(),
+        ));
+    };
+    Ok(Some((ref_name.to_string(), value.clone())))
 }
 
 fn is_simple_callee(term: &Term, expected: &str) -> bool {
@@ -1354,12 +1483,24 @@ fn ptx_memory_type(ty: ArrayElementType) -> &'static str {
     }
 }
 
+fn ptx_register_type(ty: ArrayElementType) -> &'static str {
+    match ty {
+        ArrayElementType::I32 | ArrayElementType::U8 => "u32",
+        ArrayElementType::I64 => "u64",
+        ArrayElementType::F32 => "f32",
+    }
+}
+
 fn ptx_binary_primitive(name: &str) -> Option<(ArrayElementType, &'static str)> {
     match name {
         "i32_add" => Some((ArrayElementType::I32, "add.s32")),
         "i32_sub" => Some((ArrayElementType::I32, "sub.s32")),
         "i32_mul" => Some((ArrayElementType::I32, "mul.lo.s32")),
         "i32_div" => Some((ArrayElementType::I32, "div.s32")),
+        "i32_mod" => Some((ArrayElementType::I32, "rem.s32")),
+        "i32_xor" => Some((ArrayElementType::I32, "xor.b32")),
+        "i32_shl" => Some((ArrayElementType::I32, "shl.b32")),
+        "i32_shr" => Some((ArrayElementType::I32, "shr.u32")),
         "i64_add" => Some((ArrayElementType::I64, "add.s64")),
         "i64_sub" => Some((ArrayElementType::I64, "sub.s64")),
         "i64_mul" => Some((ArrayElementType::I64, "mul.lo.s64")),

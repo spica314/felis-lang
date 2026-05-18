@@ -315,14 +315,23 @@ fn lower_i32_primitive_value(
     let Some(primitive) = simple_builtin_path_name(
         path,
         "i32 primitive",
-        &["i32_add", "i32_sub", "i32_mul", "i32_div", "i32_mod"],
+        &[
+            "i32_add", "i32_sub", "i32_mul", "i32_div", "i32_mod", "i32_xor", "i32_shl", "i32_shr",
+        ],
     )?
     else {
         return Ok(None);
     };
     if !matches!(
         primitive,
-        "i32_add" | "i32_sub" | "i32_mul" | "i32_div" | "i32_mod"
+        "i32_add"
+            | "i32_sub"
+            | "i32_mul"
+            | "i32_div"
+            | "i32_mod"
+            | "i32_xor"
+            | "i32_shl"
+            | "i32_shr"
     ) {
         return Ok(None);
     }
@@ -342,6 +351,9 @@ fn lower_i32_primitive_value(
         "i32_mul" => I32Expr::Mul(lhs, rhs),
         "i32_div" => I32Expr::Div(lhs, rhs),
         "i32_mod" => I32Expr::Mod(lhs, rhs),
+        "i32_xor" => I32Expr::Xor(lhs, rhs),
+        "i32_shl" => I32Expr::Shl(lhs, rhs),
+        "i32_shr" => I32Expr::Shr(lhs, rhs),
         _ => unreachable!("checked above"),
     })))
 }

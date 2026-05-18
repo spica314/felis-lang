@@ -49,6 +49,9 @@ pub(crate) enum I32Expr {
     Mul(Box<I32Expr>, Box<I32Expr>),
     Div(Box<I32Expr>, Box<I32Expr>),
     Mod(Box<I32Expr>, Box<I32Expr>),
+    Xor(Box<I32Expr>, Box<I32Expr>),
+    Shl(Box<I32Expr>, Box<I32Expr>),
+    Shr(Box<I32Expr>, Box<I32Expr>),
     ArrayGet {
         array_slot: usize,
         index: Box<I64Expr>,

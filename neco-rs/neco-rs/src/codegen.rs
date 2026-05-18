@@ -897,6 +897,9 @@ fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>, program: &LoweredPro
         }
         I32Expr::Div(lhs, rhs) => emit_i32_div_mod_expr(lhs, rhs, code, program, false),
         I32Expr::Mod(lhs, rhs) => emit_i32_div_mod_expr(lhs, rhs, code, program, true),
+        I32Expr::Xor(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0x31, 0xc8]),
+        I32Expr::Shl(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0xd3, 0xe0]),
+        I32Expr::Shr(lhs, rhs) => emit_i32_binary_expr(lhs, rhs, code, program, &[0xd3, 0xe8]),
         I32Expr::ArrayGet { array_slot, index } => {
             emit_array_get(*array_slot, index, code, program)
         }

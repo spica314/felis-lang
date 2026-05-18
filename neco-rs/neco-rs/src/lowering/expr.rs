@@ -577,6 +577,9 @@ fn lower_i32_primitive_call(
         "i32_mul" => Ok(I32Expr::Mul(lhs, rhs)),
         "i32_div" => Ok(I32Expr::Div(lhs, rhs)),
         "i32_mod" => Ok(I32Expr::Mod(lhs, rhs)),
+        "i32_xor" => Ok(I32Expr::Xor(lhs, rhs)),
+        "i32_shl" => Ok(I32Expr::Shl(lhs, rhs)),
+        "i32_shr" => Ok(I32Expr::Shr(lhs, rhs)),
         _ => Err(Error::Unsupported(format!(
             "unsupported `i32` primitive call `{primitive}`"
         ))),

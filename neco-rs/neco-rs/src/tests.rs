@@ -2708,6 +2708,52 @@ fn compiles_f32_ptx_arithmetic() {
 }
 
 #[test]
+fn compiles_i32_ptx_bitwise_loop_and_local_refs() {
+    let package = parse_inline_binary_package(
+        "compile-i32-ptx-bitwise-loop",
+        r#"
+#fn kernel : (array : ArrayVLPTX i32) -> () #with PTX {
+    #let acc : i32 = 1i32;
+    #let index : i32 = 0i32;
+    #letref #excl acc_ref : &^ i32 #borrow acc;
+    #letref #excl index_ref : &^ i32 #borrow index;
+    #loop {
+        #let current : i32 = ref_get i32 index_ref;
+        #if i32_gte current 3i32 {
+            #break;
+        };
+        #let shifted : i32 = i32_shl (ref_get i32 acc_ref) 1i32;
+        #let mixed : i32 = i32_xor shifted current;
+        ref_set i32 acc_ref (i32_shr mixed 1i32);
+        ref_set i32 index_ref (i32_add current 1i32);
+    };
+    ref_set_ptx i32 array 0i32 (ref_get i32 acc_ref);
+    ()
+}
+
+#compile_ptx kernel #to kernel_ptx;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    ()
+}
+"#,
+    );
+
+    let program = lower_package_to_program(&package).expect("lower package");
+    let ptx = String::from_utf8_lossy(&program.data[0]);
+    assert!(ptx.contains(".visible .entry kernel("));
+    assert!(ptx.contains("shl.b32"));
+    assert!(ptx.contains("xor.b32"));
+    assert!(ptx.contains("shr.u32"));
+    assert!(ptx.contains("setp.ge.s32"));
+    assert!(ptx.contains("bra $kernel_loop_"));
+    assert!(ptx.contains("mov.u32"));
+    assert!(ptx.contains("st.global.u32"));
+}
+
+#[test]
 fn compiles_ptx_if_with_f32_comparison() {
     let root = repo_root().join("tests/testcases/compile-ptx-if");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

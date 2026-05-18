@@ -21,9 +21,13 @@
 #use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::i32::i32_from_f32;
 #use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_lt;
 #use std_core::primitive::i32::i32_mod;
 #use std_core::primitive::i32::i32_mul;
+#use std_core::primitive::i32::i32_shl;
+#use std_core::primitive::i32::i32_shr;
 #use std_core::primitive::i32::i32_sub;
+#use std_core::primitive::i32::i32_xor;
 #use std_core::primitive::i64::i64;
 #use std_core::primitive::reference::ref_get;
 #use std_core::primitive::reference::ref_set;
@@ -107,6 +111,25 @@
     vec3 red green 1.0f32
 }
 
+#fn xorshift32 : (state : i32) -> i32 #with PTX {
+    #let x1 : i32 = i32_xor state (i32_shl state 13i32);
+    #let x2 : i32 = i32_xor x1 (i32_shr x1 17i32);
+    i32_xor x2 (i32_shl x2 5i32)
+}
+
+#fn random_unit : (state : i32) -> f32 #with PTX {
+    #let next : i32 = xorshift32 state;
+    #let mantissa : i32 = i32_shr next 9i32;
+    f32_div (f32_from_i32 mantissa) 8388608.0f32
+}
+
+#fn sample_seed : (x : i32) -> (y : i32) -> (sample_index : i32) -> i32 #with PTX {
+    #let x_part : i32 = i32_mul x 1973i32;
+    #let y_part : i32 = i32_mul y 9277i32;
+    #let sample_part : i32 = i32_mul sample_index 26699i32;
+    i32_add (i32_add (i32_add x_part y_part) sample_part) 89173i32
+}
+
 #fn color_byte : (value : f32) -> i32 #with PTX {
     i32_from_f32 (f32_mul 255.999f32 value)
 }
@@ -133,21 +156,66 @@
 #fn render_kernel : (framebuffer : ArrayVLPTX i32) -> () #with PTX {
     #let x : i32 = ctaid_x;
     #let y : i32 = tid_x;
-    #let dir_x : f32 = f32_add -1.7733333f32 (f32_mul (f32_from_i32 x) 0.008888889f32);
-    #let dir_y : f32 = f32_add 0.9955556f32 (f32_mul (f32_from_i32 y) -0.008888889f32);
-    #let ray : Ray = Ray { origin = vec3 0.0f32 0.0f32 0.0f32, direction = vec3 dir_x dir_y -1.0f32 };
     #let base : i32 = pixel_base_ptx x y;
+    #let samples_per_pixel : i32 = 100i32;
+    #let red_acc : f32 = 0.0f32;
+    #let green_acc : f32 = 0.0f32;
+    #let blue_acc : f32 = 0.0f32;
+    #let sample_index : i32 = 0i32;
+    #letref #excl red_acc_ref : &^ f32 #borrow red_acc;
+    #letref #excl green_acc_ref : &^ f32 #borrow green_acc;
+    #letref #excl blue_acc_ref : &^ f32 #borrow blue_acc;
+    #letref #excl sample_index_ref : &^ i32 #borrow sample_index;
 
-    #let sphere_center : Vec3 = vec3 0.0f32 0.0f32 -1.0f32;
-    #let sphere_radius : f32 = 0.5f32;
-    #let sphere_discriminant : f32 = sphere_discriminant sphere_center sphere_radius ray;
-    #if f32_gte sphere_discriminant 0.0f32 {
-        #let sphere_t : f32 = sphere_root sphere_center sphere_radius ray sphere_discriminant;
-        #if f32_lt 0.0f32 sphere_t {
-            #let color : Vec3 = sphere_normal_color sphere_center sphere_radius ray sphere_t;
-            ref_set_ptx i32 framebuffer base (color_byte color.x);
-            ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte color.y);
-            ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte color.z);
+    #loop {
+        #let current_sample : i32 = ref_get i32 sample_index_ref;
+        #if i32_gte current_sample samples_per_pixel {
+            #break;
+        };
+
+        #let seed : i32 = sample_seed x y current_sample;
+        #let random_x : f32 = random_unit seed;
+        #let random_y : f32 = random_unit (xorshift32 seed);
+        #let sample_x : f32 = f32_add (f32_from_i32 x) random_x;
+        #let sample_y : f32 = f32_add (f32_from_i32 y) random_y;
+        #let dir_x : f32 = f32_add -1.7777778f32 (f32_mul sample_x 0.008910891f32);
+        #let dir_y : f32 = f32_sub 1.0f32 (f32_mul sample_y 0.008928572f32);
+        #let ray : Ray = Ray { origin = vec3 0.0f32 0.0f32 0.0f32, direction = vec3 dir_x dir_y -1.0f32 };
+
+        #let sphere_center : Vec3 = vec3 0.0f32 0.0f32 -1.0f32;
+        #let sphere_radius : f32 = 0.5f32;
+        #let sphere_discriminant : f32 = sphere_discriminant sphere_center sphere_radius ray;
+        #if f32_gte sphere_discriminant 0.0f32 {
+            #let sphere_t : f32 = sphere_root sphere_center sphere_radius ray sphere_discriminant;
+            #if f32_lt 0.0f32 sphere_t {
+                #let color : Vec3 = sphere_normal_color sphere_center sphere_radius ray sphere_t;
+                ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
+                ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
+                ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
+            } #else {
+                #let ground_center : Vec3 = vec3 0.0f32 -100.5f32 -1.0f32;
+                #let ground_radius : f32 = 100.0f32;
+                #let ground_discriminant : f32 = sphere_discriminant ground_center ground_radius ray;
+                #if f32_gte ground_discriminant 0.0f32 {
+                    #let ground_t : f32 = sphere_root ground_center ground_radius ray ground_discriminant;
+                    #if f32_lt 0.0f32 ground_t {
+                        #let color : Vec3 = sphere_normal_color ground_center ground_radius ray ground_t;
+                        ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
+                        ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
+                        ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
+                    } #else {
+                        #let color : Vec3 = ray_color ray;
+                        ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
+                        ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
+                        ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
+                    };
+                } #else {
+                    #let color : Vec3 = ray_color ray;
+                    ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
+                    ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
+                    ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
+                };
+            };
         } #else {
             #let ground_center : Vec3 = vec3 0.0f32 -100.5f32 -1.0f32;
             #let ground_radius : f32 = 100.0f32;
@@ -156,46 +224,29 @@
                 #let ground_t : f32 = sphere_root ground_center ground_radius ray ground_discriminant;
                 #if f32_lt 0.0f32 ground_t {
                     #let color : Vec3 = sphere_normal_color ground_center ground_radius ray ground_t;
-                    ref_set_ptx i32 framebuffer base (color_byte color.x);
-                    ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte color.y);
-                    ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte color.z);
+                    ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
+                    ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
+                    ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
                 } #else {
                     #let color : Vec3 = ray_color ray;
-                    ref_set_ptx i32 framebuffer base (color_byte color.x);
-                    ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte color.y);
-                    ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte color.z);
+                    ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
+                    ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
+                    ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
                 };
             } #else {
                 #let color : Vec3 = ray_color ray;
-                ref_set_ptx i32 framebuffer base (color_byte color.x);
-                ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte color.y);
-                ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte color.z);
+                ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
+                ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
+                ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
             };
         };
-    } #else {
-        #let ground_center : Vec3 = vec3 0.0f32 -100.5f32 -1.0f32;
-        #let ground_radius : f32 = 100.0f32;
-        #let ground_discriminant : f32 = sphere_discriminant ground_center ground_radius ray;
-        #if f32_gte ground_discriminant 0.0f32 {
-            #let ground_t : f32 = sphere_root ground_center ground_radius ray ground_discriminant;
-            #if f32_lt 0.0f32 ground_t {
-                #let color : Vec3 = sphere_normal_color ground_center ground_radius ray ground_t;
-                ref_set_ptx i32 framebuffer base (color_byte color.x);
-                ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte color.y);
-                ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte color.z);
-            } #else {
-                #let color : Vec3 = ray_color ray;
-                ref_set_ptx i32 framebuffer base (color_byte color.x);
-                ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte color.y);
-                ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte color.z);
-            };
-        } #else {
-            #let color : Vec3 = ray_color ray;
-            ref_set_ptx i32 framebuffer base (color_byte color.x);
-            ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte color.y);
-            ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte color.z);
-        };
+        ref_set i32 sample_index_ref (i32_add current_sample 1i32);
     };
+
+    #let scale : f32 = 0.01f32;
+    ref_set_ptx i32 framebuffer base (color_byte (f32_mul scale (ref_get f32 red_acc_ref)));
+    ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte (f32_mul scale (ref_get f32 green_acc_ref)));
+    ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte (f32_mul scale (ref_get f32 blue_acc_ref)));
     ()
 }
 
