@@ -9,13 +9,13 @@ continues to grow.
 
 ## Current Stage
 
-This project implements chapter 12, "Positionable Camera", through the book's
-Image 21 result. It renders the scene with Lambertian, fuzzy metal, and a
+This project implements chapter 13, "Defocus Blur", through the book's Image 22
+result. It renders the scene with Lambertian, fuzzy metal, and a
 hollow dielectric sphere built from an outer glass sphere plus an inner air
 bubble, viewed from a positionable camera with `lookfrom = (-2, 2, 1)`,
-`lookat = (0, 0, -1)`, `vup = (0, 1, 0)`, and `vfov = 20`. The PTX kernel
-renders a 400x225 `P3` image with 100 samples per pixel and gamma-corrected
-output.
+`lookat = (0, 0, -1)`, `vup = (0, 1, 0)`, `vfov = 20`,
+`defocus_angle = 10`, and `focus_dist = 3.4`. The PTX kernel renders a 400x225
+`P3` image with 100 samples per pixel and gamma-corrected output.
 
 ## Build and Render
 
