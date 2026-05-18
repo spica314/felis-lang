@@ -423,7 +423,7 @@
                     ref_set f32 hit_albedo_z_ref 1.0f32;
                     ref_set f32 hit_fuzz_ref 0.0f32;
                     ref_set i32 hit_front_face_ref (ref_get i32 front_face_ref);
-                    ref_set f32 hit_refraction_index_ref 1.5f32;
+                    ref_set f32 hit_refraction_index_ref (f32_div 1.0f32 1.33f32);
                 } #else {
                     ()
                 };
@@ -506,10 +506,26 @@
                         ()
                     };
                     #let unit_direction : Vec3 = unit_vector current_ray.direction;
-                    #let refracted : Vec3 = refract unit_direction hit_normal (ref_get f32 ri_ref);
-                    ref_set f32 scatter_x_ref refracted.x;
-                    ref_set f32 scatter_y_ref refracted.y;
-                    ref_set f32 scatter_z_ref refracted.z;
+                    #let cos_theta : f32 = f32_min (vec3_dot (vec3_neg unit_direction) hit_normal) 1.0f32;
+                    #let sin_theta : f32 = f32_sqrt (f32_sub 1.0f32 (f32_mul cos_theta cos_theta));
+                    #let cannot_refract : i32 = 0i32;
+                    #letref #excl cannot_refract_ref : &^ i32 #borrow cannot_refract;
+                    #if f32_lt 1.0f32 (f32_mul (ref_get f32 ri_ref) sin_theta) {
+                        ref_set i32 cannot_refract_ref 1i32;
+                    } #else {
+                        ()
+                    };
+                    #if i32_eq (ref_get i32 cannot_refract_ref) 1i32 {
+                        #let reflected : Vec3 = reflect unit_direction hit_normal;
+                        ref_set f32 scatter_x_ref reflected.x;
+                        ref_set f32 scatter_y_ref reflected.y;
+                        ref_set f32 scatter_z_ref reflected.z;
+                    } #else {
+                        #let refracted : Vec3 = refract unit_direction hit_normal (ref_get f32 ri_ref);
+                        ref_set f32 scatter_x_ref refracted.x;
+                        ref_set f32 scatter_y_ref refracted.y;
+                        ref_set f32 scatter_z_ref refracted.z;
+                    };
                 };
             };
             #if i32_eq (ref_get i32 scatter_ok_ref) 1i32 {
