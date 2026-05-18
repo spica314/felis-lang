@@ -1,0 +1,89 @@
+#use std_core::io::IO;
+#use std_core::ptx::PTX;
+#use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::array::ArrayVLPTX;
+#use std_core::primitive::array::array_get;
+#use std_core::primitive::array::array_set;
+#use std_core::primitive::f32::f32;
+#use std_core::primitive::f32::f32_add;
+#use std_core::primitive::f32::f32_div;
+#use std_core::primitive::f32::f32_from_i32;
+#use std_core::primitive::f32::f32_sqrt;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::i32::i32_from_f32;
+#use std_core::primitive::i64::i64;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set_ptx;
+#use std_core::primitive::u8::u8;
+
+#fn f32_launch_kernel : (array : ArrayVLPTX i32) -> () #with PTX {
+    #let one : f32 = 1.0f32;
+    #let two : f32 = f32_from_i32 2i32;
+    #let three : f32 = f32_add one two;
+    #let four : f32 = f32_add three one;
+    #let root : f32 = f32_sqrt four;
+    #let quotient : f32 = f32_div four two;
+    ref_set_ptx i32 array 0i32 (i32_from_f32 one);
+    ref_set_ptx i32 array 1i32 (i32_from_f32 three);
+    ref_set_ptx i32 array 2i32 (i32_from_f32 quotient);
+    ref_set_ptx i32 array 3i32 (i32_from_f32 root);
+    ()
+}
+
+#compile_ptx f32_launch_kernel #to f32_launch_kernel_ptx;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let init_result : i32 <- IO::cu_init 0i32;
+    #let device : i32 = 0i32;
+    #letref #excl device : &^ i32 #borrow device;
+    #let device_result : i32 <- IO::cu_device_get device 0i32;
+    #let device_value : i32 = ref_get i32 device;
+    #let ctx : i64 = 0i64;
+    #letref #excl ctx : &^ i64 #borrow ctx;
+    #let ctx_result : i32 <- IO::cu_ctx_create_v2 ctx 0i32 device_value;
+    #let module : i64 = 0i64;
+    #letref #excl module : &^ i64 #borrow module;
+    #let ptx : & ArrayVL u8 = f32_launch_kernel_ptx;
+    #let module_result : i32 <- IO::cu_module_load_data module ptx;
+    #let module_value : i64 = ref_get i64 module;
+    #let function : i64 = 0i64;
+    #letref #excl function : &^ i64 #borrow function;
+    #let function_result : i32 <- IO::cu_module_get_function function module_value ptx;
+    #let function_value : i64 = ref_get i64 function;
+    #let host_array : ArrayVL i32 <- IO::arrayvl_new i32 4i32;
+    array_set host_array 0i32 0i32;
+    array_set host_array 1i32 0i32;
+    array_set host_array 2i32 0i32;
+    array_set host_array 3i32 0i32;
+    #let device_array : ArrayVLPTX i32 <- IO::arrayvlptx_new i32 4i32;
+    #let copy_to_result : i32 <- IO::arrayvl_to_ptx i32 host_array device_array 4i32;
+    #let launch_result : i32 <- IO::cu_launch_kernel function_value device_array 1i32 1i32 1i32 1i32 1i32 1i32 0i32 0i64;
+    #if i32_eq launch_result 0i32 {
+        ()
+    } #else {
+        #let _ : () <- IO::exit 2i32;
+        ()
+    };
+    #let copy_from_result : i32 <- IO::arrayvl_from_ptx i32 device_array host_array 4i32;
+    #if i32_eq copy_from_result 0i32 {
+        ()
+    } #else {
+        #let _ : () <- IO::exit 3i32;
+        ()
+    };
+    #let one : i32 = array_get host_array 0i32;
+    #let three : i32 = array_get host_array 1i32;
+    #let two : i32 = array_get host_array 2i32;
+    #let root : i32 = array_get host_array 3i32;
+    #let result : i32 = i32_add (i32_add (i32_add one three) two) root;
+    #if i32_eq result 8i32 {
+        #let _ : () <- IO::exit 0i32;
+    } #else {
+        #let _ : () <- IO::exit 1i32;
+    };
+    ()
+}

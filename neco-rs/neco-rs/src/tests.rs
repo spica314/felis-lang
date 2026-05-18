@@ -1,4 +1,6 @@
+use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use neco_rs_parser::{NativeLinkMode, ParsedPackage, ParsedRoot, parse_root};
 
@@ -7,17 +9,26 @@ use crate::codegen::{
     EntryAbi, build_linux_x86_64_program_executable, build_linux_x86_64_program_image,
 };
 use crate::ir::{
-    ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, ExitCodeExpr,
-    F32Expr, I32Expr, I64Expr, KernelArgumentRef, LoweredProgram, OpenPath, Operation,
-    PathBufSource, U8Expr,
+    ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, CompiledPtxArtifact,
+    ConditionExpr, ExitCodeExpr, F32Expr, I32Expr, I64Expr, KernelArgumentRef, LoweredProgram,
+    OpenPath, Operation, PathBufSource, U8Expr,
 };
 use crate::lowering::lower_package_to_program;
+use crate::write_compiled_ptx_artifacts;
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
         .expect("repo root")
+}
+
+fn unique_temp_dir(name: &str) -> PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock before unix epoch")
+        .as_nanos();
+    std::env::temp_dir().join(format!("neco-rs-test-{name}-{unique}"))
 }
 
 fn selected_fixture_package(root: &Path, binary_name: &str) -> ParsedPackage {
@@ -2672,6 +2683,19 @@ fn compiles_f32_ptx_arithmetic() {
     };
 
     let program = lower_package_to_program(&package).expect("lower package");
+    assert_eq!(
+        program.compiled_ptx,
+        vec![
+            CompiledPtxArtifact {
+                data_index: 0,
+                function_name: "i64_kernel".to_string(),
+            },
+            CompiledPtxArtifact {
+                data_index: 2,
+                function_name: "f32_kernel".to_string(),
+            }
+        ]
+    );
     let ptx = String::from_utf8_lossy(&program.data[2]);
     assert!(ptx.contains(".visible .entry f32_kernel("));
     assert!(ptx.contains(".reg .f32 %f<"));
@@ -2681,6 +2705,47 @@ fn compiles_f32_ptx_arithmetic() {
     assert!(ptx.contains("mul.rn.f32"));
     assert!(ptx.contains("div.rn.f32"));
     assert!(ptx.contains("st.global.f32"));
+}
+
+#[test]
+fn writes_compiled_ptx_artifacts_under_package_neco_directory() {
+    let root = unique_temp_dir("ptx-artifacts");
+    fs::create_dir_all(&root).expect("create temp package dir");
+    let package = ParsedPackage {
+        root_dir: root.clone(),
+        manifest_path: root.join("neco-package.json"),
+        manifest: neco_rs_parser::PackageManifest {
+            name: "ptx-artifacts".to_string(),
+            dependencies: Vec::new(),
+            felis_lib_entrypoint: None,
+            felis_bin_entrypoints: vec![PathBuf::from("src/main.fe")],
+            native_link_mode: NativeLinkMode::KernelStart,
+            native_libraries: Vec::new(),
+        },
+        source_files: Vec::new(),
+    };
+    let program = LoweredProgram {
+        operations: Vec::new(),
+        data: vec![b".version 8.0\n\0".to_vec()],
+        compiled_ptx: vec![CompiledPtxArtifact {
+            data_index: 0,
+            function_name: "kernel".to_string(),
+        }],
+        arrays: Vec::new(),
+        heap_slots: 0,
+        i32_slots: 0,
+        i64_slots: 0,
+        f32_slots: 0,
+        requires_argv: false,
+    };
+
+    write_compiled_ptx_artifacts(&package, &program).expect("write ptx artifacts");
+
+    assert_eq!(
+        fs::read(root.join(".neco/kernel.ptx")).expect("read ptx artifact"),
+        b".version 8.0\n"
+    );
+    fs::remove_dir_all(root).expect("cleanup temp package dir");
 }
 
 #[test]
@@ -3162,6 +3227,7 @@ fn builds_elf_image_with_exit_syscall() {
     let program = LoweredProgram {
         operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(42)))],
         data: Vec::new(),
+        compiled_ptx: Vec::new(),
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,
@@ -3191,6 +3257,7 @@ fn builds_elf_image_with_write_and_implicit_exit() {
             Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
         ],
         data: vec![b"Hello, world!\n\0".to_vec()],
+        compiled_ptx: Vec::new(),
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,
@@ -3238,6 +3305,7 @@ fn builds_elf_image_with_runtime_i32_ops() {
             Box::new(I32Expr::Literal(80)),
         )))],
         data: Vec::new(),
+        compiled_ptx: Vec::new(),
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,

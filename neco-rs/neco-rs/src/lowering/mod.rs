@@ -13,8 +13,8 @@ use neco_rs_parser::{
 
 use crate::effect::{Value, bind_pattern, lower_effect, resolve_value};
 use crate::ir::{
-    ArrayAllocation, ArrayElementType, ArrayKind, ExitCodeExpr, I32Expr, LoweredProgram, Operation,
-    intern_data,
+    ArrayAllocation, ArrayElementType, ArrayKind, CompiledPtxArtifact, ExitCodeExpr, I32Expr,
+    LoweredProgram, Operation, intern_data,
 };
 use crate::{Error, Result};
 
@@ -162,6 +162,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     let mut program = LoweredProgram {
         operations: Vec::new(),
         data: Vec::new(),
+        compiled_ptx: Vec::new(),
         arrays: Vec::new(),
         heap_slots: 0,
         i32_slots: 0,
@@ -286,6 +287,10 @@ fn initialize_compile_ptx_bindings(
         })?;
         let data_index = intern_data(program, ptx);
         let name_data_index = intern_data(program, nul_terminated_identifier(&function.name.name));
+        program.compiled_ptx.push(CompiledPtxArtifact {
+            data_index,
+            function_name: function.name.name.clone(),
+        });
         state
             .compiled_ptx_function_names
             .insert(data_index, name_data_index);
@@ -1635,6 +1640,7 @@ pub(super) fn lower_statement(
             let mut loop_program = LoweredProgram {
                 operations: Vec::new(),
                 data: std::mem::take(&mut program.data),
+                compiled_ptx: program.compiled_ptx.clone(),
                 arrays: std::mem::take(&mut program.arrays),
                 heap_slots: program.heap_slots,
                 i32_slots: program.i32_slots,
@@ -1700,6 +1706,7 @@ fn lower_if_statement(
     let mut then_program = LoweredProgram {
         operations: Vec::new(),
         data: std::mem::take(&mut program.data),
+        compiled_ptx: program.compiled_ptx.clone(),
         arrays: std::mem::take(&mut program.arrays),
         heap_slots: program.heap_slots,
         i32_slots: program.i32_slots,
@@ -1725,6 +1732,7 @@ fn lower_if_statement(
         let mut else_program = LoweredProgram {
             operations: Vec::new(),
             data: then_program.data,
+            compiled_ptx: then_program.compiled_ptx.clone(),
             arrays: then_program.arrays,
             heap_slots: then_program.heap_slots,
             i32_slots: then_program.i32_slots,

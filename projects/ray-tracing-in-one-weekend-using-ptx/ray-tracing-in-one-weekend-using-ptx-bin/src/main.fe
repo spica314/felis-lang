@@ -115,7 +115,9 @@
     #let red : f32 = f32_add white_weight (f32_mul a 0.5f32);
     #let green : f32 = f32_add white_weight (f32_mul a 0.7f32);
     #let base : i32 = pixel_base_ptx x y;
-    store_pixel_ptx framebuffer base (color_byte red) (color_byte green) 255i32;
+    ref_set_ptx i32 framebuffer base (color_byte red);
+    ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte green);
+    ref_set_ptx i32 framebuffer (i32_add base 2i32) 255i32;
     ()
 }
 
@@ -172,6 +174,29 @@
 #fn main : () #with IO {
     #let image_width : i32 = 400i32;
     #let image_height : i32 = 225i32;
+    #let framebuffer_len : i32 = i32_mul (i32_mul image_width image_height) 3i32;
+
+    #let init_result : i32 <- IO::cu_init 0i32;
+    #let device : i32 = 0i32;
+    #letref #excl device : &^ i32 #borrow device;
+    #let device_result : i32 <- IO::cu_device_get device 0i32;
+    #let device_value : i32 = ref_get i32 device;
+    #let ctx : i64 = 0i64;
+    #letref #excl ctx : &^ i64 #borrow ctx;
+    #let ctx_result : i32 <- IO::cu_ctx_create_v2 ctx 0i32 device_value;
+    #let module : i64 = 0i64;
+    #letref #excl module : &^ i64 #borrow module;
+    #let ptx : & ArrayVL u8 = render_kernel_ptx;
+    #let module_result : i32 <- IO::cu_module_load_data module ptx;
+    #let module_value : i64 = ref_get i64 module;
+    #let function : i64 = 0i64;
+    #letref #excl function : &^ i64 #borrow function;
+    #let function_result : i32 <- IO::cu_module_get_function function module_value ptx;
+    #let function_value : i64 = ref_get i64 function;
+    #let framebuffer : ArrayVL i32 <- IO::arrayvl_new i32 framebuffer_len;
+    #let device_framebuffer : ArrayVLPTX i32 <- IO::arrayvlptx_new i32 framebuffer_len;
+    #let launch_result : i32 <- IO::cu_launch_kernel function_value device_framebuffer image_width 1i32 1i32 image_height 1i32 1i32 0i32 0i64;
+    #let copy_from_result : i32 <- IO::arrayvl_from_ptx i32 device_framebuffer framebuffer framebuffer_len;
 
     #let stdout : FileDescriptor <- IO::stdout;
     #let header_ref : & ArrayVL u8 = "P3\n400 225\n255\n";
@@ -193,15 +218,11 @@
             #if i32_gte x image_width {
                 #break;
             };
-            #let dir_x : f32 = f32_add -1.7733333f32 (f32_mul (f32_from_i32 x) 0.008888889f32);
-            #let dir_y : f32 = f32_add 0.9955556f32 (f32_mul (f32_from_i32 y) -0.008888889f32);
-            #let dir_len : f32 = f32_sqrt (f32_add (f32_add (f32_mul dir_x dir_x) (f32_mul dir_y dir_y)) 1.0f32);
-            #let unit_y : f32 = f32_div dir_y dir_len;
-            #let a : f32 = f32_mul 0.5f32 (f32_add unit_y 1.0f32);
-            #let white_weight : f32 = f32_sub 1.0f32 a;
-            #let red_f : f32 = f32_add white_weight (f32_mul a 0.5f32);
-            #let green_f : f32 = f32_add white_weight (f32_mul a 0.7f32);
-            write_pixel stdout line_buffer_ref (color_byte_host red_f) (color_byte_host green_f) 255i32;
+            #let base : i32 = pixel_base x y;
+            #let red : i32 = array_get framebuffer base;
+            #let green : i32 = array_get framebuffer (i32_add base 1i32);
+            #let blue : i32 = array_get framebuffer (i32_add base 2i32);
+            write_pixel stdout line_buffer_ref red green blue;
             ref_set i32 x_ref (i32_add x 1i32);
         };
         ref_set i32 y_ref (i32_add y 1i32);

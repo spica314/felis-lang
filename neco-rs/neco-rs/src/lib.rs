@@ -97,6 +97,7 @@ pub fn compile_path_to_elf(input: &Path, output: &Path) -> Result<()> {
 
 fn compile_package_to_elf(package: &neco_rs_parser::ParsedPackage, output: &Path) -> Result<()> {
     let program = lower_package_to_program(package)?;
+    write_compiled_ptx_artifacts(package, &program)?;
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent).map_err(|source| Error::Io {
             path: Some(parent.to_path_buf()),
@@ -122,5 +123,34 @@ fn compile_package_to_elf(package: &neco_rs_parser::ParsedPackage, output: &Path
         }
     }
     cli::set_output_executable(output)?;
+    Ok(())
+}
+
+fn write_compiled_ptx_artifacts(
+    package: &neco_rs_parser::ParsedPackage,
+    program: &ir::LoweredProgram,
+) -> Result<()> {
+    if program.compiled_ptx.is_empty() {
+        return Ok(());
+    }
+
+    let output_dir = package.root_dir.join(".neco");
+    fs::create_dir_all(&output_dir).map_err(|source| Error::Io {
+        path: Some(output_dir.clone()),
+        source,
+    })?;
+
+    for artifact in &program.compiled_ptx {
+        let mut bytes = program.data[artifact.data_index].as_slice();
+        if bytes.ends_with(&[0]) {
+            bytes = &bytes[..bytes.len() - 1];
+        }
+        let path = output_dir.join(format!("{}.ptx", artifact.function_name));
+        fs::write(&path, bytes).map_err(|source| Error::Io {
+            path: Some(path),
+            source,
+        })?;
+    }
+
     Ok(())
 }

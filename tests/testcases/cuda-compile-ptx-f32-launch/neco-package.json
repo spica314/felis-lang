@@ -1,0 +1,6 @@
+{
+    "name": "cuda-compile-ptx-f32-launch",
+    "felis-bin-entrypoints": ["src/cuda-compile-ptx-f32-launch.fe"],
+    "native-link-mode": "libc-start",
+    "native-libraries": ["cuda"]
+}

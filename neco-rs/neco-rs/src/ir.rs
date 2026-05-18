@@ -2,12 +2,19 @@
 pub(crate) struct LoweredProgram {
     pub(crate) operations: Vec<Operation>,
     pub(crate) data: Vec<Vec<u8>>,
+    pub(crate) compiled_ptx: Vec<CompiledPtxArtifact>,
     pub(crate) arrays: Vec<ArrayAllocation>,
     pub(crate) heap_slots: usize,
     pub(crate) i32_slots: usize,
     pub(crate) i64_slots: usize,
     pub(crate) f32_slots: usize,
     pub(crate) requires_argv: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CompiledPtxArtifact {
+    pub(crate) data_index: usize,
+    pub(crate) function_name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
