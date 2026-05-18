@@ -9,9 +9,10 @@ continues to grow.
 
 ## Current Stage
 
-This project implements chapter 4.2, "Sending Rays Into the Scene", through the
-book's `image.2` result. It writes a 400x225 `P3` image to standard output with
-the ray-direction sky gradient from white to blue.
+This project implements chapter 11.2, "Snell's Law", through the book's Image
+16 result. It renders the four-sphere scene with Lambertian, fuzzy metal, and a
+dielectric glass sphere that always refracts. The PTX kernel renders a 400x225
+`P3` image with 100 samples per pixel and gamma-corrected output.
 
 ## Build and Render
 

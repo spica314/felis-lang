@@ -104,6 +104,13 @@
     f32_div (f32_sub h (f32_sqrt discriminant)) a
 }
 
+#fn sphere_root_far : (center : Vec3) -> (radius : f32) -> (ray : Ray) -> (discriminant : f32) -> f32 #with PTX {
+    #let oc : Vec3 = vec3_sub center ray.origin;
+    #let a : f32 = vec3_dot ray.direction ray.direction;
+    #let h : f32 = vec3_dot ray.direction oc;
+    f32_div (f32_add h (f32_sqrt discriminant)) a
+}
+
 #fn sphere_normal : (center : Vec3) -> (radius : f32) -> (ray : Ray) -> (t : f32) -> Vec3 #with PTX {
     #let hit_point : Vec3 = ray_at ray t;
     vec3_div (vec3_sub hit_point center) radius
@@ -207,6 +214,25 @@
     vec3_sub v (vec3_mul (f32_mul 2.0f32 (vec3_dot v normal)) normal)
 }
 
+#fn f32_min : (a : f32) -> (b : f32) -> f32 #with PTX {
+    #let result : f32 = b;
+    #letref #excl result_ref : &^ f32 #borrow result;
+    #if f32_lt a b {
+        ref_set f32 result_ref a;
+    } #else {
+        ()
+    };
+    ref_get f32 result_ref
+}
+
+#fn refract : (uv : Vec3) -> (normal : Vec3) -> (etai_over_etat : f32) -> Vec3 #with PTX {
+    #let cos_theta : f32 = f32_min (vec3_dot (vec3_neg uv) normal) 1.0f32;
+    #let r_out_perp : Vec3 = vec3_mul etai_over_etat (vec3_add uv (vec3_mul cos_theta normal));
+    #let parallel_len_squared : f32 = f32_sub 1.0f32 (vec3_length_squared r_out_perp);
+    #let r_out_parallel : Vec3 = vec3_mul (f32_sub 0.0f32 (f32_sqrt parallel_len_squared)) normal;
+    vec3_add r_out_perp r_out_parallel
+}
+
 #fn sample_seed : (x : i32) -> (y : i32) -> (sample_index : i32) -> i32 #with PTX {
     #let x_part : i32 = i32_mul x 1973i32;
     #let y_part : i32 = i32_mul y 9277i32;
@@ -284,6 +310,8 @@
         #let hit_albedo_y : f32 = 0.0f32;
         #let hit_albedo_z : f32 = 0.0f32;
         #let hit_fuzz : f32 = 0.0f32;
+        #let hit_front_face : i32 = 1i32;
+        #let hit_refraction_index : f32 = 1.0f32;
         #letref #excl hit_anything_ref : &^ i32 #borrow hit_anything;
         #letref #excl hit_t_ref : &^ f32 #borrow hit_t;
         #letref #excl hit_normal_x_ref : &^ f32 #borrow hit_normal_x;
@@ -294,6 +322,8 @@
         #letref #excl hit_albedo_y_ref : &^ f32 #borrow hit_albedo_y;
         #letref #excl hit_albedo_z_ref : &^ f32 #borrow hit_albedo_z;
         #letref #excl hit_fuzz_ref : &^ f32 #borrow hit_fuzz;
+        #letref #excl hit_front_face_ref : &^ i32 #borrow hit_front_face;
+        #letref #excl hit_refraction_index_ref : &^ f32 #borrow hit_refraction_index;
 
         #let center_sphere_center : Vec3 = vec3 0.0f32 0.0f32 -1.2f32;
         #let center_sphere_radius : f32 = 0.5f32;
@@ -312,6 +342,8 @@
                 ref_set f32 hit_albedo_y_ref 0.2f32;
                 ref_set f32 hit_albedo_z_ref 0.5f32;
                 ref_set f32 hit_fuzz_ref 0.0f32;
+                ref_set i32 hit_front_face_ref 1i32;
+                ref_set f32 hit_refraction_index_ref 1.0f32;
             } #else {
                 ()
             };
@@ -337,6 +369,8 @@
                     ref_set f32 hit_albedo_y_ref 0.8f32;
                     ref_set f32 hit_albedo_z_ref 0.0f32;
                     ref_set f32 hit_fuzz_ref 0.0f32;
+                    ref_set i32 hit_front_face_ref 1i32;
+                    ref_set f32 hit_refraction_index_ref 1.0f32;
                 } #else {
                     ()
                 };
@@ -352,19 +386,44 @@
         #let left_sphere_discriminant : f32 = sphere_discriminant left_sphere_center left_sphere_radius current_ray;
         #if f32_gte left_sphere_discriminant 0.0f32 {
             #let left_sphere_t : f32 = sphere_root left_sphere_center left_sphere_radius current_ray left_sphere_discriminant;
+            #letref #excl left_sphere_t_ref : &^ f32 #borrow left_sphere_t;
+            #if f32_lt (ref_get f32 left_sphere_t_ref) 0.001f32 {
+                ref_set f32 left_sphere_t_ref (sphere_root_far left_sphere_center left_sphere_radius current_ray left_sphere_discriminant);
+            } #else {
+                ()
+            };
+            #let left_sphere_t : f32 = ref_get f32 left_sphere_t_ref;
             #if f32_lt 0.001f32 left_sphere_t {
                 #if f32_lt left_sphere_t (ref_get f32 hit_t_ref) {
                     #let normal : Vec3 = sphere_normal left_sphere_center left_sphere_radius current_ray left_sphere_t;
+                    #let front_face : i32 = 0i32;
+                    #let face_normal_x : f32 = normal.x;
+                    #let face_normal_y : f32 = normal.y;
+                    #let face_normal_z : f32 = normal.z;
+                    #letref #excl front_face_ref : &^ i32 #borrow front_face;
+                    #letref #excl face_normal_x_ref : &^ f32 #borrow face_normal_x;
+                    #letref #excl face_normal_y_ref : &^ f32 #borrow face_normal_y;
+                    #letref #excl face_normal_z_ref : &^ f32 #borrow face_normal_z;
+                    #if f32_lt (vec3_dot current_ray.direction normal) 0.0f32 {
+                        ref_set i32 front_face_ref 1i32;
+                    } #else {
+                        #let opposite : Vec3 = vec3_neg normal;
+                        ref_set f32 face_normal_x_ref opposite.x;
+                        ref_set f32 face_normal_y_ref opposite.y;
+                        ref_set f32 face_normal_z_ref opposite.z;
+                    };
                     ref_set i32 hit_anything_ref 1i32;
                     ref_set f32 hit_t_ref left_sphere_t;
-                    ref_set f32 hit_normal_x_ref normal.x;
-                    ref_set f32 hit_normal_y_ref normal.y;
-                    ref_set f32 hit_normal_z_ref normal.z;
-                    ref_set i32 hit_material_ref 1i32;
-                    ref_set f32 hit_albedo_x_ref 0.8f32;
-                    ref_set f32 hit_albedo_y_ref 0.8f32;
-                    ref_set f32 hit_albedo_z_ref 0.8f32;
-                    ref_set f32 hit_fuzz_ref 0.3f32;
+                    ref_set f32 hit_normal_x_ref (ref_get f32 face_normal_x_ref);
+                    ref_set f32 hit_normal_y_ref (ref_get f32 face_normal_y_ref);
+                    ref_set f32 hit_normal_z_ref (ref_get f32 face_normal_z_ref);
+                    ref_set i32 hit_material_ref 2i32;
+                    ref_set f32 hit_albedo_x_ref 1.0f32;
+                    ref_set f32 hit_albedo_y_ref 1.0f32;
+                    ref_set f32 hit_albedo_z_ref 1.0f32;
+                    ref_set f32 hit_fuzz_ref 0.0f32;
+                    ref_set i32 hit_front_face_ref (ref_get i32 front_face_ref);
+                    ref_set f32 hit_refraction_index_ref 1.5f32;
                 } #else {
                     ()
                 };
@@ -393,6 +452,8 @@
                     ref_set f32 hit_albedo_y_ref 0.6f32;
                     ref_set f32 hit_albedo_z_ref 0.2f32;
                     ref_set f32 hit_fuzz_ref 1.0f32;
+                    ref_set i32 hit_front_face_ref 1i32;
+                    ref_set f32 hit_refraction_index_ref 1.0f32;
                 } #else {
                     ()
                 };
@@ -423,16 +484,32 @@
                 ref_set f32 scatter_z_ref scatter.value.z;
                 ref_set i32 scatter_state_ref scatter.state;
             } #else {
-                #let reflected : Vec3 = unit_vector (reflect current_ray.direction hit_normal);
-                #let fuzz_random : RandomVec3 = random_unit_vector (ref_get i32 current_seed_ref);
-                #let fuzzed : Vec3 = vec3_add reflected (vec3_mul (ref_get f32 hit_fuzz_ref) fuzz_random.value);
-                ref_set i32 scatter_state_ref fuzz_random.state;
-                #if f32_lt 0.0f32 (vec3_dot fuzzed hit_normal) {
-                    ref_set f32 scatter_x_ref fuzzed.x;
-                    ref_set f32 scatter_y_ref fuzzed.y;
-                    ref_set f32 scatter_z_ref fuzzed.z;
+                #if i32_eq (ref_get i32 hit_material_ref) 1i32 {
+                    #let reflected : Vec3 = unit_vector (reflect current_ray.direction hit_normal);
+                    #let fuzz_random : RandomVec3 = random_unit_vector (ref_get i32 current_seed_ref);
+                    #let fuzzed : Vec3 = vec3_add reflected (vec3_mul (ref_get f32 hit_fuzz_ref) fuzz_random.value);
+                    ref_set i32 scatter_state_ref fuzz_random.state;
+                    #if f32_lt 0.0f32 (vec3_dot fuzzed hit_normal) {
+                        ref_set f32 scatter_x_ref fuzzed.x;
+                        ref_set f32 scatter_y_ref fuzzed.y;
+                        ref_set f32 scatter_z_ref fuzzed.z;
+                    } #else {
+                        ref_set i32 scatter_ok_ref 0i32;
+                    };
                 } #else {
-                    ref_set i32 scatter_ok_ref 0i32;
+                    #let refraction_index : f32 = ref_get f32 hit_refraction_index_ref;
+                    #let ri : f32 = refraction_index;
+                    #letref #excl ri_ref : &^ f32 #borrow ri;
+                    #if i32_eq (ref_get i32 hit_front_face_ref) 1i32 {
+                        ref_set f32 ri_ref (f32_div 1.0f32 refraction_index);
+                    } #else {
+                        ()
+                    };
+                    #let unit_direction : Vec3 = unit_vector current_ray.direction;
+                    #let refracted : Vec3 = refract unit_direction hit_normal (ref_get f32 ri_ref);
+                    ref_set f32 scatter_x_ref refracted.x;
+                    ref_set f32 scatter_y_ref refracted.y;
+                    ref_set f32 scatter_z_ref refracted.z;
                 };
             };
             #if i32_eq (ref_get i32 scatter_ok_ref) 1i32 {
