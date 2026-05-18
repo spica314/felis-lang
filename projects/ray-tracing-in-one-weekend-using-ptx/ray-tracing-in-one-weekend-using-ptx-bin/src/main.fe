@@ -295,16 +295,16 @@
 }
 
 #fn pixel_base_ptx : (x : i32) -> (y : i32) -> i32 #with PTX {
-    i32_mul (i32_add (i32_mul y 400i32) x) 3i32
+    i32_mul (i32_add (i32_mul y 1600i32) x) 3i32
 }
 
 #fn pixel_base : (x : i32) -> (y : i32) -> i32 {
-    i32_mul (i32_add (i32_mul y 400i32) x) 3i32
+    i32_mul (i32_add (i32_mul y 1600i32) x) 3i32
 }
 
 #fn camera_ray : (sample_x : f32) -> (sample_y : f32) -> (seed : i32) -> Ray #with PTX {
-    #let image_width : f32 = 400.0f32;
-    #let image_height : f32 = 225.0f32;
+    #let image_width : f32 = 1600.0f32;
+    #let image_height : f32 = 900.0f32;
     #let lookfrom : Vec3 = vec3 13.0f32 2.0f32 3.0f32;
     #let lookat : Vec3 = vec3 0.0f32 0.0f32 0.0f32;
     #let vup : Vec3 = vec3 0.0f32 1.0f32 0.0f32;
@@ -929,8 +929,8 @@
 }
 
 #fn main : () #with IO {
-    #let image_width : i32 = 400i32;
-    #let image_height : i32 = 225i32;
+    #let image_width : i32 = 1600i32;
+    #let image_height : i32 = 900i32;
     #let framebuffer_len : i32 = i32_mul (i32_mul image_width image_height) 3i32;
 
     #let init_result : i32 <- IO::cu_init 0i32;
@@ -956,8 +956,8 @@
     #let copy_from_result : i32 <- IO::arrayvl_from_ptx i32 device_framebuffer framebuffer framebuffer_len;
 
     #let stdout : FileDescriptor <- IO::stdout;
-    #let header_ref : & ArrayVL u8 = "P3\n400 225\n255\n";
-    #let _ : () <- IO::write stdout header_ref 15i32;
+    #let header_ref : & ArrayVL u8 = "P3\n1600 900\n255\n";
+    #let _ : () <- IO::write stdout header_ref 16i32;
     #let line_buffer : ArrayVL u8 <- IO::arrayvl_new u8 16i32;
     #letref #excl line_buffer_ref : &^ ArrayVL u8 #borrow line_buffer;
 
