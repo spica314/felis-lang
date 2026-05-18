@@ -61,6 +61,10 @@
     vec3 (f32_mul t v.x) (f32_mul t v.y) (f32_mul t v.z)
 }
 
+#fn vec3_neg : (v : Vec3) -> Vec3 #with PTX {
+    vec3 (f32_sub 0.0f32 v.x) (f32_sub 0.0f32 v.y) (f32_sub 0.0f32 v.z)
+}
+
 #fn vec3_div : (v : Vec3) -> (t : f32) -> Vec3 #with PTX {
     vec3_mul (f32_div 1.0f32 t) v
 }
@@ -71,6 +75,10 @@
 
 #fn vec3_length : (v : Vec3) -> f32 #with PTX {
     f32_sqrt (vec3_dot v v)
+}
+
+#fn vec3_length_squared : (v : Vec3) -> f32 #with PTX {
+    vec3_dot v v
 }
 
 #fn unit_vector : (v : Vec3) -> Vec3 #with PTX {
@@ -96,10 +104,9 @@
     f32_div (f32_sub h (f32_sqrt discriminant)) a
 }
 
-#fn sphere_normal_color : (center : Vec3) -> (radius : f32) -> (ray : Ray) -> (t : f32) -> Vec3 #with PTX {
+#fn sphere_normal : (center : Vec3) -> (radius : f32) -> (ray : Ray) -> (t : f32) -> Vec3 #with PTX {
     #let hit_point : Vec3 = ray_at ray t;
-    #let normal : Vec3 = vec3_div (vec3_sub hit_point center) radius;
-    vec3_mul 0.5f32 (vec3_add normal (vec3 1.0f32 1.0f32 1.0f32))
+    vec3_div (vec3_sub hit_point center) radius
 }
 
 #fn ray_color : (ray : Ray) -> Vec3 #with PTX {
@@ -123,6 +130,74 @@
     f32_div (f32_from_i32 mantissa) 8388608.0f32
 }
 
+#fn random_unit_from_state : (state : i32) -> f32 #with PTX {
+    #let mantissa : i32 = i32_shr state 9i32;
+    f32_div (f32_from_i32 mantissa) 8388608.0f32
+}
+
+#fn random_signed_unit_from_state : (state : i32) -> f32 #with PTX {
+    f32_sub (f32_mul 2.0f32 (random_unit_from_state state)) 1.0f32
+}
+
+#struct RandomVec3 : Type[0] {
+    value : Vec3,
+    state : i32,
+}
+
+#fn random_unit_vector : (state : i32) -> RandomVec3 #with PTX {
+    #let current_state : i32 = state;
+    #let out_x : f32 = 1.0f32;
+    #let out_y : f32 = 0.0f32;
+    #let out_z : f32 = 0.0f32;
+    #letref #excl current_state_ref : &^ i32 #borrow current_state;
+    #letref #excl out_x_ref : &^ f32 #borrow out_x;
+    #letref #excl out_y_ref : &^ f32 #borrow out_y;
+    #letref #excl out_z_ref : &^ f32 #borrow out_z;
+
+    #loop {
+        #let state_x : i32 = xorshift32 (ref_get i32 current_state_ref);
+        #let state_y : i32 = xorshift32 state_x;
+        #let state_z : i32 = xorshift32 state_y;
+        #let p : Vec3 = vec3 (random_signed_unit_from_state state_x) (random_signed_unit_from_state state_y) (random_signed_unit_from_state state_z);
+        #let lensq : f32 = vec3_length_squared p;
+        ref_set i32 current_state_ref state_z;
+        #if f32_lt 0.000001f32 lensq {
+            #if f32_gte 1.0f32 lensq {
+                #let unit : Vec3 = vec3_div p (f32_sqrt lensq);
+                ref_set f32 out_x_ref unit.x;
+                ref_set f32 out_y_ref unit.y;
+                ref_set f32 out_z_ref unit.z;
+                #break;
+            } #else {
+                ()
+            };
+        } #else {
+            ()
+        };
+    };
+
+    RandomVec3 { value = vec3 (ref_get f32 out_x_ref) (ref_get f32 out_y_ref) (ref_get f32 out_z_ref), state = ref_get i32 current_state_ref }
+}
+
+#fn random_on_hemisphere : (normal : Vec3) -> (state : i32) -> RandomVec3 #with PTX {
+    #let random : RandomVec3 = random_unit_vector state;
+    #let out_x : f32 = random.value.x;
+    #let out_y : f32 = random.value.y;
+    #let out_z : f32 = random.value.z;
+    #letref #excl out_x_ref : &^ f32 #borrow out_x;
+    #letref #excl out_y_ref : &^ f32 #borrow out_y;
+    #letref #excl out_z_ref : &^ f32 #borrow out_z;
+    #if f32_lt (vec3_dot random.value normal) 0.0f32 {
+        #let opposite : Vec3 = vec3_neg random.value;
+        ref_set f32 out_x_ref opposite.x;
+        ref_set f32 out_y_ref opposite.y;
+        ref_set f32 out_z_ref opposite.z;
+    } #else {
+        ()
+    };
+    RandomVec3 { value = vec3 (ref_get f32 out_x_ref) (ref_get f32 out_y_ref) (ref_get f32 out_z_ref), state = random.state }
+}
+
 #fn sample_seed : (x : i32) -> (y : i32) -> (sample_index : i32) -> i32 #with PTX {
     #let x_part : i32 = i32_mul x 1973i32;
     #let y_part : i32 = i32_mul y 9277i32;
@@ -144,6 +219,121 @@
 
 #fn pixel_base : (x : i32) -> (y : i32) -> i32 {
     i32_mul (i32_add (i32_mul y 400i32) x) 3i32
+}
+
+#fn ray_color_diffuse : (ray : Ray) -> (seed : i32) -> Vec3 #with PTX {
+    #let ray_origin_x : f32 = ray.origin.x;
+    #let ray_origin_y : f32 = ray.origin.y;
+    #let ray_origin_z : f32 = ray.origin.z;
+    #let ray_dir_x : f32 = ray.direction.x;
+    #let ray_dir_y : f32 = ray.direction.y;
+    #let ray_dir_z : f32 = ray.direction.z;
+    #let attenuation : f32 = 1.0f32;
+    #let current_seed : i32 = seed;
+    #let depth : i32 = 0i32;
+    #let result_red : f32 = 0.0f32;
+    #let result_green : f32 = 0.0f32;
+    #let result_blue : f32 = 0.0f32;
+    #letref #excl ray_origin_x_ref : &^ f32 #borrow ray_origin_x;
+    #letref #excl ray_origin_y_ref : &^ f32 #borrow ray_origin_y;
+    #letref #excl ray_origin_z_ref : &^ f32 #borrow ray_origin_z;
+    #letref #excl ray_dir_x_ref : &^ f32 #borrow ray_dir_x;
+    #letref #excl ray_dir_y_ref : &^ f32 #borrow ray_dir_y;
+    #letref #excl ray_dir_z_ref : &^ f32 #borrow ray_dir_z;
+    #letref #excl attenuation_ref : &^ f32 #borrow attenuation;
+    #letref #excl current_seed_ref : &^ i32 #borrow current_seed;
+    #letref #excl depth_ref : &^ i32 #borrow depth;
+    #letref #excl result_red_ref : &^ f32 #borrow result_red;
+    #letref #excl result_green_ref : &^ f32 #borrow result_green;
+    #letref #excl result_blue_ref : &^ f32 #borrow result_blue;
+
+    #loop {
+        #let current_depth : i32 = ref_get i32 depth_ref;
+        #if i32_gte current_depth 50i32 {
+            #break;
+        };
+
+        #let current_ray : Ray = Ray {
+            origin = vec3 (ref_get f32 ray_origin_x_ref) (ref_get f32 ray_origin_y_ref) (ref_get f32 ray_origin_z_ref),
+            direction = vec3 (ref_get f32 ray_dir_x_ref) (ref_get f32 ray_dir_y_ref) (ref_get f32 ray_dir_z_ref),
+        };
+        #let hit_anything : i32 = 0i32;
+        #let hit_t : f32 = 1000000.0f32;
+        #let hit_normal_x : f32 = 0.0f32;
+        #let hit_normal_y : f32 = 0.0f32;
+        #let hit_normal_z : f32 = 0.0f32;
+        #letref #excl hit_anything_ref : &^ i32 #borrow hit_anything;
+        #letref #excl hit_t_ref : &^ f32 #borrow hit_t;
+        #letref #excl hit_normal_x_ref : &^ f32 #borrow hit_normal_x;
+        #letref #excl hit_normal_y_ref : &^ f32 #borrow hit_normal_y;
+        #letref #excl hit_normal_z_ref : &^ f32 #borrow hit_normal_z;
+
+        #let sphere_center : Vec3 = vec3 0.0f32 0.0f32 -1.0f32;
+        #let sphere_radius : f32 = 0.5f32;
+        #let sphere_discriminant : f32 = sphere_discriminant sphere_center sphere_radius current_ray;
+        #if f32_gte sphere_discriminant 0.0f32 {
+            #let sphere_t : f32 = sphere_root sphere_center sphere_radius current_ray sphere_discriminant;
+            #if f32_lt 0.001f32 sphere_t {
+                #let normal : Vec3 = sphere_normal sphere_center sphere_radius current_ray sphere_t;
+                ref_set i32 hit_anything_ref 1i32;
+                ref_set f32 hit_t_ref sphere_t;
+                ref_set f32 hit_normal_x_ref normal.x;
+                ref_set f32 hit_normal_y_ref normal.y;
+                ref_set f32 hit_normal_z_ref normal.z;
+            } #else {
+                ()
+            };
+        } #else {
+            ()
+        };
+
+        #let ground_center : Vec3 = vec3 0.0f32 -100.5f32 -1.0f32;
+        #let ground_radius : f32 = 100.0f32;
+        #let ground_discriminant : f32 = sphere_discriminant ground_center ground_radius current_ray;
+        #if f32_gte ground_discriminant 0.0f32 {
+            #let ground_t : f32 = sphere_root ground_center ground_radius current_ray ground_discriminant;
+            #if f32_lt 0.001f32 ground_t {
+                #if f32_lt ground_t (ref_get f32 hit_t_ref) {
+                    #let normal : Vec3 = sphere_normal ground_center ground_radius current_ray ground_t;
+                    ref_set i32 hit_anything_ref 1i32;
+                    ref_set f32 hit_t_ref ground_t;
+                    ref_set f32 hit_normal_x_ref normal.x;
+                    ref_set f32 hit_normal_y_ref normal.y;
+                    ref_set f32 hit_normal_z_ref normal.z;
+                } #else {
+                    ()
+                };
+            } #else {
+                ()
+            };
+        } #else {
+            ()
+        };
+
+        #if i32_eq (ref_get i32 hit_anything_ref) 1i32 {
+            #let hit_point : Vec3 = ray_at current_ray (ref_get f32 hit_t_ref);
+            #let hit_normal : Vec3 = vec3 (ref_get f32 hit_normal_x_ref) (ref_get f32 hit_normal_y_ref) (ref_get f32 hit_normal_z_ref);
+            #let scatter : RandomVec3 = random_on_hemisphere hit_normal (ref_get i32 current_seed_ref);
+            ref_set f32 ray_origin_x_ref hit_point.x;
+            ref_set f32 ray_origin_y_ref hit_point.y;
+            ref_set f32 ray_origin_z_ref hit_point.z;
+            ref_set f32 ray_dir_x_ref scatter.value.x;
+            ref_set f32 ray_dir_y_ref scatter.value.y;
+            ref_set f32 ray_dir_z_ref scatter.value.z;
+            ref_set f32 attenuation_ref (f32_mul 0.5f32 (ref_get f32 attenuation_ref));
+            ref_set i32 current_seed_ref scatter.state;
+            ref_set i32 depth_ref (i32_add current_depth 1i32);
+        } #else {
+            #let sky : Vec3 = ray_color current_ray;
+            #let scale : f32 = ref_get f32 attenuation_ref;
+            ref_set f32 result_red_ref (f32_mul scale sky.x);
+            ref_set f32 result_green_ref (f32_mul scale sky.y);
+            ref_set f32 result_blue_ref (f32_mul scale sky.z);
+            #break;
+        };
+    };
+
+    vec3 (ref_get f32 result_red_ref) (ref_get f32 result_green_ref) (ref_get f32 result_blue_ref)
 }
 
 #fn store_pixel_ptx : (framebuffer : ArrayVLPTX i32) -> (base : i32) -> (red : i32) -> (green : i32) -> (blue : i32) -> () #with PTX {
@@ -181,65 +371,10 @@
         #let dir_x : f32 = f32_add -1.7777778f32 (f32_mul sample_x 0.008910891f32);
         #let dir_y : f32 = f32_sub 1.0f32 (f32_mul sample_y 0.008928572f32);
         #let ray : Ray = Ray { origin = vec3 0.0f32 0.0f32 0.0f32, direction = vec3 dir_x dir_y -1.0f32 };
-
-        #let sphere_center : Vec3 = vec3 0.0f32 0.0f32 -1.0f32;
-        #let sphere_radius : f32 = 0.5f32;
-        #let sphere_discriminant : f32 = sphere_discriminant sphere_center sphere_radius ray;
-        #if f32_gte sphere_discriminant 0.0f32 {
-            #let sphere_t : f32 = sphere_root sphere_center sphere_radius ray sphere_discriminant;
-            #if f32_lt 0.0f32 sphere_t {
-                #let color : Vec3 = sphere_normal_color sphere_center sphere_radius ray sphere_t;
-                ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
-                ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
-                ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
-            } #else {
-                #let ground_center : Vec3 = vec3 0.0f32 -100.5f32 -1.0f32;
-                #let ground_radius : f32 = 100.0f32;
-                #let ground_discriminant : f32 = sphere_discriminant ground_center ground_radius ray;
-                #if f32_gte ground_discriminant 0.0f32 {
-                    #let ground_t : f32 = sphere_root ground_center ground_radius ray ground_discriminant;
-                    #if f32_lt 0.0f32 ground_t {
-                        #let color : Vec3 = sphere_normal_color ground_center ground_radius ray ground_t;
-                        ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
-                        ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
-                        ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
-                    } #else {
-                        #let color : Vec3 = ray_color ray;
-                        ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
-                        ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
-                        ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
-                    };
-                } #else {
-                    #let color : Vec3 = ray_color ray;
-                    ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
-                    ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
-                    ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
-                };
-            };
-        } #else {
-            #let ground_center : Vec3 = vec3 0.0f32 -100.5f32 -1.0f32;
-            #let ground_radius : f32 = 100.0f32;
-            #let ground_discriminant : f32 = sphere_discriminant ground_center ground_radius ray;
-            #if f32_gte ground_discriminant 0.0f32 {
-                #let ground_t : f32 = sphere_root ground_center ground_radius ray ground_discriminant;
-                #if f32_lt 0.0f32 ground_t {
-                    #let color : Vec3 = sphere_normal_color ground_center ground_radius ray ground_t;
-                    ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
-                    ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
-                    ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
-                } #else {
-                    #let color : Vec3 = ray_color ray;
-                    ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
-                    ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
-                    ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
-                };
-            } #else {
-                #let color : Vec3 = ray_color ray;
-                ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
-                ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
-                ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
-            };
-        };
+        #let color : Vec3 = ray_color_diffuse ray (xorshift32 seed);
+        ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
+        ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
+        ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
         ref_set i32 sample_index_ref (i32_add current_sample 1i32);
     };
 
