@@ -260,16 +260,30 @@ fn lower_f32_primitive_value(
     let Some(primitive) = simple_builtin_path_name(
         path,
         "f32 primitive",
-        &["f32_add", "f32_sub", "f32_mul", "f32_div"],
+        &["f32_add", "f32_sub", "f32_mul", "f32_div", "f32_sqrt"],
     )?
     else {
         return Ok(None);
     };
-    if !matches!(primitive, "f32_add" | "f32_sub" | "f32_mul" | "f32_div") {
+    if !matches!(
+        primitive,
+        "f32_add" | "f32_sub" | "f32_mul" | "f32_div" | "f32_sqrt"
+    ) {
         return Ok(None);
     }
 
     let normalized = normalize_numeric_literal_arguments(arguments);
+    if primitive == "f32_sqrt" {
+        let [value] = normalized.as_slice() else {
+            return Err(Error::Unsupported(format!(
+                "`{primitive}` must receive exactly one argument"
+            )));
+        };
+        return Ok(Some(Value::F32(F32Expr::Sqrt(Box::new(
+            lower_pure_f32_argument(value, state, program)?,
+        )))));
+    }
+
     let [lhs, rhs] = normalized.as_slice() else {
         return Err(Error::Unsupported(format!(
             "`{primitive}` must receive exactly two arguments"

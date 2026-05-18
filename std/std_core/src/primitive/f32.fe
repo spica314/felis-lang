@@ -3,6 +3,7 @@
 #bind_builtin "f32_sub" #as f32_sub;
 #bind_builtin "f32_mul" #as f32_mul;
 #bind_builtin "f32_div" #as f32_div;
+#bind_builtin "f32_sqrt" #as f32_sqrt;
 #bind_builtin "f32_eq" #as f32_eq;
 #bind_builtin "f32_lte" #as f32_lte;
 #bind_builtin "f32_lt" #as f32_lt;
@@ -17,6 +18,7 @@
 #pub #use f32_sub;
 #pub #use f32_mul;
 #pub #use f32_div;
+#pub #use f32_sqrt;
 #pub #use f32_eq;
 #pub #use f32_lte;
 #pub #use f32_lt;

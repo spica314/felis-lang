@@ -83,6 +83,7 @@ pub(crate) enum F32Expr {
     Sub(Box<F32Expr>, Box<F32Expr>),
     Mul(Box<F32Expr>, Box<F32Expr>),
     Div(Box<F32Expr>, Box<F32Expr>),
+    Sqrt(Box<F32Expr>),
     ArrayGet {
         array_slot: usize,
         index: Box<I64Expr>,

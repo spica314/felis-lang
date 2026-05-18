@@ -7,6 +7,7 @@
 #use std_core::primitive::f32::f32_sub;
 #use std_core::primitive::f32::f32_mul;
 #use std_core::primitive::f32::f32_div;
+#use std_core::primitive::f32::f32_sqrt;
 #use std_core::primitive::f32::f32_eq;
 #use std_core::primitive::f32::f32_gt;
 #use std_core::primitive::f32::f32_gte;
@@ -49,9 +50,12 @@
                         #let from_i64 : f32 = f32_from_i64 (i64_from_f32 2.0f32);
                         #let from_u8 : f32 = f32_from_u8 (u8_from_f32 3.0f32);
                         #let converted_sum : f32 = f32_add from_i64 from_u8;
-                        #let exit_value : f32 = f32_add (f32_add result converted_sum) 22.0f32;
-                        #let exit_code : i32 = i32_from_f32 exit_value;
-                        #let _ : () <- IO::exit exit_code;
+                        #let root : f32 = f32_sqrt 16.0f32;
+                        #if f32_eq root 4.0f32 {
+                            #let exit_value : f32 = f32_add (f32_add result converted_sum) 22.0f32;
+                            #let exit_code : i32 = i32_from_f32 exit_value;
+                            #let _ : () <- IO::exit exit_code;
+                        };
                     };
                 };
             };

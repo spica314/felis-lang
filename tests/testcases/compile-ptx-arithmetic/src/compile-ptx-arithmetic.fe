@@ -16,7 +16,8 @@
     #let diff : f32 = f32_sub sum 1.5f32;
     #let product : f32 = f32_mul diff 2.0f32;
     #let quotient : f32 = f32_div product b;
-    ref_set_ptx f32 array 2i32 quotient;
+    #let root : f32 = f32_sqrt quotient;
+    ref_set_ptx f32 array 2i32 root;
     ()
 }
 

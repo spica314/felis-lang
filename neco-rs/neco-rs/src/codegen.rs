@@ -1046,6 +1046,10 @@ fn emit_f32_expr_to_xmm0(expr: &F32Expr, code: &mut Vec<u8>, program: &LoweredPr
         F32Expr::Div(lhs, rhs) => {
             emit_f32_binary_expr(lhs, rhs, code, program, &[0xf3, 0x0f, 0x5e, 0xc1])
         }
+        F32Expr::Sqrt(value) => {
+            emit_f32_expr_to_xmm0(value, code, program);
+            code.extend_from_slice(&[0xf3, 0x0f, 0x51, 0xc0]);
+        }
         F32Expr::ArrayGet { array_slot, index } => {
             emit_f32_array_get(*array_slot, index, code, program)
         }

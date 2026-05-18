@@ -750,6 +750,14 @@ fn lower_f32_primitive_call(
             };
             return Ok(F32Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
         }
+        "f32_sqrt" => {
+            let [value] = normalized.as_slice() else {
+                return Err(Error::Unsupported(format!(
+                    "`{primitive}` must receive exactly one argument"
+                )));
+            };
+            return Ok(F32Expr::Sqrt(Box::new(lower_f32_expr(value, state)?)));
+        }
         _ => {}
     }
 

@@ -697,6 +697,12 @@ impl PtxBodyCompiler<'_> {
         let Some(primitive) = simple_path_name(callee) else {
             return Ok(None);
         };
+        if let Some(value) = self.compile_ptx_conversion_call(primitive, &arguments)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = self.compile_ptx_unary_call(primitive, &arguments)? {
+            return Ok(Some(value));
+        }
         let Some((ty, instruction)) = ptx_binary_primitive(primitive) else {
             return Ok(None);
         };
@@ -715,6 +721,59 @@ impl PtxBodyCompiler<'_> {
         self.instructions.push_str(&format!(
             "    {instruction} {}, {}, {};\n",
             register, lhs.register, rhs.register
+        ));
+        Ok(Some(PtxScalarValue { ty, register }))
+    }
+
+    fn compile_ptx_conversion_call(
+        &mut self,
+        primitive: &str,
+        arguments: &[Term],
+    ) -> Result<Option<PtxScalarValue>> {
+        let Some((source_ty, dest_ty, instruction)) = ptx_conversion_primitive(primitive) else {
+            return Ok(None);
+        };
+        let normalized = normalize_numeric_literal_arguments(arguments);
+        let [value] = normalized.as_slice() else {
+            return Err(
+                self.unsupported("PTX conversion primitive must receive exactly one argument")
+            );
+        };
+        let value = self.compile_scalar_value(value)?;
+        if value.ty != source_ty {
+            return Err(self.unsupported("PTX conversion primitive argument has the wrong type"));
+        }
+        let register = self.allocate_register(dest_ty);
+        self.instructions.push_str(&format!(
+            "    {instruction} {}, {};\n",
+            register, value.register
+        ));
+        Ok(Some(PtxScalarValue {
+            ty: dest_ty,
+            register,
+        }))
+    }
+
+    fn compile_ptx_unary_call(
+        &mut self,
+        primitive: &str,
+        arguments: &[Term],
+    ) -> Result<Option<PtxScalarValue>> {
+        let Some((ty, instruction)) = ptx_unary_primitive(primitive) else {
+            return Ok(None);
+        };
+        let normalized = normalize_numeric_literal_arguments(arguments);
+        let [value] = normalized.as_slice() else {
+            return Err(self.unsupported("PTX unary primitive must receive exactly one argument"));
+        };
+        let value = self.compile_scalar_value(value)?;
+        if value.ty != ty {
+            return Err(self.unsupported("PTX unary primitive argument has the wrong type"));
+        }
+        let register = self.allocate_register(ty);
+        self.instructions.push_str(&format!(
+            "    {instruction} {}, {};\n",
+            register, value.register
         ));
         Ok(Some(PtxScalarValue { ty, register }))
     }
@@ -1217,6 +1276,31 @@ fn ptx_binary_primitive(name: &str) -> Option<(ArrayElementType, &'static str)> 
         "f32_sub" => Some((ArrayElementType::F32, "sub.rn.f32")),
         "f32_mul" => Some((ArrayElementType::F32, "mul.rn.f32")),
         "f32_div" => Some((ArrayElementType::F32, "div.rn.f32")),
+        _ => None,
+    }
+}
+
+fn ptx_unary_primitive(name: &str) -> Option<(ArrayElementType, &'static str)> {
+    match name {
+        "f32_sqrt" => Some((ArrayElementType::F32, "sqrt.rn.f32")),
+        _ => None,
+    }
+}
+
+fn ptx_conversion_primitive(
+    name: &str,
+) -> Option<(ArrayElementType, ArrayElementType, &'static str)> {
+    match name {
+        "f32_from_i32" => Some((
+            ArrayElementType::I32,
+            ArrayElementType::F32,
+            "cvt.rn.f32.s32",
+        )),
+        "i32_from_f32" => Some((
+            ArrayElementType::F32,
+            ArrayElementType::I32,
+            "cvt.rzi.s32.f32",
+        )),
         _ => None,
     }
 }
