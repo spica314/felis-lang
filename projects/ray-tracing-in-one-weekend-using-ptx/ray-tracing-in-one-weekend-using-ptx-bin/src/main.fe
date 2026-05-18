@@ -198,6 +198,11 @@
     RandomVec3 { value = vec3 (ref_get f32 out_x_ref) (ref_get f32 out_y_ref) (ref_get f32 out_z_ref), state = random.state }
 }
 
+#fn random_lambertian_direction : (normal : Vec3) -> (state : i32) -> RandomVec3 #with PTX {
+    #let random : RandomVec3 = random_unit_vector state;
+    RandomVec3 { value = vec3_add normal random.value, state = random.state }
+}
+
 #fn sample_seed : (x : i32) -> (y : i32) -> (sample_index : i32) -> i32 #with PTX {
     #let x_part : i32 = i32_mul x 1973i32;
     #let y_part : i32 = i32_mul y 9277i32;
@@ -313,7 +318,7 @@
         #if i32_eq (ref_get i32 hit_anything_ref) 1i32 {
             #let hit_point : Vec3 = ray_at current_ray (ref_get f32 hit_t_ref);
             #let hit_normal : Vec3 = vec3 (ref_get f32 hit_normal_x_ref) (ref_get f32 hit_normal_y_ref) (ref_get f32 hit_normal_z_ref);
-            #let scatter : RandomVec3 = random_on_hemisphere hit_normal (ref_get i32 current_seed_ref);
+            #let scatter : RandomVec3 = random_lambertian_direction hit_normal (ref_get i32 current_seed_ref);
             ref_set f32 ray_origin_x_ref hit_point.x;
             ref_set f32 ray_origin_y_ref hit_point.y;
             ref_set f32 ray_origin_z_ref hit_point.z;
