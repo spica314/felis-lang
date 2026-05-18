@@ -214,6 +214,10 @@
     i32_from_f32 (f32_mul 255.999f32 value)
 }
 
+#fn linear_to_gamma : (linear_component : f32) -> f32 #with PTX {
+    f32_sqrt linear_component
+}
+
 #fn color_byte_host : (value : f32) -> i32 {
     i32_from_f32 (f32_mul 255.999f32 value)
 }
@@ -384,9 +388,9 @@
     };
 
     #let scale : f32 = 0.01f32;
-    ref_set_ptx i32 framebuffer base (color_byte (f32_mul scale (ref_get f32 red_acc_ref)));
-    ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte (f32_mul scale (ref_get f32 green_acc_ref)));
-    ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte (f32_mul scale (ref_get f32 blue_acc_ref)));
+    ref_set_ptx i32 framebuffer base (color_byte (linear_to_gamma (f32_mul scale (ref_get f32 red_acc_ref))));
+    ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte (linear_to_gamma (f32_mul scale (ref_get f32 green_acc_ref))));
+    ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte (linear_to_gamma (f32_mul scale (ref_get f32 blue_acc_ref))));
     ()
 }
 
