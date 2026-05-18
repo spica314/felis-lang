@@ -1,0 +1,4 @@
+{
+    "name": "compile-ptx-if",
+    "felis-bin-entrypoints": ["src/compile-ptx-if.fe"]
+}

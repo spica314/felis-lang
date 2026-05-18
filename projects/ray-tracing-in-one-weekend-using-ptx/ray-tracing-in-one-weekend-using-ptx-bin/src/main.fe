@@ -11,6 +11,7 @@
 #use std_core::primitive::f32::f32_add;
 #use std_core::primitive::f32::f32_div;
 #use std_core::primitive::f32::f32_from_i32;
+#use std_core::primitive::f32::f32_gte;
 #use std_core::primitive::f32::f32_mul;
 #use std_core::primitive::f32::f32_sqrt;
 #use std_core::primitive::f32::f32_sub;
@@ -71,6 +72,14 @@
     vec3_div v (vec3_length v)
 }
 
+#fn sphere_discriminant : (center : Vec3) -> (radius : f32) -> (ray : Ray) -> f32 #with PTX {
+    #let oc : Vec3 = vec3_sub center ray.origin;
+    #let a : f32 = vec3_dot ray.direction ray.direction;
+    #let b : f32 = f32_mul -2.0f32 (vec3_dot ray.direction oc);
+    #let c : f32 = f32_sub (vec3_dot oc oc) (f32_mul radius radius);
+    f32_sub (f32_mul b b) (f32_mul (f32_mul 4.0f32 a) c)
+}
+
 #fn ray_color : (ray : Ray) -> Vec3 #with PTX {
     #let unit_direction : Vec3 = unit_vector ray.direction;
     #let a : f32 = f32_mul 0.5f32 (f32_add unit_direction.y 1.0f32);
@@ -108,16 +117,19 @@
     #let y : i32 = tid_x;
     #let dir_x : f32 = f32_add -1.7733333f32 (f32_mul (f32_from_i32 x) 0.008888889f32);
     #let dir_y : f32 = f32_add 0.9955556f32 (f32_mul (f32_from_i32 y) -0.008888889f32);
-    #let dir_len : f32 = f32_sqrt (f32_add (f32_add (f32_mul dir_x dir_x) (f32_mul dir_y dir_y)) 1.0f32);
-    #let unit_y : f32 = f32_div dir_y dir_len;
-    #let a : f32 = f32_mul 0.5f32 (f32_add unit_y 1.0f32);
-    #let white_weight : f32 = f32_sub 1.0f32 a;
-    #let red : f32 = f32_add white_weight (f32_mul a 0.5f32);
-    #let green : f32 = f32_add white_weight (f32_mul a 0.7f32);
+    #let ray : Ray = Ray { origin = vec3 0.0f32 0.0f32 0.0f32, direction = vec3 dir_x dir_y -1.0f32 };
     #let base : i32 = pixel_base_ptx x y;
-    ref_set_ptx i32 framebuffer base (color_byte red);
-    ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte green);
-    ref_set_ptx i32 framebuffer (i32_add base 2i32) 255i32;
+    #let discriminant : f32 = sphere_discriminant (vec3 0.0f32 0.0f32 -1.0f32) 0.5f32 ray;
+    #if f32_gte discriminant 0.0f32 {
+        ref_set_ptx i32 framebuffer base 255i32;
+        ref_set_ptx i32 framebuffer (i32_add base 1i32) 0i32;
+        ref_set_ptx i32 framebuffer (i32_add base 2i32) 0i32;
+    } #else {
+        #let color : Vec3 = ray_color ray;
+        ref_set_ptx i32 framebuffer base (color_byte color.x);
+        ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte color.y);
+        ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte color.z);
+    };
     ()
 }
 

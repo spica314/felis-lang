@@ -347,18 +347,24 @@ fn compile_empty_ptx_function(
     } else {
         format!("    .reg .f32 %f<{}>;\n", body.next_f32_register)
     };
+    let pred_regs = if body.next_pred_register == 1 {
+        String::new()
+    } else {
+        format!("    .reg .pred %p<{}>;\n", body.next_pred_register)
+    };
     let parameter_load = if body.loads_array_parameter {
         "    ld.param.u64 %rd1, [arg0];\n"
     } else {
         ""
     };
     let mut ptx = format!(
-        ".version 7.0\n.target sm_52\n.address_size 64\n\n.visible .entry {}(\n    .param {} arg0\n)\n{{\n{}{}{}{}{}    ret;\n}}\n",
+        ".version 7.0\n.target sm_52\n.address_size 64\n\n.visible .entry {}(\n    .param {} arg0\n)\n{{\n{}{}{}{}{}{}    ret;\n}}\n",
         function.name.name,
         ptx_parameter_type(function)?,
         u64_regs,
         u32_regs,
         f32_regs,
+        pred_regs,
         parameter_load,
         body.instructions
     )
@@ -372,6 +378,7 @@ struct CompiledPtxBody {
     next_u32_register: usize,
     next_u64_register: usize,
     next_f32_register: usize,
+    next_pred_register: usize,
     loads_array_parameter: bool,
 }
 
@@ -465,6 +472,7 @@ fn compile_ptx_body(
             next_u32_register: 1,
             next_u64_register: 1,
             next_f32_register: 1,
+            next_pred_register: 1,
             loads_array_parameter: false,
         });
     }
@@ -482,6 +490,8 @@ fn compile_ptx_body(
         next_u32_register: 1,
         next_u64_register: 2,
         next_f32_register: 1,
+        next_pred_register: 1,
+        next_label: 0,
         inline_stack: vec![function.name.name.clone()],
     };
     for statement in &function.body.statements {
@@ -492,6 +502,7 @@ fn compile_ptx_body(
         next_u32_register: compiler.next_u32_register,
         next_u64_register: compiler.next_u64_register,
         next_f32_register: compiler.next_f32_register,
+        next_pred_register: compiler.next_pred_register,
         loads_array_parameter: true,
     })
 }
@@ -533,6 +544,8 @@ struct PtxBodyCompiler<'a> {
     next_u32_register: usize,
     next_u64_register: usize,
     next_f32_register: usize,
+    next_pred_register: usize,
+    next_label: usize,
     inline_stack: Vec<String>,
 }
 
@@ -549,6 +562,7 @@ impl PtxBodyCompiler<'_> {
                 self.locals.insert(name.clone(), value);
                 Ok(())
             }
+            Statement::If(if_stmt) => self.compile_if_statement(if_stmt),
             Statement::Expression(term) => {
                 if let Some((array_name, index, value)) = ptx_ref_set_call_parts(term)? {
                     self.ensure_parameter_array(&array_name)?;
@@ -571,9 +585,70 @@ impl PtxBodyCompiler<'_> {
                 ))
             }
             _ => Err(self.unsupported(
-                "PTX bodies currently support only `#let` values and expression `ref_set_ptx`",
+                "PTX bodies currently support only `#let` values, `#if`, and expression `ref_set_ptx`",
             )),
         }
+    }
+
+    fn compile_if_statement(&mut self, if_stmt: &neco_rs_parser::IfStatement) -> Result<()> {
+        let predicate = self.compile_condition(if_stmt.condition.as_ref())?;
+        let else_label = self.allocate_label("else");
+        let end_label = self.allocate_label("endif");
+        self.instructions
+            .push_str(&format!("    @!{} bra {};\n", predicate, else_label));
+
+        self.compile_scoped_statements(&if_stmt.then_block.statements)?;
+        self.instructions
+            .push_str(&format!("    bra {};\n", end_label));
+        self.instructions.push_str(&format!("{}:\n", else_label));
+        if let Some(else_branch) = &if_stmt.else_branch {
+            match else_branch {
+                ElseBranch::Block(block) => self.compile_scoped_statements(&block.statements)?,
+                ElseBranch::If(else_if) => self.compile_if_statement(else_if)?,
+            }
+        }
+        self.instructions.push_str(&format!("{}:\n", end_label));
+        Ok(())
+    }
+
+    fn compile_scoped_statements(&mut self, statements: &[Statement]) -> Result<()> {
+        let saved_locals = self.locals.clone();
+        for statement in statements {
+            self.compile_statement(statement)?;
+        }
+        self.locals = saved_locals;
+        Ok(())
+    }
+
+    fn compile_condition(&mut self, term: &Term) -> Result<String> {
+        let Some((callee, arguments)) = flatten_application(term) else {
+            return Err(self.unsupported("PTX `#if` condition must be a comparison"));
+        };
+        let Some(primitive) = simple_path_name(callee) else {
+            return Err(self.unsupported("PTX `#if` condition must use a simple comparison"));
+        };
+        let Some((ty, comparison)) = ptx_comparison_primitive(primitive) else {
+            return Err(self.unsupported("PTX `#if` condition must be a supported comparison"));
+        };
+        let normalized = normalize_numeric_literal_arguments(&arguments);
+        let [lhs, rhs] = normalized.as_slice() else {
+            return Err(self.unsupported("PTX comparison must receive exactly two arguments"));
+        };
+        let lhs = self.compile_scalar_value(lhs)?;
+        let rhs = self.compile_scalar_value(rhs)?;
+        if lhs.ty != ty || rhs.ty != ty {
+            return Err(self.unsupported("PTX comparison arguments must match its type"));
+        }
+        let predicate = self.allocate_predicate_register();
+        self.instructions.push_str(&format!(
+            "    setp.{}.{} {}, {}, {};\n",
+            comparison,
+            ptx_comparison_type(ty),
+            predicate,
+            lhs.register,
+            rhs.register
+        ));
+        Ok(predicate)
     }
 
     fn compile_value(&mut self, term: &Term) -> Result<PtxValue> {
@@ -1024,6 +1099,18 @@ impl PtxBodyCompiler<'_> {
         register
     }
 
+    fn allocate_predicate_register(&mut self) -> String {
+        let register = format!("%p{}", self.next_pred_register);
+        self.next_pred_register += 1;
+        register
+    }
+
+    fn allocate_label(&mut self, prefix: &str) -> String {
+        let label = format!("${}_{}_{}", self.function_name, prefix, self.next_label);
+        self.next_label += 1;
+        label
+    }
+
     fn allocate_register(&mut self, ty: ArrayElementType) -> String {
         match ty {
             ArrayElementType::I32 | ArrayElementType::U8 => self.allocate_u32_register(),
@@ -1289,6 +1376,30 @@ fn ptx_unary_primitive(name: &str) -> Option<(ArrayElementType, &'static str)> {
     match name {
         "f32_sqrt" => Some((ArrayElementType::F32, "sqrt.rn.f32")),
         _ => None,
+    }
+}
+
+fn ptx_comparison_primitive(name: &str) -> Option<(ArrayElementType, &'static str)> {
+    match name {
+        "i32_eq" => Some((ArrayElementType::I32, "eq")),
+        "i32_lte" => Some((ArrayElementType::I32, "le")),
+        "i32_lt" => Some((ArrayElementType::I32, "lt")),
+        "i32_gte" => Some((ArrayElementType::I32, "ge")),
+        "i32_gt" => Some((ArrayElementType::I32, "gt")),
+        "f32_eq" => Some((ArrayElementType::F32, "eq")),
+        "f32_lte" => Some((ArrayElementType::F32, "le")),
+        "f32_lt" => Some((ArrayElementType::F32, "lt")),
+        "f32_gte" => Some((ArrayElementType::F32, "ge")),
+        "f32_gt" => Some((ArrayElementType::F32, "gt")),
+        _ => None,
+    }
+}
+
+fn ptx_comparison_type(ty: ArrayElementType) -> &'static str {
+    match ty {
+        ArrayElementType::I32 => "s32",
+        ArrayElementType::F32 => "f32",
+        ArrayElementType::I64 | ArrayElementType::U8 => unreachable!(),
     }
 }
 

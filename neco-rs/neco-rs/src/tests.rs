@@ -2708,6 +2708,23 @@ fn compiles_f32_ptx_arithmetic() {
 }
 
 #[test]
+fn compiles_ptx_if_with_f32_comparison() {
+    let root = repo_root().join("tests/testcases/compile-ptx-if");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let program = lower_package_to_program(&package).expect("lower package");
+    let ptx = String::from_utf8_lossy(&program.data[0]);
+    assert!(ptx.contains(".visible .entry threshold_kernel("));
+    assert!(ptx.contains(".reg .pred %p<"));
+    assert!(ptx.contains("setp.ge.f32"));
+    assert!(ptx.contains("@!%p"));
+    assert!(ptx.contains("bra"));
+    assert!(ptx.contains("st.global.f32"));
+}
+
+#[test]
 fn writes_compiled_ptx_artifacts_under_package_neco_directory() {
     let root = unique_temp_dir("ptx-artifacts");
     fs::create_dir_all(&root).expect("create temp package dir");
