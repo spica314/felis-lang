@@ -423,7 +423,60 @@
                     ref_set f32 hit_albedo_z_ref 1.0f32;
                     ref_set f32 hit_fuzz_ref 0.0f32;
                     ref_set i32 hit_front_face_ref (ref_get i32 front_face_ref);
-                    ref_set f32 hit_refraction_index_ref (f32_div 1.0f32 1.33f32);
+                    ref_set f32 hit_refraction_index_ref 1.5f32;
+                } #else {
+                    ()
+                };
+            } #else {
+                ()
+            };
+        } #else {
+            ()
+        };
+
+        #let bubble_sphere_center : Vec3 = vec3 -1.0f32 0.0f32 -1.0f32;
+        #let bubble_sphere_radius : f32 = 0.4f32;
+        #let bubble_sphere_discriminant : f32 = sphere_discriminant bubble_sphere_center bubble_sphere_radius current_ray;
+        #if f32_gte bubble_sphere_discriminant 0.0f32 {
+            #let bubble_sphere_t : f32 = sphere_root bubble_sphere_center bubble_sphere_radius current_ray bubble_sphere_discriminant;
+            #letref #excl bubble_sphere_t_ref : &^ f32 #borrow bubble_sphere_t;
+            #if f32_lt (ref_get f32 bubble_sphere_t_ref) 0.001f32 {
+                ref_set f32 bubble_sphere_t_ref (sphere_root_far bubble_sphere_center bubble_sphere_radius current_ray bubble_sphere_discriminant);
+            } #else {
+                ()
+            };
+            #let bubble_sphere_t : f32 = ref_get f32 bubble_sphere_t_ref;
+            #if f32_lt 0.001f32 bubble_sphere_t {
+                #if f32_lt bubble_sphere_t (ref_get f32 hit_t_ref) {
+                    #let normal : Vec3 = sphere_normal bubble_sphere_center bubble_sphere_radius current_ray bubble_sphere_t;
+                    #let front_face : i32 = 0i32;
+                    #let face_normal_x : f32 = normal.x;
+                    #let face_normal_y : f32 = normal.y;
+                    #let face_normal_z : f32 = normal.z;
+                    #letref #excl front_face_ref : &^ i32 #borrow front_face;
+                    #letref #excl face_normal_x_ref : &^ f32 #borrow face_normal_x;
+                    #letref #excl face_normal_y_ref : &^ f32 #borrow face_normal_y;
+                    #letref #excl face_normal_z_ref : &^ f32 #borrow face_normal_z;
+                    #if f32_lt (vec3_dot current_ray.direction normal) 0.0f32 {
+                        ref_set i32 front_face_ref 1i32;
+                    } #else {
+                        #let opposite : Vec3 = vec3_neg normal;
+                        ref_set f32 face_normal_x_ref opposite.x;
+                        ref_set f32 face_normal_y_ref opposite.y;
+                        ref_set f32 face_normal_z_ref opposite.z;
+                    };
+                    ref_set i32 hit_anything_ref 1i32;
+                    ref_set f32 hit_t_ref bubble_sphere_t;
+                    ref_set f32 hit_normal_x_ref (ref_get f32 face_normal_x_ref);
+                    ref_set f32 hit_normal_y_ref (ref_get f32 face_normal_y_ref);
+                    ref_set f32 hit_normal_z_ref (ref_get f32 face_normal_z_ref);
+                    ref_set i32 hit_material_ref 2i32;
+                    ref_set f32 hit_albedo_x_ref 1.0f32;
+                    ref_set f32 hit_albedo_y_ref 1.0f32;
+                    ref_set f32 hit_albedo_z_ref 1.0f32;
+                    ref_set f32 hit_fuzz_ref 0.0f32;
+                    ref_set i32 hit_front_face_ref (ref_get i32 front_face_ref);
+                    ref_set f32 hit_refraction_index_ref (f32_div 1.0f32 1.5f32);
                 } #else {
                     ()
                 };
