@@ -2,7 +2,11 @@
 #use std_core::io::FileDescriptor;
 #use std_core::ptx::PTX;
 #use std_core::ptx::ctaid_x;
+#use std_core::ptx::ctaid_y;
+#use std_core::ptx::ntid_x;
+#use std_core::ptx::ntid_y;
 #use std_core::ptx::tid_x;
+#use std_core::ptx::tid_y;
 #use std_core::primitive::array::ArrayVL;
 #use std_core::primitive::array::ArrayVLPTX;
 #use std_core::primitive::array::array_get;
@@ -258,10 +262,21 @@
     ref_get f32 result_ref
 }
 
+#fn f32_max : (a : f32) -> (b : f32) -> f32 #with PTX {
+    #let result : f32 = b;
+    #letref #excl result_ref : &^ f32 #borrow result;
+    #if f32_lt b a {
+        ref_set f32 result_ref a;
+    } #else {
+        ()
+    };
+    ref_get f32 result_ref
+}
+
 #fn refract : (uv : Vec3) -> (normal : Vec3) -> (etai_over_etat : f32) -> Vec3 #with PTX {
     #let cos_theta : f32 = f32_min (vec3_dot (vec3_neg uv) normal) 1.0f32;
     #let r_out_perp : Vec3 = vec3_mul etai_over_etat (vec3_add uv (vec3_mul cos_theta normal));
-    #let parallel_len_squared : f32 = f32_sub 1.0f32 (vec3_length_squared r_out_perp);
+    #let parallel_len_squared : f32 = f32_max (f32_sub 1.0f32 (vec3_length_squared r_out_perp)) 0.0f32;
     #let r_out_parallel : Vec3 = vec3_mul (f32_sub 0.0f32 (f32_sqrt parallel_len_squared)) normal;
     vec3_add r_out_perp r_out_parallel
 }
@@ -295,16 +310,16 @@
 }
 
 #fn pixel_base_ptx : (x : i32) -> (y : i32) -> i32 #with PTX {
-    i32_mul (i32_add (i32_mul y 1600i32) x) 3i32
+    i32_mul (i32_add (i32_mul y 6016i32) x) 3i32
 }
 
 #fn pixel_base : (x : i32) -> (y : i32) -> i32 {
-    i32_mul (i32_add (i32_mul y 1600i32) x) 3i32
+    i32_mul (i32_add (i32_mul y 6016i32) x) 3i32
 }
 
 #fn camera_ray : (sample_x : f32) -> (sample_y : f32) -> (seed : i32) -> Ray #with PTX {
-    #let image_width : f32 = 1600.0f32;
-    #let image_height : f32 = 900.0f32;
+    #let image_width : f32 = 6016.0f32;
+    #let image_height : f32 = 3384.0f32;
     #let lookfrom : Vec3 = vec3 13.0f32 2.0f32 3.0f32;
     #let lookat : Vec3 = vec3 0.0f32 0.0f32 0.0f32;
     #let vup : Vec3 = vec3 0.0f32 1.0f32 0.0f32;
@@ -837,44 +852,50 @@
 }
 
 #fn render_kernel : (framebuffer : ArrayVLPTX i32) -> () #with PTX {
-    #let x : i32 = ctaid_x;
-    #let y : i32 = tid_x;
-    #let base : i32 = pixel_base_ptx x y;
-    #let samples_per_pixel : i32 = 100i32;
-    #let red_acc : f32 = 0.0f32;
-    #let green_acc : f32 = 0.0f32;
-    #let blue_acc : f32 = 0.0f32;
-    #let sample_index : i32 = 0i32;
-    #letref #excl red_acc_ref : &^ f32 #borrow red_acc;
-    #letref #excl green_acc_ref : &^ f32 #borrow green_acc;
-    #letref #excl blue_acc_ref : &^ f32 #borrow blue_acc;
-    #letref #excl sample_index_ref : &^ i32 #borrow sample_index;
+    #let x : i32 = i32_add (i32_mul ctaid_x ntid_x) tid_x;
+    #let y : i32 = i32_add (i32_mul ctaid_y ntid_y) tid_y;
+    #if i32_gte x 6016i32 {
+        ()
+    } #else #if i32_gte y 3384i32 {
+        ()
+    } #else {
+        #let base : i32 = pixel_base_ptx x y;
+        #let samples_per_pixel : i32 = 100i32;
+        #let red_acc : f32 = 0.0f32;
+        #let green_acc : f32 = 0.0f32;
+        #let blue_acc : f32 = 0.0f32;
+        #let sample_index : i32 = 0i32;
+        #letref #excl red_acc_ref : &^ f32 #borrow red_acc;
+        #letref #excl green_acc_ref : &^ f32 #borrow green_acc;
+        #letref #excl blue_acc_ref : &^ f32 #borrow blue_acc;
+        #letref #excl sample_index_ref : &^ i32 #borrow sample_index;
 
-    #loop {
-        #let current_sample : i32 = ref_get i32 sample_index_ref;
-        #if i32_gte current_sample samples_per_pixel {
-            #break;
+        #loop {
+            #let current_sample : i32 = ref_get i32 sample_index_ref;
+            #if i32_gte current_sample samples_per_pixel {
+                #break;
+            };
+
+            #let seed : i32 = sample_seed x y current_sample;
+            #let random_x : f32 = random_unit seed;
+            #let random_y : f32 = random_unit (xorshift32 seed);
+            #let sample_x : f32 = f32_add (f32_from_i32 x) random_x;
+            #let sample_y : f32 = f32_add (f32_from_i32 y) random_y;
+            #let defocus_seed : i32 = xorshift32 (xorshift32 seed);
+            #let scatter_seed : i32 = xorshift32 (xorshift32 (xorshift32 defocus_seed));
+            #let ray : Ray = camera_ray sample_x sample_y defocus_seed;
+            #let color : Vec3 = ray_color_diffuse ray scatter_seed;
+            ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
+            ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
+            ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
+            ref_set i32 sample_index_ref (i32_add current_sample 1i32);
         };
 
-        #let seed : i32 = sample_seed x y current_sample;
-        #let random_x : f32 = random_unit seed;
-        #let random_y : f32 = random_unit (xorshift32 seed);
-        #let sample_x : f32 = f32_add (f32_from_i32 x) random_x;
-        #let sample_y : f32 = f32_add (f32_from_i32 y) random_y;
-        #let defocus_seed : i32 = xorshift32 (xorshift32 seed);
-        #let scatter_seed : i32 = xorshift32 (xorshift32 (xorshift32 defocus_seed));
-        #let ray : Ray = camera_ray sample_x sample_y defocus_seed;
-        #let color : Vec3 = ray_color_diffuse ray scatter_seed;
-        ref_set f32 red_acc_ref (f32_add (ref_get f32 red_acc_ref) color.x);
-        ref_set f32 green_acc_ref (f32_add (ref_get f32 green_acc_ref) color.y);
-        ref_set f32 blue_acc_ref (f32_add (ref_get f32 blue_acc_ref) color.z);
-        ref_set i32 sample_index_ref (i32_add current_sample 1i32);
+        #let scale : f32 = 0.01f32;
+        ref_set_ptx i32 framebuffer base (color_byte (linear_to_gamma (f32_mul scale (ref_get f32 red_acc_ref))));
+        ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte (linear_to_gamma (f32_mul scale (ref_get f32 green_acc_ref))));
+        ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte (linear_to_gamma (f32_mul scale (ref_get f32 blue_acc_ref))));
     };
-
-    #let scale : f32 = 0.01f32;
-    ref_set_ptx i32 framebuffer base (color_byte (linear_to_gamma (f32_mul scale (ref_get f32 red_acc_ref))));
-    ref_set_ptx i32 framebuffer (i32_add base 1i32) (color_byte (linear_to_gamma (f32_mul scale (ref_get f32 green_acc_ref))));
-    ref_set_ptx i32 framebuffer (i32_add base 2i32) (color_byte (linear_to_gamma (f32_mul scale (ref_get f32 blue_acc_ref))));
     ()
 }
 
@@ -929,8 +950,8 @@
 }
 
 #fn main : () #with IO {
-    #let image_width : i32 = 1600i32;
-    #let image_height : i32 = 900i32;
+    #let image_width : i32 = 6016i32;
+    #let image_height : i32 = 3384i32;
     #let framebuffer_len : i32 = i32_mul (i32_mul image_width image_height) 3i32;
 
     #let init_result : i32 <- IO::cu_init 0i32;
@@ -952,12 +973,13 @@
     #let function_value : i64 = ref_get i64 function;
     #let framebuffer : ArrayVL i32 <- IO::arrayvl_new i32 framebuffer_len;
     #let device_framebuffer : ArrayVLPTX i32 <- IO::arrayvlptx_new i32 framebuffer_len;
-    #let launch_result : i32 <- IO::cu_launch_kernel function_value device_framebuffer image_width 1i32 1i32 image_height 1i32 1i32 0i32 0i64;
+    // 6016 / 16 = 376, ceil(3384 / 16) = 212.
+    #let launch_result : i32 <- IO::cu_launch_kernel function_value device_framebuffer 376i32 212i32 1i32 16i32 16i32 1i32 0i32 0i64;
     #let copy_from_result : i32 <- IO::arrayvl_from_ptx i32 device_framebuffer framebuffer framebuffer_len;
 
     #let stdout : FileDescriptor <- IO::stdout;
-    #let header_ref : & ArrayVL u8 = "P3\n1600 900\n255\n";
-    #let _ : () <- IO::write stdout header_ref 16i32;
+    #let header_ref : & ArrayVL u8 = "P3\n6016 3384\n255\n";
+    #let _ : () <- IO::write stdout header_ref 17i32;
     #let line_buffer : ArrayVL u8 <- IO::arrayvl_new u8 16i32;
     #letref #excl line_buffer_ref : &^ ArrayVL u8 #borrow line_buffer;
 
