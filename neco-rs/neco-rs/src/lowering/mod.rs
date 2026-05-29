@@ -313,10 +313,10 @@ fn compile_empty_ptx_function(
     structs: &HashMap<String, StructSignature>,
     ptx_functions: &HashMap<String, PtxFunction>,
 ) -> Result<Vec<u8>> {
-    if !function
+    if function
         .effect
         .as_ref()
-        .is_some_and(|effect| effect.lexeme == "PTX")
+        .is_none_or(|effect| effect.lexeme != "PTX")
     {
         return Err(Error::Unsupported(format!(
             "`#compile_ptx` target `{}` must use `#with PTX`",
@@ -406,10 +406,10 @@ fn collect_ptx_functions(packages: &[ParsedPackage]) -> Result<HashMap<String, P
             let Item::Function(function) = item else {
                 continue;
             };
-            if !function
+            if function
                 .effect
                 .as_ref()
-                .is_some_and(|effect| effect.lexeme == "PTX")
+                .is_none_or(|effect| effect.lexeme != "PTX")
             {
                 continue;
             }

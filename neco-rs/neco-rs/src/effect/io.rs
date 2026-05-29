@@ -296,38 +296,26 @@ pub(crate) fn lower_io_call(
             Some(Ok(false))
         }
         ["IO", "cu_launch_kernel"] => {
-            let (
-                function,
-                arg,
-                grid_dim_x,
-                grid_dim_y,
-                grid_dim_z,
-                block_dim_x,
-                block_dim_y,
-                block_dim_z,
-                shared_mem_bytes,
-                stream,
-                result_slot,
-            ) = match parse_cu_launch_kernel_arguments(arguments, state) {
+            let launch = match parse_cu_launch_kernel_arguments(arguments, state) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
             };
             program.operations.push(Operation::CuLaunchKernel {
-                function,
-                arg,
-                grid_dim_x,
-                grid_dim_y,
-                grid_dim_z,
-                block_dim_x,
-                block_dim_y,
-                block_dim_z,
-                shared_mem_bytes,
-                stream,
-                result_slot,
+                function: launch.function,
+                arg: launch.arg,
+                grid_dim_x: launch.grid_dim_x,
+                grid_dim_y: launch.grid_dim_y,
+                grid_dim_z: launch.grid_dim_z,
+                block_dim_x: launch.block_dim_x,
+                block_dim_y: launch.block_dim_y,
+                block_dim_z: launch.block_dim_z,
+                shared_mem_bytes: launch.shared_mem_bytes,
+                stream: launch.stream,
+                result_slot: launch.result_slot,
             });
             if let Err(error) = bind_checked_pattern(
                 binder,
-                Value::I32(I32Expr::Local(result_slot)),
+                Value::I32(I32Expr::Local(launch.result_slot)),
                 ty,
                 state,
                 program,
@@ -907,22 +895,24 @@ fn parse_cu_module_get_function_arguments(
     Ok((function_slot, module, name_data_index, result_slot))
 }
 
+struct CuLaunchKernelArguments {
+    function: I64Expr,
+    arg: KernelArgumentRef,
+    grid_dim_x: I32Expr,
+    grid_dim_y: I32Expr,
+    grid_dim_z: I32Expr,
+    block_dim_x: I32Expr,
+    block_dim_y: I32Expr,
+    block_dim_z: I32Expr,
+    shared_mem_bytes: I32Expr,
+    stream: I64Expr,
+    result_slot: usize,
+}
+
 fn parse_cu_launch_kernel_arguments(
     arguments: &[Term],
     state: &mut LoweringState,
-) -> Result<(
-    I64Expr,
-    KernelArgumentRef,
-    I32Expr,
-    I32Expr,
-    I32Expr,
-    I32Expr,
-    I32Expr,
-    I32Expr,
-    I32Expr,
-    I64Expr,
-    usize,
-)> {
+) -> Result<CuLaunchKernelArguments> {
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [
         function_term,
@@ -986,7 +976,7 @@ fn parse_cu_launch_kernel_arguments(
         Error::Unsupported("`IO::cu_launch_kernel` expects an `i64` stream".to_string())
     })?;
     let result_slot = state.allocate_i32_slot();
-    Ok((
+    Ok(CuLaunchKernelArguments {
         function,
         arg,
         grid_dim_x,
@@ -998,7 +988,7 @@ fn parse_cu_launch_kernel_arguments(
         shared_mem_bytes,
         stream,
         result_slot,
-    ))
+    })
 }
 
 fn parse_arrayvlptx_new_arguments(

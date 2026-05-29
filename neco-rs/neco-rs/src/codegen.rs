@@ -119,30 +119,41 @@ fn program_syscall_code(
         emit_array_initializers(program, &mut code);
     }
 
+    let mut emit_context = EmitOperationsContext {
+        program,
+        addresses: &addresses,
+        entry_abi,
+        external_calls,
+    };
     emit_operations(
         &program.operations,
         &mut code,
-        program,
-        &addresses,
-        entry_abi,
+        &mut emit_context,
         None,
         None,
-        external_calls,
     );
 
     code
 }
 
+struct EmitOperationsContext<'a> {
+    program: &'a LoweredProgram,
+    addresses: &'a [u64],
+    entry_abi: EntryAbi,
+    external_calls: &'a mut Vec<ExternalCall>,
+}
+
 fn emit_operations(
     operations: &[Operation],
     code: &mut Vec<u8>,
-    program: &LoweredProgram,
-    addresses: &[u64],
-    entry_abi: EntryAbi,
+    context: &mut EmitOperationsContext<'_>,
     mut break_patches: Option<&mut Vec<usize>>,
     mut continue_patches: Option<&mut Vec<usize>>,
-    external_calls: &mut Vec<ExternalCall>,
 ) {
+    let program = context.program;
+    let addresses = context.addresses;
+    let entry_abi = context.entry_abi;
+
     for operation in operations {
         match operation {
             Operation::StoreI32 { slot, value } => {
@@ -344,7 +355,7 @@ fn emit_operations(
             Operation::CuInit { flags, result_slot } => {
                 emit_i32_expr_to_eax(flags, code, program);
                 code.extend_from_slice(&[0x89, 0xc7]);
-                external_calls.push(ExternalCall {
+                context.external_calls.push(ExternalCall {
                     offset: code.len(),
                     symbol: "cuInit",
                 });
@@ -363,7 +374,7 @@ fn emit_operations(
                 code.extend_from_slice(&device_offset.to_le_bytes());
                 emit_i32_expr_to_eax(ordinal, code, program);
                 code.extend_from_slice(&[0x89, 0xc6]);
-                external_calls.push(ExternalCall {
+                context.external_calls.push(ExternalCall {
                     offset: code.len(),
                     symbol: "cuDeviceGet",
                 });
@@ -385,7 +396,7 @@ fn emit_operations(
                 code.extend_from_slice(&[0x89, 0xc6]);
                 emit_i32_expr_to_eax(device, code, program);
                 code.extend_from_slice(&[0x89, 0xc2]);
-                external_calls.push(ExternalCall {
+                context.external_calls.push(ExternalCall {
                     offset: code.len(),
                     symbol: "cuCtxCreate_v2",
                 });
@@ -404,7 +415,7 @@ fn emit_operations(
                 code.extend_from_slice(&module_offset.to_le_bytes());
                 code.extend_from_slice(&[0x48, 0xbe]);
                 code.extend_from_slice(&addresses[*data_index].to_le_bytes());
-                external_calls.push(ExternalCall {
+                context.external_calls.push(ExternalCall {
                     offset: code.len(),
                     symbol: "cuModuleLoadData",
                 });
@@ -426,7 +437,7 @@ fn emit_operations(
                 code.extend_from_slice(&[0x48, 0x89, 0xc6]);
                 code.extend_from_slice(&[0x48, 0xba]);
                 code.extend_from_slice(&addresses[*name_data_index].to_le_bytes());
-                external_calls.push(ExternalCall {
+                context.external_calls.push(ExternalCall {
                     offset: code.len(),
                     symbol: "cuModuleGetFunction",
                 });
@@ -477,7 +488,7 @@ fn emit_operations(
                 code.push(0x50);
                 emit_i32_expr_to_eax(block_dim_z, code, program);
                 code.push(0x50);
-                external_calls.push(ExternalCall {
+                context.external_calls.push(ExternalCall {
                     offset: code.len(),
                     symbol: "cuLaunchKernel",
                 });
@@ -502,7 +513,7 @@ fn emit_operations(
                 }
                 code.extend_from_slice(&[0x48, 0x98]);
                 code.extend_from_slice(&[0x48, 0x89, 0xc6]);
-                external_calls.push(ExternalCall {
+                context.external_calls.push(ExternalCall {
                     offset: code.len(),
                     symbol: "cuMemAlloc_v2",
                 });
@@ -528,7 +539,7 @@ fn emit_operations(
                 code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
                 code.extend_from_slice(&source_offset.to_le_bytes());
                 emit_array_copy_byte_len_to_rdx(*source_slot, len, code, program);
-                external_calls.push(ExternalCall {
+                context.external_calls.push(ExternalCall {
                     offset: code.len(),
                     symbol: "cuMemcpyHtoD_v2",
                 });
@@ -550,7 +561,7 @@ fn emit_operations(
                 code.extend_from_slice(&[0x48, 0x8b, 0xb5]);
                 code.extend_from_slice(&source_offset.to_le_bytes());
                 emit_array_copy_byte_len_to_rdx(*source_slot, len, code, program);
-                external_calls.push(ExternalCall {
+                context.external_calls.push(ExternalCall {
                     offset: code.len(),
                     symbol: "cuMemcpyDtoH_v2",
                 });
@@ -568,12 +579,9 @@ fn emit_operations(
                 emit_operations(
                     then_operations,
                     code,
-                    program,
-                    addresses,
-                    entry_abi,
+                    context,
                     break_patches.as_deref_mut(),
                     continue_patches.as_deref_mut(),
-                    external_calls,
                 );
                 if else_operations.is_empty() {
                     let end = code.len();
@@ -586,12 +594,9 @@ fn emit_operations(
                     emit_operations(
                         else_operations,
                         code,
-                        program,
-                        addresses,
-                        entry_abi,
+                        context,
                         break_patches.as_deref_mut(),
                         continue_patches.as_deref_mut(),
-                        external_calls,
                     );
                     let end = code.len();
                     patch_jumps_to(&false_patch_ats, else_start, code);
@@ -627,12 +632,9 @@ fn emit_operations(
                 emit_operations(
                     body_operations,
                     code,
-                    program,
-                    addresses,
-                    entry_abi,
+                    context,
                     Some(&mut loop_break_patches),
                     Some(&mut loop_continue_patches),
-                    external_calls,
                 );
                 code.push(0xe9);
                 let back_patch_at = code.len();
