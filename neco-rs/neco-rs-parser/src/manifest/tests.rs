@@ -139,6 +139,28 @@ fn rejects_empty_workspace_member_path() {
 }
 
 #[test]
+fn rejects_empty_workspace_members_list() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "workspace": {
+                    "members": []
+                }
+            }"#,
+    ) {
+        Ok(_) => panic!("workspace members list should not be empty"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("`workspace.members` must contain at least one path"),
+        "unexpected error: {error:?}"
+    );
+}
+
+#[test]
 fn rejects_empty_library_entrypoint_path() {
     let error = match parse_manifest(
         Path::new("neco-package.json"),

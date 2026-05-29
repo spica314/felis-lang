@@ -36,7 +36,14 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
             }
 
             let workspace = expect_object(path, workspace, "`workspace`")?;
-            let members = required_string_array_field(path, workspace, "members")?
+            let member_paths = required_string_array_field(path, workspace, "members")?;
+            if member_paths.is_empty() {
+                return Err(
+                    Error::new("`workspace.members` must contain at least one path")
+                        .with_path(path.to_path_buf()),
+                );
+            }
+            let members = member_paths
                 .into_iter()
                 .map(|member| parse_manifest_path(path, &member, "workspace member"))
                 .collect::<Result<Vec<_>>>()?;

@@ -83,6 +83,18 @@ fn rejects_empty_workspace_member_paths() {
 }
 
 #[test]
+fn rejects_empty_workspace_members_lists() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/empty-members-list");
+    let error = parse_root(&root).expect_err("workspace should reject empty members list");
+    assert!(
+        error
+            .to_string()
+            .contains("`workspace.members` must contain at least one path"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn rejects_entrypoint_paths_that_escape_package_roots() {
     let root = repo_root().join("tests/testcases/manifest-invalid/parent-entrypoint-path");
     let error = parse_root(&root).expect_err("package should reject escaping entrypoint paths");
