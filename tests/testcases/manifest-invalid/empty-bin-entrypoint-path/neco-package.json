@@ -1,0 +1,4 @@
+{
+  "name": "empty-bin-entrypoint-path",
+  "felis-bin-entrypoints": [""]
+}

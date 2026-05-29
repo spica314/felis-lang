@@ -71,6 +71,18 @@ fn rejects_parent_workspace_member_paths() {
 }
 
 #[test]
+fn rejects_empty_workspace_member_paths() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/empty-member-path");
+    let error = parse_root(&root).expect_err("workspace should reject empty member paths");
+    assert!(
+        error
+            .to_string()
+            .contains("workspace member path must not be empty"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn rejects_entrypoint_paths_that_escape_package_roots() {
     let root = repo_root().join("tests/testcases/manifest-invalid/parent-entrypoint-path");
     let error = parse_root(&root).expect_err("package should reject escaping entrypoint paths");
@@ -78,6 +90,18 @@ fn rejects_entrypoint_paths_that_escape_package_roots() {
         error
             .to_string()
             .contains("binary entrypoint path `../main.fe` must stay within the manifest root"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn rejects_empty_binary_entrypoint_paths() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/empty-bin-entrypoint-path");
+    let error = parse_root(&root).expect_err("package should reject empty binary entrypoint paths");
+    assert!(
+        error
+            .to_string()
+            .contains("binary entrypoint path must not be empty"),
         "unexpected error: {error}"
     );
 }

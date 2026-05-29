@@ -206,6 +206,11 @@ fn expect_string_array(value: &JsonValue, context: &str) -> Result<Vec<String>> 
 }
 
 fn parse_manifest_path(path: &Path, raw_path: &str, context: &str) -> Result<PathBuf> {
+    if raw_path.is_empty() {
+        return Err(
+            Error::new(format!("{context} path must not be empty")).with_path(path.to_path_buf())
+        );
+    }
     let parsed = PathBuf::from(raw_path);
     let escapes_root = parsed.components().any(|component| {
         matches!(

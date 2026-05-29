@@ -115,3 +115,67 @@ fn parses_workspace_manifest_without_serde() {
         vec![PathBuf::from("app"), PathBuf::from("lib")]
     );
 }
+
+#[test]
+fn rejects_empty_workspace_member_path() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "workspace": {
+                    "members": [""]
+                }
+            }"#,
+    ) {
+        Ok(_) => panic!("workspace member path should not be empty"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("workspace member path must not be empty"),
+        "unexpected error: {error:?}"
+    );
+}
+
+#[test]
+fn rejects_empty_library_entrypoint_path() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "name": "lib",
+                "felis-lib-entrypoint": ""
+            }"#,
+    ) {
+        Ok(_) => panic!("library entrypoint path should not be empty"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("library entrypoint path must not be empty"),
+        "unexpected error: {error:?}"
+    );
+}
+
+#[test]
+fn rejects_empty_binary_entrypoint_path() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "name": "bin",
+                "felis-bin-entrypoints": [""]
+            }"#,
+    ) {
+        Ok(_) => panic!("binary entrypoint path should not be empty"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("binary entrypoint path must not be empty"),
+        "unexpected error: {error:?}"
+    );
+}
