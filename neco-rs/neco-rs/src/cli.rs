@@ -186,12 +186,33 @@ impl CliOptions {
         let mut args = args.into_iter();
         let _program = args.next();
 
+        let Some(subcommand) = args.next() else {
+            return Err(Error::Usage(
+                "usage: neco-rs build <package-root> [-o <output-elf>]".to_string(),
+            ));
+        };
+        match subcommand.as_str() {
+            "build" => {}
+            "--help" | "-h" => {
+                return Err(Error::Usage(
+                    "usage: neco-rs build <package-root> [-o <output-elf>]".to_string(),
+                ));
+            }
+            _ if subcommand.starts_with('-') => {
+                return Err(Error::Usage(format!("unknown option `{subcommand}`")));
+            }
+            _ => {
+                return Err(Error::Usage(format!(
+                    "expected `build` subcommand, found `{subcommand}`"
+                )));
+            }
+        }
+
         let mut input = None;
         let mut output = None;
 
         while let Some(arg) = args.next() {
             match arg.as_str() {
-                "build" => {}
                 "-o" | "--output" => {
                     let Some(path) = args.next() else {
                         return Err(Error::Usage("missing value for --output".to_string()));
@@ -232,4 +253,54 @@ pub(crate) fn default_output_path(package: &ParsedPackage) -> PathBuf {
         .unwrap_or_else(|| std::ffi::OsStr::new("a.out"));
 
     package.root_dir.join(".neco").join(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CliOptions;
+
+    fn parse(args: &[&str]) -> String {
+        CliOptions::parse(args.iter().map(|arg| arg.to_string()))
+            .map(|options| {
+                format!(
+                    "input={},output={}",
+                    options.input.display(),
+                    options
+                        .output
+                        .as_ref()
+                        .map(|path| path.display().to_string())
+                        .unwrap_or_default()
+                )
+            })
+            .unwrap_or_else(|error| error.to_string())
+    }
+
+    #[test]
+    fn parses_build_subcommand() {
+        assert_eq!(parse(&["neco-rs", "build", "pkg"]), "input=pkg,output=");
+        assert_eq!(
+            parse(&["neco-rs", "build", "pkg", "-o", "out"]),
+            "input=pkg,output=out"
+        );
+    }
+
+    #[test]
+    fn allows_build_as_package_root_name() {
+        assert_eq!(parse(&["neco-rs", "build", "build"]), "input=build,output=");
+    }
+
+    #[test]
+    fn rejects_missing_or_misplaced_build_subcommand() {
+        assert!(parse(&["neco-rs"]).contains("usage: neco-rs build <package-root>"));
+        assert!(parse(&["neco-rs", "pkg"]).contains("expected `build` subcommand"));
+        assert!(parse(&["neco-rs", "pkg", "build"]).contains("expected `build` subcommand"));
+    }
+
+    #[test]
+    fn rejects_extra_build_token_after_package_root() {
+        assert!(
+            parse(&["neco-rs", "build", "pkg", "build"])
+                .contains("expected a single package root path")
+        );
+    }
 }
