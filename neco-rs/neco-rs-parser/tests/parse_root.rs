@@ -57,6 +57,42 @@ fn rejects_duplicate_dependency_entries() {
 }
 
 #[test]
+fn rejects_unknown_manifest_fields() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/unknown-package-field");
+    let error = parse_root(&root).expect_err("package should reject unknown manifest fields");
+    assert!(
+        error
+            .to_string()
+            .contains("manifest contains unknown field `felis-bin-entrypoint`"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn rejects_unknown_workspace_fields() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/unknown-workspace-field");
+    let error = parse_root(&root).expect_err("workspace should reject unknown fields");
+    assert!(
+        error
+            .to_string()
+            .contains("`workspace` contains unknown field `member`"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn rejects_unknown_dependency_fields() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/unknown-dependency-field");
+    let error = parse_root(&root).expect_err("package should reject unknown dependency fields");
+    assert!(
+        error
+            .to_string()
+            .contains("dependency entry contains unknown field `workspacce`"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn rejects_absolute_workspace_member_paths() {
     let root = repo_root().join("tests/testcases/manifest-invalid/absolute-member-path");
     let error = parse_root(&root).expect_err("workspace should reject absolute member paths");

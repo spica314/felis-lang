@@ -15,6 +15,20 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
     let (_, value) =
         neco_rs_json::parse(raw).map_err(|error| convert_json_error(path, raw, error))?;
     let object = expect_object(path, &value, "manifest")?;
+    reject_unknown_fields(
+        path,
+        object,
+        &[
+            "workspace",
+            "name",
+            "dependencies",
+            "felis-lib-entrypoint",
+            "felis-bin-entrypoints",
+            "native-link-mode",
+            "native-libraries",
+        ],
+        "manifest",
+    )?;
 
     let workspace = optional_field(object, "workspace")?;
     let name = optional_string_field(object, "name")?;
@@ -39,6 +53,7 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
             }
 
             let workspace = expect_object(path, workspace, "`workspace`")?;
+            reject_unknown_fields(path, workspace, &["members"], "`workspace`")?;
             let member_paths = required_string_array_field(path, workspace, "members")?;
             if member_paths.is_empty() {
                 return Err(
@@ -119,6 +134,7 @@ fn parse_dependencies(path: &Path, value: Option<&JsonValue>) -> Result<Vec<Depe
                     .with_path(path.to_path_buf()));
             }
             let dependency = expect_object(path, &entry.value, "dependency entry")?;
+            reject_unknown_fields(path, dependency, &["workspace"], "dependency entry")?;
             match optional_bool_field(dependency, "workspace")? {
                 Some(true) => {}
                 Some(false) => {
@@ -138,6 +154,23 @@ fn parse_dependencies(path: &Path, value: Option<&JsonValue>) -> Result<Vec<Depe
             })
         })
         .collect()
+}
+
+fn reject_unknown_fields(
+    path: &Path,
+    entries: &[JsonEntry],
+    allowed: &[&str],
+    context: &str,
+) -> Result<()> {
+    for entry in entries {
+        if !allowed.contains(&entry.key.as_str()) {
+            return Err(
+                Error::new(format!("{context} contains unknown field `{}`", entry.key))
+                    .with_path(path.to_path_buf()),
+            );
+        }
+    }
+    Ok(())
 }
 
 fn optional_field<'a>(entries: &'a [JsonEntry], key: &str) -> Result<Option<&'a JsonValue>> {

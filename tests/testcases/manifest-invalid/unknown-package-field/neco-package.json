@@ -1,0 +1,4 @@
+{
+  "name": "unknown-package-field",
+  "felis-bin-entrypoint": "src/main.fe"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "unknown-dependency-field",
+  "dependencies": {
+    "std": { "workspacce": true }
+  }
+}

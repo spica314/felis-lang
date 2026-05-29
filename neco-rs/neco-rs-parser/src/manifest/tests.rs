@@ -99,6 +99,73 @@ fn rejects_duplicate_dependency_entries() {
 }
 
 #[test]
+fn rejects_unknown_package_fields() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "name": "hello-world",
+                "felis-bin-entrypoint": "src/main.fe"
+            }"#,
+    ) {
+        Ok(_) => panic!("manifest should reject unknown package fields"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("manifest contains unknown field `felis-bin-entrypoint`"),
+        "unexpected error: {error:?}"
+    );
+}
+
+#[test]
+fn rejects_unknown_workspace_fields() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "workspace": {
+                    "members": ["app"],
+                    "member": ["lib"]
+                }
+            }"#,
+    ) {
+        Ok(_) => panic!("manifest should reject unknown workspace fields"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("`workspace` contains unknown field `member`"),
+        "unexpected error: {error:?}"
+    );
+}
+
+#[test]
+fn rejects_unknown_dependency_fields() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "name": "hello-world",
+                "dependencies": {
+                    "std": { "workspacce": true }
+                }
+            }"#,
+    ) {
+        Ok(_) => panic!("manifest should reject unknown dependency fields"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("dependency entry contains unknown field `workspacce`"),
+        "unexpected error: {error:?}"
+    );
+}
+
+#[test]
 fn reports_multiline_json_error_positions() {
     let error = match parse_manifest(
         Path::new("neco-package.json"),
