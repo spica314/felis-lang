@@ -68,19 +68,30 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
 
             Ok(Manifest::Workspace(WorkspaceManifest { members }))
         }
-        (None, Some(name)) => Ok(Manifest::Package(PackageManifest {
-            name,
-            dependencies: parse_dependencies(path, dependencies)?,
-            felis_lib_entrypoint: felis_lib_entrypoint
-                .map(|entrypoint| parse_manifest_path(path, &entrypoint, "library entrypoint"))
-                .transpose()?,
-            felis_bin_entrypoints: felis_bin_entrypoints
-                .into_iter()
-                .map(|entrypoint| parse_manifest_path(path, &entrypoint, "binary entrypoint"))
-                .collect::<Result<Vec<_>>>()?,
-            native_link_mode: parse_native_link_mode(path, native_link_mode)?,
-            native_libraries: parse_native_libraries(path, native_libraries)?,
-        })),
+        (None, Some(name)) => {
+            let native_link_mode = parse_native_link_mode(path, native_link_mode)?;
+            let native_libraries = parse_native_libraries(path, native_libraries)?;
+            if !native_libraries.is_empty() && native_link_mode != NativeLinkMode::LibcStart {
+                return Err(Error::new(
+                    "`native-libraries` requires `native-link-mode` to be `libc-start`",
+                )
+                .with_path(path.to_path_buf()));
+            }
+
+            Ok(Manifest::Package(PackageManifest {
+                name,
+                dependencies: parse_dependencies(path, dependencies)?,
+                felis_lib_entrypoint: felis_lib_entrypoint
+                    .map(|entrypoint| parse_manifest_path(path, &entrypoint, "library entrypoint"))
+                    .transpose()?,
+                felis_bin_entrypoints: felis_bin_entrypoints
+                    .into_iter()
+                    .map(|entrypoint| parse_manifest_path(path, &entrypoint, "binary entrypoint"))
+                    .collect::<Result<Vec<_>>>()?,
+                native_link_mode,
+                native_libraries,
+            }))
+        }
         (Some(_), Some(_)) => Err(
             Error::new("manifest cannot be both a workspace and a package")
                 .with_path(path.to_path_buf()),

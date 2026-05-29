@@ -54,6 +54,28 @@ fn parses_native_link_fields() {
 }
 
 #[test]
+fn rejects_native_libraries_without_libc_start() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "name": "hello-world",
+                "felis-bin-entrypoints": ["src/main.fe"],
+                "native-libraries": ["m"]
+            }"#,
+    ) {
+        Ok(_) => panic!("manifest should reject native libraries without libc-start"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("`native-libraries` requires `native-link-mode` to be `libc-start`"),
+        "unexpected error: {error:?}"
+    );
+}
+
+#[test]
 fn rejects_non_workspace_dependency_entries() {
     let error = match parse_manifest(
         Path::new("neco-package.json"),

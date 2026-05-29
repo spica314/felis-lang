@@ -1,0 +1,5 @@
+{
+  "name": "native-libraries-kernel-start",
+  "felis-bin-entrypoints": ["src/main.fe"],
+  "native-libraries": ["m"]
+}

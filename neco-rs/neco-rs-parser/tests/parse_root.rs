@@ -93,6 +93,18 @@ fn rejects_unknown_dependency_fields() {
 }
 
 #[test]
+fn rejects_native_libraries_without_libc_start() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/native-libraries-kernel-start");
+    let error = parse_root(&root).expect_err("package should reject ignored native libraries");
+    assert!(
+        error
+            .to_string()
+            .contains("`native-libraries` requires `native-link-mode` to be `libc-start`"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn rejects_absolute_workspace_member_paths() {
     let root = repo_root().join("tests/testcases/manifest-invalid/absolute-member-path");
     let error = parse_root(&root).expect_err("workspace should reject absolute member paths");
