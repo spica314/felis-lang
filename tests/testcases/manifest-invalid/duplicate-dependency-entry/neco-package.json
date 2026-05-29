@@ -1,0 +1,7 @@
+{
+  "name": "duplicate-dependency-entry",
+  "dependencies": {
+    "std": { "workspace": true },
+    "std": { "workspace": true }
+  }
+}

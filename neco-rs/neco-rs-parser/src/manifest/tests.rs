@@ -77,6 +77,28 @@ fn rejects_non_workspace_dependency_entries() {
 }
 
 #[test]
+fn rejects_duplicate_dependency_entries() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "name": "hello-world",
+                "dependencies": {
+                    "std": { "workspace": true },
+                    "std": { "workspace": true }
+                }
+            }"#,
+    ) {
+        Ok(_) => panic!("manifest should reject duplicate dependency entries"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error.to_string().contains("duplicate dependency `std`"),
+        "unexpected error: {error:?}"
+    );
+}
+
+#[test]
 fn reports_multiline_json_error_positions() {
     let error = match parse_manifest(
         Path::new("neco-package.json"),

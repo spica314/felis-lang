@@ -47,6 +47,16 @@ fn rejects_duplicate_workspace_package_names() {
 }
 
 #[test]
+fn rejects_duplicate_dependency_entries() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/duplicate-dependency-entry");
+    let error = parse_root(&root).expect_err("package should reject duplicate dependencies");
+    assert!(
+        error.to_string().contains("duplicate dependency `std`"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn rejects_absolute_workspace_member_paths() {
     let root = repo_root().join("tests/testcases/manifest-invalid/absolute-member-path");
     let error = parse_root(&root).expect_err("workspace should reject absolute member paths");

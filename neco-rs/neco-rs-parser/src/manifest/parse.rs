@@ -1,4 +1,7 @@
-use std::path::{Component, Path, PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Component, Path, PathBuf},
+};
 
 use neco_rs_json::{JsonEntry, JsonValue};
 
@@ -107,9 +110,14 @@ fn parse_dependencies(path: &Path, value: Option<&JsonValue>) -> Result<Vec<Depe
         return Ok(Vec::new());
     };
     let object = expect_object(path, value, "`dependencies`")?;
+    let mut names = HashSet::new();
     object
         .iter()
         .map(|entry| {
+            if !names.insert(entry.key.clone()) {
+                return Err(Error::new(format!("duplicate dependency `{}`", entry.key))
+                    .with_path(path.to_path_buf()));
+            }
             let dependency = expect_object(path, &entry.value, "dependency entry")?;
             match optional_bool_field(dependency, "workspace")? {
                 Some(true) => {}
