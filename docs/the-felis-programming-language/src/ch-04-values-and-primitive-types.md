@@ -19,9 +19,11 @@ Hex literals use the same suffix style.
 #let len : i32 = 0x2i32;
 ```
 
-Negative `i64` literals are supported.
+Negative signed integer literals are supported for `i32` and `i64`, including
+signed hexadecimal literals.
 
 ```felis
+#let min_i32 : i32 = -0x80000000i32;
 #let minus_one : i64 = -1i64;
 ```
 
@@ -45,9 +47,11 @@ Arithmetic operations are standard library functions.
 
 ## Floating-Point Numbers
 
-`f32` values use decimal literals with the `f32` suffix.
+`f32` values use the `f32` suffix. They may be written with or without a
+fractional part.
 
 ```felis
+#let one : f32 = 1f32;
 #let a : f32 = 3.5f32;
 #let b : f32 = 7.5f32;
 ```
@@ -134,10 +138,13 @@ For structs and algebraic data types, define equality by comparing the relevant 
 
 ## Characters and String Literals
 
-Character literals can be used as `u8` values.
+Character literals can be used as `u8` values. They are byte-oriented: an
+unescaped character must be ASCII. The supported escapes are `\'`, `\"`, `\\`,
+`\0`, `\n`, `\r`, and `\t`.
 
 ```felis
 #let c : u8 = 'f';
+#let newline : u8 = '\n';
 ```
 
 String literals are used as `& ArrayVL u8`.
