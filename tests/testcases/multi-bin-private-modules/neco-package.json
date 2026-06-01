@@ -1,0 +1,7 @@
+{
+    "name": "multi-bin-private-modules",
+    "felis-bin-entrypoints": [
+        "src/server.fe",
+        "src/tool.fe"
+    ]
+}

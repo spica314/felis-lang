@@ -1,0 +1,11 @@
+#use std_core::io::IO;
+
+#mod private;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let code : i32 = helper 7i32;
+    #let _ : () <- IO::exit code;
+    ()
+}

@@ -3,7 +3,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use neco_rs_parser::{ParsedPackage, ParsedRoot, ParsedWorkspace};
+use neco_rs_parser::{Item, ParsedPackage, ParsedRoot, ParsedSourceFile, ParsedWorkspace};
 
 use crate::{Error, Result};
 
@@ -90,13 +90,12 @@ pub(crate) fn select_binary_from_package(
                 ));
             };
             let selected_path = package.root_dir.join(&selected);
+            let reachable_paths =
+                reachable_binary_source_paths(&package.source_files, &selected_path);
             let source_files = package
                 .source_files
                 .into_iter()
-                .filter(|file| {
-                    file.role != neco_rs_parser::SourceFileRole::BinaryEntrypoint
-                        || file.path == selected_path
-                })
+                .filter(|file| reachable_paths.contains(&file.path))
                 .collect();
             let mut manifest = package.manifest;
             manifest.felis_bin_entrypoints = vec![selected];
@@ -109,6 +108,54 @@ pub(crate) fn select_binary_from_package(
             })
         }
     }
+}
+
+fn reachable_binary_source_paths(
+    source_files: &[ParsedSourceFile],
+    selected_binary_path: &Path,
+) -> std::collections::HashSet<PathBuf> {
+    let mut reachable = std::collections::HashSet::new();
+    for file in source_files {
+        if file.role == neco_rs_parser::SourceFileRole::LibraryEntrypoint
+            || file.path == selected_binary_path
+        {
+            collect_reachable_source_paths(source_files, &file.path, &mut reachable);
+        }
+    }
+    reachable
+}
+
+fn collect_reachable_source_paths(
+    source_files: &[ParsedSourceFile],
+    path: &Path,
+    reachable: &mut std::collections::HashSet<PathBuf>,
+) {
+    if !reachable.insert(path.to_path_buf()) {
+        return;
+    }
+    let Some(file) = source_files.iter().find(|file| file.path == path) else {
+        return;
+    };
+    for module_name in file.syntax.items.iter().filter_map(|item| match item {
+        Item::Mod(decl) => Some(decl.name.as_str()),
+        _ => None,
+    }) {
+        let child_path = module_source_path(path, module_name);
+        collect_reachable_source_paths(source_files, &child_path, reachable);
+    }
+}
+
+fn module_source_path(current_file: &Path, module_name: &str) -> PathBuf {
+    let parent = current_file.parent().unwrap_or_else(|| Path::new("."));
+    let stem = current_file
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("");
+    let module_dir = match stem {
+        "lib" | "main" => parent.to_path_buf(),
+        _ => parent.join(stem),
+    };
+    module_dir.join(format!("{module_name}.fe"))
 }
 
 fn select_default_binary_from_package(package: ParsedPackage) -> Result<ParsedPackage> {

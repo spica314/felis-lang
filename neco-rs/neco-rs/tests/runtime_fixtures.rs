@@ -64,6 +64,17 @@ fn libc_start_fixture_uses_crt_start_as_elf_entry() {
 }
 
 #[test]
+fn selected_binary_ignores_unselected_private_modules() {
+    let root = repo_root().join("tests/testcases/multi-bin-private-modules");
+
+    let server = run_fixture_status(&root, "server");
+    assert_eq!(server.code(), Some(42));
+
+    let tool = run_fixture_status(&root, "tool");
+    assert_eq!(tool.code(), Some(7));
+}
+
+#[test]
 #[ignore = "requires a CUDA driver installation with libcuda.so available to the native linker"]
 fn compiles_and_runs_cuda_cu_init_fixture() {
     if std::env::var_os("NECO_RS_TEST_CUDA").is_none() {
