@@ -16,6 +16,8 @@ Import them through `std_core` modules instead of relying on implicit names.
 | `false` | `bool` | Boolean false value. |
 | `Array` | `(t : Type[0]) -> (len : i32) -> Type[0]` | Fixed-size array type constructor; the length must be a constant `i32` literal. |
 | `ArrayVL` | `(t : Type[0]) -> Type[0]` | Runtime-sized array value type constructor. |
+| `ArrayVLPTX` | `(t : Type[0]) -> Type[0]` | PTX device-side runtime-sized array value type constructor. |
+| `PTX` | effect | Effect marker used by functions that compile to PTX kernels. |
 | `IO` | effect | Effect marker used by functions that perform builtin IO operations. |
 | `FileDescriptor` | `Type[0]` | File descriptor value type returned by IO descriptor operations. |
 | `PathBuf` | `Type[0]` | Mutable NUL-terminated file path buffer. |
@@ -29,6 +31,9 @@ Import them through `std_core` modules instead of relying on implicit names.
 | `i32_mul` | `(lhs : i32) -> (rhs : i32) -> i32`; returns `lhs * rhs`. |
 | `i32_div` | `(lhs : i32) -> (rhs : i32) -> i32`; returns integer division of `lhs` by `rhs`. |
 | `i32_mod` | `(lhs : i32) -> (rhs : i32) -> i32`; returns the remainder of `lhs / rhs`. |
+| `i32_xor` | `(lhs : i32) -> (rhs : i32) -> i32`; returns bitwise exclusive-or. |
+| `i32_shl` | `(lhs : i32) -> (rhs : i32) -> i32`; shifts `lhs` left by `rhs` bits. |
+| `i32_shr` | `(lhs : i32) -> (rhs : i32) -> i32`; shifts `lhs` right by `rhs` bits. |
 | `i32_eq` | `(lhs : i32) -> (rhs : i32) -> bool`; returns whether the two values are equal. |
 | `i32_lte` | `(lhs : i32) -> (rhs : i32) -> bool`; returns whether `lhs <= rhs`. |
 | `i32_lt` | `(lhs : i32) -> (rhs : i32) -> bool`; returns whether `lhs < rhs`. |
@@ -64,6 +69,7 @@ Import them through `std_core` modules instead of relying on implicit names.
 | `f32_sub` | `(lhs : f32) -> (rhs : f32) -> f32`; returns `lhs - rhs`. |
 | `f32_mul` | `(lhs : f32) -> (rhs : f32) -> f32`; returns `lhs * rhs`. |
 | `f32_div` | `(lhs : f32) -> (rhs : f32) -> f32`; returns `lhs / rhs`. |
+| `f32_sqrt` | `(value : f32) -> f32`; returns the square root of `value`. |
 | `f32_eq` | `(lhs : f32) -> (rhs : f32) -> bool`; returns whether the two values are equal. |
 | `f32_lte` | `(lhs : f32) -> (rhs : f32) -> bool`; returns whether `lhs <= rhs`. |
 | `f32_lt` | `(lhs : f32) -> (rhs : f32) -> bool`; returns whether `lhs < rhs`. |
@@ -109,6 +115,22 @@ These operations require a function annotated with `#with IO`.
 | `array_set` | `(array : &^ Array t n or &^ ArrayVL t) -> (index : i32 or i64) -> (value : t) -> () #with IO`; writes one element. |
 | `array_len` | `(array : ArrayVL t) -> i32 #with IO`; returns the runtime length of an `ArrayVL t`. |
 
+## PTX Special Registers
+
+These functions require a function annotated with `#with PTX`.
+
+| Symbol | Description |
+| --- | --- |
+| `ctaid_x` | `() -> i32 #with PTX`; returns the CTA/block index in the x dimension. |
+| `ctaid_y` | `() -> i32 #with PTX`; returns the CTA/block index in the y dimension. |
+| `ctaid_z` | `() -> i32 #with PTX`; returns the CTA/block index in the z dimension. |
+| `ntid_x` | `() -> i32 #with PTX`; returns the block dimension in the x dimension. |
+| `ntid_y` | `() -> i32 #with PTX`; returns the block dimension in the y dimension. |
+| `ntid_z` | `() -> i32 #with PTX`; returns the block dimension in the z dimension. |
+| `tid_x` | `() -> i32 #with PTX`; returns the thread index in the x dimension. |
+| `tid_y` | `() -> i32 #with PTX`; returns the thread index in the y dimension. |
+| `tid_z` | `() -> i32 #with PTX`; returns the thread index in the z dimension. |
+
 ## Reference Functions
 
 These operations require a function annotated with `#with IO`.
@@ -134,7 +156,16 @@ All `IO` operations must be used in a function annotated with `#with IO`.
 | `IO::array_new` | `(t : Type[0]) -> (len : i32) -> Array t len #with IO`; allocates a fixed-size array. |
 | `IO::arrayvl_new` | `(t : Type[0]) -> (len : i32) -> ArrayVL t #with IO`; allocates a runtime-sized array value. |
 | `IO::arrayvl_replace` | `(t : Type[0]) -> (dest : ArrayVL t) -> (source : ArrayVL t) -> () #with IO`; replaces the backing storage of a dynamic array. |
+| `IO::arrayvlptx_new` | `(t : Type[0]) -> (len : i32) -> ArrayVLPTX t #with IO`; allocates a device-side runtime-sized array value. |
+| `IO::arrayvl_to_ptx` | `(t : Type[0]) -> (host : ArrayVL t) -> (device : ArrayVLPTX t) -> () #with IO`; copies a host dynamic array to device storage. |
+| `IO::arrayvl_from_ptx` | `(t : Type[0]) -> (device : ArrayVLPTX t) -> (host : ArrayVL t) -> () #with IO`; copies a device dynamic array to host storage. |
 | `IO::pathbuf_new` | `(capacity : i32) -> PathBuf #with IO`; allocates an empty NUL-terminated path buffer. |
 | `IO::pathbuf_push` | `(path : &^ PathBuf) -> (source : & ArrayVL u8) -> () #with IO`; appends NUL-terminated bytes while preserving the trailing NUL. |
 | `IO::pathbuf_pop` | `(path : &^ PathBuf) -> () #with IO`; removes the last path component while preserving the trailing NUL. |
 | `IO::arg` | `(index : i32) -> & ArrayVL u8 #with IO`; returns a command-line argument as a byte array reference. |
+| `IO::cu_init` | `(flags : i32) -> i32 #with IO`; initializes the CUDA driver. |
+| `IO::cu_device_get` | `(ordinal : i32) -> i32 #with IO`; returns a CUDA device handle. |
+| `IO::cu_ctx_create_v2` | `(flags : i32) -> (device : i32) -> i32 #with IO`; creates a CUDA context. |
+| `IO::cu_module_load_data` | `(ptx : & ArrayVL u8) -> i64 #with IO`; loads a CUDA module from PTX bytes. |
+| `IO::cu_module_get_function` | `(module : i64) -> (name : & ArrayVL u8) -> i64 #with IO`; resolves a CUDA kernel function. |
+| `IO::cu_launch_kernel` | CUDA kernel launch operation using a function handle, grid/block dimensions, and kernel arguments. |

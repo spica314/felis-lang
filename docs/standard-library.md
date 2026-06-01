@@ -24,6 +24,7 @@ currently re-exports:
 
 - `Array`
 - `ArrayVL`
+- `ArrayVLPTX`
 - `array_get`
 - `array_set`
 - `array_len`
@@ -57,6 +58,7 @@ currently re-exports:
 - `f32_sub`
 - `f32_mul`
 - `f32_div`
+- `f32_sqrt`
 - `f32_eq`
 - `f32_lte`
 - `f32_lt`
@@ -75,6 +77,9 @@ currently re-exports:
 - `i32_mul`
 - `i32_div`
 - `i32_mod`
+- `i32_xor`
+- `i32_shl`
+- `i32_shr`
 - `i32_eq`
 - `i32_lte`
 - `i32_lt`
@@ -139,6 +144,22 @@ The `hello-world` testcase shows this binding being imported as
 `std_core::io::IO` and used in a function declaration with `#with IO`. In this
 context, `#with` attaches an Algebraic Effects `Effect` to the function
 declaration.
+
+## PTX Module
+
+[`std/std_core/src/ptx.fe`](../std/std_core/src/ptx.fe) exposes the PTX effect
+and special-register helpers used by GPU fixtures:
+
+- `PTX`
+- `ctaid_x`
+- `ctaid_y`
+- `ctaid_z`
+- `ntid_x`
+- `ntid_y`
+- `ntid_z`
+- `tid_x`
+- `tid_y`
+- `tid_z`
 
 ## Path Module
 
