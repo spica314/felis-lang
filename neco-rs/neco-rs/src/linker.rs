@@ -11,14 +11,24 @@ pub(crate) fn link_linux_x86_64_libc_start_executable(
     libraries: &[String],
     output: &Path,
 ) -> Result<()> {
-    let work_dir = link_work_dir(output)?;
-    fs::create_dir_all(&work_dir).map_err(|source| Error::Io {
-        path: Some(work_dir.clone()),
+    let cc = std::env::var_os("CC").unwrap_or_else(|| "cc".into());
+    link_linux_x86_64_libc_start_executable_with_cc(image, libraries, output, cc)
+}
+
+fn link_linux_x86_64_libc_start_executable_with_cc(
+    image: &ProgramImage,
+    libraries: &[String],
+    output: &Path,
+    cc: impl AsRef<std::ffi::OsStr>,
+) -> Result<()> {
+    let work_dir = LinkWorkDir::new(link_work_dir(output)?);
+    fs::create_dir_all(work_dir.path()).map_err(|source| Error::Io {
+        path: Some(work_dir.path().to_path_buf()),
         source,
     })?;
 
-    let assembly_path = work_dir.join("program.s");
-    let linker_script_path = work_dir.join("neco.ld");
+    let assembly_path = work_dir.path().join("program.s");
+    let linker_script_path = work_dir.path().join("neco.ld");
     fs::write(&assembly_path, program_assembly(image)).map_err(|source| Error::Io {
         path: Some(assembly_path.clone()),
         source,
@@ -28,7 +38,6 @@ pub(crate) fn link_linux_x86_64_libc_start_executable(
         source,
     })?;
 
-    let cc = std::env::var_os("CC").unwrap_or_else(|| "cc".into());
     let mut command = Command::new(cc);
     command
         .arg("-no-pie")
@@ -50,10 +59,27 @@ pub(crate) fn link_linux_x86_64_libc_start_executable(
         });
     }
 
-    let _ = fs::remove_file(&assembly_path);
-    let _ = fs::remove_file(&linker_script_path);
-    let _ = fs::remove_dir(&work_dir);
     Ok(())
+}
+
+struct LinkWorkDir {
+    path: PathBuf,
+}
+
+impl LinkWorkDir {
+    fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for LinkWorkDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
 }
 
 fn link_work_dir(output: &Path) -> Result<PathBuf> {
@@ -133,4 +159,55 @@ fn linker_script() -> &'static str {
   .bss : { *(.bss.neco) *(.bss .bss.* COMMON) }
 } INSERT AFTER .interp;
 "#
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::*;
+
+    #[test]
+    fn removes_link_work_dir_when_linker_fails() {
+        let root = unique_temp_dir("neco-linker-failure");
+        fs::create_dir_all(&root).expect("create temp root");
+
+        let image = ProgramImage {
+            code: vec![0xc3],
+            data: Vec::new(),
+            requires_argv: false,
+            external_calls: Vec::new(),
+        };
+        let output = root.join("program");
+
+        let err = link_linux_x86_64_libc_start_executable_with_cc(&image, &[], &output, "false")
+            .expect_err("link should fail");
+
+        assert!(matches!(err, Error::Link { .. }));
+        assert_eq!(link_work_dir_count(&root), 0);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    fn unique_temp_dir(name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!("{name}-{unique}"))
+    }
+
+    fn link_work_dir_count(root: &Path) -> usize {
+        fs::read_dir(root)
+            .expect("read temp root")
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|name| name.starts_with(".neco-link-"))
+            })
+            .count()
+    }
 }
