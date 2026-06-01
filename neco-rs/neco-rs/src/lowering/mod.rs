@@ -1791,7 +1791,9 @@ fn resolve_workspace_dependency_packages(package: &ParsedPackage) -> Result<Vec<
     }
 
     let Some(workspace) = find_workspace_for_package(package)? else {
-        return Ok(Vec::new());
+        return Err(Error::Unsupported(
+            "`workspace: true` dependencies require a containing workspace".to_string(),
+        ));
     };
 
     let mut packages = Vec::new();

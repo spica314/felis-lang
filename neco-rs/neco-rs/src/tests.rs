@@ -98,6 +98,23 @@ fn lowers_exit_fixture_to_program() {
 }
 
 #[test]
+fn rejects_workspace_dependency_without_workspace() {
+    let root = repo_root().join("tests/testcases/workspace-dependency-without-workspace");
+    let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
+        panic!("expected package root");
+    };
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject workspace dependencies without workspace");
+    assert!(
+        error
+            .to_string()
+            .contains("`workspace: true` dependencies require a containing workspace"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn rejects_reference_method_get() {
     let package = parse_inline_binary_package(
         "reference-method-get",
