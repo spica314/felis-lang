@@ -1913,6 +1913,7 @@ pub(super) fn lower_statement(
         Statement::Expression(term) => lower_expression_statement(term.as_ref(), state, program),
         Statement::If(if_stmt) => lower_if_statement(if_stmt, state, program),
         Statement::Loop(loop_stmt) => {
+            reject_control_flow_block_tail(loop_stmt.body.tail.as_deref(), "#loop")?;
             let mut loop_state = state.child_scope();
             loop_state.loop_depth += 1;
             let mut loop_program = LoweredProgram {
@@ -1976,6 +1977,7 @@ fn lower_if_statement(
     program: &mut LoweredProgram,
 ) -> Result<bool> {
     ensure_no_io_effects(if_stmt.condition.as_ref(), state)?;
+    reject_control_flow_block_tail(if_stmt.then_block.tail.as_deref(), "#if")?;
     let condition = lower_condition_expr(if_stmt.condition.as_ref(), state, program)?;
     let mut then_state = state.child_scope();
     let mut then_operations = Vec::new();
@@ -2019,6 +2021,7 @@ fn lower_if_statement(
         };
         match else_branch {
             ElseBranch::Block(else_block) => {
+                reject_control_flow_block_tail(else_block.tail.as_deref(), "#else")?;
                 let mut else_terminated = false;
                 for statement in &else_block.statements {
                     if else_terminated {
@@ -2057,6 +2060,15 @@ fn lower_if_statement(
         else_operations,
     });
     Ok(false)
+}
+
+fn reject_control_flow_block_tail(tail: Option<&Term>, block_kind: &str) -> Result<()> {
+    if tail.is_some() {
+        return Err(Error::Unsupported(format!(
+            "tail expressions in `{block_kind}` statement blocks are not supported"
+        )));
+    }
+    Ok(())
 }
 
 fn statements_after_termination_error(operations: &[Operation]) -> Error {

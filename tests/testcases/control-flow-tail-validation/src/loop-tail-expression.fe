@@ -1,0 +1,11 @@
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#entrypoint main;
+
+#fn main : () {
+    #loop {
+        i32_add 1i32 2i32
+    };
+    ()
+}

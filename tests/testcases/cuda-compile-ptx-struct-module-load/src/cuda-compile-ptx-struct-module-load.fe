@@ -48,7 +48,7 @@
     #let ptx : & ArrayVL u8 = vec3_sum_kernel_ptx;
     #let module_result : i32 <- IO::cu_module_load_data module ptx;
     #if i32_eq module_result 0i32 {
-        ()
+        ();
     } #else {
         #let _ : () <- IO::exit 2i32;
     };
@@ -57,7 +57,7 @@
     #letref #excl function : &^ i64 #borrow function;
     #let function_result : i32 <- IO::cu_module_get_function function module_value ptx;
     #if i32_eq function_result 0i32 {
-        ()
+        ();
     } #else {
         #let _ : () <- IO::exit 3i32;
     };

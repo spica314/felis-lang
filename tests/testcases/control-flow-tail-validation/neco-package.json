@@ -1,0 +1,8 @@
+{
+    "name": "control-flow-tail-validation",
+    "felis-bin-entrypoints": [
+        "src/if-tail-expression.fe",
+        "src/else-tail-expression.fe",
+        "src/loop-tail-expression.fe"
+    ]
+}

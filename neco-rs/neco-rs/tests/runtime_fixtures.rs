@@ -637,6 +637,27 @@ fn rejects_statement_after_continue_fixture() {
 }
 
 #[test]
+fn rejects_if_tail_expression_fixture() {
+    let root = repo_root().join("tests/testcases/control-flow-tail-validation");
+    let error = compile_fixture_error(&root, "if-tail-expression");
+    assert!(error.contains("tail expressions in `#if` statement blocks are not supported"));
+}
+
+#[test]
+fn rejects_else_tail_expression_fixture() {
+    let root = repo_root().join("tests/testcases/control-flow-tail-validation");
+    let error = compile_fixture_error(&root, "else-tail-expression");
+    assert!(error.contains("tail expressions in `#else` statement blocks are not supported"));
+}
+
+#[test]
+fn rejects_loop_tail_expression_fixture() {
+    let root = repo_root().join("tests/testcases/control-flow-tail-validation");
+    let error = compile_fixture_error(&root, "loop-tail-expression");
+    assert!(error.contains("tail expressions in `#loop` statement blocks are not supported"));
+}
+
+#[test]
 fn rejects_statement_after_exit_in_if_fixture() {
     let root = repo_root().join("tests/testcases/exit-control-validation");
     let error = compile_fixture_error(&root, "statement-after-exit-in-if");
