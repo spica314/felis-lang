@@ -1718,10 +1718,20 @@ fn resolve_zero_arg_imported_pure_function(
         package
     } else {
         let package_name = &path.segments[0].lexeme;
-        available_packages
+        match available_packages
             .iter()
             .find(|candidate| candidate.manifest.name == *package_name)
-            .unwrap_or(package)
+        {
+            Some(package) => package,
+            None => {
+                if package_has_zero_arg_pure_function(package, &last_segment.lexeme)? {
+                    return Err(Error::Unsupported(format!(
+                        "unknown package-qualified use `{package_name}`"
+                    )));
+                }
+                return Ok(None);
+            }
+        }
     };
 
     for item in target_package
@@ -1747,6 +1757,23 @@ fn resolve_zero_arg_imported_pure_function(
     }
 
     Ok(None)
+}
+
+fn package_has_zero_arg_pure_function(package: &ParsedPackage, name: &str) -> Result<bool> {
+    for item in package
+        .source_files
+        .iter()
+        .flat_map(|file| file.syntax.items.iter())
+    {
+        let Item::Function(function) = item else {
+            continue;
+        };
+        if function.effect.is_some() || function.name.name != name {
+            continue;
+        }
+        return Ok(pure_function_from_decl(function)?.parameters.is_empty());
+    }
+    Ok(false)
 }
 
 fn collect_callable_packages(package: &ParsedPackage) -> Result<Vec<ParsedPackage>> {

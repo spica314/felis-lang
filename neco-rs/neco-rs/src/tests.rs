@@ -60,9 +60,10 @@ fn operations_contain_static_data_get(operations: &[Operation]) -> bool {
 fn parse_inline_binary_package(name: &str, source: &str) -> ParsedPackage {
     let source_path = PathBuf::from("src/main.fe");
     let (tokens, syntax) = neco_rs_parser::parse_source(source).expect("parse source");
+    let root_dir = repo_root().join("tests/testcases").join(name);
     ParsedPackage {
-        root_dir: PathBuf::from("."),
-        manifest_path: PathBuf::from("neco-package.json"),
+        manifest_path: root_dir.join("neco-package.json"),
+        root_dir,
         manifest: neco_rs_parser::PackageManifest {
             name: name.to_string(),
             dependencies: Vec::new(),
@@ -116,6 +117,34 @@ fn rejects_reference_method_get() {
 
     let error = lower_package_to_program(&package).expect_err("lowering must reject `.> get`");
     assert!(error.to_string().contains("unsupported pure expression"));
+}
+
+#[test]
+fn rejects_unknown_package_qualified_use() {
+    let package = parse_inline_binary_package(
+        "unknown-package-qualified-use",
+        r#"
+#use missing-package::default_value;
+#entrypoint main;
+
+#fn default_value : i32 {
+    42i32
+}
+
+#fn main : () {
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject unknown package use");
+    assert!(
+        error
+            .to_string()
+            .contains("unknown package-qualified use `missing-package`"),
+        "unexpected error: {error}"
+    );
 }
 
 #[test]
