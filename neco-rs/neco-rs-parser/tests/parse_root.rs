@@ -57,6 +57,18 @@ fn rejects_duplicate_dependency_entries() {
 }
 
 #[test]
+fn rejects_duplicate_binary_entrypoint_paths() {
+    let root = repo_root().join("tests/testcases/manifest-invalid/duplicate-bin-entrypoint-path");
+    let error = parse_root(&root).expect_err("package should reject duplicate binary entrypoints");
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate binary entrypoint path `src/main.fe`"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn rejects_unknown_manifest_fields() {
     let root = repo_root().join("tests/testcases/manifest-invalid/unknown-package-field");
     let error = parse_root(&root).expect_err("package should reject unknown manifest fields");

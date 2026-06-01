@@ -1,0 +1,4 @@
+{
+    "name": "duplicate-bin-entrypoint-path",
+    "felis-bin-entrypoints": ["src/main.fe", "./src/main.fe"]
+}

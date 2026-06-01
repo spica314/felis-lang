@@ -121,6 +121,27 @@ fn rejects_duplicate_dependency_entries() {
 }
 
 #[test]
+fn rejects_duplicate_binary_entrypoint_paths() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "name": "hello-world",
+                "felis-bin-entrypoints": ["src/main.fe", "./src/main.fe"]
+            }"#,
+    ) {
+        Ok(_) => panic!("manifest should reject duplicate binary entrypoint paths"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate binary entrypoint path `src/main.fe`"),
+        "unexpected error: {error:?}"
+    );
+}
+
+#[test]
 fn rejects_unknown_package_fields() {
     let error = match parse_manifest(
         Path::new("neco-package.json"),

@@ -84,10 +84,11 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
                 felis_lib_entrypoint: felis_lib_entrypoint
                     .map(|entrypoint| parse_manifest_path(path, &entrypoint, "library entrypoint"))
                     .transpose()?,
-                felis_bin_entrypoints: felis_bin_entrypoints
-                    .into_iter()
-                    .map(|entrypoint| parse_manifest_path(path, &entrypoint, "binary entrypoint"))
-                    .collect::<Result<Vec<_>>>()?,
+                felis_bin_entrypoints: parse_manifest_paths(
+                    path,
+                    felis_bin_entrypoints,
+                    "binary entrypoint",
+                )?,
                 native_link_mode,
                 native_libraries,
             }))
@@ -283,7 +284,41 @@ fn parse_manifest_path(path: &Path, raw_path: &str, context: &str) -> Result<Pat
         ))
         .with_path(path.to_path_buf()));
     }
-    Ok(parsed)
+    let normalized = parsed
+        .components()
+        .filter_map(|component| match component {
+            Component::Normal(segment) => Some(PathBuf::from(segment)),
+            Component::CurDir => None,
+            Component::Prefix(_) | Component::RootDir | Component::ParentDir => unreachable!(),
+        })
+        .collect::<PathBuf>();
+    if normalized.as_os_str().is_empty() {
+        return Err(
+            Error::new(format!("{context} path must not be empty")).with_path(path.to_path_buf())
+        );
+    }
+    Ok(normalized)
+}
+
+fn parse_manifest_paths(
+    path: &Path,
+    raw_paths: Vec<String>,
+    context: &str,
+) -> Result<Vec<PathBuf>> {
+    let mut seen = HashSet::new();
+    raw_paths
+        .into_iter()
+        .map(|raw_path| {
+            let parsed = parse_manifest_path(path, &raw_path, context)?;
+            if !seen.insert(parsed.clone()) {
+                return Err(
+                    Error::new(format!("duplicate {context} path `{}`", parsed.display()))
+                        .with_path(path.to_path_buf()),
+                );
+            }
+            Ok(parsed)
+        })
+        .collect()
 }
 
 fn convert_json_error(path: &Path, raw: &str, error: neco_rs_json::Error) -> Error {
