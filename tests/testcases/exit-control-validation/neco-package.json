@@ -1,0 +1,8 @@
+{
+    "name": "exit-control-validation",
+    "felis-bin-entrypoints": [
+        "src/statement-after-exit-in-if.fe",
+        "src/statement-after-exit-in-else.fe",
+        "src/statement-after-exit-in-loop.fe"
+    ]
+}

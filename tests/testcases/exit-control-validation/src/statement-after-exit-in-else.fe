@@ -1,0 +1,15 @@
+#use std_core::io::IO;
+#use std_core::primitive::bool::false;
+#use std_core::primitive::i32::i32;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #if false {
+        ()
+    } #else {
+        #let _ : () <- IO::exit 1i32;
+        #let unreachable : i32 = 2i32;
+    };
+    ()
+}

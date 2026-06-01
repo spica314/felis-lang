@@ -1932,9 +1932,7 @@ pub(super) fn lower_statement(
             let mut terminated = false;
             for statement in &loop_stmt.body.statements {
                 if terminated {
-                    return Err(Error::Unsupported(
-                        "statements after loop control are not supported".to_string(),
-                    ));
+                    return Err(statements_after_termination_error(&loop_program.operations));
                 }
                 terminated = lower_statement(statement, &mut loop_state, &mut loop_program)?;
             }
@@ -1995,11 +1993,12 @@ fn lower_if_statement(
         f32_slots: program.f32_slots,
         requires_argv: program.requires_argv,
     };
+    let mut then_terminated = false;
     for statement in &if_stmt.then_block.statements {
-        let terminated = lower_statement(statement, &mut then_state, &mut then_program)?;
-        if terminated {
-            break;
+        if then_terminated {
+            return Err(statements_after_termination_error(&then_program.operations));
         }
+        then_terminated = lower_statement(statement, &mut then_state, &mut then_program)?;
     }
     then_operations.append(&mut then_program.operations);
     let mut else_operations = Vec::new();
@@ -2023,12 +2022,13 @@ fn lower_if_statement(
         };
         match else_branch {
             ElseBranch::Block(else_block) => {
+                let mut else_terminated = false;
                 for statement in &else_block.statements {
-                    let terminated =
-                        lower_statement(statement, &mut else_state, &mut else_program)?;
-                    if terminated {
-                        break;
+                    if else_terminated {
+                        return Err(statements_after_termination_error(&else_program.operations));
                     }
+                    else_terminated =
+                        lower_statement(statement, &mut else_state, &mut else_program)?;
                 }
             }
             ElseBranch::If(else_if) => {
@@ -2060,6 +2060,15 @@ fn lower_if_statement(
         else_operations,
     });
     Ok(false)
+}
+
+fn statements_after_termination_error(operations: &[Operation]) -> Error {
+    match operations.last() {
+        Some(Operation::Exit(_)) => {
+            Error::Unsupported("statements after `IO::exit` are not supported".to_string())
+        }
+        _ => Error::Unsupported("statements after loop control are not supported".to_string()),
+    }
 }
 
 fn lower_let_equals_statement(
