@@ -2,6 +2,7 @@
 #use std_core::primitive::reference::ref_set;
 #use std_core::io::IO;
 #use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_gt;
 #use std_core::primitive::i32::i32_gte;
 #use std_core::primitive::i32::i32_mul;
 #use std_core::primitive::i64::i64_from_i32;
@@ -66,7 +67,12 @@
 #fn dyn_array_grow : (t : Type[0]) -> (array_ref : &^ DynArray t) -> () #with IO {
     #let array : DynArray t = (ref_get (DynArray t) array_ref);
     #let capacity : i32 = dyn_array_capacity t array;
-    #let next_capacity : i32 = i32_mul capacity 2i32;
+    #let next_capacity_ref : i32 = 1i32;
+    #letref #excl next_capacity_ref : &^ i32 #borrow next_capacity_ref;
+    #if i32_gt capacity 0i32 {
+        ref_set i32 next_capacity_ref (i32_mul capacity 2i32);
+    };
+    #let next_capacity : i32 = ref_get i32 next_capacity_ref;
     #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
     #let next_arrayvl : ArrayVL t <- IO::arrayvl_new t next_capacity;
     #letref #excl next_arrayvl_ref : &^ ArrayVL t #borrow next_arrayvl;
