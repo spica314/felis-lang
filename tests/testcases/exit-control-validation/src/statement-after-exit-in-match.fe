@@ -1,0 +1,21 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+
+#type Flag : Type[0] {
+    yes : Flag,
+    no : Flag,
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let flag : Flag = Flag::yes;
+    #match flag {
+        Flag::yes => {
+            #let _ : () <- IO::exit 1i32;
+        },
+        Flag::no => (),
+    };
+    #let unreachable : i32 = 2i32;
+    ()
+}

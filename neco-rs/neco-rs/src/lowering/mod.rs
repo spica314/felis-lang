@@ -1910,10 +1910,7 @@ pub(super) fn lower_statement(
             )?;
             Ok(false)
         }
-        Statement::Expression(term) => {
-            lower_expression_statement(term.as_ref(), state, program)?;
-            Ok(false)
-        }
+        Statement::Expression(term) => lower_expression_statement(term.as_ref(), state, program),
         Statement::If(if_stmt) => lower_if_statement(if_stmt, state, program),
         Statement::Loop(loop_stmt) => {
             let mut loop_state = state.child_scope();
@@ -2183,27 +2180,25 @@ fn lower_expression_statement(
     term: &Term,
     state: &mut LoweringState,
     program: &mut LoweredProgram,
-) -> Result<()> {
+) -> Result<bool> {
     ensure_no_nested_io_effects(term, state)?;
     if let Term::Block(block) = term {
-        lower_effectful_block(block, state, program)?;
-        return Ok(());
+        return lower_effectful_block(block, state, program);
     }
     if matches!(term, Term::Unit) {
-        return Ok(());
+        return Ok(false);
     }
     if let Term::Match(match_expr) = term {
-        lower_match_expression_statement(match_expr, state, program)?;
-        return Ok(());
+        return lower_match_expression_statement(match_expr, state, program);
     }
     if lower_reference_set_builtin_statement(term, state, program)? {
-        return Ok(());
+        return Ok(false);
     }
     if lower_array_set_builtin_statement(term, state, program)? {
-        return Ok(());
+        return Ok(false);
     }
     if lower_function_call_statement(term, state, program)?.is_some() {
-        return Ok(());
+        return Ok(false);
     }
 
     Err(Error::Unsupported(format!(
@@ -2759,8 +2754,12 @@ fn lower_effectful_block(
     program: &mut LoweredProgram,
 ) -> Result<bool> {
     let mut scoped_state = state.child_scope();
+    let mut terminated = false;
     for statement in &block.statements {
-        let terminated = lower_statement(statement, &mut scoped_state, program)?;
+        if terminated {
+            return Err(statements_after_termination_error(&program.operations));
+        }
+        terminated = lower_statement(statement, &mut scoped_state, program)?;
         if terminated {
             state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
             state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
@@ -2770,20 +2769,20 @@ fn lower_effectful_block(
         }
     }
     if let Some(tail) = block.tail.as_deref() {
-        lower_expression_statement(tail, &mut scoped_state, program)?;
+        terminated = lower_expression_statement(tail, &mut scoped_state, program)?;
     }
     state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
     state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
     state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
     state.next_f32_slot = state.next_f32_slot.max(scoped_state.next_f32_slot);
-    Ok(false)
+    Ok(terminated)
 }
 
 fn lower_match_expression_statement(
     match_expr: &MatchExpression,
     state: &mut LoweringState,
     program: &mut LoweredProgram,
-) -> Result<()> {
+) -> Result<bool> {
     let scrutinee = lower_pure_value(match_expr.scrutinee.as_ref(), state, program)?;
     for arm in &match_expr.arms {
         if let Some(bindings) =
@@ -2791,12 +2790,13 @@ fn lower_match_expression_statement(
         {
             let mut scoped_state = state.child_scope();
             scoped_state.environment.extend(bindings);
-            lower_expression_statement(arm.result.as_ref(), &mut scoped_state, program)?;
+            let terminated =
+                lower_expression_statement(arm.result.as_ref(), &mut scoped_state, program)?;
             state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
             state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
             state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
             state.next_f32_slot = state.next_f32_slot.max(scoped_state.next_f32_slot);
-            return Ok(());
+            return Ok(terminated);
         }
     }
 

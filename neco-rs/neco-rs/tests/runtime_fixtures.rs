@@ -658,6 +658,20 @@ fn rejects_statement_after_exit_in_loop_fixture() {
 }
 
 #[test]
+fn rejects_statement_after_exit_in_block_fixture() {
+    let root = repo_root().join("tests/testcases/exit-control-validation");
+    let error = compile_fixture_error(&root, "statement-after-exit-in-block");
+    assert!(error.contains("statements after `IO::exit` are not supported"));
+}
+
+#[test]
+fn rejects_statement_after_exit_in_match_fixture() {
+    let root = repo_root().join("tests/testcases/exit-control-validation");
+    let error = compile_fixture_error(&root, "statement-after-exit-in-match");
+    assert!(error.contains("statements after `IO::exit` are not supported"));
+}
+
+#[test]
 fn rejects_unknown_applied_type_annotation_fixture() {
     let root = repo_root().join("tests/testcases/type-application-validation");
     let error = compile_fixture_error(&root, "unknown-applied-type");
