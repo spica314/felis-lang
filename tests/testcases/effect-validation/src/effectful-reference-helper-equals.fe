@@ -1,7 +1,6 @@
+#use std_core::io::IO;
 #use std_core::primitive::reference::ref_get;
 #use std_core::primitive::reference::ref_set;
-#use std_core::io::IO;
-#use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
 
 #entrypoint main;
@@ -10,14 +9,13 @@
     #let value : i32 = ref_get i32 value_ref;
     #let next_value : i32 = i32_add value delta;
     ref_set i32 value_ref next_value;
-    #let updated_value : i32 = ref_get i32 value_ref;
-    i32_add updated_value delta
+    ref_get i32 value_ref
 }
 
 #fn main : () #with IO {
-    #let value : i32 = 38i32;
+    #let value : i32 = 40i32;
     #letref #excl value_ref : &^ i32 #borrow value;
-    #let code : i32 <- add_into_ref value_ref 2i32;
+    #let code : i32 = add_into_ref value_ref 2i32;
     #let _ : () <- IO::exit code;
     ()
 }

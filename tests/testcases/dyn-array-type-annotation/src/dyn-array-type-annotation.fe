@@ -21,7 +21,7 @@
     array_set arrayvl_ref 0i32 7i32;
     array_set arrayvl_ref 1i32 14i32;
     array_set arrayvl_ref 2i32 21i32;
-    #let r : i32 = sum3 arrayvl_ref;
+    #let r : i32 <- sum3 arrayvl_ref;
     #let _ : () <- IO::exit r;
     ()
 }

@@ -36,20 +36,20 @@
     dyn_array_push i64 longs_ref 9i64;
     dyn_array_push i64 longs_ref 8i64;
 
-    #let byte0 : u8 = dyn_array_get u8 bytes_ref 0i32;
-    #let byte1 : u8 = dyn_array_get u8 bytes_ref 1i32;
+    #let byte0 : u8 <- dyn_array_get u8 bytes_ref 0i32;
+    #let byte1 : u8 <- dyn_array_get u8 bytes_ref 1i32;
     #let byte0_i32 : i32 = i32_from_u8 byte0;
     #let byte1_i32 : i32 = i32_from_u8 byte1;
-    #let empty_byte : u8 = dyn_array_get u8 empty_bytes_ref 0i32;
+    #let empty_byte : u8 <- dyn_array_get u8 empty_bytes_ref 0i32;
     #let empty_byte_i32 : i32 = i32_from_u8 empty_byte;
     #let byte_sum : i32 = i32_add (i32_add byte0_i32 byte1_i32) empty_byte_i32;
 
-    #let number0 : i32 = dyn_array_get i32 numbers_ref 0i32;
-    #let number1 : i32 = dyn_array_get i32 numbers_ref 1i32;
+    #let number0 : i32 <- dyn_array_get i32 numbers_ref 0i32;
+    #let number1 : i32 <- dyn_array_get i32 numbers_ref 1i32;
     #let number_sum : i32 = i32_add number0 number1;
 
-    #let long0 : i64 = dyn_array_get i64 longs_ref 0i32;
-    #let long1 : i64 = dyn_array_get i64 longs_ref 1i32;
+    #let long0 : i64 <- dyn_array_get i64 longs_ref 0i32;
+    #let long1 : i64 <- dyn_array_get i64 longs_ref 1i32;
     #let long0_i32 : i32 = i32_from_i64 long0;
     #let long1_i32 : i32 = i32_from_i64 long1;
     #let long_sum : i32 = i32_add long0_i32 long1_i32;
@@ -58,10 +58,10 @@
     #let empty_bytes_len : i32 = dyn_array_len u8 empty_bytes_ref;
     #let numbers_len : i32 = dyn_array_len i32 numbers_ref;
     #let longs_len : i32 = dyn_array_len i64 longs_ref;
-    #let bytes_capacity : i32 = dyn_array_capacity u8 bytes_ref;
-    #let empty_bytes_capacity : i32 = dyn_array_capacity u8 empty_bytes_ref;
-    #let numbers_capacity : i32 = dyn_array_capacity i32 numbers_ref;
-    #let longs_capacity : i32 = dyn_array_capacity i64 longs_ref;
+    #let bytes_capacity : i32 <- dyn_array_capacity u8 bytes_ref;
+    #let empty_bytes_capacity : i32 <- dyn_array_capacity u8 empty_bytes_ref;
+    #let numbers_capacity : i32 <- dyn_array_capacity i32 numbers_ref;
+    #let longs_capacity : i32 <- dyn_array_capacity i64 longs_ref;
     #let len_sum : i32 = i32_add (i32_add (i32_add bytes_len empty_bytes_len) numbers_len) longs_len;
     #let capacity_sum : i32 = i32_add (i32_add (i32_add bytes_capacity empty_bytes_capacity) numbers_capacity) longs_capacity;
 

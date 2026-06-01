@@ -2535,6 +2535,12 @@ fn term_uses_io_builtin(term: &Term, state: &LoweringState, visited: &mut HashSe
                 if matches!(segments.as_slice(), ["IO", _]) {
                     return true;
                 }
+                if matches!(
+                    segments.as_slice(),
+                    ["ref_get" | "ref_set" | "array_get" | "array_set" | "array_len"]
+                ) {
+                    return true;
+                }
                 if let [name] = segments.as_slice()
                     && visited.insert((*name).to_string())
                     && let Some(function) = state.statement_functions.get(*name)

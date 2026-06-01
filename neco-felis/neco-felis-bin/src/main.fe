@@ -183,7 +183,7 @@
     #let stdin : FileDescriptor <- IO::stdin;
     #let source_ref : Array u8 1024i32 <- IO::array_new u8 1024i32;
     #let _ : i32 <- IO::read stdin source_ref 1024i32;
-    #let parsed : ParsedSourceFile = parse_source source_ref;
+    #let parsed : ParsedSourceFile <- parse_source source_ref;
     write_exit_elf parsed.exit_code;
     ()
 }

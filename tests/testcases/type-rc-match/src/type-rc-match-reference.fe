@@ -17,8 +17,13 @@
         List::nil => 0i32,
         List::cons head tail => {
             #let head_code : i32 = ref_get i32 head;
-            #let tail_sum : i32 = list_sum_ref tail;
-            i32_add head_code tail_sum
+            #match tail {
+                List::nil => head_code,
+                List::cons next_head _ => {
+                    #let next_code : i32 = ref_get i32 next_head;
+                    i32_add head_code next_code
+                }
+            }
         }
     }
 }
@@ -28,7 +33,7 @@
 #fn main : () #with IO {
     #let list : List = List::cons 20i32 (List::cons 22i32 List::nil);
     #letref list_ref : & List #borrow list;
-    #let code : i32 = list_sum_ref list_ref;
+    #let code : i32 <- list_sum_ref list_ref;
     #let _ : () <- IO::exit code;
     ()
 }

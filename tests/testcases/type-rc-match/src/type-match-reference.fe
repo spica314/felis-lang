@@ -19,7 +19,7 @@
 #fn main : () #with IO {
     #let token : Token = Token::number 42i32;
     #letref token_ref : & Token #borrow token;
-    #let code : i32 = token_ref_code token_ref;
+    #let code : i32 <- token_ref_code token_ref;
     #let _ : () <- IO::exit code;
     ()
 }

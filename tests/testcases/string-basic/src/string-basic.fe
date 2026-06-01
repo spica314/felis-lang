@@ -27,7 +27,7 @@
     array_set arrayvl_ref 1i32 2u8;
     #let array : DynArray u8 = DynArray::dyn_array u8 arrayvl 2i64;
     #let string : String = string_from_dyn_array array;
-    #let first : u8 = string_get_u8 string 0i32;
+    #let first : u8 <- string_get_u8 string 0i32;
     #let len : i32 = string_len string;
     #let first_code : i32 = i32_from_u8 first;
     #let code : i32 = i32_add first_code len;

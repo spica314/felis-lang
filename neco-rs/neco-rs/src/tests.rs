@@ -1630,7 +1630,7 @@ fn rejects_effectful_operations_in_function_arguments() {
     ()
 }
 "#,
-            "`ref_get` is effectful and must be used as a top-level statement",
+            "`add1` is effectful and must be bound with `<-`",
         ),
     ];
 
@@ -2202,10 +2202,7 @@ fn lowers_type_rc_match_reference_fixture_to_runtime_exit() {
         program.operations.last(),
         Some(&Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
             Box::new(I32Expr::Literal(20)),
-            Box::new(I32Expr::Add(
-                Box::new(I32Expr::Literal(22)),
-                Box::new(I32Expr::Literal(0)),
-            )),
+            Box::new(I32Expr::Literal(22)),
         ))))
     );
     assert!(program.arrays.is_empty());

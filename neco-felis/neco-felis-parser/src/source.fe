@@ -6,6 +6,6 @@
 }
 
 #fn parse_source : (source : Array u8 1024i32) -> ParsedSourceFile #with IO {
-    #let exit_code : i32 = parse_exit_code source;
+    #let exit_code : i32 <- parse_exit_code source;
     ParsedSourceFile { exit_code = exit_code }
 }

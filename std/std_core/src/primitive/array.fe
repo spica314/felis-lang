@@ -56,7 +56,7 @@
         #if i32_gte index len {
             #break;
         };
-        #let value : t = dyn_array_get t source index;
+        #let value : t <- dyn_array_get t source index;
         array_set dest_ref index value;
         #let next_index : i32 = i32_add index 1i32;
         ref_set i32 index_ref next_index;
@@ -66,7 +66,7 @@
 
 #fn dyn_array_grow : (t : Type[0]) -> (array_ref : &^ DynArray t) -> () #with IO {
     #let array : DynArray t = (ref_get (DynArray t) array_ref);
-    #let capacity : i32 = dyn_array_capacity t array;
+    #let capacity : i32 <- dyn_array_capacity t array;
     #let next_capacity_ref : i32 = 1i32;
     #letref #excl next_capacity_ref : &^ i32 #borrow next_capacity_ref;
     #if i32_gt capacity 0i32 {
@@ -84,7 +84,7 @@
 #fn dyn_array_push : (t : Type[0]) -> (array_ref : &^ DynArray t) -> (value : t) -> () #with IO {
     #let array : DynArray t = (ref_get (DynArray t) array_ref);
     #let len : i32 = dyn_array_len t array;
-    #let capacity : i32 = dyn_array_capacity t array;
+    #let capacity : i32 <- dyn_array_capacity t array;
     #if i32_gte len capacity {
         dyn_array_grow t array_ref;
     };

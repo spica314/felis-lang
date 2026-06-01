@@ -20,7 +20,7 @@
     array_set array_ref 0i32 7i32;
     array_set array_ref 1i32 14i32;
     array_set array_ref 2i32 21i32;
-    #let r : i32 = sum3 array_ref;
+    #let r : i32 <- sum3 array_ref;
     #let _ : () <- IO::exit r;
     ()
 }

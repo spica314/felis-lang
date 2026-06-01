@@ -42,7 +42,7 @@
             #break;
         };
         #let source_index : i32 = i32_add start index;
-        #let byte : u8 = dyn_array_get u8 source source_index;
+        #let byte : u8 <- dyn_array_get u8 source source_index;
         string_set_u8 dest index byte;
         #let next_index : i32 = i32_add index 1i32;
         ref_set i32 index_ref next_index;
@@ -108,8 +108,8 @@
             #if i32_gte index left_len {
                 #break;
             };
-            #let left_byte : u8 = string_get_u8 left index;
-            #let right_byte : u8 = string_get_u8 right index;
+            #let left_byte : u8 <- string_get_u8 left index;
+            #let right_byte : u8 <- string_get_u8 right index;
             #if u8_eq left_byte right_byte {
                 #let next_index : i32 = i32_add index 1i32;
                 ref_set i32 index_ref next_index;
@@ -136,8 +136,8 @@
                 #break;
             };
             #let source_index : i32 = i32_add start index;
-            #let string_byte : u8 = string_get_u8 string index;
-            #let source_byte : u8 = dyn_array_get u8 source source_index;
+            #let string_byte : u8 <- string_get_u8 string index;
+            #let source_byte : u8 <- dyn_array_get u8 source source_index;
             #if u8_eq string_byte source_byte {
                 #let next_index : i32 = i32_add index 1i32;
                 ref_set i32 index_ref next_index;

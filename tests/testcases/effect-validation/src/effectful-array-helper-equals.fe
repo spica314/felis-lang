@@ -1,0 +1,16 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::array::array_get;
+
+#entrypoint main;
+
+#fn read_first : (array : ArrayVL i32) -> i32 #with IO {
+    array_get array 0i32
+}
+
+#fn main : () #with IO {
+    #let array : ArrayVL i32 <- IO::arrayvl_new i32 1i32;
+    #let value : i32 = read_first array;
+    #let _ : () <- IO::exit value;
+    ()
+}
