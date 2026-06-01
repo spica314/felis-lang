@@ -1,0 +1,7 @@
+{
+    "name": "ref-set-validation",
+    "felis-bin-entrypoints": [
+        "src/struct-replacement-type-mismatch.fe",
+        "src/constructor-replacement-type-mismatch.fe"
+    ]
+}

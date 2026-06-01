@@ -483,6 +483,20 @@ fn rejects_shared_primitive_ref_set_fixture() {
 }
 
 #[test]
+fn rejects_struct_ref_set_replacement_type_mismatch_fixture() {
+    let root = repo_root().join("tests/testcases/ref-set-validation");
+    let error = compile_fixture_error(&root, "struct-replacement-type-mismatch");
+    assert!(error.contains("expected a value of type `Span`"));
+}
+
+#[test]
+fn rejects_constructor_ref_set_replacement_type_mismatch_fixture() {
+    let root = repo_root().join("tests/testcases/ref-set-validation");
+    let error = compile_fixture_error(&root, "constructor-replacement-type-mismatch");
+    assert!(error.contains("expected a value of type `LocalOption`"));
+}
+
+#[test]
 fn rejects_shared_primitive_reference_exclusive_parameter_fixture() {
     let root = repo_root().join("tests/testcases/primitive-reference-mutability");
     let error = compile_fixture_error(&root, "shared-ref-exclusive-parameter");

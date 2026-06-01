@@ -2372,6 +2372,8 @@ fn lower_reference_set_builtin_statement(
             exclusive: true,
         } = current_value
     {
+        let ty = substitute_type_bindings(_ty, &type_bindings_from_environment(&state.environment));
+        validate_value_against_type(referent.as_ref(), &ty, program)?;
         let lowered_value = match referent.as_ref() {
             Value::I32(_) => Value::I32(lower_i32_expr(value, state)?),
             Value::I64(_) => Value::I64(lower_i64_expr(value, state)?),
@@ -2383,6 +2385,7 @@ fn lower_reference_set_builtin_statement(
                 )));
             }
         };
+        validate_value_against_type(&lowered_value, &ty, program)?;
         state.environment.insert(
             name.to_string(),
             Value::Reference {

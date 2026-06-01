@@ -1,0 +1,23 @@
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_set;
+#use std_core::primitive::i32::i32;
+
+#type LocalOption : Type[0] {
+    none : LocalOption,
+    some : i32 -> LocalOption,
+}
+
+#type LocalResult : Type[0] {
+    ok : i32 -> LocalResult,
+    err : i32 -> LocalResult,
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let option : LocalOption = LocalOption::some 1i32;
+    #letref #excl option_ref : &^ LocalOption #borrow option;
+    ref_set LocalOption option_ref (LocalResult::ok 2i32);
+    #let _ : () <- IO::exit 0i32;
+    ()
+}
