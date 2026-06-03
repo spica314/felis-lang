@@ -41,6 +41,8 @@ pub(crate) struct LoweringState {
     pub(crate) next_i32_slot: usize,
     pub(crate) next_i64_slot: usize,
     pub(crate) next_f32_slot: usize,
+    pub(crate) next_u8_slot: usize,
+    pub(crate) next_bool_slot: usize,
     pub(crate) io_effect_allowed: bool,
     pub(crate) compiled_ptx_function_names: HashMap<usize, usize>,
     functions: HashMap<String, PureFunction>,
@@ -58,6 +60,8 @@ impl LoweringState {
             next_i32_slot: 0,
             next_i64_slot: 0,
             next_f32_slot: 0,
+            next_u8_slot: 0,
+            next_bool_slot: 0,
             io_effect_allowed: false,
             compiled_ptx_function_names: HashMap::new(),
             functions: HashMap::new(),
@@ -105,6 +109,18 @@ impl LoweringState {
     pub(crate) fn allocate_f32_slot(&mut self) -> usize {
         let slot = self.next_f32_slot;
         self.next_f32_slot += 1;
+        slot
+    }
+
+    pub(crate) fn allocate_u8_slot(&mut self) -> usize {
+        let slot = self.next_u8_slot;
+        self.next_u8_slot += 1;
+        slot
+    }
+
+    pub(crate) fn allocate_bool_slot(&mut self) -> usize {
+        let slot = self.next_bool_slot;
+        self.next_bool_slot += 1;
         slot
     }
 }
@@ -168,6 +184,8 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
         i32_slots: 0,
         i64_slots: 0,
         f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
         requires_argv: false,
     };
     let mut state = LoweringState::new();
@@ -201,6 +219,8 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     program.i32_slots = state.next_i32_slot;
     program.i64_slots = state.next_i64_slot;
     program.f32_slots = state.next_f32_slot;
+    program.u8_slots = state.next_u8_slot;
+    program.bool_slots = state.next_bool_slot;
 
     Ok(program)
 }
@@ -1925,6 +1945,8 @@ pub(super) fn lower_statement(
                 i32_slots: program.i32_slots,
                 i64_slots: program.i64_slots,
                 f32_slots: program.f32_slots,
+                u8_slots: program.u8_slots,
+                bool_slots: program.bool_slots,
                 requires_argv: program.requires_argv,
             };
             let mut terminated = false;
@@ -1942,6 +1964,8 @@ pub(super) fn lower_statement(
             state.next_i32_slot = state.next_i32_slot.max(loop_state.next_i32_slot);
             state.next_i64_slot = state.next_i64_slot.max(loop_state.next_i64_slot);
             state.next_f32_slot = state.next_f32_slot.max(loop_state.next_f32_slot);
+            state.next_u8_slot = state.next_u8_slot.max(loop_state.next_u8_slot);
+            state.next_bool_slot = state.next_bool_slot.max(loop_state.next_bool_slot);
             program.operations.push(Operation::Loop {
                 body_operations: loop_program.operations,
             });
@@ -1990,6 +2014,8 @@ fn lower_if_statement(
         i32_slots: program.i32_slots,
         i64_slots: program.i64_slots,
         f32_slots: program.f32_slots,
+        u8_slots: program.u8_slots,
+        bool_slots: program.bool_slots,
         requires_argv: program.requires_argv,
     };
     let mut then_terminated = false;
@@ -2005,6 +2031,8 @@ fn lower_if_statement(
     let mut next_i32_slot = then_state.next_i32_slot;
     let mut next_i64_slot = then_state.next_i64_slot;
     let mut next_f32_slot = then_state.next_f32_slot;
+    let mut next_u8_slot = then_state.next_u8_slot;
+    let mut next_bool_slot = then_state.next_bool_slot;
 
     if let Some(else_branch) = &if_stmt.else_branch {
         let mut else_state = state.child_scope();
@@ -2017,6 +2045,8 @@ fn lower_if_statement(
             i32_slots: then_program.i32_slots,
             i64_slots: then_program.i64_slots,
             f32_slots: then_program.f32_slots,
+            u8_slots: then_program.u8_slots,
+            bool_slots: then_program.bool_slots,
             requires_argv: then_program.requires_argv,
         };
         match else_branch {
@@ -2044,6 +2074,8 @@ fn lower_if_statement(
         next_i32_slot = next_i32_slot.max(else_state.next_i32_slot);
         next_i64_slot = next_i64_slot.max(else_state.next_i64_slot);
         next_f32_slot = next_f32_slot.max(else_state.next_f32_slot);
+        next_u8_slot = next_u8_slot.max(else_state.next_u8_slot);
+        next_bool_slot = next_bool_slot.max(else_state.next_bool_slot);
     } else {
         program.data = then_program.data;
         program.arrays = then_program.arrays;
@@ -2054,6 +2086,8 @@ fn lower_if_statement(
     state.next_i32_slot = next_i32_slot;
     state.next_i64_slot = next_i64_slot;
     state.next_f32_slot = next_f32_slot;
+    state.next_u8_slot = next_u8_slot;
+    state.next_bool_slot = next_bool_slot;
     program.operations.push(Operation::If {
         condition,
         then_operations,
@@ -2106,6 +2140,8 @@ fn wrap_reference_value(value: Value, ty: &Term) -> Value {
         Value::I32Reference { .. }
         | Value::I64Reference { .. }
         | Value::F32Reference { .. }
+        | Value::U8Reference { .. }
+        | Value::BoolReference { .. }
         | Value::Reference { .. }
         | Value::StaticSlice { .. }
         | Value::RuntimeArg(_)
@@ -2159,6 +2195,20 @@ fn lower_letref_borrow_statement(
                 .operations
                 .push(Operation::StoreF32 { slot, value: expr });
             Value::F32Reference { slot, exclusive }
+        }
+        Value::U8(expr) => {
+            let slot = state.allocate_u8_slot();
+            program
+                .operations
+                .push(Operation::StoreU8 { slot, value: expr });
+            Value::U8Reference { slot, exclusive }
+        }
+        Value::Bool(condition) => {
+            let slot = state.allocate_bool_slot();
+            program
+                .operations
+                .push(Operation::StoreBool { slot, condition });
+            Value::BoolReference { slot, exclusive }
         }
         other => other,
     };
@@ -2385,6 +2435,8 @@ fn lower_reference_set_builtin_statement(
             Value::I32(_) => Value::I32(lower_i32_expr(value, state)?),
             Value::I64(_) => Value::I64(lower_i64_expr(value, state)?),
             Value::F32(_) => Value::F32(lower_f32_expr(value, state)?),
+            Value::U8(_) => Value::U8(lower_u8_expr(value, state)?),
+            Value::Bool(_) => Value::Bool(lower_bool_expr(value, state)?),
             Value::Constructor(_) | Value::Struct(_) => lower_pure_value(value, state, program)?,
             other => {
                 return Err(Error::Unsupported(format!(
@@ -2431,6 +2483,24 @@ fn lower_reference_set_builtin_statement(
                 value: lower_f32_expr(value, state)?,
             });
         }
+        Value::U8Reference {
+            slot,
+            exclusive: true,
+        } => {
+            program.operations.push(Operation::StoreU8 {
+                slot,
+                value: lower_u8_expr(value, state)?,
+            });
+        }
+        Value::BoolReference {
+            slot,
+            exclusive: true,
+        } => {
+            program.operations.push(Operation::StoreBool {
+                slot,
+                condition: lower_bool_expr(value, state)?,
+            });
+        }
         Value::Reference {
             exclusive: false, ..
         } => {
@@ -2445,6 +2515,12 @@ fn lower_reference_set_builtin_statement(
             exclusive: false, ..
         }
         | Value::F32Reference {
+            exclusive: false, ..
+        }
+        | Value::U8Reference {
+            exclusive: false, ..
+        }
+        | Value::BoolReference {
             exclusive: false, ..
         } => {
             return Err(Error::Unsupported(

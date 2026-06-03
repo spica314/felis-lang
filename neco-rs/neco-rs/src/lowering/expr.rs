@@ -159,6 +159,9 @@ pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr
             if let Some(expr) = lower_u8_literal_application(callee, arguments)? {
                 return Ok(expr);
             }
+            if let Some(expr) = lower_u8_reference_get_builtin_call(callee, arguments, state)? {
+                return Ok(expr);
+            }
             if let Some(expr) = lower_dyn_array_get_u8_call(callee, arguments, state)? {
                 return Ok(expr);
             }
@@ -329,6 +332,12 @@ fn lower_bool_application_expr(term: &Term, state: &LoweringState) -> Result<Con
             render_path(path)
         )));
     };
+
+    if let Some(condition) =
+        lower_bool_reference_get_builtin_call(callee.as_ref(), arguments, state)?
+    {
+        return Ok(condition);
+    }
 
     if let Some(condition) = lower_bool_primitive_call(primitive, arguments, state)? {
         return Ok(condition);
@@ -1196,6 +1205,46 @@ fn lower_i64_reference_get_builtin_call(
         Value::I64Reference { slot, .. } => Ok(Some(I64Expr::Local(slot))),
         Value::Reference { value, .. } => match value.as_ref() {
             Value::I64(expr) => Ok(Some(expr.clone())),
+            _ => Ok(None),
+        },
+        _ => Ok(None),
+    }
+}
+
+fn lower_u8_reference_get_builtin_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<U8Expr>> {
+    let Some(receiver) = reference_get_builtin_receiver(callee, arguments)? else {
+        return Ok(None);
+    };
+    ensure_io_effect_allowed(state, "ref_get")?;
+
+    match resolve_value(receiver, &state.environment)? {
+        Value::U8Reference { slot, .. } => Ok(Some(U8Expr::Local(slot))),
+        Value::Reference { value, .. } => match value.as_ref() {
+            Value::U8(expr) => Ok(Some(expr.clone())),
+            _ => Ok(None),
+        },
+        _ => Ok(None),
+    }
+}
+
+fn lower_bool_reference_get_builtin_call(
+    callee: &Term,
+    arguments: &[Term],
+    state: &LoweringState,
+) -> Result<Option<ConditionExpr>> {
+    let Some(receiver) = reference_get_builtin_receiver(callee, arguments)? else {
+        return Ok(None);
+    };
+    ensure_io_effect_allowed(state, "ref_get")?;
+
+    match resolve_value(receiver, &state.environment)? {
+        Value::BoolReference { slot, .. } => Ok(Some(ConditionExpr::Local(slot))),
+        Value::Reference { value, .. } => match value.as_ref() {
+            Value::Bool(condition) => Ok(Some(condition.clone())),
             _ => Ok(None),
         },
         _ => Ok(None),

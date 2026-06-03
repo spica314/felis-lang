@@ -46,7 +46,15 @@ pub(crate) enum Value {
         exclusive: bool,
     },
     U8(U8Expr),
+    U8Reference {
+        slot: usize,
+        exclusive: bool,
+    },
     Bool(ConditionExpr),
+    BoolReference {
+        slot: usize,
+        exclusive: bool,
+    },
     Array {
         slot: usize,
         element_type: ArrayElementType,

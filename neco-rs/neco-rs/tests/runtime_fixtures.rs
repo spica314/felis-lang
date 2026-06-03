@@ -322,6 +322,20 @@ fn compiles_and_runs_u8_ops_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_u8_reference_set_fixture() {
+    let root = repo_root().join("tests/testcases/primitive-reference-values");
+    let status = run_fixture_status(&root, "u8-ref-set");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_bool_reference_set_fixture() {
+    let root = repo_root().join("tests/testcases/primitive-reference-values");
+    let status = run_fixture_status(&root, "bool-ref-set");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_primitive_conversions_fixture() {
     let root = repo_root().join("tests/testcases/primitive-conversions");
     let status = run_fixture_status(&root, "primitive-conversions");

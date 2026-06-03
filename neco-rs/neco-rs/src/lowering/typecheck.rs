@@ -325,6 +325,27 @@ fn validate_reference_value_against_type(
                 {
                     Ok(())
                 }
+                "u8" if matches!(
+                    value,
+                    Value::U8Reference {
+                        exclusive: actual_exclusive,
+                        ..
+                    } if !exclusive || *actual_exclusive
+                ) =>
+                {
+                    Ok(())
+                }
+                "bool"
+                    if matches!(
+                        value,
+                        Value::BoolReference {
+                            exclusive: actual_exclusive,
+                            ..
+                        } if !exclusive || *actual_exclusive
+                    ) =>
+                {
+                    Ok(())
+                }
                 "PathBuf" if matches!(value, Value::PathBuf { .. }) => Ok(()),
                 type_name => match value {
                     Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),

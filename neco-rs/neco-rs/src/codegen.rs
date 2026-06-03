@@ -174,6 +174,18 @@ fn emit_operations(
                 code.extend_from_slice(&[0xf3, 0x0f, 0x11, 0x85]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
             }
+            Operation::StoreU8 { slot, value } => {
+                emit_u8_expr_to_eax(value, code, program);
+                let slot_offset = u8_slot_offset(program, *slot);
+                code.extend_from_slice(&[0x88, 0x85]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+            }
+            Operation::StoreBool { slot, condition } => {
+                emit_bool_condition_to_al(condition, code, program);
+                let slot_offset = bool_slot_offset(program, *slot);
+                code.extend_from_slice(&[0x88, 0x85]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+            }
             Operation::Mmap { len, result_slot } => {
                 code.extend_from_slice(&[0x31, 0xff]);
                 emit_i32_expr_to_eax(len, code, program);
@@ -696,6 +708,11 @@ fn emit_condition_false_jumps(
             code.push(0xe9);
             vec![emit_jump_placeholder(code)]
         }
+        ConditionExpr::Local(slot) => {
+            emit_bool_local_compare(*slot, code, program);
+            code.extend_from_slice(&[0x0f, 0x84]);
+            vec![emit_jump_placeholder(code)]
+        }
         ConditionExpr::And(lhs, rhs) => {
             let mut patches = emit_condition_false_jumps(lhs, code, program);
             patches.extend(emit_condition_false_jumps(rhs, code, program));
@@ -757,6 +774,11 @@ fn emit_condition_true_jumps(
             vec![emit_jump_placeholder(code)]
         }
         ConditionExpr::Literal(false) => Vec::new(),
+        ConditionExpr::Local(slot) => {
+            emit_bool_local_compare(*slot, code, program);
+            code.extend_from_slice(&[0x0f, 0x85]);
+            vec![emit_jump_placeholder(code)]
+        }
         ConditionExpr::And(lhs, rhs) => {
             let false_patches = emit_condition_false_jumps(lhs, code, program);
             let true_patches = emit_condition_true_jumps(rhs, code, program);
@@ -805,6 +827,27 @@ fn emit_condition_true_jumps(
             vec![emit_jump_placeholder(code)]
         }
     }
+}
+
+fn emit_bool_condition_to_al(
+    condition: &ConditionExpr,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    let false_patches = emit_condition_false_jumps(condition, code, program);
+    code.extend_from_slice(&[0xb0, 0x01]);
+    code.push(0xe9);
+    let done_patch = emit_jump_placeholder(code);
+    patch_jumps_to_current(&false_patches, code);
+    code.extend_from_slice(&[0xb0, 0x00]);
+    patch_jumps_to_current(&[done_patch], code);
+}
+
+fn emit_bool_local_compare(slot: usize, code: &mut Vec<u8>, program: &LoweredProgram) {
+    let slot_offset = bool_slot_offset(program, slot);
+    code.extend_from_slice(&[0x80, 0xbd]);
+    code.extend_from_slice(&slot_offset.to_le_bytes());
+    code.push(0x00);
 }
 
 fn emit_jump_placeholder(code: &mut Vec<u8>) -> usize {
@@ -1123,6 +1166,11 @@ fn emit_u8_expr_to_eax(expr: &U8Expr, code: &mut Vec<u8>, program: &LoweredProgr
             code.push(0xb8);
             code.extend_from_slice(&u32::from(*value).to_le_bytes());
         }
+        U8Expr::Local(slot) => {
+            let slot_offset = u8_slot_offset(program, *slot);
+            code.extend_from_slice(&[0x0f, 0xb6, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
+        }
         U8Expr::FromI32(value) => {
             emit_i32_expr_to_eax(value, code, program);
             code.extend_from_slice(&[0x0f, 0xb6, 0xc0]);
@@ -1264,8 +1312,16 @@ fn stack_frame_size(program: &LoweredProgram) -> usize {
     let i32_slot_bytes = program.i32_slots * 4;
     let i64_slot_bytes = program.i64_slots * 8;
     let f32_slot_bytes = program.f32_slots * 4;
+    let u8_slot_bytes = program.u8_slots;
+    let bool_slot_bytes = program.bool_slots;
     let array_bytes: usize = program.arrays.iter().map(array_storage_size).sum();
-    let size = pointer_bytes + i32_slot_bytes + i64_slot_bytes + f32_slot_bytes + array_bytes;
+    let size = pointer_bytes
+        + i32_slot_bytes
+        + i64_slot_bytes
+        + f32_slot_bytes
+        + u8_slot_bytes
+        + bool_slot_bytes
+        + array_bytes;
     size.next_multiple_of(16)
 }
 
@@ -1297,7 +1353,14 @@ fn array_data_offset(program: &LoweredProgram, slot: usize) -> i32 {
     let i32_slot_bytes = (program.i32_slots * 4) as i32;
     let i64_slot_bytes = (program.i64_slots * 8) as i32;
     let f32_slot_bytes = (program.f32_slots * 4) as i32;
-    let mut offset = pointer_bytes + i32_slot_bytes + i64_slot_bytes + f32_slot_bytes;
+    let u8_slot_bytes = program.u8_slots as i32;
+    let bool_slot_bytes = program.bool_slots as i32;
+    let mut offset = pointer_bytes
+        + i32_slot_bytes
+        + i64_slot_bytes
+        + f32_slot_bytes
+        + u8_slot_bytes
+        + bool_slot_bytes;
     for array in &program.arrays {
         offset += array_storage_size(array) as i32;
         if array.slot == slot {
@@ -1324,6 +1387,27 @@ fn f32_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
     let i32_slot_bytes = (program.i32_slots * 4) as i32;
     let i64_slot_bytes = (program.i64_slots * 8) as i32;
     -(pointer_bytes(program) + i32_slot_bytes + i64_slot_bytes + 4 * (slot as i32 + 1))
+}
+
+fn u8_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
+    let i32_slot_bytes = (program.i32_slots * 4) as i32;
+    let i64_slot_bytes = (program.i64_slots * 8) as i32;
+    let f32_slot_bytes = (program.f32_slots * 4) as i32;
+    -(pointer_bytes(program) + i32_slot_bytes + i64_slot_bytes + f32_slot_bytes + slot as i32 + 1)
+}
+
+fn bool_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
+    let i32_slot_bytes = (program.i32_slots * 4) as i32;
+    let i64_slot_bytes = (program.i64_slots * 8) as i32;
+    let f32_slot_bytes = (program.f32_slots * 4) as i32;
+    let u8_slot_bytes = program.u8_slots as i32;
+    -(pointer_bytes(program)
+        + i32_slot_bytes
+        + i64_slot_bytes
+        + f32_slot_bytes
+        + u8_slot_bytes
+        + slot as i32
+        + 1)
 }
 
 fn kernel_argument_ref_offset(program: &LoweredProgram, arg: KernelArgumentRef) -> i32 {

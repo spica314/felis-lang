@@ -7,8 +7,8 @@ use neco_rs_parser::{
 
 use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::ir::{
-    ConstructorValue, F32Expr, I32Expr, I64Expr, LoweredProgram, Operation, StructFieldValue,
-    StructValue, U8Expr, intern_data,
+    ConditionExpr, ConstructorValue, F32Expr, I32Expr, I64Expr, LoweredProgram, Operation,
+    StructFieldValue, StructValue, U8Expr, intern_data,
 };
 use crate::{Error, Result};
 
@@ -439,6 +439,8 @@ fn lower_reference_get_receiver_value(receiver: &Term, state: &LoweringState) ->
         Value::I32Reference { slot, .. } => Value::I32(I32Expr::Local(slot)),
         Value::I64Reference { slot, .. } => Value::I64(I64Expr::Local(slot)),
         Value::F32Reference { slot, .. } => Value::F32(F32Expr::Local(slot)),
+        Value::U8Reference { slot, .. } => Value::U8(U8Expr::Local(slot)),
+        Value::BoolReference { slot, .. } => Value::Bool(ConditionExpr::Local(slot)),
         Value::Reference { value, .. } => *value,
         other => other,
     })
@@ -1095,6 +1097,8 @@ fn wrap_reference_parameter(value: Value, ty: &Term) -> Value {
         Value::I32Reference { .. }
         | Value::I64Reference { .. }
         | Value::F32Reference { .. }
+        | Value::U8Reference { .. }
+        | Value::BoolReference { .. }
         | Value::Reference { .. }
         | Value::StaticSlice { .. }
         | Value::RuntimeArg(_)

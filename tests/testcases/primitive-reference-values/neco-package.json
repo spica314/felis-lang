@@ -1,0 +1,7 @@
+{
+    "name": "primitive-reference-values",
+    "felis-bin-entrypoints": [
+        "src/u8-ref-set.fe",
+        "src/bool-ref-set.fe"
+    ]
+}

@@ -8,6 +8,8 @@ pub(crate) struct LoweredProgram {
     pub(crate) i32_slots: usize,
     pub(crate) i64_slots: usize,
     pub(crate) f32_slots: usize,
+    pub(crate) u8_slots: usize,
+    pub(crate) bool_slots: usize,
     pub(crate) requires_argv: bool,
 }
 
@@ -112,6 +114,7 @@ pub(crate) enum ComparisonKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ConditionExpr {
     Literal(bool),
+    Local(usize),
     And(Box<ConditionExpr>, Box<ConditionExpr>),
     Or(Box<ConditionExpr>, Box<ConditionExpr>),
     Not(Box<ConditionExpr>),
@@ -140,6 +143,7 @@ pub(crate) enum ConditionExpr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum U8Expr {
     Literal(u8),
+    Local(usize),
     FromI32(Box<I32Expr>),
     FromI64(Box<I64Expr>),
     FromF32(Box<F32Expr>),
@@ -205,6 +209,14 @@ pub(crate) enum Operation {
     StoreF32 {
         slot: usize,
         value: F32Expr,
+    },
+    StoreU8 {
+        slot: usize,
+        value: U8Expr,
+    },
+    StoreBool {
+        slot: usize,
+        condition: ConditionExpr,
     },
     Mmap {
         len: I32Expr,

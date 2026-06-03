@@ -2842,6 +2842,8 @@ fn writes_compiled_ptx_artifacts_under_package_neco_directory() {
         i32_slots: 0,
         i64_slots: 0,
         f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
         requires_argv: false,
     };
 
@@ -3339,6 +3341,8 @@ fn builds_elf_image_with_exit_syscall() {
         i32_slots: 0,
         i64_slots: 0,
         f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
         requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)
@@ -3369,6 +3373,8 @@ fn builds_elf_image_with_write_and_implicit_exit() {
         i32_slots: 0,
         i64_slots: 0,
         f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
         requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)
@@ -3417,6 +3423,8 @@ fn builds_elf_image_with_runtime_i32_ops() {
         i32_slots: 0,
         i64_slots: 0,
         f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
         requires_argv: false,
     };
     let elf = build_linux_x86_64_program_executable(&program)

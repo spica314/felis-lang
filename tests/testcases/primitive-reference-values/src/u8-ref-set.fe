@@ -1,0 +1,15 @@
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
+#use std_core::primitive::u8::u8;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let value : u8 = 1u8;
+    #letref #excl value_ref : &^ u8 #borrow value;
+    ref_set u8 value_ref 42u8;
+    #let code : u8 = ref_get u8 value_ref;
+    #let _ : () <- IO::exit code;
+    ()
+}
