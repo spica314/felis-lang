@@ -44,7 +44,6 @@ pub(crate) struct LoweringState {
     pub(crate) next_u8_slot: usize,
     pub(crate) next_bool_slot: usize,
     pub(crate) io_effect_allowed: bool,
-    pub(crate) compiled_ptx_function_names: HashMap<usize, usize>,
     functions: HashMap<String, PureFunction>,
     statement_functions: HashMap<String, StatementFunction>,
     constructors: HashMap<String, ConstructorSignature>,
@@ -63,7 +62,6 @@ impl LoweringState {
             next_u8_slot: 0,
             next_bool_slot: 0,
             io_effect_allowed: false,
-            compiled_ptx_function_names: HashMap::new(),
             functions: HashMap::new(),
             statement_functions: HashMap::new(),
             constructors: HashMap::new(),
@@ -306,14 +304,10 @@ fn initialize_compile_ptx_bindings(
             ))
         })?;
         let data_index = intern_data(program, ptx);
-        let name_data_index = intern_data(program, nul_terminated_identifier(&function.name.name));
         program.compiled_ptx.push(CompiledPtxArtifact {
             data_index,
             function_name: function.name.name.clone(),
         });
-        state
-            .compiled_ptx_function_names
-            .insert(data_index, name_data_index);
         let previous = state.environment.insert(
             compile_ptx.value_name.clone(),
             Value::StaticSlice { data_index, len },
@@ -1682,12 +1676,6 @@ fn simple_type_name(ty: &Term) -> Option<&str> {
     } else {
         None
     }
-}
-
-fn nul_terminated_identifier(name: &str) -> Vec<u8> {
-    let mut bytes = name.as_bytes().to_vec();
-    bytes.push(0);
-    bytes
 }
 
 fn initialize_zero_arg_use_bindings(

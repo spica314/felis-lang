@@ -2734,12 +2734,12 @@ fn compiles_f32_ptx_arithmetic() {
                 function_name: "i64_kernel".to_string(),
             },
             CompiledPtxArtifact {
-                data_index: 2,
+                data_index: 1,
                 function_name: "f32_kernel".to_string(),
             }
         ]
     );
-    let ptx = String::from_utf8_lossy(&program.data[2]);
+    let ptx = String::from_utf8_lossy(&program.data[1]);
     assert!(ptx.contains(".visible .entry f32_kernel("));
     assert!(ptx.contains(".reg .f32 %f<"));
     assert!(ptx.contains("ld.global.f32"));

@@ -59,7 +59,7 @@
     #let module_value : i64 = ref_get i64 module;
     #let function : i64 = 0i64;
     #letref #excl function : &^ i64 #borrow function;
-    #let function_result : i32 <- IO::cu_module_get_function function module_value ptx;
+    #let function_result : i32 <- IO::cu_module_get_function function module_value "special_registers_kernel";
     #if i32_eq function_result 0i32 {
         ();
     } #else {

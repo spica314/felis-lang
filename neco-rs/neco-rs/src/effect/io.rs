@@ -274,7 +274,7 @@ pub(crate) fn lower_io_call(
         }
         ["IO", "cu_module_get_function"] => {
             let (function_slot, module, name_data_index, result_slot) =
-                match parse_cu_module_get_function_arguments(arguments, state) {
+                match parse_cu_module_get_function_arguments(arguments, state, program) {
                     Ok(value) => value,
                     Err(err) => return Some(Err(err)),
                 };
@@ -851,10 +851,11 @@ fn parse_cu_module_load_data_arguments(
 fn parse_cu_module_get_function_arguments(
     arguments: &[Term],
     state: &mut LoweringState,
+    program: &mut LoweredProgram,
 ) -> Result<(usize, I64Expr, usize, usize)> {
-    let [function_term, module_term, ptx_term] = arguments else {
+    let [function_term, module_term, name_term] = arguments else {
         return Err(Error::Unsupported(
-            "`IO::cu_module_get_function` must receive an exclusive `i64` reference, an `i64` module, and a compiled PTX value"
+            "`IO::cu_module_get_function` must receive an exclusive `i64` reference, an `i64` module, and a function name string"
                 .to_string(),
         ));
     };
@@ -873,24 +874,20 @@ fn parse_cu_module_get_function_arguments(
     let module = lower_i64_expr(module_term, state).map_err(|_| {
         Error::Unsupported("`IO::cu_module_get_function` expects an `i64` module".to_string())
     })?;
-    let data_index = match resolve_value(ptx_term, &state.environment)? {
-        Value::StaticSlice { data_index, .. } => data_index,
-        other => {
-            return Err(Error::Unsupported(format!(
-                "`IO::cu_module_get_function` expects a compiled PTX value as its third argument, got {other:?}"
-            )));
+    let name_data_index = if let Term::StringLiteral(literal) = name_term {
+        let mut bytes = literal.as_bytes().to_vec();
+        bytes.push(0);
+        intern_data(program, bytes)
+    } else {
+        match resolve_value(name_term, &state.environment)? {
+            Value::StaticSlice { data_index, .. } => data_index,
+            other => {
+                return Err(Error::Unsupported(format!(
+                    "`IO::cu_module_get_function` expects a function name string as its third argument, got {other:?}"
+                )));
+            }
         }
     };
-    let name_data_index = state
-        .compiled_ptx_function_names
-        .get(&data_index)
-        .copied()
-        .ok_or_else(|| {
-            Error::Unsupported(
-                "`IO::cu_module_get_function` expects a value produced by `#compile_ptx`"
-                    .to_string(),
-            )
-        })?;
     let result_slot = state.allocate_i32_slot();
     Ok((function_slot, module, name_data_index, result_slot))
 }

@@ -52,7 +52,7 @@
     #let module_value : i64 = ref_get i64 module;
     #let function : i64 = 0i64;
     #letref #excl function : &^ i64 #borrow function;
-    #let function_result : i32 <- IO::cu_module_get_function function module_value ptx;
+    #let function_result : i32 <- IO::cu_module_get_function function module_value "f32_launch_kernel";
     #let function_value : i64 = ref_get i64 function;
     #let host_array : ArrayVL i32 <- IO::arrayvl_new i32 4i32;
     array_set host_array 0i32 0i32;
