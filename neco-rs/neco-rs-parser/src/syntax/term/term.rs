@@ -1,5 +1,9 @@
-use super::{ArrowTerm, Block, ForallTerm, MatchExpression, StructLiteralField, TypedBinder};
+use super::{
+    ArrowTerm, Block, ForallTerm, MatchExpression, StructLiteralField, TermParseOption,
+    TypedBinder, parse::parse_arrow_term,
+};
 use crate::syntax::PathExpression;
+use crate::{Parse, Result, Token};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
@@ -34,4 +38,16 @@ pub enum Term {
     },
     Arrow(ArrowTerm),
     Forall(ForallTerm),
+}
+
+impl Parse for Term {
+    type ParseOption = TermParseOption;
+
+    fn parse_with_option(
+        tokens: &[Token],
+        i: &mut usize,
+        option: Option<Self::ParseOption>,
+    ) -> Result<Option<Self>> {
+        parse_arrow_term(tokens, i, option.unwrap_or_default())
+    }
 }
