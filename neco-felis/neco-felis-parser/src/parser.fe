@@ -1,5 +1,8 @@
 #use std_core::primitive::array::Array;
+#use std_core::primitive::bool::false;
+#use std_core::primitive::bool::true;
 #use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_eq;
 
 #fn exit_integer_argument : (tokens : Tokens) -> i32 {
     #match tokens {
@@ -42,5 +45,10 @@
 }
 
 #fn parse_exit_code : (source : Array u8 1024i32) -> i32 #with IO {
-    fallback_exit_code source
+    #let tokens : Tokens <- lex source;
+    #let parsed : i32 = find_io_exit_integer tokens;
+    #match (i32_eq parsed 255i32) {
+        true => fallback_exit_code source,
+        false => parsed,
+    }
 }
