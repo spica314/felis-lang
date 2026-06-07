@@ -559,15 +559,14 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
             data_index,
             len,
         }),
-        Value::Array {
-            slot,
-            element_type: ArrayElementType::U8,
-            ..
-        } => Ok(Operation::WriteArray {
-            fd,
-            array_slot: slot,
-            len,
-        }),
+        value if u8_array_slot(&value).is_some() => {
+            let slot = u8_array_slot(&value).expect("checked u8 array slot");
+            Ok(Operation::WriteArray {
+                fd,
+                array_slot: slot,
+                len,
+            })
+        }
         other => Err(Error::Unsupported(format!(
             "`IO::write` expects an `ArrayVL u8` or `u8` array as its second argument, got {other:?}"
         ))),
@@ -596,11 +595,9 @@ fn parse_read_arguments(
     };
 
     let array_slot = match resolve_value(bytes_term, &state.environment)? {
-        Value::Array {
-            slot,
-            element_type: ArrayElementType::U8,
-            ..
-        } => slot,
+        value if u8_array_slot(&value).is_some() => {
+            u8_array_slot(&value).expect("checked u8 array slot")
+        }
         other => {
             return Err(Error::Unsupported(format!(
                 "`IO::read` expects a `u8` array reference as its second argument, got {other:?}"
@@ -613,6 +610,18 @@ fn parse_read_arguments(
     })?;
     let result_slot = state.allocate_i32_slot();
     Ok((fd, array_slot, len, result_slot))
+}
+
+fn u8_array_slot(value: &Value) -> Option<usize> {
+    match value {
+        Value::Array {
+            slot,
+            element_type: ArrayElementType::U8,
+            ..
+        } => Some(*slot),
+        Value::Reference { value, .. } => u8_array_slot(value),
+        _ => None,
+    }
 }
 
 fn parse_arrayvl_replace_arguments(
@@ -666,14 +675,7 @@ fn parse_open_arguments(
             "`IO::open` expects a `PathBuf` as its first argument".to_string(),
         ));
     } else {
-        match resolve_value(path_term, &state.environment)? {
-            Value::PathBuf { slot } => OpenPath::PathBuf(slot),
-            other => {
-                return Err(Error::Unsupported(format!(
-                    "`IO::open` expects a `PathBuf` as its first argument, got {other:?}"
-                )));
-            }
-        }
+        OpenPath::PathBuf(parse_pathbuf_slot(path_term, state, "open", false)?)
     };
 
     let flags = lower_i32_expr(flags_term, state).map_err(|_| {
@@ -716,7 +718,7 @@ fn parse_pathbuf_push_arguments(
             "`IO::pathbuf_push` must receive a `PathBuf` and an `ArrayVL u8` source".to_string(),
         ));
     };
-    let path_slot = parse_pathbuf_slot(path_term, state, "pathbuf_push")?;
+    let path_slot = parse_pathbuf_slot(path_term, state, "pathbuf_push", true)?;
     let source = if let Term::StringLiteral(literal) = source_term {
         let mut bytes = literal.as_bytes().to_vec();
         bytes.push(0);
@@ -725,11 +727,9 @@ fn parse_pathbuf_push_arguments(
         match resolve_value(source_term, &state.environment)? {
             Value::StaticSlice { data_index, .. } => PathBufSource::StaticData(data_index),
             Value::RuntimeArg(arg_index) => PathBufSource::RuntimeArg(arg_index),
-            Value::Array {
-                slot,
-                element_type: ArrayElementType::U8,
-                ..
-            } => PathBufSource::Array(slot),
+            value if u8_array_slot(&value).is_some() => {
+                PathBufSource::Array(u8_array_slot(&value).expect("checked u8 array slot"))
+            }
             other => {
                 return Err(Error::Unsupported(format!(
                     "`IO::pathbuf_push` expects a nul-terminated `u8` source, got {other:?}"
@@ -747,12 +747,29 @@ fn parse_pathbuf_pop_arguments(arguments: &[Term], state: &LoweringState) -> Res
             "`IO::pathbuf_pop` must receive a `PathBuf`".to_string(),
         ));
     };
-    parse_pathbuf_slot(path_term, state, "pathbuf_pop")
+    parse_pathbuf_slot(path_term, state, "pathbuf_pop", true)
 }
 
-fn parse_pathbuf_slot(term: &Term, state: &LoweringState, builtin_name: &str) -> Result<usize> {
+fn parse_pathbuf_slot(
+    term: &Term,
+    state: &LoweringState,
+    builtin_name: &str,
+    require_exclusive: bool,
+) -> Result<usize> {
     match resolve_value(term, &state.environment)? {
-        Value::PathBuf { slot } => Ok(slot),
+        Value::PathBuf { slot } if !require_exclusive => Ok(slot),
+        Value::Reference { value, exclusive } => match value.as_ref() {
+            Value::PathBuf { slot } if !require_exclusive || exclusive => Ok(*slot),
+            Value::PathBuf { .. } => Err(Error::Unsupported(format!(
+                "`IO::{builtin_name}` requires an exclusive `PathBuf` reference"
+            ))),
+            other => Err(Error::Unsupported(format!(
+                "`IO::{builtin_name}` expects a `PathBuf`, got {other:?}"
+            ))),
+        },
+        Value::PathBuf { .. } => Err(Error::Unsupported(format!(
+            "`IO::{builtin_name}` requires an exclusive `PathBuf` reference"
+        ))),
         other => Err(Error::Unsupported(format!(
             "`IO::{builtin_name}` expects a `PathBuf`, got {other:?}"
         ))),

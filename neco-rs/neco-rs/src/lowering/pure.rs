@@ -1101,9 +1101,7 @@ fn wrap_reference_parameter(value: Value, ty: &Term) -> Value {
         | Value::BoolReference { .. }
         | Value::Reference { .. }
         | Value::StaticSlice { .. }
-        | Value::RuntimeArg(_)
-        | Value::PathBuf { .. }
-        | Value::Array { .. } => value,
+        | Value::RuntimeArg(_) => value,
         value => Value::Reference {
             value: Box::new(value),
             exclusive: *exclusive,

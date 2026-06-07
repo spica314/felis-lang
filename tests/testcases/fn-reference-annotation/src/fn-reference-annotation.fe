@@ -28,8 +28,9 @@
     #let value_ref : i32 = 39i32;
     #letref #excl value_ref : &^ i32 #borrow value_ref;
     #let array_ref : Array i32 2i32 <- IO::array_new i32 2i32;
-    fill_refs value_ref array_ref;
-    #let code : i32 <- sum_refs value_ref array_ref;
+    #letref #excl array_write_ref : &^ Array i32 2i32 #borrow array_ref;
+    fill_refs value_ref array_write_ref;
+    #let code : i32 <- sum_refs value_ref array_write_ref;
     #let _ : () <- IO::exit code;
     ()
 }

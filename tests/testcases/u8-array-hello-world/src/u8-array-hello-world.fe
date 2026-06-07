@@ -9,19 +9,20 @@
 #fn main : () #with IO {
     #let stdout : FileDescriptor <- IO::stdout;
     #let bytes_ref : Array u8 13i32 <- IO::array_new u8 13i32;
-    array_set bytes_ref 0i32 'h';
-    array_set bytes_ref 1i32 'e';
-    array_set bytes_ref 2i32 'l';
-    array_set bytes_ref 3i32 'l';
-    array_set bytes_ref 4i32 'o';
-    array_set bytes_ref 5i32 ',';
-    array_set bytes_ref 6i32 ' ';
-    array_set bytes_ref 7i32 'w';
-    array_set bytes_ref 8i32 'o';
-    array_set bytes_ref 9i32 'r';
-    array_set bytes_ref 10i32 'l';
-    array_set bytes_ref 11i32 'd';
-    array_set bytes_ref 12i32 '\n';
+    #letref #excl bytes_write_ref : &^ Array u8 13i32 #borrow bytes_ref;
+    array_set bytes_write_ref 0i32 'h';
+    array_set bytes_write_ref 1i32 'e';
+    array_set bytes_write_ref 2i32 'l';
+    array_set bytes_write_ref 3i32 'l';
+    array_set bytes_write_ref 4i32 'o';
+    array_set bytes_write_ref 5i32 ',';
+    array_set bytes_write_ref 6i32 ' ';
+    array_set bytes_write_ref 7i32 'w';
+    array_set bytes_write_ref 8i32 'o';
+    array_set bytes_write_ref 9i32 'r';
+    array_set bytes_write_ref 10i32 'l';
+    array_set bytes_write_ref 11i32 'd';
+    array_set bytes_write_ref 12i32 '\n';
     #let _ : () <- IO::write stdout bytes_ref 13i32;
     ()
 }

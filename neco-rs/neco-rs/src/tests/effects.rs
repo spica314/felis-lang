@@ -169,7 +169,8 @@ fn rejects_reference_and_array_builtins_without_io_effect() {
 
 #fn main : () #with IO {
     #let array_ref : Array i32 1i32 <- IO::array_new i32 1i32;
-    write_array array_ref;
+    #letref #excl array_write_ref : &^ Array i32 1i32 #borrow array_ref;
+    write_array array_write_ref;
     #let _ : () <- IO::exit (array_get array_ref 0i32);
     ()
 }

@@ -206,6 +206,13 @@ fn validate_reference_value_against_type(
         return validate_value_against_type(value, referent, program);
     }
 
+    if exclusive && aggregate_value_requires_reference(value) {
+        return Err(Error::Unsupported(format!(
+            "expected a value of type `{}` but got {value:?}",
+            render_reference_term(referent, exclusive)
+        )));
+    }
+
     if let Some(element_type) = parse_slice_type_annotation(referent)? {
         return match value {
             Value::StaticSlice { .. } if element_type == ArrayElementType::U8 => Ok(()),
@@ -385,6 +392,19 @@ fn validate_reference_value_against_type(
             render_reference_term(referent, exclusive)
         ))),
     }
+}
+
+fn aggregate_value_requires_reference(value: &Value) -> bool {
+    matches!(
+        value,
+        Value::Reference { .. }
+            | Value::Constructor(_)
+            | Value::Struct(_)
+            | Value::StaticSlice { .. }
+            | Value::RuntimeArg(_)
+            | Value::PathBuf { .. }
+            | Value::Array { .. }
+    )
 }
 
 fn parse_array_type_annotation(ty: &Term) -> Result<Option<(ArrayElementType, usize)>> {

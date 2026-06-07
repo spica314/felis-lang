@@ -43,7 +43,8 @@
 
 #fn dyn_array_set : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> (value : t) -> () #with IO {
     #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
-    array_set arrayvl (i64_from_i32 index) value;
+    #letref #excl arrayvl_ref : &^ ArrayVL t #borrow arrayvl;
+    array_set arrayvl_ref (i64_from_i32 index) value;
     ()
 }
 

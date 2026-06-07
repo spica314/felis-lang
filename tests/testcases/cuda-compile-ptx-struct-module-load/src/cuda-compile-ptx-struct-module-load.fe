@@ -63,10 +63,11 @@
     };
     #let function_value : i64 = ref_get i64 function;
     #let host_array : ArrayVL i32 <- IO::arrayvl_new i32 4i32;
-    array_set host_array 0i32 1i32;
-    array_set host_array 1i32 2i32;
-    array_set host_array 2i32 3i32;
-    array_set host_array 3i32 0i32;
+    #letref #excl host_array_ref : &^ ArrayVL i32 #borrow host_array;
+    array_set host_array_ref 0i32 1i32;
+    array_set host_array_ref 1i32 2i32;
+    array_set host_array_ref 2i32 3i32;
+    array_set host_array_ref 3i32 0i32;
     #let device_array : ArrayVLPTX i32 <- IO::arrayvlptx_new i32 4i32;
     #let copy_to_result : i32 <- IO::arrayvl_to_ptx i32 host_array device_array 4i32;
     #let launch_result : i32 <- IO::cu_launch_kernel function_value device_array 1i32 1i32 1i32 1i32 1i32 1i32 0i32 0i64;

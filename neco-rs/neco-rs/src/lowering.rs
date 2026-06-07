@@ -628,9 +628,7 @@ fn wrap_reference_value(value: Value, ty: &Term) -> Value {
         | Value::BoolReference { .. }
         | Value::Reference { .. }
         | Value::StaticSlice { .. }
-        | Value::RuntimeArg(_)
-        | Value::PathBuf { .. }
-        | Value::Array { .. } => value,
+        | Value::RuntimeArg(_) => value,
         value => Value::Reference {
             value: Box::new(value),
             exclusive: *exclusive,
@@ -694,7 +692,10 @@ fn lower_letref_borrow_statement(
                 .push(Operation::StoreBool { slot, condition });
             Value::BoolReference { slot, exclusive }
         }
-        other => other,
+        other => Value::Reference {
+            value: Box::new(other),
+            exclusive,
+        },
     };
     validate_value_against_type(&reference_value, ty, program)?;
     let reference_value = wrap_reference_value(reference_value, ty);
@@ -786,7 +787,7 @@ fn lower_array_set_statement(
         )));
     };
 
-    match crate::effect::resolve_value(&receiver, &state.environment)? {
+    match exclusive_array_set_receiver(&receiver, state)? {
         Value::Array {
             slot,
             element_type: ArrayElementType::I32,
@@ -853,11 +854,28 @@ fn lower_array_set_statement(
         }
         other => {
             return Err(Error::Unsupported(format!(
-                "`set` expects an array reference, got {other:?}"
+                "`array_set` requires an exclusive array reference, got {other:?}"
             )));
         }
     }
     Ok(())
+}
+
+fn exclusive_array_set_receiver(term: &Term, state: &LoweringState) -> Result<Value> {
+    match crate::effect::resolve_value(term, &state.environment)? {
+        Value::Reference {
+            value,
+            exclusive: true,
+        } => Ok(*value),
+        Value::Reference {
+            exclusive: false, ..
+        } => Err(Error::Unsupported(
+            "`array_set` requires an exclusive array reference".to_string(),
+        )),
+        other => Err(Error::Unsupported(format!(
+            "`array_set` requires an exclusive array reference, got {other:?}"
+        ))),
+    }
 }
 
 fn array_set_call_parts(callee: &Term, arguments: &[Term]) -> Result<Option<(Term, Vec<Term>)>> {

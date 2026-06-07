@@ -993,6 +993,143 @@ fn rejects_shared_primitive_reference_for_exclusive_parameter() {
 }
 
 #[test]
+fn rejects_array_set_without_exclusive_reference() {
+    let package = parse_inline_binary_package(
+        "array-set-without-exclusive-reference",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_set;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let array : Array i32 1i32 <- IO::array_new i32 1i32;
+    array_set array 0i32 2i32;
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject array_set without an exclusive reference");
+    assert!(
+        error
+            .to_string()
+            .contains("`array_set` requires an exclusive array reference")
+    );
+}
+
+#[test]
+fn rejects_array_set_through_shared_reference() {
+    let package = parse_inline_binary_package(
+        "array-set-shared-reference",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_set;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let array : Array i32 1i32 <- IO::array_new i32 1i32;
+    #letref array_ref : & Array i32 1i32 #borrow array;
+    array_set array_ref 0i32 2i32;
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject array_set through a shared reference");
+    assert!(
+        error
+            .to_string()
+            .contains("`array_set` requires an exclusive array reference")
+    );
+}
+
+#[test]
+fn rejects_pathbuf_push_without_exclusive_reference() {
+    let package = parse_inline_binary_package(
+        "pathbuf-push-without-exclusive-reference",
+        r#"
+#use std_core::io::IO;
+#use std_core::path::PathBuf;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let path : PathBuf <- IO::pathbuf_new 16i32;
+    #let _ : () <- IO::pathbuf_push path "tmp";
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject pathbuf_push without an exclusive reference");
+    assert!(
+        error
+            .to_string()
+            .contains("`IO::pathbuf_push` requires an exclusive `PathBuf` reference")
+    );
+}
+
+#[test]
+fn rejects_pathbuf_push_through_shared_reference() {
+    let package = parse_inline_binary_package(
+        "pathbuf-push-shared-reference",
+        r#"
+#use std_core::io::IO;
+#use std_core::path::PathBuf;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let path : PathBuf <- IO::pathbuf_new 16i32;
+    #letref path_ref : & PathBuf #borrow path;
+    #let _ : () <- IO::pathbuf_push path_ref "tmp";
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject pathbuf_push through a shared reference");
+    assert!(
+        error
+            .to_string()
+            .contains("`IO::pathbuf_push` requires an exclusive `PathBuf` reference")
+    );
+}
+
+#[test]
+fn rejects_dyn_array_push_without_exclusive_reference() {
+    let package = parse_inline_binary_package(
+        "dyn-array-push-without-exclusive-reference",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::dyn_array_push;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 1i32;
+    #let array : DynArray u8 = DynArray::dyn_array u8 arrayvl 0i64;
+    dyn_array_push u8 array 1u8;
+    ()
+}
+"#,
+    );
+
+    let error = lower_package_to_program(&package)
+        .expect_err("lowering must reject dyn_array_push without an exclusive reference");
+    assert!(
+        error
+            .to_string()
+            .contains("expected a value of type `&^ DynArray u8`")
+    );
+}
+
+#[test]
 fn rejects_unknown_effect_on_non_entrypoint_function() {
     let package = parse_inline_binary_package(
         "unknown-function-effect",

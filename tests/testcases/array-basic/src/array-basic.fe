@@ -8,9 +8,10 @@
 
 #fn main : () #with IO {
     #let array_ref : Array i32 4i32 <- IO::array_new i32 4i32;
-    array_set array_ref 0i32 7i32;
-    array_set array_ref 1i32 14i32;
-    array_set array_ref 2i32 21i32;
+    #letref #excl array_write_ref : &^ Array i32 4i32 #borrow array_ref;
+    array_set array_write_ref 0i32 7i32;
+    array_set array_write_ref 1i32 14i32;
+    array_set array_write_ref 2i32 21i32;
     #let a0 : i32 = array_get array_ref 0i32;
     #let a1 : i32 = array_get array_ref 1i32;
     #let a2 : i32 = array_get array_ref 2i32;
