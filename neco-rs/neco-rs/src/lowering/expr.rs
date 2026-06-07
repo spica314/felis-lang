@@ -2,12 +2,12 @@ use neco_rs_parser::{PathExpression, Term};
 
 use crate::effect::{Value, resolve_value};
 use crate::ir::{
-    ArrayElementType, ArrayKind, ComparisonKind, ConditionExpr, F32Expr, I32Expr, I64Expr,
-    LoweredProgram, U8Expr,
+    ArrayElementType, ArrayKind, ConditionExpr, F32Expr, I32Expr, I64Expr, LoweredProgram, U8Expr,
 };
 use crate::{Error, Result};
 
 use super::pure::lower_pure_value;
+use super::scalar::{ScalarBinaryOp, ScalarPrimitive, ScalarType, ScalarUnaryOp, scalar_primitive};
 use super::typecheck::{
     is_f32_suffix_term, is_i32_suffix_term, is_i64_suffix_term, is_u8_suffix_term,
     parse_bare_f32_literal, parse_bare_i32_literal, parse_bare_i64_literal, parse_bare_u8_literal,
@@ -400,38 +400,43 @@ fn lower_comparison_expr(
         ));
     };
 
-    if let Some(kind) = i32_comparison_kind(primitive) {
-        return Ok(ConditionExpr::I32 {
+    match scalar_primitive(primitive) {
+        Some(ScalarPrimitive::Comparison {
+            ty: ScalarType::I32,
+            kind,
+        }) => Ok(ConditionExpr::I32 {
             kind,
             lhs: lower_i32_expr(lhs, state)?,
             rhs: lower_i32_expr(rhs, state)?,
-        });
-    }
-    if let Some(kind) = i64_comparison_kind(primitive) {
-        return Ok(ConditionExpr::I64 {
+        }),
+        Some(ScalarPrimitive::Comparison {
+            ty: ScalarType::I64,
+            kind,
+        }) => Ok(ConditionExpr::I64 {
             kind,
             lhs: lower_i64_expr(lhs, state)?,
             rhs: lower_i64_expr(rhs, state)?,
-        });
-    }
-    if let Some(kind) = f32_comparison_kind(primitive) {
-        return Ok(ConditionExpr::F32 {
+        }),
+        Some(ScalarPrimitive::Comparison {
+            ty: ScalarType::F32,
+            kind,
+        }) => Ok(ConditionExpr::F32 {
             kind,
             lhs: lower_f32_expr(lhs, state)?,
             rhs: lower_f32_expr(rhs, state)?,
-        });
-    }
-    if let Some(kind) = u8_comparison_kind(primitive) {
-        return Ok(ConditionExpr::U8 {
+        }),
+        Some(ScalarPrimitive::Comparison {
+            ty: ScalarType::U8,
+            kind,
+        }) => Ok(ConditionExpr::U8 {
             kind,
             lhs: lower_u8_expr(lhs, state)?,
             rhs: lower_u8_expr(rhs, state)?,
-        });
+        }),
+        _ => Err(Error::Unsupported(format!(
+            "unsupported `bool` comparison `{primitive}`"
+        ))),
     }
-
-    Err(Error::Unsupported(format!(
-        "unsupported `bool` comparison `{primitive}`"
-    )))
 }
 
 fn lower_i32_literal_application(callee: &Term, arguments: &[Term]) -> Result<Option<I32Expr>> {
@@ -486,50 +491,6 @@ fn lower_f32_literal_application(callee: &Term, arguments: &[Term]) -> Result<Op
     parse_bare_f32_literal(literal).map(Some)
 }
 
-fn i32_comparison_kind(name: &str) -> Option<ComparisonKind> {
-    match name {
-        "i32_eq" => Some(ComparisonKind::Eq),
-        "i32_lte" => Some(ComparisonKind::Lte),
-        "i32_lt" => Some(ComparisonKind::Lt),
-        "i32_gte" => Some(ComparisonKind::Gte),
-        "i32_gt" => Some(ComparisonKind::Gt),
-        _ => None,
-    }
-}
-
-fn i64_comparison_kind(name: &str) -> Option<ComparisonKind> {
-    match name {
-        "i64_eq" => Some(ComparisonKind::Eq),
-        "i64_lte" => Some(ComparisonKind::Lte),
-        "i64_lt" => Some(ComparisonKind::Lt),
-        "i64_gte" => Some(ComparisonKind::Gte),
-        "i64_gt" => Some(ComparisonKind::Gt),
-        _ => None,
-    }
-}
-
-fn f32_comparison_kind(name: &str) -> Option<ComparisonKind> {
-    match name {
-        "f32_eq" => Some(ComparisonKind::Eq),
-        "f32_lte" => Some(ComparisonKind::Lte),
-        "f32_lt" => Some(ComparisonKind::Lt),
-        "f32_gte" => Some(ComparisonKind::Gte),
-        "f32_gt" => Some(ComparisonKind::Gt),
-        _ => None,
-    }
-}
-
-fn u8_comparison_kind(name: &str) -> Option<ComparisonKind> {
-    match name {
-        "u8_eq" => Some(ComparisonKind::Eq),
-        "u8_lte" => Some(ComparisonKind::Lte),
-        "u8_lt" => Some(ComparisonKind::Lt),
-        "u8_gte" => Some(ComparisonKind::Gte),
-        "u8_gt" => Some(ComparisonKind::Gt),
-        _ => None,
-    }
-}
-
 fn lower_i32_primitive_call(
     callee: &Term,
     arguments: &[Term],
@@ -547,48 +508,50 @@ fn lower_i32_primitive_call(
             render_path(path)
         )));
     };
+    let descriptor = scalar_primitive(primitive)
+        .filter(|descriptor| scalar_primitive_result_type(*descriptor) == Some(ScalarType::I32))
+        .ok_or_else(|| {
+            Error::Unsupported(format!("unsupported `i32` primitive call `{primitive}`"))
+        })?;
     let normalized = normalize_numeric_literal_arguments(arguments);
-    if primitive == "i32_from_u8" {
-        let [value] = normalized.as_slice() else {
-            return Err(Error::Unsupported(format!(
-                "`{primitive}` must receive exactly one argument"
-            )));
-        };
-        return Ok(I32Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
-    }
-    if primitive == "i32_from_i64" {
-        let [value] = normalized.as_slice() else {
-            return Err(Error::Unsupported(format!(
-                "`{primitive}` must receive exactly one argument"
-            )));
-        };
-        return Ok(I32Expr::FromI64(Box::new(lower_i64_expr(value, state)?)));
-    }
-    if primitive == "i32_from_f32" {
-        let [value] = normalized.as_slice() else {
-            return Err(Error::Unsupported(format!(
-                "`{primitive}` must receive exactly one argument"
-            )));
-        };
-        return Ok(I32Expr::FromF32(Box::new(lower_f32_expr(value, state)?)));
-    }
-    let [lhs, rhs] = normalized.as_slice() else {
-        return Err(Error::Unsupported(format!(
-            "`{primitive}` must receive exactly two arguments"
-        )));
-    };
-    let lhs = Box::new(lower_i32_expr(lhs, state)?);
-    let rhs = Box::new(lower_i32_expr(rhs, state)?);
+    ensure_scalar_primitive_arity(primitive, descriptor, normalized.len())?;
 
-    match primitive {
-        "i32_add" => Ok(I32Expr::Add(lhs, rhs)),
-        "i32_sub" => Ok(I32Expr::Sub(lhs, rhs)),
-        "i32_mul" => Ok(I32Expr::Mul(lhs, rhs)),
-        "i32_div" => Ok(I32Expr::Div(lhs, rhs)),
-        "i32_mod" => Ok(I32Expr::Mod(lhs, rhs)),
-        "i32_xor" => Ok(I32Expr::Xor(lhs, rhs)),
-        "i32_shl" => Ok(I32Expr::Shl(lhs, rhs)),
-        "i32_shr" => Ok(I32Expr::Shr(lhs, rhs)),
+    match descriptor {
+        ScalarPrimitive::Conversion {
+            source: ScalarType::U8,
+            ..
+        } => Ok(I32Expr::FromU8(Box::new(lower_u8_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Conversion {
+            source: ScalarType::I64,
+            ..
+        } => Ok(I32Expr::FromI64(Box::new(lower_i64_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Conversion {
+            source: ScalarType::F32,
+            ..
+        } => Ok(I32Expr::FromF32(Box::new(lower_f32_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Binary { op, .. } => {
+            let lhs = Box::new(lower_i32_expr(&normalized[0], state)?);
+            let rhs = Box::new(lower_i32_expr(&normalized[1], state)?);
+            match op {
+                ScalarBinaryOp::Add => Ok(I32Expr::Add(lhs, rhs)),
+                ScalarBinaryOp::Sub => Ok(I32Expr::Sub(lhs, rhs)),
+                ScalarBinaryOp::Mul => Ok(I32Expr::Mul(lhs, rhs)),
+                ScalarBinaryOp::Div => Ok(I32Expr::Div(lhs, rhs)),
+                ScalarBinaryOp::Mod => Ok(I32Expr::Mod(lhs, rhs)),
+                ScalarBinaryOp::Xor => Ok(I32Expr::Xor(lhs, rhs)),
+                ScalarBinaryOp::Shl => Ok(I32Expr::Shl(lhs, rhs)),
+                ScalarBinaryOp::Shr => Ok(I32Expr::Shr(lhs, rhs)),
+            }
+        }
         _ => Err(Error::Unsupported(format!(
             "unsupported `i32` primitive call `{primitive}`"
         ))),
@@ -612,45 +575,50 @@ fn lower_i64_primitive_call(
             render_path(path)
         )));
     };
+    let descriptor = scalar_primitive(primitive)
+        .filter(|descriptor| scalar_primitive_result_type(*descriptor) == Some(ScalarType::I64))
+        .ok_or_else(|| {
+            Error::Unsupported(format!("unsupported `i64` primitive call `{primitive}`"))
+        })?;
     let normalized = normalize_numeric_literal_arguments(arguments);
-    if primitive == "i64_from_i32" {
-        let [value] = normalized.as_slice() else {
-            return Err(Error::Unsupported(format!(
-                "`{primitive}` must receive exactly one argument"
-            )));
-        };
-        return Ok(I64Expr::FromI32(Box::new(lower_i32_expr(value, state)?)));
-    }
-    if primitive == "i64_from_u8" {
-        let [value] = normalized.as_slice() else {
-            return Err(Error::Unsupported(format!(
-                "`{primitive}` must receive exactly one argument"
-            )));
-        };
-        return Ok(I64Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
-    }
-    if primitive == "i64_from_f32" {
-        let [value] = normalized.as_slice() else {
-            return Err(Error::Unsupported(format!(
-                "`{primitive}` must receive exactly one argument"
-            )));
-        };
-        return Ok(I64Expr::FromF32(Box::new(lower_f32_expr(value, state)?)));
-    }
-    let [lhs, rhs] = normalized.as_slice() else {
-        return Err(Error::Unsupported(format!(
-            "`{primitive}` must receive exactly two arguments"
-        )));
-    };
-    let lhs = Box::new(lower_i64_expr(lhs, state)?);
-    let rhs = Box::new(lower_i64_expr(rhs, state)?);
+    ensure_scalar_primitive_arity(primitive, descriptor, normalized.len())?;
 
-    match primitive {
-        "i64_add" => Ok(I64Expr::Add(lhs, rhs)),
-        "i64_sub" => Ok(I64Expr::Sub(lhs, rhs)),
-        "i64_mul" => Ok(I64Expr::Mul(lhs, rhs)),
-        "i64_div" => Ok(I64Expr::Div(lhs, rhs)),
-        "i64_mod" => Ok(I64Expr::Mod(lhs, rhs)),
+    match descriptor {
+        ScalarPrimitive::Conversion {
+            source: ScalarType::I32,
+            ..
+        } => Ok(I64Expr::FromI32(Box::new(lower_i32_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Conversion {
+            source: ScalarType::U8,
+            ..
+        } => Ok(I64Expr::FromU8(Box::new(lower_u8_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Conversion {
+            source: ScalarType::F32,
+            ..
+        } => Ok(I64Expr::FromF32(Box::new(lower_f32_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Binary { op, .. } => {
+            let lhs = Box::new(lower_i64_expr(&normalized[0], state)?);
+            let rhs = Box::new(lower_i64_expr(&normalized[1], state)?);
+            match op {
+                ScalarBinaryOp::Add => Ok(I64Expr::Add(lhs, rhs)),
+                ScalarBinaryOp::Sub => Ok(I64Expr::Sub(lhs, rhs)),
+                ScalarBinaryOp::Mul => Ok(I64Expr::Mul(lhs, rhs)),
+                ScalarBinaryOp::Div => Ok(I64Expr::Div(lhs, rhs)),
+                ScalarBinaryOp::Mod => Ok(I64Expr::Mod(lhs, rhs)),
+                _ => Err(Error::Unsupported(format!(
+                    "unsupported `i64` primitive call `{primitive}`"
+                ))),
+            }
+        }
         _ => Err(Error::Unsupported(format!(
             "unsupported `i64` primitive call `{primitive}`"
         ))),
@@ -674,45 +642,50 @@ fn lower_u8_primitive_call(
             render_path(path)
         )));
     };
+    let descriptor = scalar_primitive(primitive)
+        .filter(|descriptor| scalar_primitive_result_type(*descriptor) == Some(ScalarType::U8))
+        .ok_or_else(|| {
+            Error::Unsupported(format!("unsupported `u8` primitive call `{primitive}`"))
+        })?;
     let normalized = normalize_numeric_literal_arguments(arguments);
-    if primitive == "u8_from_i32" {
-        let [value] = normalized.as_slice() else {
-            return Err(Error::Unsupported(format!(
-                "`{primitive}` must receive exactly one argument"
-            )));
-        };
-        return Ok(U8Expr::FromI32(Box::new(lower_i32_expr(value, state)?)));
-    }
-    if primitive == "u8_from_i64" {
-        let [value] = normalized.as_slice() else {
-            return Err(Error::Unsupported(format!(
-                "`{primitive}` must receive exactly one argument"
-            )));
-        };
-        return Ok(U8Expr::FromI64(Box::new(lower_i64_expr(value, state)?)));
-    }
-    if primitive == "u8_from_f32" {
-        let [value] = normalized.as_slice() else {
-            return Err(Error::Unsupported(format!(
-                "`{primitive}` must receive exactly one argument"
-            )));
-        };
-        return Ok(U8Expr::FromF32(Box::new(lower_f32_expr(value, state)?)));
-    }
-    let [lhs, rhs] = normalized.as_slice() else {
-        return Err(Error::Unsupported(format!(
-            "`{primitive}` must receive exactly two arguments"
-        )));
-    };
-    let lhs = Box::new(lower_u8_expr(lhs, state)?);
-    let rhs = Box::new(lower_u8_expr(rhs, state)?);
+    ensure_scalar_primitive_arity(primitive, descriptor, normalized.len())?;
 
-    match primitive {
-        "u8_add" => Ok(U8Expr::Add(lhs, rhs)),
-        "u8_sub" => Ok(U8Expr::Sub(lhs, rhs)),
-        "u8_mul" => Ok(U8Expr::Mul(lhs, rhs)),
-        "u8_div" => Ok(U8Expr::Div(lhs, rhs)),
-        "u8_mod" => Ok(U8Expr::Mod(lhs, rhs)),
+    match descriptor {
+        ScalarPrimitive::Conversion {
+            source: ScalarType::I32,
+            ..
+        } => Ok(U8Expr::FromI32(Box::new(lower_i32_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Conversion {
+            source: ScalarType::I64,
+            ..
+        } => Ok(U8Expr::FromI64(Box::new(lower_i64_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Conversion {
+            source: ScalarType::F32,
+            ..
+        } => Ok(U8Expr::FromF32(Box::new(lower_f32_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Binary { op, .. } => {
+            let lhs = Box::new(lower_u8_expr(&normalized[0], state)?);
+            let rhs = Box::new(lower_u8_expr(&normalized[1], state)?);
+            match op {
+                ScalarBinaryOp::Add => Ok(U8Expr::Add(lhs, rhs)),
+                ScalarBinaryOp::Sub => Ok(U8Expr::Sub(lhs, rhs)),
+                ScalarBinaryOp::Mul => Ok(U8Expr::Mul(lhs, rhs)),
+                ScalarBinaryOp::Div => Ok(U8Expr::Div(lhs, rhs)),
+                ScalarBinaryOp::Mod => Ok(U8Expr::Mod(lhs, rhs)),
+                _ => Err(Error::Unsupported(format!(
+                    "unsupported `u8` primitive call `{primitive}`"
+                ))),
+            }
+        }
         _ => Err(Error::Unsupported(format!(
             "unsupported `u8` primitive call `{primitive}`"
         ))),
@@ -736,60 +709,87 @@ fn lower_f32_primitive_call(
             render_path(path)
         )));
     };
+    let descriptor = scalar_primitive(primitive)
+        .filter(|descriptor| scalar_primitive_result_type(*descriptor) == Some(ScalarType::F32))
+        .ok_or_else(|| {
+            Error::Unsupported(format!("unsupported `f32` primitive call `{primitive}`"))
+        })?;
     let normalized = normalize_numeric_literal_arguments(arguments);
-    match primitive {
-        "f32_from_i32" => {
-            let [value] = normalized.as_slice() else {
-                return Err(Error::Unsupported(format!(
-                    "`{primitive}` must receive exactly one argument"
-                )));
-            };
-            return Ok(F32Expr::FromI32(Box::new(lower_i32_expr(value, state)?)));
-        }
-        "f32_from_i64" => {
-            let [value] = normalized.as_slice() else {
-                return Err(Error::Unsupported(format!(
-                    "`{primitive}` must receive exactly one argument"
-                )));
-            };
-            return Ok(F32Expr::FromI64(Box::new(lower_i64_expr(value, state)?)));
-        }
-        "f32_from_u8" => {
-            let [value] = normalized.as_slice() else {
-                return Err(Error::Unsupported(format!(
-                    "`{primitive}` must receive exactly one argument"
-                )));
-            };
-            return Ok(F32Expr::FromU8(Box::new(lower_u8_expr(value, state)?)));
-        }
-        "f32_sqrt" => {
-            let [value] = normalized.as_slice() else {
-                return Err(Error::Unsupported(format!(
-                    "`{primitive}` must receive exactly one argument"
-                )));
-            };
-            return Ok(F32Expr::Sqrt(Box::new(lower_f32_expr(value, state)?)));
-        }
-        _ => {}
-    }
+    ensure_scalar_primitive_arity(primitive, descriptor, normalized.len())?;
 
-    let [lhs, rhs] = normalized.as_slice() else {
-        return Err(Error::Unsupported(format!(
-            "`{primitive}` must receive exactly two arguments"
-        )));
-    };
-    let lhs = Box::new(lower_f32_expr(lhs, state)?);
-    let rhs = Box::new(lower_f32_expr(rhs, state)?);
-
-    match primitive {
-        "f32_add" => Ok(F32Expr::Add(lhs, rhs)),
-        "f32_sub" => Ok(F32Expr::Sub(lhs, rhs)),
-        "f32_mul" => Ok(F32Expr::Mul(lhs, rhs)),
-        "f32_div" => Ok(F32Expr::Div(lhs, rhs)),
+    match descriptor {
+        ScalarPrimitive::Conversion {
+            source: ScalarType::I32,
+            ..
+        } => Ok(F32Expr::FromI32(Box::new(lower_i32_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Conversion {
+            source: ScalarType::I64,
+            ..
+        } => Ok(F32Expr::FromI64(Box::new(lower_i64_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Conversion {
+            source: ScalarType::U8,
+            ..
+        } => Ok(F32Expr::FromU8(Box::new(lower_u8_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Unary {
+            op: ScalarUnaryOp::Sqrt,
+            ..
+        } => Ok(F32Expr::Sqrt(Box::new(lower_f32_expr(
+            &normalized[0],
+            state,
+        )?))),
+        ScalarPrimitive::Binary { op, .. } => {
+            let lhs = Box::new(lower_f32_expr(&normalized[0], state)?);
+            let rhs = Box::new(lower_f32_expr(&normalized[1], state)?);
+            match op {
+                ScalarBinaryOp::Add => Ok(F32Expr::Add(lhs, rhs)),
+                ScalarBinaryOp::Sub => Ok(F32Expr::Sub(lhs, rhs)),
+                ScalarBinaryOp::Mul => Ok(F32Expr::Mul(lhs, rhs)),
+                ScalarBinaryOp::Div => Ok(F32Expr::Div(lhs, rhs)),
+                _ => Err(Error::Unsupported(format!(
+                    "unsupported `f32` primitive call `{primitive}`"
+                ))),
+            }
+        }
         _ => Err(Error::Unsupported(format!(
             "unsupported `f32` primitive call `{primitive}`"
         ))),
     }
+}
+
+fn scalar_primitive_result_type(descriptor: ScalarPrimitive) -> Option<ScalarType> {
+    match descriptor {
+        ScalarPrimitive::Binary { ty, .. } | ScalarPrimitive::Unary { ty, .. } => Some(ty),
+        ScalarPrimitive::Conversion { dest, .. } => Some(dest),
+        ScalarPrimitive::Comparison { .. } => None,
+    }
+}
+
+fn ensure_scalar_primitive_arity(
+    primitive: &str,
+    descriptor: ScalarPrimitive,
+    actual: usize,
+) -> Result<()> {
+    let expected = descriptor.arity();
+    if actual == expected {
+        return Ok(());
+    }
+    let noun = if expected == 1 {
+        "argument"
+    } else {
+        "arguments"
+    };
+    Err(Error::Unsupported(format!(
+        "`{primitive}` must receive exactly {expected} {noun}"
+    )))
 }
 
 fn lower_array_get_call(

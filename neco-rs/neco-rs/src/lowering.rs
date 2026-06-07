@@ -3,6 +3,7 @@ mod expr;
 mod package;
 mod ptx;
 mod pure;
+mod scalar;
 mod typecheck;
 
 use neco_rs_parser::{

@@ -9,6 +9,7 @@ use crate::ir::{ArrayElementType, CompiledPtxArtifact, LoweredProgram, intern_da
 use crate::{Error, Result};
 
 use super::declarations::StructSignature;
+use super::scalar::{ScalarBinaryOp, ScalarPrimitive, ScalarType, ScalarUnaryOp, scalar_primitive};
 use super::{LoweringState, normalize_numeric_literal_arguments};
 
 pub(super) fn initialize_compile_ptx_bindings(
@@ -1253,46 +1254,34 @@ fn ptx_register_type(ty: ArrayElementType) -> &'static str {
 }
 
 fn ptx_binary_primitive(name: &str) -> Option<(ArrayElementType, &'static str)> {
-    match name {
-        "i32_add" => Some((ArrayElementType::I32, "add.s32")),
-        "i32_sub" => Some((ArrayElementType::I32, "sub.s32")),
-        "i32_mul" => Some((ArrayElementType::I32, "mul.lo.s32")),
-        "i32_div" => Some((ArrayElementType::I32, "div.s32")),
-        "i32_mod" => Some((ArrayElementType::I32, "rem.s32")),
-        "i32_xor" => Some((ArrayElementType::I32, "xor.b32")),
-        "i32_shl" => Some((ArrayElementType::I32, "shl.b32")),
-        "i32_shr" => Some((ArrayElementType::I32, "shr.u32")),
-        "i64_add" => Some((ArrayElementType::I64, "add.s64")),
-        "i64_sub" => Some((ArrayElementType::I64, "sub.s64")),
-        "i64_mul" => Some((ArrayElementType::I64, "mul.lo.s64")),
-        "i64_div" => Some((ArrayElementType::I64, "div.s64")),
-        "f32_add" => Some((ArrayElementType::F32, "add.rn.f32")),
-        "f32_sub" => Some((ArrayElementType::F32, "sub.rn.f32")),
-        "f32_mul" => Some((ArrayElementType::F32, "mul.rn.f32")),
-        "f32_div" => Some((ArrayElementType::F32, "div.rn.f32")),
+    match scalar_primitive(name) {
+        Some(ScalarPrimitive::Binary { ty, op }) => {
+            ptx_binary_instruction(ty, op).map(|instruction| (array_element_type(ty), instruction))
+        }
         _ => None,
     }
 }
 
 fn ptx_unary_primitive(name: &str) -> Option<(ArrayElementType, &'static str)> {
-    match name {
-        "f32_sqrt" => Some((ArrayElementType::F32, "sqrt.rn.f32")),
+    match scalar_primitive(name) {
+        Some(ScalarPrimitive::Unary {
+            ty: ScalarType::F32,
+            op: ScalarUnaryOp::Sqrt,
+        }) => Some((ArrayElementType::F32, "sqrt.rn.f32")),
         _ => None,
     }
 }
 
 fn ptx_comparison_primitive(name: &str) -> Option<(ArrayElementType, &'static str)> {
-    match name {
-        "i32_eq" => Some((ArrayElementType::I32, "eq")),
-        "i32_lte" => Some((ArrayElementType::I32, "le")),
-        "i32_lt" => Some((ArrayElementType::I32, "lt")),
-        "i32_gte" => Some((ArrayElementType::I32, "ge")),
-        "i32_gt" => Some((ArrayElementType::I32, "gt")),
-        "f32_eq" => Some((ArrayElementType::F32, "eq")),
-        "f32_lte" => Some((ArrayElementType::F32, "le")),
-        "f32_lt" => Some((ArrayElementType::F32, "lt")),
-        "f32_gte" => Some((ArrayElementType::F32, "ge")),
-        "f32_gt" => Some((ArrayElementType::F32, "gt")),
+    match scalar_primitive(name) {
+        Some(ScalarPrimitive::Comparison { ty, kind }) => {
+            let ty = match ty {
+                ScalarType::I32 => ArrayElementType::I32,
+                ScalarType::F32 => ArrayElementType::F32,
+                ScalarType::I64 | ScalarType::U8 => return None,
+            };
+            Some((ty, ptx_comparison_instruction(kind)))
+        }
         _ => None,
     }
 }
@@ -1308,18 +1297,65 @@ fn ptx_comparison_type(ty: ArrayElementType) -> &'static str {
 fn ptx_conversion_primitive(
     name: &str,
 ) -> Option<(ArrayElementType, ArrayElementType, &'static str)> {
-    match name {
-        "f32_from_i32" => Some((
+    match scalar_primitive(name) {
+        Some(ScalarPrimitive::Conversion {
+            source: ScalarType::I32,
+            dest: ScalarType::F32,
+        }) => Some((
             ArrayElementType::I32,
             ArrayElementType::F32,
             "cvt.rn.f32.s32",
         )),
-        "i32_from_f32" => Some((
+        Some(ScalarPrimitive::Conversion {
+            source: ScalarType::F32,
+            dest: ScalarType::I32,
+        }) => Some((
             ArrayElementType::F32,
             ArrayElementType::I32,
             "cvt.rzi.s32.f32",
         )),
         _ => None,
+    }
+}
+
+fn array_element_type(ty: ScalarType) -> ArrayElementType {
+    match ty {
+        ScalarType::I32 => ArrayElementType::I32,
+        ScalarType::I64 => ArrayElementType::I64,
+        ScalarType::F32 => ArrayElementType::F32,
+        ScalarType::U8 => ArrayElementType::U8,
+    }
+}
+
+fn ptx_binary_instruction(ty: ScalarType, op: ScalarBinaryOp) -> Option<&'static str> {
+    match (ty, op) {
+        (ScalarType::I32, ScalarBinaryOp::Add) => Some("add.s32"),
+        (ScalarType::I32, ScalarBinaryOp::Sub) => Some("sub.s32"),
+        (ScalarType::I32, ScalarBinaryOp::Mul) => Some("mul.lo.s32"),
+        (ScalarType::I32, ScalarBinaryOp::Div) => Some("div.s32"),
+        (ScalarType::I32, ScalarBinaryOp::Mod) => Some("rem.s32"),
+        (ScalarType::I32, ScalarBinaryOp::Xor) => Some("xor.b32"),
+        (ScalarType::I32, ScalarBinaryOp::Shl) => Some("shl.b32"),
+        (ScalarType::I32, ScalarBinaryOp::Shr) => Some("shr.u32"),
+        (ScalarType::I64, ScalarBinaryOp::Add) => Some("add.s64"),
+        (ScalarType::I64, ScalarBinaryOp::Sub) => Some("sub.s64"),
+        (ScalarType::I64, ScalarBinaryOp::Mul) => Some("mul.lo.s64"),
+        (ScalarType::I64, ScalarBinaryOp::Div) => Some("div.s64"),
+        (ScalarType::F32, ScalarBinaryOp::Add) => Some("add.rn.f32"),
+        (ScalarType::F32, ScalarBinaryOp::Sub) => Some("sub.rn.f32"),
+        (ScalarType::F32, ScalarBinaryOp::Mul) => Some("mul.rn.f32"),
+        (ScalarType::F32, ScalarBinaryOp::Div) => Some("div.rn.f32"),
+        _ => None,
+    }
+}
+
+fn ptx_comparison_instruction(kind: crate::ir::ComparisonKind) -> &'static str {
+    match kind {
+        crate::ir::ComparisonKind::Eq => "eq",
+        crate::ir::ComparisonKind::Lte => "le",
+        crate::ir::ComparisonKind::Lt => "lt",
+        crate::ir::ComparisonKind::Gte => "ge",
+        crate::ir::ComparisonKind::Gt => "gt",
     }
 }
 
