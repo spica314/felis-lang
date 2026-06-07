@@ -108,7 +108,8 @@ fn program_syscall_code(
 ) -> Vec<u8> {
     let addresses = data_addresses(program, data_virtual_address);
     let mut code = Vec::new();
-    let stack_frame_size = stack_frame_size(program);
+    let frame_layout = FrameLayout::new(program);
+    let stack_frame_size = frame_layout.stack_frame_size();
 
     if let Some(argv_global_address) = argv_global_address {
         emit_argv_global_init(&mut code, argv_global_address, entry_abi);
@@ -119,7 +120,7 @@ fn program_syscall_code(
         code.extend_from_slice(&[0x48, 0x89, 0xe5]);
         code.extend_from_slice(&[0x48, 0x81, 0xec]);
         code.extend_from_slice(&(stack_frame_size as u32).to_le_bytes());
-        emit_array_initializers(program, &mut code);
+        emit_array_initializers(program, &frame_layout, &mut code);
     }
 
     let mut emit_context = EmitOperationsContext {
@@ -199,7 +200,7 @@ fn emit_operations(
                 code.extend_from_slice(&[0x45, 0x31, 0xc9]);
                 code.extend_from_slice(&[0xb8, 0x09, 0x00, 0x00, 0x00]);
                 code.extend_from_slice(&[0x0f, 0x05]);
-                let slot_offset = heap_slot_offset(*result_slot);
+                let slot_offset = heap_slot_offset(program, *result_slot);
                 code.extend_from_slice(&[0x48, 0x89, 0x85]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
             }
@@ -250,7 +251,7 @@ fn emit_operations(
             } => {
                 emit_i32_expr_to_eax(value, code, program);
                 code.extend_from_slice(&[0x89, 0xc2]);
-                let slot_offset = heap_slot_offset(*heap_slot);
+                let slot_offset = heap_slot_offset(program, *heap_slot);
                 code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
                 code.extend_from_slice(&[0x89, 0x93]);
@@ -263,7 +264,7 @@ fn emit_operations(
             } => {
                 emit_i64_expr_to_rax(value, code, program);
                 code.extend_from_slice(&[0x48, 0x89, 0xc2]);
-                let slot_offset = heap_slot_offset(*heap_slot);
+                let slot_offset = heap_slot_offset(program, *heap_slot);
                 code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
                 code.extend_from_slice(&[0x48, 0x89, 0x93]);
@@ -274,11 +275,11 @@ fn emit_operations(
                 byte_offset,
                 source_heap_slot,
             } => {
-                let source_slot_offset = heap_slot_offset(*source_heap_slot);
+                let source_slot_offset = heap_slot_offset(program, *source_heap_slot);
                 code.extend_from_slice(&[0x48, 0x8b, 0x85]);
                 code.extend_from_slice(&source_slot_offset.to_le_bytes());
                 code.extend_from_slice(&[0x48, 0x89, 0xc1]);
-                let target_slot_offset = heap_slot_offset(*heap_slot);
+                let target_slot_offset = heap_slot_offset(program, *heap_slot);
                 code.extend_from_slice(&[0x48, 0x8b, 0x95]);
                 code.extend_from_slice(&target_slot_offset.to_le_bytes());
                 code.extend_from_slice(&[0x48, 0x89, 0x8a]);
