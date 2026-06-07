@@ -13,8 +13,8 @@ use neco_rs_parser::{
 
 use crate::effect::{Value, bind_pattern, lower_effect, resolve_value};
 use crate::ir::{
-    ArrayAllocation, ArrayElementType, ArrayKind, CompiledPtxArtifact, ExitCodeExpr, I32Expr,
-    LoweredProgram, Operation, intern_data,
+    ArrayAllocation, ArrayElementType, ArrayKind, CompiledPtxArtifact, ConditionExpr, ExitCodeExpr,
+    I32Expr, LoweredProgram, Operation, intern_data,
 };
 use crate::{Error, Result};
 
@@ -74,6 +74,28 @@ impl LoweringState {
         self.clone()
     }
 
+    fn merge_allocations_from(&mut self, scoped_state: &Self) {
+        self.next_array_slot = self.next_array_slot.max(scoped_state.next_array_slot);
+        self.next_i32_slot = self.next_i32_slot.max(scoped_state.next_i32_slot);
+        self.next_i64_slot = self.next_i64_slot.max(scoped_state.next_i64_slot);
+        self.next_f32_slot = self.next_f32_slot.max(scoped_state.next_f32_slot);
+        self.next_u8_slot = self.next_u8_slot.max(scoped_state.next_u8_slot);
+        self.next_bool_slot = self.next_bool_slot.max(scoped_state.next_bool_slot);
+    }
+
+    fn propagate_aggregate_reference_updates_from(&mut self, scoped_state: &Self) {
+        let names: Vec<String> = self.environment.keys().cloned().collect();
+        for name in names {
+            let Some(scoped_value) = scoped_state.environment.get(&name).cloned() else {
+                continue;
+            };
+            if aggregate_reference_update_can_propagate(self.environment.get(&name), &scoped_value)
+            {
+                self.environment.insert(name, scoped_value);
+            }
+        }
+    }
+
     pub(crate) fn allocate_array(
         &mut self,
         element_type: ArrayElementType,
@@ -120,6 +142,58 @@ impl LoweringState {
         let slot = self.next_bool_slot;
         self.next_bool_slot += 1;
         slot
+    }
+}
+
+fn aggregate_reference_update_can_propagate(
+    parent_value: Option<&Value>,
+    scoped_value: &Value,
+) -> bool {
+    match (parent_value, scoped_value) {
+        (
+            Some(Value::Reference {
+                value: parent_referent,
+                ..
+            }),
+            Value::Reference {
+                value: scoped_referent,
+                ..
+            },
+        ) => {
+            matches!(
+                parent_referent.as_ref(),
+                Value::Constructor(_) | Value::Struct(_)
+            ) && matches!(
+                scoped_referent.as_ref(),
+                Value::Constructor(_) | Value::Struct(_)
+            )
+        }
+        (
+            Some(Value::Constructor(_) | Value::Struct(_)),
+            Value::Constructor(_) | Value::Struct(_),
+        ) => true,
+        _ => false,
+    }
+}
+
+fn propagate_converged_aggregate_reference_updates(
+    state: &mut LoweringState,
+    then_state: &LoweringState,
+    else_state: &LoweringState,
+) {
+    let names: Vec<String> = state.environment.keys().cloned().collect();
+    for name in names {
+        let Some(then_value) = then_state.environment.get(&name) else {
+            continue;
+        };
+        let Some(else_value) = else_state.environment.get(&name) else {
+            continue;
+        };
+        if then_value == else_value
+            && aggregate_reference_update_can_propagate(state.environment.get(&name), then_value)
+        {
+            state.environment.insert(name, then_value.clone());
+        }
     }
 }
 
@@ -1944,16 +2018,12 @@ pub(super) fn lower_statement(
                 }
                 terminated = lower_statement(statement, &mut loop_state, &mut loop_program)?;
             }
+            state.propagate_aggregate_reference_updates_from(&loop_state);
             program.data = loop_program.data;
             program.arrays = loop_program.arrays;
             program.heap_slots = program.heap_slots.max(loop_program.heap_slots);
             program.requires_argv = loop_program.requires_argv;
-            state.next_array_slot = state.next_array_slot.max(loop_state.next_array_slot);
-            state.next_i32_slot = state.next_i32_slot.max(loop_state.next_i32_slot);
-            state.next_i64_slot = state.next_i64_slot.max(loop_state.next_i64_slot);
-            state.next_f32_slot = state.next_f32_slot.max(loop_state.next_f32_slot);
-            state.next_u8_slot = state.next_u8_slot.max(loop_state.next_u8_slot);
-            state.next_bool_slot = state.next_bool_slot.max(loop_state.next_bool_slot);
+            state.merge_allocations_from(&loop_state);
             program.operations.push(Operation::Loop {
                 body_operations: loop_program.operations,
             });
@@ -2064,11 +2134,25 @@ fn lower_if_statement(
         next_f32_slot = next_f32_slot.max(else_state.next_f32_slot);
         next_u8_slot = next_u8_slot.max(else_state.next_u8_slot);
         next_bool_slot = next_bool_slot.max(else_state.next_bool_slot);
+        match &condition {
+            ConditionExpr::Literal(true) => {
+                state.propagate_aggregate_reference_updates_from(&then_state);
+            }
+            ConditionExpr::Literal(false) => {
+                state.propagate_aggregate_reference_updates_from(&else_state);
+            }
+            _ => {
+                propagate_converged_aggregate_reference_updates(state, &then_state, &else_state);
+            }
+        }
     } else {
         program.data = then_program.data;
         program.arrays = then_program.arrays;
         program.heap_slots = program.heap_slots.max(then_program.heap_slots);
         program.requires_argv = then_program.requires_argv;
+        if matches!(condition, ConditionExpr::Literal(true)) {
+            state.propagate_aggregate_reference_updates_from(&then_state);
+        }
     }
     state.next_array_slot = next_array_slot;
     state.next_i32_slot = next_i32_slot;
@@ -2837,20 +2921,16 @@ fn lower_effectful_block(
         }
         terminated = lower_statement(statement, &mut scoped_state, program)?;
         if terminated {
-            state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
-            state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
-            state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
-            state.next_f32_slot = state.next_f32_slot.max(scoped_state.next_f32_slot);
+            state.propagate_aggregate_reference_updates_from(&scoped_state);
+            state.merge_allocations_from(&scoped_state);
             return Ok(true);
         }
     }
     if let Some(tail) = block.tail.as_deref() {
         terminated = lower_expression_statement(tail, &mut scoped_state, program)?;
     }
-    state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
-    state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
-    state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
-    state.next_f32_slot = state.next_f32_slot.max(scoped_state.next_f32_slot);
+    state.propagate_aggregate_reference_updates_from(&scoped_state);
+    state.merge_allocations_from(&scoped_state);
     Ok(terminated)
 }
 
@@ -2868,10 +2948,8 @@ fn lower_match_expression_statement(
             scoped_state.environment.extend(bindings);
             let terminated =
                 lower_expression_statement(arm.result.as_ref(), &mut scoped_state, program)?;
-            state.next_array_slot = state.next_array_slot.max(scoped_state.next_array_slot);
-            state.next_i32_slot = state.next_i32_slot.max(scoped_state.next_i32_slot);
-            state.next_i64_slot = state.next_i64_slot.max(scoped_state.next_i64_slot);
-            state.next_f32_slot = state.next_f32_slot.max(scoped_state.next_f32_slot);
+            state.propagate_aggregate_reference_updates_from(&scoped_state);
+            state.merge_allocations_from(&scoped_state);
             return Ok(terminated);
         }
     }

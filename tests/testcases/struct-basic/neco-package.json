@@ -7,6 +7,9 @@
         "src/struct-rc-field-access.fe",
         "src/struct-reference.fe",
         "src/struct-mut-reference.fe",
+        "src/struct-mut-reference-block.fe",
+        "src/struct-mut-reference-if.fe",
+        "src/struct-mut-reference-loop.fe",
         "src/struct-rc-reference.fe",
         "src/struct-rc-mut-reference.fe"
     ]

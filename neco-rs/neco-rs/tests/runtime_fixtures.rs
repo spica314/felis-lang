@@ -873,6 +873,27 @@ fn compiles_and_runs_struct_mut_reference_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_struct_mut_reference_block_fixture() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let status = run_fixture_status(&root, "struct-mut-reference-block");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_struct_mut_reference_if_fixture() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let status = run_fixture_status(&root, "struct-mut-reference-if");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
+fn compiles_and_runs_struct_mut_reference_loop_fixture() {
+    let root = repo_root().join("tests/testcases/struct-basic");
+    let status = run_fixture_status(&root, "struct-mut-reference-loop");
+    assert_eq!(status.code(), Some(42));
+}
+
+#[test]
 fn compiles_and_runs_struct_rc_reference_fixture() {
     let root = repo_root().join("tests/testcases/struct-basic");
     let status = run_fixture_status(&root, "struct-rc-reference");

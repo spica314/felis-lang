@@ -1,0 +1,23 @@
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#struct Span : Type[0] {
+    start : i32,
+    end : i32,
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let span : Span = Span { start = 1i32, end = 2i32 };
+    #letref #excl span_ref : &^ Span #borrow span;
+    {
+        ref_set Span span_ref Span { start = 20i32, end = 22i32 };
+    };
+    #let updated : Span = ref_get Span span_ref;
+    #let _ : () <- IO::exit (i32_add updated.start updated.end);
+    ()
+}
