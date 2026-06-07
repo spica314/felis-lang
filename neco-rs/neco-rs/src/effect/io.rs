@@ -172,6 +172,20 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(false))
         }
+        ["IO", "panic"] => {
+            let operation = match parse_panic_arguments(arguments, state) {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            program.operations.push(operation);
+            program
+                .operations
+                .push(Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(101))));
+            if let Err(error) = bind_checked_pattern(binder, Value::Unit, ty, state, program) {
+                return Some(Err(error));
+            }
+            Some(Ok(true))
+        }
         ["IO", "arrayvl_replace"] => {
             let (dest_slot, source_slot) = match parse_arrayvl_replace_arguments(arguments, state) {
                 Ok(value) => value,
@@ -475,6 +489,34 @@ pub(crate) fn lower_io_call(
             Some(Ok(false))
         }
         _ => None,
+    }
+}
+
+fn parse_panic_arguments(arguments: &[Term], state: &LoweringState) -> Result<Operation> {
+    let [message_term] = arguments else {
+        return Err(Error::Unsupported(
+            "`IO::panic` must receive a single `ArrayVL u8` message".to_string(),
+        ));
+    };
+
+    match resolve_value(message_term, &state.environment)? {
+        Value::StaticSlice { data_index, len } => Ok(Operation::WriteStatic {
+            fd: I32Expr::Literal(2),
+            data_index,
+            len: I32Expr::Literal(len),
+        }),
+        Value::Array {
+            slot,
+            element_type: ArrayElementType::U8,
+            ..
+        } => Ok(Operation::WriteArray {
+            fd: I32Expr::Literal(2),
+            array_slot: slot,
+            len: I32Expr::ArrayLen { array_slot: slot },
+        }),
+        other => Err(Error::Unsupported(format!(
+            "`IO::panic` expects an `ArrayVL u8` message, got {other:?}"
+        ))),
     }
 }
 

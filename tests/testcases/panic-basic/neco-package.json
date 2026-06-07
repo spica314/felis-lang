@@ -1,0 +1,4 @@
+{
+    "name": "panic-basic",
+    "felis-bin-entrypoints": ["src/panic-basic.fe"]
+}

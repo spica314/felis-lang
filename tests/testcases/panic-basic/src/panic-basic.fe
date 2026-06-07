@@ -1,0 +1,11 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::u8::u8;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let message : & ArrayVL u8 = "panic-basic\n";
+    #let _ : () <- IO::panic message;
+    ()
+}

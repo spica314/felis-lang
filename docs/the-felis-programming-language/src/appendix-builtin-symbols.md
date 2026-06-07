@@ -150,6 +150,7 @@ All `IO` operations must be used in a function annotated with `#with IO`.
 | `IO::stdout` | `FileDescriptor #with IO`; returns the standard output descriptor. |
 | `IO::read` | `(fd : FileDescriptor) -> (buffer : Array u8 n or ArrayVL u8) -> (len : i32) -> i32 #with IO`; reads bytes and returns the byte count. |
 | `IO::write` | `(fd : FileDescriptor) -> (bytes : Array u8 n or ArrayVL u8) -> (len : i32) -> () #with IO`; writes bytes to a descriptor. |
+| `IO::panic` | `(message : & ArrayVL u8) -> () #with IO`; writes the message to standard error and terminates with exit code 101. |
 | `IO::open` | `(path : & PathBuf) -> (flags : i32) -> (mode : i32) -> FileDescriptor #with IO`; opens a path and returns a descriptor. |
 | `IO::close` | `(fd : FileDescriptor) -> () #with IO`; closes a descriptor. |
 | `IO::exit` | `(code : i32 or i64 or u8) -> () #with IO`; terminates the process with the given exit code. |

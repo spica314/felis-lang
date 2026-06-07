@@ -26,6 +26,15 @@ fn compiles_and_runs_libc_start_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_panic_basic_fixture() {
+    let root = repo_root().join("tests/testcases/panic-basic");
+    let output = run_fixture_output(&root, "panic-basic");
+    assert_eq!(output.status.code(), Some(101));
+    assert!(output.stdout.is_empty());
+    assert_eq!(output.stderr, b"panic-basic\n");
+}
+
+#[test]
 fn libc_start_fixture_links_requested_shared_libraries() {
     let root = repo_root().join("tests/testcases/libc-start-hello");
     let output = compile_fixture(&root, "libc-start-hello");

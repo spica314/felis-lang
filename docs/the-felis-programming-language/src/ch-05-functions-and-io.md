@@ -60,6 +60,14 @@ Functions that use IO are annotated with `#with IO`.
 #let _ : () <- IO::exit 42i32;
 ```
 
+`IO::panic` writes a message to standard error and terminates with exit code
+101.
+
+```felis
+#let message : & ArrayVL u8 = "panic\n";
+#let _ : () <- IO::panic message;
+```
+
 File descriptors are obtained from `IO::stdin`, `IO::stdout`, and `IO::open`.
 `IO::open` requires a `PathBuf`; string literals and byte arrays must first be
 pushed into a path buffer.
