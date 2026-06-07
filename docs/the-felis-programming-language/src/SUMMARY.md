@@ -11,4 +11,5 @@
 - [Arrays, ArrayVL, and Strings](./ch-09-arrays-arrayvl-and-strings.md)
 - [Generics](./ch-10-generics.md)
 - [Modules and Workspaces](./ch-11-modules-and-workspaces.md)
+- [PTX and CUDA](./ch-12-ptx-and-cuda.md)
 - [Appendix: Builtin Symbols](./appendix-builtin-symbols.md)
