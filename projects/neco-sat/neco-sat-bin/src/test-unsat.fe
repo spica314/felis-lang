@@ -1,0 +1,41 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_set;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::reference::ref_get;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let assignments : Array i32 12i32 <- IO::array_new i32 12i32;
+    #letref #excl assignments_ref : &^ Array i32 12i32 #borrow assignments;
+    #let lit_vars : Array i32 2048i32 <- IO::array_new i32 2048i32;
+    #letref #excl lit_vars_ref : &^ Array i32 2048i32 #borrow lit_vars;
+    #let lit_negated : Array i32 2048i32 <- IO::array_new i32 2048i32;
+    #letref #excl lit_negated_ref : &^ Array i32 2048i32 #borrow lit_negated;
+    #let clause_starts : Array i32 256i32 <- IO::array_new i32 256i32;
+    #letref #excl clause_starts_ref : &^ Array i32 256i32 #borrow clause_starts;
+    #let clause_ends : Array i32 256i32 <- IO::array_new i32 256i32;
+    #letref #excl clause_ends_ref : &^ Array i32 256i32 #borrow clause_ends;
+
+    array_set lit_vars_ref 0i32 0i32;
+    array_set lit_negated_ref 0i32 0i32;
+    array_set lit_vars_ref 1i32 0i32;
+    array_set lit_negated_ref 1i32 1i32;
+    array_set clause_starts_ref 0i32 0i32;
+    array_set clause_ends_ref 0i32 1i32;
+    array_set clause_starts_ref 1i32 1i32;
+    array_set clause_ends_ref 1i32 2i32;
+
+    #let found : i32 = 0i32;
+    #letref #excl found : &^ i32 #borrow found;
+    solve assignments_ref lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref 1i32 2i32 found;
+
+    #let found_value : i32 = ref_get i32 found;
+    #if i32_eq found_value 0i32 {
+        #let _ : () <- IO::exit 0i32;
+    } #else {
+        #let _ : () <- IO::exit 1i32;
+    };
+    ()
+}

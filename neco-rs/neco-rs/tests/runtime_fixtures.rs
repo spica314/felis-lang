@@ -186,6 +186,17 @@ fn compiles_and_runs_compile_ptx_function_call_fixture() {
     assert_eq!(status.code(), Some(0));
 }
 
+#[test]
+fn compiles_and_runs_neco_sat_test_binaries() {
+    let root = repo_root().join("projects/neco-sat");
+
+    let sat = run_fixture_status(&root, "neco-sat-test-sat");
+    assert_eq!(sat.code(), Some(0));
+
+    let unsat = run_fixture_status(&root, "neco-sat-test-unsat");
+    assert_eq!(unsat.code(), Some(0));
+}
+
 fn readelf_entry_address(output: &str) -> u64 {
     output
         .lines()

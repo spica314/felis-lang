@@ -1,4 +1,9 @@
 {
     "name": "neco-sat-bin",
-    "felis-bin-entrypoints": ["src/main.fe"]
+    "felis-lib-entrypoint": "src/lib.fe",
+    "felis-bin-entrypoints": [
+        "src/main.fe",
+        "src/test-sat.fe",
+        "src/test-unsat.fe"
+    ]
 }
