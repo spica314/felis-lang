@@ -4,6 +4,7 @@ mod package;
 mod ptx;
 mod pure;
 mod scalar;
+mod symbol;
 mod typecheck;
 
 use neco_rs_parser::{
@@ -30,6 +31,7 @@ use pure::{
     lower_function_call_statement, lower_function_call_value, lower_pure_value,
     pattern_match_bindings, substitute_type_bindings,
 };
+use symbol::SymbolTable;
 pub(crate) use typecheck::validate_value_against_type;
 
 pub(crate) use expr::{
@@ -274,14 +276,15 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     };
     let mut state = LoweringState::new();
     let callable_packages = collect_callable_packages(package)?;
-    state.functions = collect_pure_functions(&callable_packages)?;
-    state.statement_functions = collect_statement_functions(&callable_packages)?;
-    state.constructors = collect_constructors(&callable_packages)?;
-    state.structs = collect_structs(&callable_packages)?;
-    state.builtin_aliases = collect_builtin_aliases(&callable_packages)?;
-    let ptx_functions = collect_ptx_functions(&callable_packages)?;
-    initialize_compile_ptx_bindings(package, &ptx_functions, &mut state, &mut program)?;
-    initialize_zero_arg_use_bindings(package, &callable_packages, &mut state, &mut program)?;
+    let symbols = SymbolTable::build(&callable_packages);
+    state.functions = collect_pure_functions(&symbols)?;
+    state.statement_functions = collect_statement_functions(&symbols)?;
+    state.constructors = collect_constructors(&symbols)?;
+    state.structs = collect_structs(&symbols)?;
+    state.builtin_aliases = collect_builtin_aliases(&symbols)?;
+    let ptx_functions = collect_ptx_functions(&symbols)?;
+    initialize_compile_ptx_bindings(package, &symbols, &ptx_functions, &mut state, &mut program)?;
+    initialize_zero_arg_use_bindings(package, &symbols, &mut state, &mut program)?;
     state.io_effect_allowed = function_has_io_effect(main_fn);
     let mut terminated = false;
 

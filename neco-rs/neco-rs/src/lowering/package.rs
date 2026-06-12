@@ -7,11 +7,12 @@ use crate::{Error, Result};
 
 use super::declarations::{PureFunction, pure_function_from_decl};
 use super::pure::lower_pure_block_value;
+use super::symbol::SymbolTable;
 use super::{LoweringState, validate_value_against_type};
 
 pub(super) fn initialize_zero_arg_use_bindings(
     package: &ParsedPackage,
-    available_packages: &[ParsedPackage],
+    symbols: &SymbolTable<'_>,
     state: &mut LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<()> {
@@ -25,7 +26,7 @@ pub(super) fn initialize_zero_arg_use_bindings(
         };
 
         let Some(function) =
-            resolve_zero_arg_imported_pure_function(package, available_packages, &use_decl.path)?
+            resolve_zero_arg_imported_pure_function(package, symbols, &use_decl.path)?
         else {
             continue;
         };
@@ -47,47 +48,35 @@ pub(super) fn initialize_zero_arg_use_bindings(
 
 fn resolve_zero_arg_imported_pure_function(
     package: &ParsedPackage,
-    available_packages: &[ParsedPackage],
+    symbols: &SymbolTable<'_>,
     path: &neco_rs_parser::PathExpression,
 ) -> Result<Option<PureFunction>> {
     let Some(last_segment) = path.segments.last() else {
         return Ok(None);
     };
-    let target_package = if path.token_keyword_package.is_some() || path.segments.len() == 1 {
-        package
+    let target_package_name = if path.token_keyword_package.is_some() || path.segments.len() == 1 {
+        package.manifest.name.as_str()
     } else {
         let package_name = &path.segments[0].lexeme;
-        match available_packages
-            .iter()
-            .find(|candidate| candidate.manifest.name == *package_name)
-        {
-            Some(package) => package,
-            None => {
-                if package_has_zero_arg_pure_function(package, &last_segment.lexeme)? {
-                    return Err(Error::Unsupported(format!(
-                        "unknown package-qualified use `{package_name}`"
-                    )));
-                }
-                return Ok(None);
+        if symbols.package_exists(package_name) {
+            package_name.as_str()
+        } else {
+            if package_has_zero_arg_pure_function(
+                symbols,
+                &package.manifest.name,
+                &last_segment.lexeme,
+            )? {
+                return Err(Error::Unsupported(format!(
+                    "unknown package-qualified use `{package_name}`"
+                )));
             }
+            return Ok(None);
         }
     };
 
-    for item in target_package
-        .source_files
-        .iter()
-        .flat_map(|file| file.syntax.items.iter())
+    if let Some(function) =
+        symbols.find_pure_function_in_package(target_package_name, &last_segment.lexeme)
     {
-        let Item::Function(function) = item else {
-            continue;
-        };
-        if function.effect.is_some() {
-            continue;
-        }
-        if function.name.name != last_segment.lexeme {
-            continue;
-        }
-
         let function = pure_function_from_decl(function)?;
         if function.parameters.is_empty() {
             return Ok(Some(function));
@@ -98,18 +87,12 @@ fn resolve_zero_arg_imported_pure_function(
     Ok(None)
 }
 
-fn package_has_zero_arg_pure_function(package: &ParsedPackage, name: &str) -> Result<bool> {
-    for item in package
-        .source_files
-        .iter()
-        .flat_map(|file| file.syntax.items.iter())
-    {
-        let Item::Function(function) = item else {
-            continue;
-        };
-        if function.effect.is_some() || function.name.name != name {
-            continue;
-        }
+fn package_has_zero_arg_pure_function(
+    symbols: &SymbolTable<'_>,
+    package_name: &str,
+    name: &str,
+) -> Result<bool> {
+    if let Some(function) = symbols.find_pure_function_in_package(package_name, name) {
         return Ok(pure_function_from_decl(function)?.parameters.is_empty());
     }
     Ok(false)

@@ -10,10 +10,12 @@ use crate::{Error, Result};
 
 use super::declarations::StructSignature;
 use super::scalar::{ScalarBinaryOp, ScalarPrimitive, ScalarType, ScalarUnaryOp, scalar_primitive};
+use super::symbol::SymbolTable;
 use super::{LoweringState, normalize_numeric_literal_arguments};
 
 pub(super) fn initialize_compile_ptx_bindings(
     package: &ParsedPackage,
+    symbols: &SymbolTable<'_>,
     ptx_functions: &HashMap<String, PtxFunction>,
     state: &mut LoweringState,
     program: &mut LoweredProgram,
@@ -26,16 +28,8 @@ pub(super) fn initialize_compile_ptx_bindings(
         let Item::CompilePtx(compile_ptx) = item else {
             continue;
         };
-        let function = package
-            .source_files
-            .iter()
-            .flat_map(|file| file.syntax.items.iter())
-            .find_map(|item| match item {
-                Item::Function(function) if function.name.name == compile_ptx.function_name => {
-                    Some(function)
-                }
-                _ => None,
-            })
+        let function = symbols
+            .find_function_in_package(&package.manifest.name, &compile_ptx.function_name)
             .ok_or_else(|| {
                 Error::Unsupported(format!(
                     "`#compile_ptx` target `{}` was not found",
@@ -156,32 +150,23 @@ struct PtxFunctionParameter {
 }
 
 pub(super) fn collect_ptx_functions(
-    packages: &[ParsedPackage],
+    symbols: &SymbolTable<'_>,
 ) -> Result<HashMap<String, PtxFunction>> {
     let mut functions = HashMap::new();
-    for package in packages {
-        for item in package
-            .source_files
-            .iter()
-            .flat_map(|file| file.syntax.items.iter())
+    for function in symbols.function_declarations() {
+        if function
+            .effect
+            .as_ref()
+            .is_none_or(|effect| effect.lexeme != "PTX")
         {
-            let Item::Function(function) = item else {
-                continue;
-            };
-            if function
-                .effect
-                .as_ref()
-                .is_none_or(|effect| effect.lexeme != "PTX")
-            {
-                continue;
-            }
-            let name = function.name.name.clone();
-            let value = ptx_function_from_decl(function)?;
-            if functions.insert(name.clone(), value).is_some() {
-                return Err(Error::Unsupported(format!(
-                    "duplicate function `{name}` is not supported"
-                )));
-            }
+            continue;
+        }
+        let name = function.name.name.clone();
+        let value = ptx_function_from_decl(function)?;
+        if functions.insert(name.clone(), value).is_some() {
+            return Err(Error::Unsupported(format!(
+                "duplicate function `{name}` is not supported"
+            )));
         }
     }
     Ok(functions)

@@ -1,11 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
 use neco_rs_parser::{
-    ArrowParameter, Block, ConstructorDeclaration, DeclaredName, FunctionDeclaration, Item,
-    ParsedPackage, StructDeclaration, Term,
+    ArrowParameter, Block, ConstructorDeclaration, DeclaredName, FunctionDeclaration,
+    StructDeclaration, Term,
 };
 
 use crate::{Error, Result};
+
+use super::symbol::SymbolTable;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct PureFunction {
@@ -63,97 +65,70 @@ pub(super) struct StructFieldSignature {
 }
 
 pub(super) fn collect_pure_functions(
-    packages: &[ParsedPackage],
+    symbols: &SymbolTable<'_>,
 ) -> Result<HashMap<String, PureFunction>> {
     let mut functions = HashMap::new();
-    for package in packages {
-        for item in package
-            .source_files
-            .iter()
-            .flat_map(|file| file.syntax.items.iter())
-        {
-            let Item::Function(function) = item else {
-                continue;
-            };
-            if function.effect.is_some() {
-                continue;
-            }
-            let name = function.name.name.clone();
-            let value = pure_function_from_decl(function)?;
-            if functions.insert(name.clone(), value).is_some() {
-                return Err(Error::Unsupported(format!(
-                    "duplicate function `{name}` is not supported"
-                )));
-            }
+    for function in symbols.function_declarations() {
+        if function.effect.is_some() {
+            continue;
+        }
+        let name = function.name.name.clone();
+        let value = pure_function_from_decl(function)?;
+        if functions.insert(name.clone(), value).is_some() {
+            return Err(Error::Unsupported(format!(
+                "duplicate function `{name}` is not supported"
+            )));
         }
     }
     Ok(functions)
 }
 
 pub(super) fn collect_statement_functions(
-    packages: &[ParsedPackage],
+    symbols: &SymbolTable<'_>,
 ) -> Result<HashMap<String, StatementFunction>> {
     let mut functions = HashMap::new();
-    for package in packages {
-        for item in package
-            .source_files
-            .iter()
-            .flat_map(|file| file.syntax.items.iter())
+    for function in symbols.function_declarations() {
+        if function
+            .effect
+            .as_ref()
+            .is_some_and(|effect| effect.lexeme == "PTX")
         {
-            let Item::Function(function) = item else {
-                continue;
-            };
-            if function
-                .effect
-                .as_ref()
-                .is_some_and(|effect| effect.lexeme == "PTX")
-            {
-                continue;
-            }
-            let name = function.name.name.clone();
-            let value = statement_function_from_decl(function)?;
-            if functions.insert(name.clone(), value).is_some() {
-                return Err(Error::Unsupported(format!(
-                    "duplicate function `{name}` is not supported"
-                )));
-            }
+            continue;
+        }
+        let name = function.name.name.clone();
+        let value = statement_function_from_decl(function)?;
+        if functions.insert(name.clone(), value).is_some() {
+            return Err(Error::Unsupported(format!(
+                "duplicate function `{name}` is not supported"
+            )));
         }
     }
     Ok(functions)
 }
 
 pub(super) fn collect_constructors(
-    packages: &[ParsedPackage],
+    symbols: &SymbolTable<'_>,
 ) -> Result<HashMap<String, ConstructorSignature>> {
     let mut constructors = HashMap::new();
-    for package in packages {
-        for item in package
-            .source_files
-            .iter()
-            .flat_map(|file| file.syntax.items.iter())
-        {
-            let Item::Type(type_decl) = item else {
-                continue;
+    for type_decl in symbols.type_declarations() {
+        validate_modifier("type", &type_decl.name.name, type_decl.modifier.as_deref())?;
+        validate_type_kind_annotation("type", &type_decl.name, &type_decl.ty)?;
+
+        for (tag, constructor) in type_decl.constructors.iter().enumerate() {
+            let parameters = constructor_parameters(constructor, &type_decl.name)?;
+
+            let key = constructor_key(&type_decl.name.name, &constructor.name.name);
+            let value = ConstructorSignature {
+                type_name: type_decl.name.name.clone(),
+                constructor_name: constructor.name.name.clone(),
+                parameters,
+                is_rc: type_decl.modifier.as_deref() == Some("rc"),
+                tag: tag as i32,
             };
-            validate_modifier("type", &type_decl.name.name, type_decl.modifier.as_deref())?;
-            validate_type_kind_annotation("type", &type_decl.name, &type_decl.ty)?;
-
-            for (tag, constructor) in type_decl.constructors.iter().enumerate() {
-                let parameters = constructor_parameters(constructor, &type_decl.name)?;
-
-                let key = constructor_key(&type_decl.name.name, &constructor.name.name);
-                let value = ConstructorSignature {
-                    type_name: type_decl.name.name.clone(),
-                    constructor_name: constructor.name.name.clone(),
-                    parameters,
-                    is_rc: type_decl.modifier.as_deref() == Some("rc"),
-                    tag: tag as i32,
-                };
-                if constructors.insert(key.clone(), value).is_some() {
-                    return Err(Error::Unsupported(format!(
-                        "duplicate constructor `{key}` is not supported"
-                    )));
-                }
+            if constructors.insert(key.clone(), value).is_some() {
+                return Err(Error::Unsupported(format!(
+                    "duplicate constructor `{key}` is not supported"
+                )));
             }
         }
     }
@@ -161,87 +136,60 @@ pub(super) fn collect_constructors(
 }
 
 pub(super) fn collect_structs(
-    packages: &[ParsedPackage],
+    symbols: &SymbolTable<'_>,
 ) -> Result<HashMap<String, StructSignature>> {
     let mut structs = HashMap::new();
-    let type_names = collect_type_names(packages)?;
-    for package in packages {
-        for item in package
-            .source_files
-            .iter()
-            .flat_map(|file| file.syntax.items.iter())
+    let type_names = collect_type_names(symbols)?;
+    for struct_decl in symbols.struct_declarations() {
+        let signature = struct_signature_from_decl(struct_decl)?;
+        if structs
+            .insert(signature.type_name.clone(), signature)
+            .is_some()
         {
-            let Item::Struct(struct_decl) = item else {
-                continue;
-            };
-            let signature = struct_signature_from_decl(struct_decl)?;
-            if structs
-                .insert(signature.type_name.clone(), signature)
-                .is_some()
-            {
-                return Err(Error::Unsupported(format!(
-                    "duplicate struct `{}` is not supported",
-                    struct_decl.name.name
-                )));
-            }
-            if type_names.contains(&struct_decl.name.name) {
-                return Err(Error::Unsupported(format!(
-                    "type name `{}` is already used by an algebraic type",
-                    struct_decl.name.name
-                )));
-            }
+            return Err(Error::Unsupported(format!(
+                "duplicate struct `{}` is not supported",
+                struct_decl.name.name
+            )));
+        }
+        if type_names.contains(&struct_decl.name.name) {
+            return Err(Error::Unsupported(format!(
+                "type name `{}` is already used by an algebraic type",
+                struct_decl.name.name
+            )));
         }
     }
     Ok(structs)
 }
 
 pub(super) fn collect_builtin_aliases(
-    packages: &[ParsedPackage],
+    symbols: &SymbolTable<'_>,
 ) -> Result<HashMap<String, String>> {
     let mut aliases = HashMap::new();
-    for package in packages {
-        for item in package
-            .source_files
-            .iter()
-            .flat_map(|file| file.syntax.items.iter())
+    for bind_builtin in symbols.bind_builtin_declarations() {
+        if aliases
+            .insert(
+                bind_builtin.alias.clone(),
+                bind_builtin.builtin_name.clone(),
+            )
+            .is_some()
         {
-            let Item::BindBuiltin(bind_builtin) = item else {
-                continue;
-            };
-            if aliases
-                .insert(
-                    bind_builtin.alias.clone(),
-                    bind_builtin.builtin_name.clone(),
-                )
-                .is_some()
-            {
-                return Err(Error::Unsupported(format!(
-                    "duplicate builtin alias `{}` is not supported",
-                    bind_builtin.alias
-                )));
-            }
+            return Err(Error::Unsupported(format!(
+                "duplicate builtin alias `{}` is not supported",
+                bind_builtin.alias
+            )));
         }
     }
     Ok(aliases)
 }
 
-fn collect_type_names(packages: &[ParsedPackage]) -> Result<HashSet<String>> {
+fn collect_type_names(symbols: &SymbolTable<'_>) -> Result<HashSet<String>> {
     let mut type_names = HashSet::new();
-    for package in packages {
-        for item in package
-            .source_files
-            .iter()
-            .flat_map(|file| file.syntax.items.iter())
-        {
-            let Item::Type(type_decl) = item else {
-                continue;
-            };
-            if !type_names.insert(type_decl.name.name.clone()) {
-                return Err(Error::Unsupported(format!(
-                    "duplicate type `{}` is not supported",
-                    type_decl.name.name
-                )));
-            }
+    for type_decl in symbols.type_declarations() {
+        if !type_names.insert(type_decl.name.name.clone()) {
+            return Err(Error::Unsupported(format!(
+                "duplicate type `{}` is not supported",
+                type_decl.name.name
+            )));
         }
     }
     Ok(type_names)
