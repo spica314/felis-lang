@@ -246,6 +246,74 @@ fn builds_elf_image_with_dynamic_array_mmap_failure_check() {
 }
 
 #[test]
+fn builds_elf_image_with_array_get_bounds_check() {
+    let program = LoweredProgram {
+        operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::ArrayGet {
+            array_slot: 0,
+            index: Box::new(I64Expr::Literal(0)),
+        }))],
+        data: Vec::new(),
+        compiled_ptx: Vec::new(),
+        arrays: vec![ArrayAllocation {
+            slot: 0,
+            len: 1,
+            element_type: ArrayElementType::I32,
+            kind: ArrayKind::Fixed,
+        }],
+        heap_slots: 0,
+        i32_slots: 0,
+        i64_slots: 0,
+        f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
+        requires_argv: false,
+    };
+    let image = build_linux_x86_64_program_image(&program, EntryAbi::KernelStart);
+    assert!(
+        image
+            .code
+            .windows(5)
+            .any(|window| window == [0x48, 0x85, 0xc9, 0x0f, 0x88])
+    );
+}
+
+#[test]
+fn builds_elf_image_with_array_set_bounds_check() {
+    let program = LoweredProgram {
+        operations: vec![
+            Operation::ArraySetI32 {
+                array_slot: 0,
+                index: I64Expr::Literal(0),
+                value: I32Expr::Literal(42),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
+        ],
+        data: Vec::new(),
+        compiled_ptx: Vec::new(),
+        arrays: vec![ArrayAllocation {
+            slot: 0,
+            len: 1,
+            element_type: ArrayElementType::I32,
+            kind: ArrayKind::Fixed,
+        }],
+        heap_slots: 0,
+        i32_slots: 0,
+        i64_slots: 0,
+        f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
+        requires_argv: false,
+    };
+    let image = build_linux_x86_64_program_image(&program, EntryAbi::KernelStart);
+    assert!(
+        image
+            .code
+            .windows(5)
+            .any(|window| window == [0x48, 0x85, 0xc9, 0x0f, 0x88])
+    );
+}
+
+#[test]
 fn builds_elf_image_with_runtime_i32_ops() {
     let program = LoweredProgram {
         operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Mod(

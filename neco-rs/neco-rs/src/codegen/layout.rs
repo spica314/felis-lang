@@ -5,7 +5,8 @@ use crate::ir::{
 
 use super::{
     ARGV_GLOBAL_ADDRESS, DATA_VIRTUAL_ADDRESS, data_addresses, emit_f32_expr_to_xmm0,
-    emit_i32_expr_to_eax, emit_i64_expr_to_rax, emit_runtime_arg_ptr_to_rax, emit_u8_expr_to_eax,
+    emit_i32_expr_to_eax, emit_i64_expr_to_rax, emit_runtime_arg_ptr_to_rax,
+    emit_runtime_error_exit, emit_u8_expr_to_eax,
 };
 
 const ARRAY_DESCRIPTOR_SIZE: usize = 16;
@@ -360,6 +361,7 @@ pub(super) fn emit_i32_array_set(
 ) {
     emit_i64_expr_to_rax(index, code, program);
     code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    emit_array_bounds_check(array_slot, code, program);
     code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x02]);
     code.push(0x51);
     emit_i32_expr_to_eax(value, code, program);
@@ -395,6 +397,7 @@ pub(super) fn emit_i64_array_set(
 ) {
     emit_i64_expr_to_rax(index, code, program);
     code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    emit_array_bounds_check(array_slot, code, program);
     code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x03]);
     code.push(0x51);
     emit_i64_expr_to_rax(value, code, program);
@@ -415,6 +418,7 @@ pub(super) fn emit_f32_array_set(
 ) {
     emit_i64_expr_to_rax(index, code, program);
     code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    emit_array_bounds_check(array_slot, code, program);
     code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x02]);
     code.push(0x51);
     emit_f32_expr_to_xmm0(value, code, program);
@@ -446,6 +450,7 @@ pub(super) fn emit_u8_array_set(
 ) {
     emit_i64_expr_to_rax(index, code, program);
     code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    emit_array_bounds_check(array_slot, code, program);
     code.push(0x51);
     emit_u8_expr_to_eax(value, code, program);
     code.extend_from_slice(&[0x89, 0xc2]);
@@ -573,6 +578,7 @@ pub(super) fn emit_array_get(
 ) {
     emit_i64_expr_to_rax(index, code, program);
     code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    emit_array_bounds_check(array_slot, code, program);
     code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x02]);
     let slot_offset = array_slot_offset(program, array_slot);
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
@@ -588,6 +594,7 @@ pub(super) fn emit_i64_array_get(
 ) {
     emit_i64_expr_to_rax(index, code, program);
     code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    emit_array_bounds_check(array_slot, code, program);
     code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x03]);
     let slot_offset = array_slot_offset(program, array_slot);
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
@@ -603,6 +610,7 @@ pub(super) fn emit_f32_array_get(
 ) {
     emit_i64_expr_to_rax(index, code, program);
     code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    emit_array_bounds_check(array_slot, code, program);
     code.extend_from_slice(&[0x48, 0xc1, 0xe1, 0x02]);
     let slot_offset = array_slot_offset(program, array_slot);
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
@@ -618,8 +626,37 @@ pub(super) fn emit_u8_array_get(
 ) {
     emit_i64_expr_to_rax(index, code, program);
     code.extend_from_slice(&[0x48, 0x89, 0xc1]);
+    emit_array_bounds_check(array_slot, code, program);
     let slot_offset = array_slot_offset(program, array_slot);
     code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
     code.extend_from_slice(&slot_offset.to_le_bytes());
     code.extend_from_slice(&[0x0f, 0xb6, 0x04, 0x0b]);
+}
+
+fn emit_array_bounds_check(array_slot: usize, code: &mut Vec<u8>, program: &LoweredProgram) {
+    code.extend_from_slice(&[0x48, 0x85, 0xc9]);
+    code.extend_from_slice(&[0x0f, 0x88]);
+    let negative_index_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    let len_offset = array_logical_len_offset(program, array_slot);
+    code.extend_from_slice(&[0x8b, 0x85]);
+    code.extend_from_slice(&len_offset.to_le_bytes());
+    code.extend_from_slice(&[0x48, 0x98]);
+    code.extend_from_slice(&[0x48, 0x39, 0xc1]);
+    code.extend_from_slice(&[0x0f, 0x83]);
+    let out_of_range_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    code.push(0xe9);
+    let valid_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    let error_start = code.len();
+    emit_runtime_error_exit(code);
+    let valid_start = code.len();
+
+    for patch in [negative_index_patch, out_of_range_patch] {
+        let offset = error_start as i32 - (patch + 4) as i32;
+        code[patch..patch + 4].copy_from_slice(&offset.to_le_bytes());
+    }
+    let valid_offset = valid_start as i32 - (valid_patch + 4) as i32;
+    code[valid_patch..valid_patch + 4].copy_from_slice(&valid_offset.to_le_bytes());
 }

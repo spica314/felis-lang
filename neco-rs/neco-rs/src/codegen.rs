@@ -1352,7 +1352,7 @@ fn emit_mmap_error_check(code: &mut Vec<u8>) {
     code[valid_patch..valid_patch + 4].copy_from_slice(&valid_offset.to_le_bytes());
 }
 
-fn emit_runtime_error_exit(code: &mut Vec<u8>) {
+pub(super) fn emit_runtime_error_exit(code: &mut Vec<u8>) {
     code.push(0xbf);
     code.extend_from_slice(&RUNTIME_ERROR_EXIT_CODE.to_le_bytes());
     code.extend_from_slice(&[0xb8, 0x3c, 0x00, 0x00, 0x00]);
