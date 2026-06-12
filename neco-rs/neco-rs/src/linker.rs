@@ -109,7 +109,7 @@ fn program_assembly(image: &ProgramImage) -> String {
     if image.requires_argv {
         assembly.push_str(".section .bss.neco,\"aw\",@nobits\n");
         assembly.push_str(".balign 8\n");
-        assembly.push_str(".zero 8\n");
+        assembly.push_str(".zero 16\n");
     }
 
     assembly.push_str(".section .note.GNU-stack,\"\",@progbits\n");

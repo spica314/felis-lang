@@ -75,6 +75,15 @@ fn compiles_and_runs_cli_args_fixture() {
 }
 
 #[test]
+fn cli_args_fixture_exits_on_missing_runtime_arg() {
+    let root = repo_root().join("tests/testcases/cli-args");
+    let run = run_fixture_output_with_args(&root, "cli-args", &[]);
+    assert_eq!(run.status.code(), Some(101));
+    assert!(run.stdout.is_empty());
+    assert!(run.stderr.is_empty());
+}
+
+#[test]
 fn compiles_and_runs_effectful_call_bind_fixture() {
     let root = repo_root().join("tests/testcases/effectful-call-bind");
     let run = run_fixture_output_in_dir(&root, "effectful-call-bind", &root);

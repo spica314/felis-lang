@@ -11,6 +11,8 @@ use layout::*;
 
 const DATA_VIRTUAL_ADDRESS: u64 = 0x410000;
 const ARGV_GLOBAL_ADDRESS: u64 = 0x420000;
+const ARGC_GLOBAL_ADDRESS: u64 = ARGV_GLOBAL_ADDRESS + 8;
+const RUNTIME_ARG_ERROR_EXIT_CODE: i32 = 101;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum EntryAbi {
@@ -54,7 +56,7 @@ pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) ->
             ARGV_GLOBAL_ADDRESS,
             0x1000,
             SegmentFlags::READ_WRITE,
-            vec![0; 8],
+            vec![0; 16],
         ));
     }
     elf
@@ -1267,11 +1269,17 @@ fn emit_static_data_u8_get(
 fn emit_argv_global_init(code: &mut Vec<u8>, argv_global_address: u64, entry_abi: EntryAbi) {
     match entry_abi {
         EntryAbi::KernelStart => {
+            code.extend_from_slice(&[0x48, 0x8b, 0x04, 0x24]);
+            code.extend_from_slice(&[0x48, 0xa3]);
+            code.extend_from_slice(&ARGC_GLOBAL_ADDRESS.to_le_bytes());
             code.extend_from_slice(&[0x48, 0x8d, 0x44, 0x24, 0x08]);
             code.extend_from_slice(&[0x48, 0xa3]);
             code.extend_from_slice(&argv_global_address.to_le_bytes());
         }
         EntryAbi::LibcMain => {
+            code.extend_from_slice(&[0x89, 0xf8]);
+            code.extend_from_slice(&[0x48, 0xa3]);
+            code.extend_from_slice(&ARGC_GLOBAL_ADDRESS.to_le_bytes());
             code.extend_from_slice(&[0x48, 0x89, 0xf0]);
             code.extend_from_slice(&[0x48, 0xa3]);
             code.extend_from_slice(&argv_global_address.to_le_bytes());
@@ -1286,13 +1294,49 @@ fn emit_runtime_arg_ptr_to_rax(
     argv_global_address: u64,
 ) {
     emit_i32_expr_to_eax(arg_index, code, program);
+    code.extend_from_slice(&[0x85, 0xc0]);
+    code.extend_from_slice(&[0x0f, 0x88]);
+    let negative_index_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
     code.extend_from_slice(&[0x48, 0x98]);
+    code.extend_from_slice(&[0x49, 0x89, 0xc3]);
+    code.extend_from_slice(&[0x48, 0xa1]);
+    code.extend_from_slice(&ARGC_GLOBAL_ADDRESS.to_le_bytes());
+    code.extend_from_slice(&[0x49, 0x39, 0xc3]);
+    code.extend_from_slice(&[0x0f, 0x83]);
+    let out_of_range_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    code.extend_from_slice(&[0x4c, 0x89, 0xd8]);
     code.extend_from_slice(&[0x48, 0xc1, 0xe0, 0x03]);
     code.extend_from_slice(&[0x49, 0x89, 0xc3]);
     code.extend_from_slice(&[0x48, 0xa1]);
     code.extend_from_slice(&argv_global_address.to_le_bytes());
     code.extend_from_slice(&[0x4c, 0x01, 0xd8]);
     code.extend_from_slice(&[0x48, 0x8b, 0x00]);
+    code.extend_from_slice(&[0x48, 0x85, 0xc0]);
+    code.extend_from_slice(&[0x0f, 0x84]);
+    let null_arg_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    code.push(0xe9);
+    let valid_arg_patch = code.len();
+    code.extend_from_slice(&0i32.to_le_bytes());
+    let error_start = code.len();
+    emit_runtime_arg_error_exit(code);
+    let valid_arg = code.len();
+
+    for patch in [negative_index_patch, out_of_range_patch, null_arg_patch] {
+        let offset = error_start as i32 - (patch + 4) as i32;
+        code[patch..patch + 4].copy_from_slice(&offset.to_le_bytes());
+    }
+    let valid_offset = valid_arg as i32 - (valid_arg_patch + 4) as i32;
+    code[valid_arg_patch..valid_arg_patch + 4].copy_from_slice(&valid_offset.to_le_bytes());
+}
+
+fn emit_runtime_arg_error_exit(code: &mut Vec<u8>) {
+    code.push(0xbf);
+    code.extend_from_slice(&RUNTIME_ARG_ERROR_EXIT_CODE.to_le_bytes());
+    code.extend_from_slice(&[0xb8, 0x3c, 0x00, 0x00, 0x00]);
+    code.extend_from_slice(&[0x0f, 0x05]);
 }
 
 fn emit_runtime_arg_u8_get(
