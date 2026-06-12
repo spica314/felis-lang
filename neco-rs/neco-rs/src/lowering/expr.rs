@@ -16,11 +16,15 @@ use super::typecheck::{
 };
 use super::{LoweringState, ensure_io_effect_allowed};
 
-fn simple_builtin_path_name(path: &PathExpression) -> Option<&str> {
+fn simple_builtin_path_name(path: &PathExpression, state: &LoweringState) -> Option<String> {
     if path.token_keyword_package.is_some() || path.segments.len() != 1 {
         return None;
     }
-    Some(path.segments[0].lexeme.as_str())
+    Some(
+        state
+            .resolve_builtin_alias(&path.segments[0].lexeme)
+            .to_string(),
+    )
 }
 
 fn render_path(path: &PathExpression) -> String {
@@ -233,14 +237,14 @@ fn lower_condition_bool_application_expr(
         ));
     };
 
-    let Some(primitive) = simple_builtin_path_name(path) else {
+    let Some(primitive) = simple_builtin_path_name(path, state) else {
         return Err(Error::Unsupported(format!(
             "`bool` primitive call must use a simple builtin path, got `{}`",
             render_path(path)
         )));
     };
 
-    match primitive {
+    match primitive.as_str() {
         "bool_and" => {
             let [lhs, rhs] = arguments.as_slice() else {
                 return Err(Error::Unsupported(
@@ -273,7 +277,7 @@ fn lower_condition_bool_application_expr(
                 value, state, program,
             )?)))
         }
-        _ => lower_comparison_expr(primitive, arguments, state),
+        _ => lower_comparison_expr(&primitive, arguments, state),
     }
 }
 
@@ -326,7 +330,7 @@ fn lower_bool_application_expr(term: &Term, state: &LoweringState) -> Result<Con
         ));
     };
 
-    let Some(primitive) = simple_builtin_path_name(path) else {
+    let Some(primitive) = simple_builtin_path_name(path, state) else {
         return Err(Error::Unsupported(format!(
             "`bool` primitive call must use a simple builtin path, got `{}`",
             render_path(path)
@@ -339,11 +343,11 @@ fn lower_bool_application_expr(term: &Term, state: &LoweringState) -> Result<Con
         return Ok(condition);
     }
 
-    if let Some(condition) = lower_bool_primitive_call(primitive, arguments, state)? {
+    if let Some(condition) = lower_bool_primitive_call(&primitive, arguments, state)? {
         return Ok(condition);
     }
 
-    lower_comparison_expr(primitive, arguments, state)
+    lower_comparison_expr(&primitive, arguments, state)
 }
 
 fn lower_bool_primitive_call(
@@ -502,19 +506,19 @@ fn lower_i32_primitive_call(
         ));
     };
 
-    let Some(primitive) = simple_builtin_path_name(path) else {
+    let Some(primitive) = simple_builtin_path_name(path, state) else {
         return Err(Error::Unsupported(format!(
             "`i32` primitive call must use a simple builtin path, got `{}`",
             render_path(path)
         )));
     };
-    let descriptor = scalar_primitive(primitive)
+    let descriptor = scalar_primitive(&primitive)
         .filter(|descriptor| scalar_primitive_result_type(*descriptor) == Some(ScalarType::I32))
         .ok_or_else(|| {
             Error::Unsupported(format!("unsupported `i32` primitive call `{primitive}`"))
         })?;
     let normalized = normalize_numeric_literal_arguments(arguments);
-    ensure_scalar_primitive_arity(primitive, descriptor, normalized.len())?;
+    ensure_scalar_primitive_arity(&primitive, descriptor, normalized.len())?;
 
     match descriptor {
         ScalarPrimitive::Conversion {
@@ -569,19 +573,19 @@ fn lower_i64_primitive_call(
         ));
     };
 
-    let Some(primitive) = simple_builtin_path_name(path) else {
+    let Some(primitive) = simple_builtin_path_name(path, state) else {
         return Err(Error::Unsupported(format!(
             "`i64` primitive call must use a simple builtin path, got `{}`",
             render_path(path)
         )));
     };
-    let descriptor = scalar_primitive(primitive)
+    let descriptor = scalar_primitive(&primitive)
         .filter(|descriptor| scalar_primitive_result_type(*descriptor) == Some(ScalarType::I64))
         .ok_or_else(|| {
             Error::Unsupported(format!("unsupported `i64` primitive call `{primitive}`"))
         })?;
     let normalized = normalize_numeric_literal_arguments(arguments);
-    ensure_scalar_primitive_arity(primitive, descriptor, normalized.len())?;
+    ensure_scalar_primitive_arity(&primitive, descriptor, normalized.len())?;
 
     match descriptor {
         ScalarPrimitive::Conversion {
@@ -636,19 +640,19 @@ fn lower_u8_primitive_call(
         ));
     };
 
-    let Some(primitive) = simple_builtin_path_name(path) else {
+    let Some(primitive) = simple_builtin_path_name(path, state) else {
         return Err(Error::Unsupported(format!(
             "`u8` primitive call must use a simple builtin path, got `{}`",
             render_path(path)
         )));
     };
-    let descriptor = scalar_primitive(primitive)
+    let descriptor = scalar_primitive(&primitive)
         .filter(|descriptor| scalar_primitive_result_type(*descriptor) == Some(ScalarType::U8))
         .ok_or_else(|| {
             Error::Unsupported(format!("unsupported `u8` primitive call `{primitive}`"))
         })?;
     let normalized = normalize_numeric_literal_arguments(arguments);
-    ensure_scalar_primitive_arity(primitive, descriptor, normalized.len())?;
+    ensure_scalar_primitive_arity(&primitive, descriptor, normalized.len())?;
 
     match descriptor {
         ScalarPrimitive::Conversion {
@@ -703,19 +707,19 @@ fn lower_f32_primitive_call(
         ));
     };
 
-    let Some(primitive) = simple_builtin_path_name(path) else {
+    let Some(primitive) = simple_builtin_path_name(path, state) else {
         return Err(Error::Unsupported(format!(
             "`f32` primitive call must use a simple builtin path, got `{}`",
             render_path(path)
         )));
     };
-    let descriptor = scalar_primitive(primitive)
+    let descriptor = scalar_primitive(&primitive)
         .filter(|descriptor| scalar_primitive_result_type(*descriptor) == Some(ScalarType::F32))
         .ok_or_else(|| {
             Error::Unsupported(format!("unsupported `f32` primitive call `{primitive}`"))
         })?;
     let normalized = normalize_numeric_literal_arguments(arguments);
-    ensure_scalar_primitive_arity(primitive, descriptor, normalized.len())?;
+    ensure_scalar_primitive_arity(&primitive, descriptor, normalized.len())?;
 
     match descriptor {
         ScalarPrimitive::Conversion {

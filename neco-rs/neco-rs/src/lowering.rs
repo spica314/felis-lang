@@ -19,8 +19,9 @@ use crate::ir::{
 use crate::{Error, Result};
 
 use declarations::{
-    ConstructorSignature, PureFunction, StatementFunction, StructSignature, collect_constructors,
-    collect_pure_functions, collect_statement_functions, collect_structs,
+    ConstructorSignature, PureFunction, StatementFunction, StructSignature,
+    collect_builtin_aliases, collect_constructors, collect_pure_functions,
+    collect_statement_functions, collect_structs,
 };
 use expr::lower_condition_expr;
 use package::{collect_callable_packages, initialize_zero_arg_use_bindings};
@@ -50,6 +51,7 @@ pub(crate) struct LoweringState {
     statement_functions: HashMap<String, StatementFunction>,
     constructors: HashMap<String, ConstructorSignature>,
     structs: HashMap<String, StructSignature>,
+    builtin_aliases: HashMap<String, String>,
     loop_depth: usize,
 }
 
@@ -68,6 +70,7 @@ impl LoweringState {
             statement_functions: HashMap::new(),
             constructors: HashMap::new(),
             structs: HashMap::new(),
+            builtin_aliases: HashMap::new(),
             loop_depth: 0,
         }
     }
@@ -144,6 +147,13 @@ impl LoweringState {
         let slot = self.next_bool_slot;
         self.next_bool_slot += 1;
         slot
+    }
+
+    pub(crate) fn resolve_builtin_alias<'a>(&'a self, name: &'a str) -> &'a str {
+        self.builtin_aliases
+            .get(name)
+            .map(|builtin| builtin.as_str())
+            .unwrap_or(name)
     }
 }
 
@@ -268,6 +278,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     state.statement_functions = collect_statement_functions(&callable_packages)?;
     state.constructors = collect_constructors(&callable_packages)?;
     state.structs = collect_structs(&callable_packages)?;
+    state.builtin_aliases = collect_builtin_aliases(&callable_packages)?;
     let ptx_functions = collect_ptx_functions(&callable_packages)?;
     initialize_compile_ptx_bindings(package, &ptx_functions, &mut state, &mut program)?;
     initialize_zero_arg_use_bindings(package, &callable_packages, &mut state, &mut program)?;

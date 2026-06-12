@@ -42,7 +42,12 @@ impl Parse for BindBuiltinDeclaration {
 
         *i = k;
         Ok(Some(Self {
-            builtin_name: builtin_name.lexeme,
+            builtin_name: builtin_name
+                .lexeme
+                .strip_prefix('"')
+                .and_then(|text| text.strip_suffix('"'))
+                .unwrap_or(&builtin_name.lexeme)
+                .to_string(),
             alias: alias.lexeme,
         }))
     }

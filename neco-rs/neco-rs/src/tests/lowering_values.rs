@@ -336,6 +336,33 @@ fn lowers_i32_ops_fixture_to_runtime_expression_tree() {
 }
 
 #[test]
+fn lowers_renamed_bind_builtin_scalar_alias() {
+    let package = parse_inline_binary_package(
+        "renamed-bind-builtin-scalar-alias",
+        r#"
+#use std_core::io::IO;
+#bind_builtin "i32_add" #as add_i32;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let code : i32 = add_i32 40i32 2i32;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#,
+    );
+
+    let program = lower_package_to_program(&package).expect("lower renamed builtin alias");
+    assert_eq!(
+        program.operations,
+        vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
+            Box::new(I32Expr::Literal(40)),
+            Box::new(I32Expr::Literal(2)),
+        )))]
+    );
+}
+
+#[test]
 fn lowers_f32_function_reference_slot_fixture_to_runtime_slot() {
     let root = repo_root().join("tests/testcases/f32-reference-slots");
     let package = selected_fixture_package(&root, "f32-function-reference-slot");

@@ -23,16 +23,21 @@ use super::{
     normalize_numeric_literal_arguments,
 };
 
-fn simple_builtin_path_name<'a>(
-    path: &'a PathExpression,
+fn simple_builtin_path_name(
+    path: &PathExpression,
+    state: &LoweringState,
     kind: &str,
     known_names: &[&str],
-) -> Result<Option<&'a str>> {
+) -> Result<Option<String>> {
     if path.token_keyword_package.is_none() && path.segments.len() == 1 {
-        return Ok(Some(path.segments[0].lexeme.as_str()));
+        return Ok(Some(
+            state
+                .resolve_builtin_alias(&path.segments[0].lexeme)
+                .to_string(),
+        ));
     }
     if let Some(name) = path.segments.last().map(|segment| segment.lexeme.as_str())
-        && known_names.contains(&name)
+        && known_names.contains(&state.resolve_builtin_alias(name))
     {
         return Err(Error::Unsupported(format!(
             "`{kind}` builtin call must use a simple builtin path, got `{}`",
@@ -161,6 +166,7 @@ fn lower_numeric_conversion_value(
     };
     let Some(primitive) = simple_builtin_path_name(
         path,
+        state,
         "numeric conversion",
         &[
             "i32_from_u8",
@@ -181,7 +187,7 @@ fn lower_numeric_conversion_value(
         return Ok(None);
     };
     if !matches!(
-        primitive,
+        primitive.as_str(),
         "i32_from_u8"
             | "i32_from_i64"
             | "i64_from_i32"
@@ -205,7 +211,7 @@ fn lower_numeric_conversion_value(
         )));
     };
 
-    Ok(Some(match primitive {
+    Ok(Some(match primitive.as_str() {
         "i32_from_u8" => Value::I32(I32Expr::FromU8(Box::new(lower_pure_u8_argument(
             value, state, program,
         )?))),
@@ -259,6 +265,7 @@ fn lower_f32_primitive_value(
     };
     let Some(primitive) = simple_builtin_path_name(
         path,
+        state,
         "f32 primitive",
         &["f32_add", "f32_sub", "f32_mul", "f32_div", "f32_sqrt"],
     )?
@@ -266,7 +273,7 @@ fn lower_f32_primitive_value(
         return Ok(None);
     };
     if !matches!(
-        primitive,
+        primitive.as_str(),
         "f32_add" | "f32_sub" | "f32_mul" | "f32_div" | "f32_sqrt"
     ) {
         return Ok(None);
@@ -292,7 +299,7 @@ fn lower_f32_primitive_value(
     let lhs = Box::new(lower_pure_f32_argument(lhs, state, program)?);
     let rhs = Box::new(lower_pure_f32_argument(rhs, state, program)?);
 
-    Ok(Some(Value::F32(match primitive {
+    Ok(Some(Value::F32(match primitive.as_str() {
         "f32_add" => F32Expr::Add(lhs, rhs),
         "f32_sub" => F32Expr::Sub(lhs, rhs),
         "f32_mul" => F32Expr::Mul(lhs, rhs),
@@ -314,6 +321,7 @@ fn lower_i32_primitive_value(
     };
     let Some(primitive) = simple_builtin_path_name(
         path,
+        state,
         "i32 primitive",
         &[
             "i32_add", "i32_sub", "i32_mul", "i32_div", "i32_mod", "i32_xor", "i32_shl", "i32_shr",
@@ -323,7 +331,7 @@ fn lower_i32_primitive_value(
         return Ok(None);
     };
     if !matches!(
-        primitive,
+        primitive.as_str(),
         "i32_add"
             | "i32_sub"
             | "i32_mul"
@@ -345,7 +353,7 @@ fn lower_i32_primitive_value(
     let lhs = Box::new(lower_pure_i32_argument(lhs, state, program)?);
     let rhs = Box::new(lower_pure_i32_argument(rhs, state, program)?);
 
-    Ok(Some(Value::I32(match primitive {
+    Ok(Some(Value::I32(match primitive.as_str() {
         "i32_add" => I32Expr::Add(lhs, rhs),
         "i32_sub" => I32Expr::Sub(lhs, rhs),
         "i32_mul" => I32Expr::Mul(lhs, rhs),

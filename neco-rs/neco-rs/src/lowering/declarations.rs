@@ -195,6 +195,36 @@ pub(super) fn collect_structs(
     Ok(structs)
 }
 
+pub(super) fn collect_builtin_aliases(
+    packages: &[ParsedPackage],
+) -> Result<HashMap<String, String>> {
+    let mut aliases = HashMap::new();
+    for package in packages {
+        for item in package
+            .source_files
+            .iter()
+            .flat_map(|file| file.syntax.items.iter())
+        {
+            let Item::BindBuiltin(bind_builtin) = item else {
+                continue;
+            };
+            if aliases
+                .insert(
+                    bind_builtin.alias.clone(),
+                    bind_builtin.builtin_name.clone(),
+                )
+                .is_some()
+            {
+                return Err(Error::Unsupported(format!(
+                    "duplicate builtin alias `{}` is not supported",
+                    bind_builtin.alias
+                )));
+            }
+        }
+    }
+    Ok(aliases)
+}
+
 fn collect_type_names(packages: &[ParsedPackage]) -> Result<HashSet<String>> {
     let mut type_names = HashSet::new();
     for package in packages {
