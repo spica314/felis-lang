@@ -245,21 +245,26 @@ The currently observed variations are:
 
 In this form, `#excl` and `&^` must agree; the non-`#excl` form uses `&`.
 
-## String Literals And Method Calls
+## String Literals And Reserved Method Calls
 
 Current sources also use these expression forms:
 
 - String literals such as `"Hello, world!"`.
-- Method calls in the form `<value> .> <method>`.
 
-Example:
+The parser also recognizes reserved method-call syntax in the form
+`<value> .> <method>`, but the Rust bootstrap lowering pipeline does not
+currently support it. Source programs that use `.>` parse successfully and are
+then rejected during lowering.
+
+Reserved example:
 
 ```felis
 #let hello_world_bytes_ref : & Array u8 = hello_world_ref .> as_bytes;
 ```
 
-The `.>` form calls a method associated with the left-hand side type. This is
-analogous to Rust's method-call `.` syntax, not to field or member access.
+This means `.>` is not a currently usable expression form. Use the existing
+builtin function-call forms instead, such as reference and array helper
+functions, until a method-resolution model is defined and implemented.
 
 ## Universal Quantification
 
