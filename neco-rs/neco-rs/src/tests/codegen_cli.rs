@@ -181,6 +181,71 @@ fn builds_elf_image_with_write_and_implicit_exit() {
 }
 
 #[test]
+fn builds_elf_image_with_mmap_failure_check() {
+    let program = LoweredProgram {
+        operations: vec![
+            Operation::Mmap {
+                len: I32Expr::Literal(4096),
+                result_slot: 0,
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
+        ],
+        data: Vec::new(),
+        compiled_ptx: Vec::new(),
+        arrays: Vec::new(),
+        heap_slots: 1,
+        i32_slots: 0,
+        i64_slots: 0,
+        f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
+        requires_argv: false,
+    };
+    let image = build_linux_x86_64_program_image(&program, EntryAbi::KernelStart);
+    assert!(
+        image
+            .code
+            .windows(8)
+            .any(|window| window == [0x0f, 0x05, 0x48, 0x85, 0xc0, 0x0f, 0x88, 0x05])
+    );
+}
+
+#[test]
+fn builds_elf_image_with_dynamic_array_mmap_failure_check() {
+    let program = LoweredProgram {
+        operations: vec![
+            Operation::ArrayAllocDynamic {
+                array_slot: 0,
+                len: I32Expr::Literal(16),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))),
+        ],
+        data: Vec::new(),
+        compiled_ptx: Vec::new(),
+        arrays: vec![ArrayAllocation {
+            slot: 0,
+            len: 0,
+            element_type: ArrayElementType::U8,
+            kind: ArrayKind::Dynamic,
+        }],
+        heap_slots: 0,
+        i32_slots: 0,
+        i64_slots: 0,
+        f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
+        requires_argv: false,
+    };
+    let image = build_linux_x86_64_program_image(&program, EntryAbi::KernelStart);
+    assert!(
+        image
+            .code
+            .windows(8)
+            .any(|window| window == [0x0f, 0x05, 0x48, 0x85, 0xc0, 0x0f, 0x88, 0x05])
+    );
+}
+
+#[test]
 fn builds_elf_image_with_runtime_i32_ops() {
     let program = LoweredProgram {
         operations: vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Mod(
