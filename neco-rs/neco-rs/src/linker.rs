@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::codegen::ProgramImage;
+use crate::codegen::{ExecutableImageLayout, ProgramImage};
 use crate::{Error, Result};
 
 pub(crate) fn link_linux_x86_64_libc_start_executable(
@@ -33,7 +33,7 @@ fn link_linux_x86_64_libc_start_executable_with_cc(
         path: Some(assembly_path.clone()),
         source,
     })?;
-    fs::write(&linker_script_path, linker_script()).map_err(|source| Error::Io {
+    fs::write(&linker_script_path, linker_script(image.layout)).map_err(|source| Error::Io {
         path: Some(linker_script_path.clone()),
         source,
     })?;
@@ -149,16 +149,19 @@ fn push_byte_directives(assembly: &mut String, bytes: &[u8]) {
     }
 }
 
-fn linker_script() -> &'static str {
-    r#"SECTIONS {
-  . = 0x401000;
-  .text : { *(.text.neco) *(.text .text.*) }
-  . = 0x410000;
-  .rodata : { *(.rodata.neco) *(.rodata .rodata.*) }
-  . = 0x420000;
-  .bss : { *(.bss.neco) *(.bss .bss.* COMMON) }
-} INSERT AFTER .interp;
-"#
+fn linker_script(layout: ExecutableImageLayout) -> String {
+    format!(
+        r#"SECTIONS {{
+  . = {:#x};
+  .text : {{ *(.text.neco) *(.text .text.*) }}
+  . = {:#x};
+  .rodata : {{ *(.rodata.neco) *(.rodata .rodata.*) }}
+  . = {:#x};
+  .bss : {{ *(.bss.neco) *(.bss .bss.* COMMON) }}
+}} INSERT AFTER .interp;
+"#,
+        layout.code_virtual_address, layout.data_virtual_address, layout.argv_global_address
+    )
 }
 
 #[cfg(test)]
@@ -179,6 +182,7 @@ mod tests {
             data: Vec::new(),
             requires_argv: false,
             external_calls: Vec::new(),
+            layout: crate::codegen::LINUX_X86_64_EXECUTABLE_LAYOUT,
         };
         let output = root.join("program");
 

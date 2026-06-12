@@ -9,10 +9,44 @@ mod layout;
 
 use layout::*;
 
-const DATA_VIRTUAL_ADDRESS: u64 = 0x410000;
-const ARGV_GLOBAL_ADDRESS: u64 = 0x420000;
-const ARGC_GLOBAL_ADDRESS: u64 = ARGV_GLOBAL_ADDRESS + 8;
 const RUNTIME_ERROR_EXIT_CODE: i32 = 101;
+
+pub(crate) const LINUX_X86_64_EXECUTABLE_LAYOUT: ExecutableImageLayout = ExecutableImageLayout {
+    code_virtual_address: 0x401000,
+    data_virtual_address: 0x410000,
+    argv_global_address: 0x420000,
+    data_file_offset: 0x1000,
+    argv_file_offset: 0x1000,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ExecutableImageLayout {
+    pub(crate) code_virtual_address: u64,
+    pub(crate) data_virtual_address: u64,
+    pub(crate) argv_global_address: u64,
+    pub(crate) data_file_offset: u64,
+    pub(crate) argv_file_offset: u64,
+}
+
+impl ExecutableImageLayout {
+    pub(crate) fn argc_global_address(self) -> u64 {
+        self.argv_global_address + 8
+    }
+
+    pub(crate) fn argv_storage_size(self) -> usize {
+        16
+    }
+
+    pub(crate) fn data_addresses(self, program: &LoweredProgram) -> Vec<u64> {
+        let mut next_address = self.data_virtual_address;
+        let mut addresses = Vec::with_capacity(program.data.len());
+        for bytes in &program.data {
+            addresses.push(next_address);
+            next_address += bytes.len() as u64;
+        }
+        addresses
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum EntryAbi {
@@ -25,6 +59,7 @@ pub(crate) struct ProgramImage {
     pub(crate) data: Vec<u8>,
     pub(crate) requires_argv: bool,
     pub(crate) external_calls: Vec<ExternalCall>,
+    pub(crate) layout: ExecutableImageLayout,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,29 +69,28 @@ pub(crate) struct ExternalCall {
 }
 
 pub(crate) fn build_linux_x86_64_program_executable(program: &LoweredProgram) -> Elf64Executable {
-    let code_virtual_address = 0x401000;
-    let data_virtual_address = DATA_VIRTUAL_ADDRESS;
-    let mut elf = Elf64Executable::new(code_virtual_address);
+    let layout = LINUX_X86_64_EXECUTABLE_LAYOUT;
+    let mut elf = Elf64Executable::new(layout.code_virtual_address);
     elf.add_load_segment(LoadSegment::new(
-        code_virtual_address,
+        layout.code_virtual_address,
         0,
         SegmentFlags::READ_EXECUTE,
         build_linux_x86_64_program_image(program, EntryAbi::KernelStart).code,
     ));
     if !program.data.is_empty() {
         elf.add_load_segment(LoadSegment::new(
-            data_virtual_address,
-            0x1000,
+            layout.data_virtual_address,
+            layout.data_file_offset,
             SegmentFlags::READ_ONLY,
             flatten_data(program),
         ));
     }
     if program.requires_argv {
         elf.add_load_segment(LoadSegment::new(
-            ARGV_GLOBAL_ADDRESS,
-            0x1000,
+            layout.argv_global_address,
+            layout.argv_file_offset,
             SegmentFlags::READ_WRITE,
-            vec![0; 16],
+            vec![0; layout.argv_storage_size()],
         ));
     }
     elf
@@ -66,11 +100,12 @@ pub(crate) fn build_linux_x86_64_program_image(
     program: &LoweredProgram,
     entry_abi: EntryAbi,
 ) -> ProgramImage {
+    let layout = LINUX_X86_64_EXECUTABLE_LAYOUT;
     let mut external_calls = Vec::new();
     let code = program_syscall_code(
         program,
-        DATA_VIRTUAL_ADDRESS,
-        program.requires_argv.then_some(ARGV_GLOBAL_ADDRESS),
+        layout,
+        program.requires_argv.then_some(layout.argv_global_address),
         entry_abi,
         &mut external_calls,
     );
@@ -79,6 +114,7 @@ pub(crate) fn build_linux_x86_64_program_image(
         data: flatten_data(program),
         requires_argv: program.requires_argv,
         external_calls,
+        layout,
     }
 }
 
@@ -91,30 +127,20 @@ fn flatten_data(program: &LoweredProgram) -> Vec<u8> {
     data
 }
 
-fn data_addresses(program: &LoweredProgram, data_virtual_address: u64) -> Vec<u64> {
-    let mut next_address = data_virtual_address;
-    let mut addresses = Vec::with_capacity(program.data.len());
-    for bytes in &program.data {
-        addresses.push(next_address);
-        next_address += bytes.len() as u64;
-    }
-    addresses
-}
-
 fn program_syscall_code(
     program: &LoweredProgram,
-    data_virtual_address: u64,
+    layout: ExecutableImageLayout,
     argv_global_address: Option<u64>,
     entry_abi: EntryAbi,
     external_calls: &mut Vec<ExternalCall>,
 ) -> Vec<u8> {
-    let addresses = data_addresses(program, data_virtual_address);
+    let addresses = layout.data_addresses(program);
     let mut code = Vec::new();
     let frame_layout = FrameLayout::new(program);
     let stack_frame_size = frame_layout.stack_frame_size();
 
     if let Some(argv_global_address) = argv_global_address {
-        emit_argv_global_init(&mut code, argv_global_address, entry_abi);
+        emit_argv_global_init(&mut code, layout, argv_global_address, entry_abi);
     }
 
     if stack_frame_size > 0 {
@@ -1198,9 +1224,13 @@ fn emit_u8_expr_to_eax(expr: &U8Expr, code: &mut Vec<u8>, program: &LoweredProgr
         U8Expr::Mul(lhs, rhs) => emit_u8_mul_expr(lhs, rhs, code, program),
         U8Expr::Div(lhs, rhs) => emit_u8_div_mod_expr(lhs, rhs, code, program, false),
         U8Expr::Mod(lhs, rhs) => emit_u8_div_mod_expr(lhs, rhs, code, program, true),
-        U8Expr::RuntimeArgGet { arg_index, index } => {
-            emit_runtime_arg_u8_get(arg_index, index, code, program, ARGV_GLOBAL_ADDRESS)
-        }
+        U8Expr::RuntimeArgGet { arg_index, index } => emit_runtime_arg_u8_get(
+            arg_index,
+            index,
+            code,
+            program,
+            LINUX_X86_64_EXECUTABLE_LAYOUT.argv_global_address,
+        ),
         U8Expr::StaticDataGet { data_index, index } => {
             emit_static_data_u8_get(*data_index, index, code, program)
         }
@@ -1269,12 +1299,17 @@ fn emit_static_data_u8_get(
     code.extend_from_slice(&[0x0f, 0xb6, 0x04, 0x03]);
 }
 
-fn emit_argv_global_init(code: &mut Vec<u8>, argv_global_address: u64, entry_abi: EntryAbi) {
+fn emit_argv_global_init(
+    code: &mut Vec<u8>,
+    layout: ExecutableImageLayout,
+    argv_global_address: u64,
+    entry_abi: EntryAbi,
+) {
     match entry_abi {
         EntryAbi::KernelStart => {
             code.extend_from_slice(&[0x48, 0x8b, 0x04, 0x24]);
             code.extend_from_slice(&[0x48, 0xa3]);
-            code.extend_from_slice(&ARGC_GLOBAL_ADDRESS.to_le_bytes());
+            code.extend_from_slice(&layout.argc_global_address().to_le_bytes());
             code.extend_from_slice(&[0x48, 0x8d, 0x44, 0x24, 0x08]);
             code.extend_from_slice(&[0x48, 0xa3]);
             code.extend_from_slice(&argv_global_address.to_le_bytes());
@@ -1282,7 +1317,7 @@ fn emit_argv_global_init(code: &mut Vec<u8>, argv_global_address: u64, entry_abi
         EntryAbi::LibcMain => {
             code.extend_from_slice(&[0x89, 0xf8]);
             code.extend_from_slice(&[0x48, 0xa3]);
-            code.extend_from_slice(&ARGC_GLOBAL_ADDRESS.to_le_bytes());
+            code.extend_from_slice(&layout.argc_global_address().to_le_bytes());
             code.extend_from_slice(&[0x48, 0x89, 0xf0]);
             code.extend_from_slice(&[0x48, 0xa3]);
             code.extend_from_slice(&argv_global_address.to_le_bytes());
@@ -1296,6 +1331,7 @@ fn emit_runtime_arg_ptr_to_rax(
     program: &LoweredProgram,
     argv_global_address: u64,
 ) {
+    let layout = LINUX_X86_64_EXECUTABLE_LAYOUT;
     emit_i32_expr_to_eax(arg_index, code, program);
     code.extend_from_slice(&[0x85, 0xc0]);
     code.extend_from_slice(&[0x0f, 0x88]);
@@ -1304,7 +1340,7 @@ fn emit_runtime_arg_ptr_to_rax(
     code.extend_from_slice(&[0x48, 0x98]);
     code.extend_from_slice(&[0x49, 0x89, 0xc3]);
     code.extend_from_slice(&[0x48, 0xa1]);
-    code.extend_from_slice(&ARGC_GLOBAL_ADDRESS.to_le_bytes());
+    code.extend_from_slice(&layout.argc_global_address().to_le_bytes());
     code.extend_from_slice(&[0x49, 0x39, 0xc3]);
     code.extend_from_slice(&[0x0f, 0x83]);
     let out_of_range_patch = code.len();

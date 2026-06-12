@@ -6,7 +6,8 @@ use neco_rs_parser::{NativeLinkMode, ParsedPackage, ParsedRoot, parse_root};
 
 use crate::cli::{default_output_path, select_binary_from_package};
 use crate::codegen::{
-    EntryAbi, build_linux_x86_64_program_executable, build_linux_x86_64_program_image,
+    EntryAbi, LINUX_X86_64_EXECUTABLE_LAYOUT, build_linux_x86_64_program_executable,
+    build_linux_x86_64_program_image,
 };
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, CompiledPtxArtifact,
@@ -168,7 +169,12 @@ fn builds_elf_image_with_write_and_implicit_exit() {
     assert_eq!(&elf[0x1000..0x1005], &[0xb8, 0x01, 0x00, 0x00, 0x00]);
     assert_eq!(&elf[0x1005..0x1007], &[0x89, 0xc7]);
     assert_eq!(&elf[0x1007..0x1009], &[0x48, 0xbe]);
-    assert_eq!(&elf[0x1009..0x1011], &0x410000_u64.to_le_bytes());
+    assert_eq!(
+        &elf[0x1009..0x1011],
+        &LINUX_X86_64_EXECUTABLE_LAYOUT
+            .data_virtual_address
+            .to_le_bytes()
+    );
     assert_eq!(&elf[0x1011..0x1016], &[0xb8, 14, 0x00, 0x00, 0x00]);
     assert_eq!(&elf[0x1016..0x1018], &[0x89, 0xc2]);
     assert_eq!(&elf[0x1018..0x101d], &[0xb8, 0x01, 0x00, 0x00, 0x00]);

@@ -4,9 +4,9 @@ use crate::ir::{
 };
 
 use super::{
-    ARGV_GLOBAL_ADDRESS, DATA_VIRTUAL_ADDRESS, data_addresses, emit_f32_expr_to_xmm0,
-    emit_i32_expr_to_eax, emit_i64_expr_to_rax, emit_runtime_arg_ptr_to_rax,
-    emit_runtime_error_exit, emit_u8_expr_to_eax,
+    LINUX_X86_64_EXECUTABLE_LAYOUT, emit_f32_expr_to_xmm0, emit_i32_expr_to_eax,
+    emit_i64_expr_to_rax, emit_runtime_arg_ptr_to_rax, emit_runtime_error_exit,
+    emit_u8_expr_to_eax,
 };
 
 const ARRAY_DESCRIPTOR_SIZE: usize = 16;
@@ -178,7 +178,7 @@ pub(super) fn array_logical_len_offset(program: &LoweredProgram, slot: usize) ->
 }
 
 pub(super) fn static_data_address(program: &LoweredProgram, data_index: usize) -> u64 {
-    data_addresses(program, DATA_VIRTUAL_ADDRESS)[data_index]
+    LINUX_X86_64_EXECUTABLE_LAYOUT.data_addresses(program)[data_index]
 }
 
 pub(super) fn i32_slot_offset(program: &LoweredProgram, slot: usize) -> i32 {
@@ -493,7 +493,12 @@ pub(super) fn emit_pathbuf_push(
             code.extend_from_slice(&addresses[*data_index].to_le_bytes());
         }
         PathBufSource::RuntimeArg(arg_index) => {
-            emit_runtime_arg_ptr_to_rax(arg_index, code, program, ARGV_GLOBAL_ADDRESS);
+            emit_runtime_arg_ptr_to_rax(
+                arg_index,
+                code,
+                program,
+                LINUX_X86_64_EXECUTABLE_LAYOUT.argv_global_address,
+            );
             code.extend_from_slice(&[0x48, 0x89, 0xc6]);
         }
         PathBufSource::Array(array_slot) => {
