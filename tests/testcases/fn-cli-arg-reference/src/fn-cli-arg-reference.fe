@@ -26,8 +26,8 @@
     #let right_ref : i32 = 0i32;
     #letref #excl right_ref : &^ i32 #borrow right_ref;
     read_digits digits_ref left_ref right_ref;
-    #let left : i32 = ref_get i32 left_ref;
-    #let right : i32 = ref_get i32 right_ref;
+    #let left : i32 <- ref_get i32 left_ref;
+    #let right : i32 <- ref_get i32 right_ref;
     #let code : i32 = i32_add left right;
     #let _ : () <- IO::exit code;
     ()

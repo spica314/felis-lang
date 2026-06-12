@@ -309,6 +309,62 @@ fn rejects_effectful_operations_in_function_arguments() {
 }
 
 #[test]
+fn rejects_ref_get_bound_with_equals() {
+    let source = r#"
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let value : i32 = 42i32;
+    #letref value_ref : & i32 #borrow value;
+    #let code : i32 = ref_get i32 value_ref;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#;
+    let package = parse_inline_binary_package("ref-get-bound-with-equals", source);
+    let error = lower_package_to_program(&package).expect_err("lowering must reject ref_get =");
+    assert!(
+        error
+            .to_string()
+            .contains("`ref_get` is effectful and must be bound with `<-`"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn lowers_ref_get_bound_with_left_arrow() {
+    let source = r#"
+#use std_core::io::IO;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let value : i32 = 42i32;
+    #letref value_ref : & i32 #borrow value;
+    #let code : i32 <- ref_get i32 value_ref;
+    #let _ : () <- IO::exit code;
+    ()
+}
+"#;
+    let package = parse_inline_binary_package("ref-get-bound-with-left-arrow", source);
+    let program = lower_package_to_program(&package).expect("lower ref_get <-");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::StoreI32 {
+                slot: 0,
+                value: I32Expr::Literal(42),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(0))),
+        ]
+    );
+}
+
+#[test]
 fn lowers_fn_reference_annotation_fixture_to_runtime_expression_tree() {
     let root = repo_root().join("tests/testcases/fn-reference-annotation");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

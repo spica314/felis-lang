@@ -27,7 +27,7 @@
 
 #fn skip_line : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> () #with IO {
     #loop {
-        #let index : i32 = ref_get i32 index_ref;
+        #let index : i32 <- ref_get i32 index_ref;
         #if i32_gte index len {
             #break;
         };
@@ -44,7 +44,7 @@
     #let done : i32 = 0i32;
     #letref #excl done : &^ i32 #borrow done;
     #loop {
-        #let index : i32 = ref_get i32 index_ref;
+        #let index : i32 <- ref_get i32 index_ref;
         #if i32_gte index len {
             #break;
         };
@@ -54,7 +54,7 @@
         } #else {
             ref_set i32 done 1i32;
         };
-        #let done_value : i32 = ref_get i32 done;
+        #let done_value : i32 <- ref_get i32 done;
         #if i32_eq done_value 1i32 {
             #break;
         };
@@ -65,12 +65,12 @@
 #fn parse_header : (bytes_ref : &^ Array u8 10000i32) -> (len : i32) -> (index_ref : &^ i32) -> (ok_ref : &^ i32) -> () #with IO {
     ref_set i32 ok_ref 0i32;
     #loop {
-        #let index : i32 = ref_get i32 index_ref;
+        #let index : i32 <- ref_get i32 index_ref;
         #if i32_gte index len {
             #break;
         };
         skip_spaces bytes_ref len index_ref;
-        #let index_after_spaces : i32 = ref_get i32 index_ref;
+        #let index_after_spaces : i32 <- ref_get i32 index_ref;
         #if i32_gte index_after_spaces len {
             #break;
         };
@@ -99,12 +99,12 @@
     #let in_number : i32 = 0i32;
     #letref #excl in_number : &^ i32 #borrow in_number;
     #loop {
-        #let index : i32 = ref_get i32 index_ref;
+        #let index : i32 <- ref_get i32 index_ref;
         #if i32_gte index len {
             #break;
         };
         skip_spaces bytes_ref len index_ref;
-        #let index_after_spaces : i32 = ref_get i32 index_ref;
+        #let index_after_spaces : i32 <- ref_get i32 index_ref;
         #if i32_gte index_after_spaces len {
             #break;
         };
@@ -122,32 +122,32 @@
                 ref_set i32 index_ref (i32_add index_after_spaces 1i32);
             };
             #loop {
-                #let digit_index : i32 = ref_get i32 index_ref;
+                #let digit_index : i32 <- ref_get i32 index_ref;
                 #if i32_gte digit_index len {
                     #break;
                 };
                 #let digit : u8 = array_get bytes_ref digit_index;
                 #if bool_and (u8_gte digit '0') (u8_lte digit '9') {
                     ref_set i32 in_number 1i32;
-                    #let value_before_digit : i32 = ref_get i32 value;
+                    #let value_before_digit : i32 <- ref_get i32 value;
                     ref_set i32 value (i32_add (i32_mul value_before_digit 10i32) (i32_sub (i32_from_u8 digit) 48i32));
                     ref_set i32 index_ref (i32_add digit_index 1i32);
                 } #else {
                     #break;
                 };
             };
-            #let in_number_value : i32 = ref_get i32 in_number;
-            #let value_done : i32 = ref_get i32 value;
+            #let in_number_value : i32 <- ref_get i32 in_number;
+            #let value_done : i32 <- ref_get i32 value;
             #if i32_eq in_number_value 0i32 {
-                #let index_before_skip : i32 = ref_get i32 index_ref;
+                #let index_before_skip : i32 <- ref_get i32 index_ref;
                 ref_set i32 index_ref (i32_add index_before_skip 1i32);
             } #else #if i32_eq value_done 0i32 {
-                #let clause_count : i32 = ref_get i32 clause_count_ref;
+                #let clause_count : i32 <- ref_get i32 clause_count_ref;
                 #if i32_gte clause_count 256i32 {
                     ref_set i32 ok_ref 0i32;
                     #break;
                 };
-                #let literal_count : i32 = ref_get i32 literal_count_ref;
+                #let literal_count : i32 <- ref_get i32 literal_count_ref;
                 array_set clause_ends_ref clause_count literal_count;
                 #let next_clause_count : i32 = i32_add clause_count 1i32;
                 ref_set i32 clause_count_ref next_clause_count;
@@ -159,16 +159,16 @@
                     ref_set i32 ok_ref 0i32;
                     #break;
                 };
-                #let literal_count : i32 = ref_get i32 literal_count_ref;
+                #let literal_count : i32 <- ref_get i32 literal_count_ref;
                 #if i32_gte literal_count 2048i32 {
                     ref_set i32 ok_ref 0i32;
                     #break;
                 };
-                #let var_count : i32 = ref_get i32 var_count_ref;
+                #let var_count : i32 <- ref_get i32 var_count_ref;
                 #if i32_gt value_done var_count {
                     ref_set i32 var_count_ref value_done;
                 };
-                #let sign_done : i32 = ref_get i32 sign;
+                #let sign_done : i32 <- ref_get i32 sign;
                 array_set lit_vars_ref literal_count (i32_sub value_done 1i32);
                 array_set lit_negated_ref literal_count sign_done;
                 ref_set i32 literal_count_ref (i32_add literal_count 1i32);
@@ -184,7 +184,7 @@
     #letref #excl literal_index : &^ i32 #borrow literal_index;
     #let literal_end : i32 = array_get clause_ends_ref clause_index;
     #loop {
-        #let literal_index_value : i32 = ref_get i32 literal_index;
+        #let literal_index_value : i32 <- ref_get i32 literal_index;
         #if i32_gte literal_index_value literal_end {
             #break;
         };
@@ -207,12 +207,12 @@
     #let clause_sat : i32 = 0i32;
     #letref #excl clause_sat : &^ i32 #borrow clause_sat;
     #loop {
-        #let clause_index_value : i32 = ref_get i32 clause_index;
+        #let clause_index_value : i32 <- ref_get i32 clause_index;
         #if i32_gte clause_index_value clause_count {
             #break;
         };
         clause_satisfied_flag assignments_ref lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref clause_index_value clause_sat;
-        #let clause_sat_value : i32 = ref_get i32 clause_sat;
+        #let clause_sat_value : i32 <- ref_get i32 clause_sat;
         #if i32_eq clause_sat_value 0i32 {
             ref_set i32 result_ref 0i32;
             #break;
@@ -228,11 +228,11 @@
     #let remaining : i32 = mask;
     #letref #excl remaining : &^ i32 #borrow remaining;
     #loop {
-        #let index_value : i32 = ref_get i32 index;
+        #let index_value : i32 <- ref_get i32 index;
         #if i32_gte index_value var_count {
             #break;
         };
-        #let remaining_value : i32 = ref_get i32 remaining;
+        #let remaining_value : i32 <- ref_get i32 remaining;
         array_set assignments_ref index_value (i32_mod remaining_value 2i32);
         ref_set i32 remaining (i32_div remaining_value 2i32);
         ref_set i32 index (i32_add index_value 1i32);
@@ -245,11 +245,11 @@
     #let index : i32 = 0i32;
     #letref #excl index : &^ i32 #borrow index;
     #loop {
-        #let index_value : i32 = ref_get i32 index;
+        #let index_value : i32 <- ref_get i32 index;
         #if i32_gte index_value value {
             #break;
         };
-        #let result_value : i32 = ref_get i32 result_ref;
+        #let result_value : i32 <- ref_get i32 result_ref;
         ref_set i32 result_ref (i32_mul result_value 2i32);
         ref_set i32 index (i32_add index_value 1i32);
     };
@@ -265,14 +265,14 @@
     #let formula_sat : i32 = 0i32;
     #letref #excl formula_sat : &^ i32 #borrow formula_sat;
     #loop {
-        #let mask_value : i32 = ref_get i32 mask;
-        #let max_mask_value : i32 = ref_get i32 max_mask;
+        #let mask_value : i32 <- ref_get i32 mask;
+        #let max_mask_value : i32 <- ref_get i32 max_mask;
         #if i32_gte mask_value max_mask_value {
             #break;
         };
         assign_from_mask assignments_ref var_count mask_value;
         formula_satisfied_flag assignments_ref lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref clause_count formula_sat;
-        #let formula_sat_value : i32 = ref_get i32 formula_sat;
+        #let formula_sat_value : i32 <- ref_get i32 formula_sat;
         #if i32_eq formula_sat_value 1i32 {
             ref_set i32 found_ref 1i32;
             #break;

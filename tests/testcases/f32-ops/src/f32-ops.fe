@@ -36,11 +36,11 @@
     #let x3 : f32 = f32_mul x2 d;
     #let x4 : f32 = f32_div x3 e;
     #letref #excl x_ref : &^ f32 #borrow x4;
-    #let current : f32 = ref_get f32 x_ref;
+    #let current : f32 <- ref_get f32 x_ref;
     ref_set f32 x_ref (f32_add current (f32_from_i32 1i32));
     #let arr : Array f32 1i32 <- IO::array_new f32 1i32;
     #letref #excl arr_write_ref : &^ Array f32 1i32 #borrow arr;
-    #let next : f32 = ref_get f32 x_ref;
+    #let next : f32 <- ref_get f32 x_ref;
     array_set arr_write_ref 0i32 next;
     #let result : f32 = array_get arr 0i32;
     #if f32_gt result 14.0f32 {

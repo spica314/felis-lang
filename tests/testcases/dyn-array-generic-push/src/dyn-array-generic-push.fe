@@ -41,10 +41,10 @@
     dyn_array_push i64 longs_ref_ref 9i64;
     dyn_array_push i64 longs_ref_ref 8i64;
 
-    #let bytes_current : DynArray u8 = ref_get (DynArray u8) bytes_ref_ref;
-    #let empty_bytes_current : DynArray u8 = ref_get (DynArray u8) empty_bytes_ref_ref;
-    #let numbers_current : DynArray i32 = ref_get (DynArray i32) numbers_ref_ref;
-    #let longs_current : DynArray i64 = ref_get (DynArray i64) longs_ref_ref;
+    #let bytes_current : DynArray u8 <- ref_get (DynArray u8) bytes_ref_ref;
+    #let empty_bytes_current : DynArray u8 <- ref_get (DynArray u8) empty_bytes_ref_ref;
+    #let numbers_current : DynArray i32 <- ref_get (DynArray i32) numbers_ref_ref;
+    #let longs_current : DynArray i64 <- ref_get (DynArray i64) longs_ref_ref;
 
     #let byte0 : u8 <- dyn_array_get u8 bytes_current 0i32;
     #let byte1 : u8 <- dyn_array_get u8 bytes_current 1i32;

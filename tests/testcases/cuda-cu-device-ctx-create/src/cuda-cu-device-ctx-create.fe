@@ -9,7 +9,7 @@
     #let device : i32 = 0i32;
     #letref #excl device : &^ i32 #borrow device;
     #let device_result : i32 <- IO::cu_device_get device 0i32;
-    #let device_value : i32 = ref_get i32 device;
+    #let device_value : i32 <- ref_get i32 device;
     #let ctx : i64 = 0i64;
     #letref #excl ctx : &^ i64 #borrow ctx;
     #let ctx_result : i32 <- IO::cu_ctx_create_v2 ctx 0i32 device_value;

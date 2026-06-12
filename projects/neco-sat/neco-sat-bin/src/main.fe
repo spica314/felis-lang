@@ -40,12 +40,12 @@
     #letref #excl ok : &^ i32 #borrow ok;
 
     parse_header input_ref len index ok;
-    #let ok_after_header : i32 = ref_get i32 ok;
+    #let ok_after_header : i32 <- ref_get i32 ok;
     #if i32_eq ok_after_header 1i32 {
         parse_clause_literals input_ref len index lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref var_count clause_count literal_count ok;
     };
 
-    #let ok_after_clauses : i32 = ref_get i32 ok;
+    #let ok_after_clauses : i32 <- ref_get i32 ok;
     #if i32_eq ok_after_clauses 0i32 {
         #let _ : () <- IO::write stdout error_ref 6i32;
         #let _ : () <- IO::exit 2i32;
@@ -53,11 +53,11 @@
 
     #let found : i32 = 0i32;
     #letref #excl found : &^ i32 #borrow found;
-    #let parsed_var_count : i32 = ref_get i32 var_count;
-    #let parsed_clause_count : i32 = ref_get i32 clause_count;
+    #let parsed_var_count : i32 <- ref_get i32 var_count;
+    #let parsed_clause_count : i32 <- ref_get i32 clause_count;
     solve assignments_ref lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref parsed_var_count parsed_clause_count found;
 
-    #let found_value : i32 = ref_get i32 found;
+    #let found_value : i32 <- ref_get i32 found;
     #if i32_eq found_value 1i32 {
         #let _ : () <- IO::write stdout sat_ref 4i32;
         #let _ : () <- IO::exit 10i32;

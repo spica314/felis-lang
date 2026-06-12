@@ -17,7 +17,7 @@
     {
         ref_set Span span_ref Span { start = 20i32, end = 22i32 };
     };
-    #let updated : Span = ref_get Span span_ref;
+    #let updated : Span <- ref_get Span span_ref;
     #let _ : () <- IO::exit (i32_add updated.start updated.end);
     ()
 }

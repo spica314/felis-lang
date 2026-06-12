@@ -7,10 +7,10 @@
 #entrypoint main;
 
 #fn add_into_ref : (value_ref : &^ i32) -> (delta : i32) -> i32 #with IO {
-    #let value : i32 = ref_get i32 value_ref;
+    #let value : i32 <- ref_get i32 value_ref;
     #let next_value : i32 = i32_add value delta;
     ref_set i32 value_ref next_value;
-    #let updated_value : i32 = ref_get i32 value_ref;
+    #let updated_value : i32 <- ref_get i32 value_ref;
     i32_add updated_value delta
 }
 

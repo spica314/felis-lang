@@ -23,7 +23,7 @@
     #letref #excl code_ref : &^ i32 #borrow code_ref;
     #let token : Token = Token::number 42i32;
     apply_token token code_ref;
-    #let code : i32 = ref_get i32 code_ref;
+    #let code : i32 <- ref_get i32 code_ref;
     #let _ : () <- IO::exit code;
     ()
 }

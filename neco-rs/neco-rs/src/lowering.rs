@@ -390,6 +390,16 @@ pub(super) fn lower_statement(
                     bind_pattern(&let_stmt.binder, value, &mut state.environment);
                     return Ok(false);
                 }
+                if root_ref_get_call_name(let_stmt.value.as_ref()).is_some() {
+                    lower_let_equals_statement(
+                        &let_stmt.binder,
+                        let_stmt.ty.as_ref(),
+                        let_stmt.value.as_ref(),
+                        state,
+                        program,
+                    )?;
+                    return Ok(false);
+                }
                 let ty = substitute_type_bindings(
                     let_stmt.ty.as_ref(),
                     &type_bindings_from_environment(&state.environment),
@@ -1067,12 +1077,28 @@ fn ensure_no_nested_io_effects(term: &Term, state: &LoweringState) -> Result<()>
 }
 
 fn ensure_not_effectful_let_value(term: &Term, state: &LoweringState) -> Result<()> {
+    if root_ref_get_call_name(term).is_some() {
+        return Err(Error::Unsupported(
+            "`ref_get` is effectful and must be bound with `<-`".to_string(),
+        ));
+    }
     if let Some(operation) = root_io_statement_function_call_name(term, state) {
         return Err(Error::Unsupported(format!(
             "`{operation}` is effectful and must be bound with `<-`"
         )));
     }
     Ok(())
+}
+
+fn root_ref_get_call_name(term: &Term) -> Option<&'static str> {
+    match term {
+        Term::Group(inner) => root_ref_get_call_name(inner),
+        Term::Application { callee, .. } => {
+            let name = single_segment_path_name(callee.as_ref())?;
+            (name == "ref_get").then_some("ref_get")
+        }
+        _ => None,
+    }
 }
 
 fn root_io_statement_function_call_name<'a>(

@@ -13,7 +13,7 @@
         Token::empty => ref_set i32 code_ref 1i32,
         Token::number value_ref => {
             ref_set i32 value_ref 42i32;
-            #let value : i32 = ref_get i32 value_ref;
+            #let value : i32 <- ref_get i32 value_ref;
             ref_set i32 code_ref value;
         }
     };
@@ -28,7 +28,7 @@
     #let code_ref : i32 = 0i32;
     #letref #excl code_ref : &^ i32 #borrow code_ref;
     apply_token_ref token_ref code_ref;
-    #let code : i32 = ref_get i32 code_ref;
+    #let code : i32 <- ref_get i32 code_ref;
     #let _ : () <- IO::exit code;
     ()
 }

@@ -53,7 +53,7 @@
     #let device : i32 = 0i32;
     #letref #excl device : &^ i32 #borrow device;
     #let device_result : i32 <- IO::cu_device_get device 0i32;
-    #let device_value : i32 = ref_get i32 device;
+    #let device_value : i32 <- ref_get i32 device;
     #let ctx : i64 = 0i64;
     #letref #excl ctx : &^ i64 #borrow ctx;
     #let ctx_result : i32 <- IO::cu_ctx_create_v2 ctx 0i32 device_value;
@@ -61,11 +61,11 @@
     #letref #excl module : &^ i64 #borrow module;
     #let ptx : & ArrayVL u8 = render_like_kernel_ptx;
     #let module_result : i32 <- IO::cu_module_load_data module ptx;
-    #let module_value : i64 = ref_get i64 module;
+    #let module_value : i64 <- ref_get i64 module;
     #let function : i64 = 0i64;
     #letref #excl function : &^ i64 #borrow function;
     #let function_result : i32 <- IO::cu_module_get_function function module_value "render_like_kernel";
-    #let function_value : i64 = ref_get i64 function;
+    #let function_value : i64 <- ref_get i64 function;
     #let host_array : ArrayVL i32 <- IO::arrayvl_new i32 framebuffer_len;
     #letref #excl host_array_ref : &^ ArrayVL i32 #borrow host_array;
     array_set host_array_ref 0i32 0i32;

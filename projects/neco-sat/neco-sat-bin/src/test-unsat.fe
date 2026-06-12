@@ -31,7 +31,7 @@
     #letref #excl found : &^ i32 #borrow found;
     solve assignments_ref lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref 1i32 2i32 found;
 
-    #let found_value : i32 = ref_get i32 found;
+    #let found_value : i32 <- ref_get i32 found;
     #if i32_eq found_value 0i32 {
         #let _ : () <- IO::exit 0i32;
     } #else {

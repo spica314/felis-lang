@@ -37,7 +37,7 @@
     #let index_ref : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
     #loop {
-        #let index : i32 = ref_get i32 index_ref;
+        #let index : i32 <- ref_get i32 index_ref;
         #if i32_gte index len {
             #break;
         };
@@ -88,7 +88,7 @@
 }
 
 #fn string_push_u8_unchecked : (string : String) -> (len_ref : &^ i32) -> (byte : u8) -> () #with IO {
-    #let len : i32 = ref_get i32 len_ref;
+    #let len : i32 <- ref_get i32 len_ref;
     string_set_u8 string len byte;
     #let next_len : i32 = i32_add len 1i32;
     ref_set i32 len_ref next_len;
@@ -104,7 +104,7 @@
         #let index_ref : i32 = 0i32;
         #letref #excl index_ref : &^ i32 #borrow index_ref;
         #loop {
-            #let index : i32 = ref_get i32 index_ref;
+            #let index : i32 <- ref_get i32 index_ref;
             #if i32_gte index left_len {
                 #break;
             };
@@ -131,7 +131,7 @@
         #let index_ref : i32 = 0i32;
         #letref #excl index_ref : &^ i32 #borrow index_ref;
         #loop {
-            #let index : i32 = ref_get i32 index_ref;
+            #let index : i32 <- ref_get i32 index_ref;
             #if i32_gte index string_len_value {
                 #break;
             };

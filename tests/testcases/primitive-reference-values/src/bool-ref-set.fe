@@ -11,7 +11,7 @@
     #let value : bool = false;
     #letref #excl value_ref : &^ bool #borrow value;
     ref_set bool value_ref true;
-    #let current : bool = ref_get bool value_ref;
+    #let current : bool <- ref_get bool value_ref;
     #if current {
         #let _ : () <- IO::exit 42i32;
     };

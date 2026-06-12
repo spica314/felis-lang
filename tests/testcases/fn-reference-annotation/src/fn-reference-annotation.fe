@@ -17,7 +17,7 @@
 }
 
 #fn sum_refs : (value_ref : & i32) -> (array_ref : &^ Array i32 2i32) -> i32 #with IO {
-    #let value : i32 = ref_get i32 value_ref;
+    #let value : i32 <- ref_get i32 value_ref;
     #let first : i32 = array_get array_ref 0i32;
     #let second : i32 = array_get array_ref 1i32;
     #let array_sum : i32 = i32_add first second;
