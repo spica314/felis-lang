@@ -4,19 +4,114 @@ use crate::effect::Value;
 use crate::ir::{ArrayElementType, ArrayKind, F32Expr, I32Expr, I64Expr, LoweredProgram, U8Expr};
 use crate::{Error, Result};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LoweredType {
+    Unit,
+    TypeUniverse,
+    Nominal(String),
+    AppliedNominal(String),
+    ArrayVl(ArrayElementType),
+    ArrayVlPtx(ArrayElementType),
+    Array(ArrayElementType, usize),
+    UnsizedArray(ArrayElementType),
+    Reference {
+        referent: Box<LoweredType>,
+        exclusive: bool,
+        display: String,
+    },
+}
+
 pub(crate) fn validate_value_against_type(
     value: &Value,
     ty: &Term,
     program: &LoweredProgram,
 ) -> Result<()> {
-    if matches!(value, Value::Reference { .. }) && !matches!(ty, Term::Reference { .. }) {
+    let expected = LoweredType::from_term(ty, false)?;
+    validate_value_against_lowered_type(value, &expected, &render_term(ty), program)
+}
+
+impl LoweredType {
+    fn from_term(ty: &Term, allow_unsized_array: bool) -> Result<Self> {
+        if is_type_universe_annotation(ty) {
+            return Ok(Self::TypeUniverse);
+        }
+
+        if let Some(element_type) = parse_slice_type_annotation(ty)? {
+            return Ok(Self::ArrayVl(element_type));
+        }
+
+        if let Some(element_type) = parse_ptx_slice_type_annotation(ty)? {
+            return Ok(Self::ArrayVlPtx(element_type));
+        }
+
+        if let Some(element_type) = parse_unsized_array_type_annotation(ty)? {
+            if allow_unsized_array {
+                return Ok(Self::UnsizedArray(element_type));
+            }
+            return Err(Error::Unsupported(
+                "`Array` type annotation must receive an element type and a constant i32 length"
+                    .to_string(),
+            ));
+        }
+
+        if let Some((element_type, len)) = parse_array_type_annotation(ty)? {
+            return Ok(Self::Array(element_type, len));
+        }
+
+        match ty {
+            Term::Reference {
+                referent,
+                exclusive,
+            } => Ok(Self::Reference {
+                referent: Box::new(Self::from_term(referent, true)?),
+                exclusive: *exclusive,
+                display: render_reference_term(referent, *exclusive),
+            }),
+            Term::Group(inner) => Self::from_term(inner, allow_unsized_array),
+            Term::Unit => Ok(Self::Unit),
+            Term::Path(path)
+                if path.token_keyword_package.is_none() && path.segments.len() == 1 =>
+            {
+                Ok(Self::Nominal(path.segments[0].lexeme.clone()))
+            }
+            Term::Application { callee, .. } => {
+                let Term::Path(path) = callee.as_ref() else {
+                    return Err(Error::Unsupported(format!(
+                        "unsupported type annotation `{}`",
+                        render_term(ty)
+                    )));
+                };
+                if path.token_keyword_package.is_some() || path.segments.len() != 1 {
+                    return Err(Error::Unsupported(format!(
+                        "unsupported type annotation `{}`",
+                        render_term(ty)
+                    )));
+                }
+                Ok(Self::AppliedNominal(path.segments[0].lexeme.clone()))
+            }
+            _ => Err(Error::Unsupported(format!(
+                "unsupported type annotation `{}`",
+                render_term(ty)
+            ))),
+        }
+    }
+}
+
+fn validate_value_against_lowered_type(
+    value: &Value,
+    expected: &LoweredType,
+    display: &str,
+    program: &LoweredProgram,
+) -> Result<()> {
+    if matches!(value, Value::Reference { .. })
+        && !matches!(expected, LoweredType::Reference { .. })
+    {
         return Err(Error::Unsupported(format!(
-            "expected a value of type `{}` but got {value:?}",
-            render_term(ty)
+            "expected a value of type `{display}` but got {value:?}"
         )));
     }
 
-    if is_type_universe_annotation(ty) {
+    if matches!(expected, LoweredType::TypeUniverse) {
         return match value {
             Value::Type(term) if is_type_argument(term) => Ok(()),
             Value::Type(term) => Err(Error::Unsupported(format!(
@@ -29,35 +124,33 @@ pub(crate) fn validate_value_against_type(
         };
     }
 
-    if let Some(element_type) = parse_slice_type_annotation(ty)? {
+    if let LoweredType::ArrayVl(element_type) = expected {
         return match value {
             Value::Array {
                 element_type: actual_element_type,
                 kind: ArrayKind::Dynamic,
                 ..
-            } if *actual_element_type == element_type => Ok(()),
+            } if actual_element_type == element_type => Ok(()),
             _ => Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_term(ty)
+                "expected a value of type `{display}` but got {value:?}"
             ))),
         };
     }
 
-    if let Some(element_type) = parse_ptx_slice_type_annotation(ty)? {
+    if let LoweredType::ArrayVlPtx(element_type) = expected {
         return match value {
             Value::Array {
                 element_type: actual_element_type,
                 kind: ArrayKind::DeviceDynamic,
                 ..
-            } if *actual_element_type == element_type => Ok(()),
+            } if actual_element_type == element_type => Ok(()),
             _ => Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_term(ty)
+                "expected a value of type `{display}` but got {value:?}"
             ))),
         };
     }
 
-    if let Some((element_type, len)) = parse_array_type_annotation(ty)? {
+    if let LoweredType::Array(element_type, len) = expected {
         let Value::Array {
             slot,
             element_type: actual_element_type,
@@ -65,14 +158,12 @@ pub(crate) fn validate_value_against_type(
         } = value
         else {
             return Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_term(ty)
+                "expected a value of type `{display}` but got {value:?}"
             )));
         };
-        if *actual_element_type != element_type {
+        if actual_element_type != element_type {
             return Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_term(ty)
+                "expected a value of type `{display}` but got {value:?}"
             )));
         }
         let actual_len = program
@@ -83,26 +174,27 @@ pub(crate) fn validate_value_against_type(
             .ok_or_else(|| {
                 Error::Unsupported(format!("unknown array slot `{slot}` while checking type"))
             })?;
-        if actual_len != len {
+        if actual_len != *len {
             return Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_term(ty)
+                "expected a value of type `{display}` but got {value:?}"
             )));
         }
         return Ok(());
     }
 
-    if let Term::Reference {
+    if let LoweredType::Reference {
         referent,
         exclusive,
-    } = ty
+        display,
+    } = expected
     {
-        return validate_reference_value_against_type(value, referent, *exclusive, program);
+        return validate_reference_value_against_lowered_type(
+            value, referent, *exclusive, display, program,
+        );
     }
 
-    match ty {
-        Term::Group(inner) => validate_value_against_type(value, inner, program),
-        Term::Unit => {
+    match expected {
+        LoweredType::Unit => {
             if matches!(value, Value::Unit) {
                 Ok(())
             } else {
@@ -111,52 +203,34 @@ pub(crate) fn validate_value_against_type(
                 )))
             }
         }
-        Term::Path(path) if path.token_keyword_package.is_none() && path.segments.len() == 1 => {
-            let segment = &path.segments[0];
-            match segment.lexeme.as_str() {
-                "i32" if matches!(value, Value::I32(_)) => Ok(()),
-                "i64" if matches!(value, Value::I64(_)) => Ok(()),
-                "f32" if matches!(value, Value::F32(_)) => Ok(()),
-                "u8" if matches!(value, Value::U8(_)) => Ok(()),
-                "bool" if matches!(value, Value::Bool(_)) => Ok(()),
-                "FileDescriptor" if matches!(value, Value::FileDescriptor(_)) => Ok(()),
-                "PathBuf" if matches!(value, Value::PathBuf { .. }) => Ok(()),
-                type_name => match value {
-                    Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
-                    Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
-                    _ => Err(Error::Unsupported(format!(
-                        "expected a value of type `{}` but got {value:?}",
-                        render_term(ty)
-                    ))),
-                },
-            }
-        }
-        Term::Application { callee, .. } => {
-            let Term::Path(path) = callee.as_ref() else {
-                return Err(Error::Unsupported(format!(
-                    "unsupported type annotation `{}`",
-                    render_term(ty)
-                )));
-            };
-            if path.token_keyword_package.is_some() || path.segments.len() != 1 {
-                return Err(Error::Unsupported(format!(
-                    "unsupported type annotation `{}`",
-                    render_term(ty)
-                )));
-            }
-            let type_name = path.segments[0].lexeme.as_str();
-            match value {
-                Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
-                Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
+        LoweredType::Nominal(type_name) => match type_name.as_str() {
+            "i32" if matches!(value, Value::I32(_)) => Ok(()),
+            "i64" if matches!(value, Value::I64(_)) => Ok(()),
+            "f32" if matches!(value, Value::F32(_)) => Ok(()),
+            "u8" if matches!(value, Value::U8(_)) => Ok(()),
+            "bool" if matches!(value, Value::Bool(_)) => Ok(()),
+            "FileDescriptor" if matches!(value, Value::FileDescriptor(_)) => Ok(()),
+            "PathBuf" if matches!(value, Value::PathBuf { .. }) => Ok(()),
+            type_name => match value {
+                Value::Constructor(constructor) if constructor.type_name == *type_name => Ok(()),
+                Value::Struct(struct_value) if struct_value.type_name == *type_name => Ok(()),
                 _ => Err(Error::Unsupported(format!(
-                    "expected a value of type `{}` but got {value:?}",
-                    render_term(ty)
+                    "expected a value of type `{display}` but got {value:?}"
                 ))),
-            }
-        }
+            },
+        },
+        LoweredType::AppliedNominal(type_name) => match value {
+            Value::Constructor(constructor) if constructor.type_name == *type_name => Ok(()),
+            Value::Struct(struct_value) if struct_value.type_name == *type_name => Ok(()),
+            _ => Err(Error::Unsupported(format!(
+                "expected a value of type `{display}` but got {value:?}"
+            ))),
+        },
+        LoweredType::UnsizedArray(_) => Err(Error::Unsupported(format!(
+            "unsupported type annotation `{display}`"
+        ))),
         _ => Err(Error::Unsupported(format!(
-            "unsupported type annotation `{}`",
-            render_term(ty)
+            "unsupported type annotation `{display}`"
         ))),
     }
 }
@@ -186,10 +260,11 @@ fn is_type_argument(term: &Term) -> bool {
     )
 }
 
-fn validate_reference_value_against_type(
+fn validate_reference_value_against_lowered_type(
     value: &Value,
-    referent: &Term,
+    referent: &LoweredType,
     exclusive: bool,
+    display: &str,
     program: &LoweredProgram,
 ) -> Result<()> {
     if let Value::Reference {
@@ -199,66 +274,61 @@ fn validate_reference_value_against_type(
     {
         if exclusive && !actual_exclusive {
             return Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, exclusive)
+                "expected a value of type `{display}` but got {value:?}"
             )));
         }
-        return validate_value_against_type(value, referent, program);
+        return validate_value_against_lowered_type(value, referent, display, program);
     }
 
     if exclusive && aggregate_value_requires_reference(value) {
         return Err(Error::Unsupported(format!(
-            "expected a value of type `{}` but got {value:?}",
-            render_reference_term(referent, exclusive)
+            "expected a value of type `{display}` but got {value:?}"
         )));
     }
 
-    if let Some(element_type) = parse_slice_type_annotation(referent)? {
+    if let LoweredType::ArrayVl(element_type) = referent {
         return match value {
-            Value::StaticSlice { .. } if element_type == ArrayElementType::U8 => Ok(()),
+            Value::StaticSlice { .. } if *element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
                 kind: ArrayKind::Dynamic,
                 ..
-            } if *actual_element_type == element_type => Ok(()),
-            Value::RuntimeArg(_) if element_type == ArrayElementType::U8 => Ok(()),
+            } if actual_element_type == element_type => Ok(()),
+            Value::RuntimeArg(_) if *element_type == ArrayElementType::U8 => Ok(()),
             _ => Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, exclusive)
+                "expected a value of type `{display}` but got {value:?}"
             ))),
         };
     }
 
-    if let Some(element_type) = parse_ptx_slice_type_annotation(referent)? {
+    if let LoweredType::ArrayVlPtx(element_type) = referent {
         return match value {
             Value::Array {
                 element_type: actual_element_type,
                 kind: ArrayKind::DeviceDynamic,
                 ..
-            } if *actual_element_type == element_type => Ok(()),
+            } if actual_element_type == element_type => Ok(()),
             _ => Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, exclusive)
+                "expected a value of type `{display}` but got {value:?}"
             ))),
         };
     }
 
-    if let Some(element_type) = parse_unsized_array_type_annotation(referent)? {
+    if let LoweredType::UnsizedArray(element_type) = referent {
         return match value {
-            Value::StaticSlice { .. } if element_type == ArrayElementType::U8 => Ok(()),
+            Value::StaticSlice { .. } if *element_type == ArrayElementType::U8 => Ok(()),
             Value::Array {
                 element_type: actual_element_type,
                 kind: ArrayKind::Dynamic,
                 ..
-            } if *actual_element_type == element_type => Ok(()),
+            } if actual_element_type == element_type => Ok(()),
             _ => Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, exclusive)
+                "expected a value of type `{display}` but got {value:?}"
             ))),
         };
     }
 
-    if let Some((element_type, len)) = parse_array_type_annotation(referent)? {
+    if let LoweredType::Array(element_type, len) = referent {
         let Value::Array {
             slot,
             element_type: actual_element_type,
@@ -266,14 +336,12 @@ fn validate_reference_value_against_type(
         } = value
         else {
             return Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, exclusive)
+                "expected a value of type `{display}` but got {value:?}"
             )));
         };
-        if *actual_element_type != element_type {
+        if actual_element_type != element_type {
             return Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, exclusive)
+                "expected a value of type `{display}` but got {value:?}"
             )));
         }
         let actual_len = program
@@ -284,112 +352,88 @@ fn validate_reference_value_against_type(
             .ok_or_else(|| {
                 Error::Unsupported(format!("unknown array slot `{slot}` while checking type"))
             })?;
-        if actual_len != len {
+        if actual_len != *len {
             return Err(Error::Unsupported(format!(
-                "expected a value of type `{}` but got {value:?}",
-                render_reference_term(referent, exclusive)
+                "expected a value of type `{display}` but got {value:?}"
             )));
         }
         return Ok(());
     }
 
     match referent {
-        Term::Group(inner) => {
-            validate_reference_value_against_type(value, inner, exclusive, program)
-        }
-        Term::Path(path) if path.token_keyword_package.is_none() && path.segments.len() == 1 => {
-            match path.segments[0].lexeme.as_str() {
-                "i32"
-                    if matches!(
-                        value,
-                        Value::I32Reference {
-                            exclusive: actual_exclusive,
-                            ..
-                        } if !exclusive || *actual_exclusive
-                    ) =>
-                {
-                    Ok(())
-                }
-                "i64"
-                    if matches!(
-                        value,
-                        Value::I64Reference {
-                            exclusive: actual_exclusive,
-                            ..
-                        } if !exclusive || *actual_exclusive
-                    ) =>
-                {
-                    Ok(())
-                }
-                "f32"
-                    if matches!(
-                        value,
-                        Value::F32Reference {
-                            exclusive: actual_exclusive,
-                            ..
-                        } if !exclusive || *actual_exclusive
-                    ) =>
-                {
-                    Ok(())
-                }
-                "u8" if matches!(
+        LoweredType::Nominal(type_name) => match type_name.as_str() {
+            "i32"
+                if matches!(
                     value,
-                    Value::U8Reference {
+                    Value::I32Reference {
                         exclusive: actual_exclusive,
                         ..
                     } if !exclusive || *actual_exclusive
                 ) =>
-                {
-                    Ok(())
-                }
-                "bool"
-                    if matches!(
-                        value,
-                        Value::BoolReference {
-                            exclusive: actual_exclusive,
-                            ..
-                        } if !exclusive || *actual_exclusive
-                    ) =>
-                {
-                    Ok(())
-                }
-                "PathBuf" if matches!(value, Value::PathBuf { .. }) => Ok(()),
-                type_name => match value {
-                    Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
-                    Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
-                    _ => Err(Error::Unsupported(format!(
-                        "expected a value of type `{}` but got {value:?}",
-                        render_reference_term(referent, exclusive)
-                    ))),
-                },
+            {
+                Ok(())
             }
-        }
-        Term::Application { callee, .. } => {
-            let Term::Path(path) = callee.as_ref() else {
-                return Err(Error::Unsupported(format!(
-                    "unsupported reference type `{}`",
-                    render_reference_term(referent, exclusive)
-                )));
-            };
-            if path.token_keyword_package.is_some() || path.segments.len() != 1 {
-                return Err(Error::Unsupported(format!(
-                    "unsupported reference type `{}`",
-                    render_reference_term(referent, exclusive)
-                )));
+            "i64"
+                if matches!(
+                    value,
+                    Value::I64Reference {
+                        exclusive: actual_exclusive,
+                        ..
+                    } if !exclusive || *actual_exclusive
+                ) =>
+            {
+                Ok(())
             }
-            let type_name = path.segments[0].lexeme.as_str();
-            match value {
-                Value::Constructor(constructor) if constructor.type_name == type_name => Ok(()),
-                Value::Struct(struct_value) if struct_value.type_name == type_name => Ok(()),
+            "f32"
+                if matches!(
+                    value,
+                    Value::F32Reference {
+                        exclusive: actual_exclusive,
+                        ..
+                    } if !exclusive || *actual_exclusive
+                ) =>
+            {
+                Ok(())
+            }
+            "u8" if matches!(
+                value,
+                Value::U8Reference {
+                    exclusive: actual_exclusive,
+                    ..
+                } if !exclusive || *actual_exclusive
+            ) =>
+            {
+                Ok(())
+            }
+            "bool"
+                if matches!(
+                    value,
+                    Value::BoolReference {
+                        exclusive: actual_exclusive,
+                        ..
+                    } if !exclusive || *actual_exclusive
+                ) =>
+            {
+                Ok(())
+            }
+            "PathBuf" if matches!(value, Value::PathBuf { .. }) => Ok(()),
+            type_name => match value {
+                Value::Constructor(constructor) if constructor.type_name == *type_name => Ok(()),
+                Value::Struct(struct_value) if struct_value.type_name == *type_name => Ok(()),
                 _ => Err(Error::Unsupported(format!(
-                    "expected a value of type `{}` but got {value:?}",
-                    render_reference_term(referent, exclusive)
+                    "expected a value of type `{display}` but got {value:?}"
                 ))),
-            }
-        }
+            },
+        },
+        LoweredType::AppliedNominal(type_name) => match value {
+            Value::Constructor(constructor) if constructor.type_name == *type_name => Ok(()),
+            Value::Struct(struct_value) if struct_value.type_name == *type_name => Ok(()),
+            _ => Err(Error::Unsupported(format!(
+                "expected a value of type `{display}` but got {value:?}"
+            ))),
+        },
         _ => Err(Error::Unsupported(format!(
-            "unsupported reference type `{}`",
-            render_reference_term(referent, exclusive)
+            "unsupported reference type `{display}`"
         ))),
     }
 }
