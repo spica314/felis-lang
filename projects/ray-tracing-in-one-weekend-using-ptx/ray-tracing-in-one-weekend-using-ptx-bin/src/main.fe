@@ -505,9 +505,15 @@
             #break;
         };
 
+        #let ray_origin_x_value : f32 = ref_get f32 ray_origin_x_ref;
+        #let ray_origin_y_value : f32 = ref_get f32 ray_origin_y_ref;
+        #let ray_origin_z_value : f32 = ref_get f32 ray_origin_z_ref;
+        #let ray_dir_x_value : f32 = ref_get f32 ray_dir_x_ref;
+        #let ray_dir_y_value : f32 = ref_get f32 ray_dir_y_ref;
+        #let ray_dir_z_value : f32 = ref_get f32 ray_dir_z_ref;
         #let current_ray : Ray = Ray {
-            origin = vec3 (ref_get f32 ray_origin_x_ref) (ref_get f32 ray_origin_y_ref) (ref_get f32 ray_origin_z_ref),
-            direction = vec3 (ref_get f32 ray_dir_x_ref) (ref_get f32 ray_dir_y_ref) (ref_get f32 ray_dir_z_ref),
+            origin = vec3 ray_origin_x_value ray_origin_y_value ray_origin_z_value,
+            direction = vec3 ray_dir_x_value ray_dir_y_value ray_dir_z_value,
         };
         #let hit_anything : i32 = 0i32;
         #let hit_t : f32 = 1000000.0f32;
@@ -766,9 +772,14 @@
         ref_set i32 hit_front_face_ref big_metal_record.hit_front_face;
         ref_set f32 hit_refraction_index_ref big_metal_record.hit_refraction_index;
 
-        #if i32_eq (ref_get i32 hit_anything_ref) 1i32 {
-            #let hit_point : Vec3 = ray_at current_ray (ref_get f32 hit_t_ref);
-            #let hit_normal : Vec3 = vec3 (ref_get f32 hit_normal_x_ref) (ref_get f32 hit_normal_y_ref) (ref_get f32 hit_normal_z_ref);
+        #let hit_anything_value : i32 = ref_get i32 hit_anything_ref;
+        #if i32_eq hit_anything_value 1i32 {
+            #let hit_t_value : f32 = ref_get f32 hit_t_ref;
+            #let hit_normal_x_value : f32 = ref_get f32 hit_normal_x_ref;
+            #let hit_normal_y_value : f32 = ref_get f32 hit_normal_y_ref;
+            #let hit_normal_z_value : f32 = ref_get f32 hit_normal_z_ref;
+            #let hit_point : Vec3 = ray_at current_ray hit_t_value;
+            #let hit_normal : Vec3 = vec3 hit_normal_x_value hit_normal_y_value hit_normal_z_value;
             #let scatter_x : f32 = 0.0f32;
             #let scatter_y : f32 = 0.0f32;
             #let scatter_z : f32 = 0.0f32;
@@ -779,17 +790,20 @@
             #letref #excl scatter_z_ref : &^ f32 #borrow scatter_z;
             #letref #excl scatter_state_ref : &^ i32 #borrow scatter_state;
             #letref #excl scatter_ok_ref : &^ i32 #borrow scatter_ok;
-            #if i32_eq (ref_get i32 hit_material_ref) 0i32 {
-                #let scatter : RandomVec3 = random_lambertian_direction hit_normal (ref_get i32 current_seed_ref);
+            #let hit_material_value : i32 = ref_get i32 hit_material_ref;
+            #let current_seed_value : i32 = ref_get i32 current_seed_ref;
+            #if i32_eq hit_material_value 0i32 {
+                #let scatter : RandomVec3 = random_lambertian_direction hit_normal current_seed_value;
                 ref_set f32 scatter_x_ref scatter.value.x;
                 ref_set f32 scatter_y_ref scatter.value.y;
                 ref_set f32 scatter_z_ref scatter.value.z;
                 ref_set i32 scatter_state_ref scatter.state;
             } #else {
-                #if i32_eq (ref_get i32 hit_material_ref) 1i32 {
+                #if i32_eq hit_material_value 1i32 {
                     #let reflected : Vec3 = unit_vector (reflect current_ray.direction hit_normal);
-                    #let fuzz_random : RandomVec3 = random_unit_vector (ref_get i32 current_seed_ref);
-                    #let fuzzed : Vec3 = vec3_add reflected (vec3_mul (ref_get f32 hit_fuzz_ref) fuzz_random.value);
+                    #let fuzz_random : RandomVec3 = random_unit_vector current_seed_value;
+                    #let hit_fuzz_value : f32 = ref_get f32 hit_fuzz_ref;
+                    #let fuzzed : Vec3 = vec3_add reflected (vec3_mul hit_fuzz_value fuzz_random.value);
                     ref_set i32 scatter_state_ref fuzz_random.state;
                     #if f32_lt 0.0f32 (vec3_dot fuzzed hit_normal) {
                         ref_set f32 scatter_x_ref fuzzed.x;
@@ -802,7 +816,8 @@
                     #let refraction_index : f32 = ref_get f32 hit_refraction_index_ref;
                     #let ri : f32 = refraction_index;
                     #letref #excl ri_ref : &^ f32 #borrow ri;
-                    #if i32_eq (ref_get i32 hit_front_face_ref) 1i32 {
+                    #let hit_front_face_value : i32 = ref_get i32 hit_front_face_ref;
+                    #if i32_eq hit_front_face_value 1i32 {
                         ref_set f32 ri_ref (f32_div 1.0f32 refraction_index);
                     } #else {
                         ()
@@ -812,59 +827,80 @@
                     #let sin_theta : f32 = f32_sqrt (f32_sub 1.0f32 (f32_mul cos_theta cos_theta));
                     #let cannot_refract : i32 = 0i32;
                     #letref #excl cannot_refract_ref : &^ i32 #borrow cannot_refract;
-                    #if f32_lt 1.0f32 (f32_mul (ref_get f32 ri_ref) sin_theta) {
+                    #let ri_value : f32 = ref_get f32 ri_ref;
+                    #if f32_lt 1.0f32 (f32_mul ri_value sin_theta) {
                         ref_set i32 cannot_refract_ref 1i32;
                     } #else {
                         ()
                     };
-                    #let reflect_seed : i32 = xorshift32 (ref_get i32 current_seed_ref);
+                    #let reflect_seed : i32 = xorshift32 current_seed_value;
                     #let reflect_random : f32 = random_unit reflect_seed;
                     ref_set i32 scatter_state_ref reflect_seed;
                     #let should_reflect : i32 = ref_get i32 cannot_refract_ref;
                     #letref #excl should_reflect_ref : &^ i32 #borrow should_reflect;
-                    #if f32_lt reflect_random (reflectance cos_theta (ref_get f32 ri_ref)) {
+                    #let ri_value_for_reflectance : f32 = ref_get f32 ri_ref;
+                    #if f32_lt reflect_random (reflectance cos_theta ri_value_for_reflectance) {
                         ref_set i32 should_reflect_ref 1i32;
                     } #else {
                         ()
                     };
-                    #if i32_eq (ref_get i32 should_reflect_ref) 1i32 {
+                    #let should_reflect_value : i32 = ref_get i32 should_reflect_ref;
+                    #if i32_eq should_reflect_value 1i32 {
                         #let reflected : Vec3 = reflect unit_direction hit_normal;
                         ref_set f32 scatter_x_ref reflected.x;
                         ref_set f32 scatter_y_ref reflected.y;
                         ref_set f32 scatter_z_ref reflected.z;
                     } #else {
-                        #let refracted : Vec3 = refract unit_direction hit_normal (ref_get f32 ri_ref);
+                        #let ri_value_for_refract : f32 = ref_get f32 ri_ref;
+                        #let refracted : Vec3 = refract unit_direction hit_normal ri_value_for_refract;
                         ref_set f32 scatter_x_ref refracted.x;
                         ref_set f32 scatter_y_ref refracted.y;
                         ref_set f32 scatter_z_ref refracted.z;
                     };
                 };
             };
-            #if i32_eq (ref_get i32 scatter_ok_ref) 1i32 {
+            #let scatter_ok_value : i32 = ref_get i32 scatter_ok_ref;
+            #if i32_eq scatter_ok_value 1i32 {
                 ref_set f32 ray_origin_x_ref hit_point.x;
                 ref_set f32 ray_origin_y_ref hit_point.y;
                 ref_set f32 ray_origin_z_ref hit_point.z;
-                ref_set f32 ray_dir_x_ref (ref_get f32 scatter_x_ref);
-                ref_set f32 ray_dir_y_ref (ref_get f32 scatter_y_ref);
-                ref_set f32 ray_dir_z_ref (ref_get f32 scatter_z_ref);
-                ref_set f32 attenuation_red_ref (f32_mul (ref_get f32 attenuation_red_ref) (ref_get f32 hit_albedo_x_ref));
-                ref_set f32 attenuation_green_ref (f32_mul (ref_get f32 attenuation_green_ref) (ref_get f32 hit_albedo_y_ref));
-                ref_set f32 attenuation_blue_ref (f32_mul (ref_get f32 attenuation_blue_ref) (ref_get f32 hit_albedo_z_ref));
-                ref_set i32 current_seed_ref (ref_get i32 scatter_state_ref);
+                #let scatter_x_value : f32 = ref_get f32 scatter_x_ref;
+                #let scatter_y_value : f32 = ref_get f32 scatter_y_ref;
+                #let scatter_z_value : f32 = ref_get f32 scatter_z_ref;
+                #let attenuation_red_value : f32 = ref_get f32 attenuation_red_ref;
+                #let attenuation_green_value : f32 = ref_get f32 attenuation_green_ref;
+                #let attenuation_blue_value : f32 = ref_get f32 attenuation_blue_ref;
+                #let hit_albedo_x_value : f32 = ref_get f32 hit_albedo_x_ref;
+                #let hit_albedo_y_value : f32 = ref_get f32 hit_albedo_y_ref;
+                #let hit_albedo_z_value : f32 = ref_get f32 hit_albedo_z_ref;
+                #let scatter_state_value : i32 = ref_get i32 scatter_state_ref;
+                ref_set f32 ray_dir_x_ref scatter_x_value;
+                ref_set f32 ray_dir_y_ref scatter_y_value;
+                ref_set f32 ray_dir_z_ref scatter_z_value;
+                ref_set f32 attenuation_red_ref (f32_mul attenuation_red_value hit_albedo_x_value);
+                ref_set f32 attenuation_green_ref (f32_mul attenuation_green_value hit_albedo_y_value);
+                ref_set f32 attenuation_blue_ref (f32_mul attenuation_blue_value hit_albedo_z_value);
+                ref_set i32 current_seed_ref scatter_state_value;
                 ref_set i32 depth_ref (i32_add current_depth 1i32);
             } #else {
                 #break;
             };
         } #else {
             #let sky : Vec3 = ray_color current_ray;
-            ref_set f32 result_red_ref (f32_mul (ref_get f32 attenuation_red_ref) sky.x);
-            ref_set f32 result_green_ref (f32_mul (ref_get f32 attenuation_green_ref) sky.y);
-            ref_set f32 result_blue_ref (f32_mul (ref_get f32 attenuation_blue_ref) sky.z);
+            #let attenuation_red_value : f32 = ref_get f32 attenuation_red_ref;
+            #let attenuation_green_value : f32 = ref_get f32 attenuation_green_ref;
+            #let attenuation_blue_value : f32 = ref_get f32 attenuation_blue_ref;
+            ref_set f32 result_red_ref (f32_mul attenuation_red_value sky.x);
+            ref_set f32 result_green_ref (f32_mul attenuation_green_value sky.y);
+            ref_set f32 result_blue_ref (f32_mul attenuation_blue_value sky.z);
             #break;
         };
     };
 
-    vec3 (ref_get f32 result_red_ref) (ref_get f32 result_green_ref) (ref_get f32 result_blue_ref)
+    #let result_red_value : f32 = ref_get f32 result_red_ref;
+    #let result_green_value : f32 = ref_get f32 result_green_ref;
+    #let result_blue_value : f32 = ref_get f32 result_blue_ref;
+    vec3 result_red_value result_green_value result_blue_value
 }
 
 #fn store_pixel_ptx : (framebuffer : ArrayVLPTX i32) -> (base : i32) -> (red : i32) -> (green : i32) -> (blue : i32) -> () #with PTX {
