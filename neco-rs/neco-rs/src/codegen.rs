@@ -202,7 +202,7 @@ fn emit_operations(
                 code.extend_from_slice(&[0x45, 0x31, 0xc9]);
                 code.extend_from_slice(&[0xb8, 0x09, 0x00, 0x00, 0x00]);
                 code.extend_from_slice(&[0x0f, 0x05]);
-                emit_mmap_error_check(code);
+                emit_negative_syscall_result_check(code);
                 let slot_offset = heap_slot_offset(program, *result_slot);
                 code.extend_from_slice(&[0x48, 0x89, 0x85]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
@@ -221,7 +221,7 @@ fn emit_operations(
                 code.extend_from_slice(&[0x45, 0x31, 0xc9]);
                 code.extend_from_slice(&[0xb8, 0x09, 0x00, 0x00, 0x00]);
                 code.extend_from_slice(&[0x0f, 0x05]);
-                emit_mmap_error_check(code);
+                emit_negative_syscall_result_check(code);
                 let slot_offset = array_slot_offset(program, *array_slot);
                 code.extend_from_slice(&[0x48, 0x89, 0x85]);
                 code.extend_from_slice(&slot_offset.to_le_bytes());
@@ -308,6 +308,7 @@ fn emit_operations(
                 code.extend_from_slice(&[0x89, 0xc2]);
                 code.extend_from_slice(&[0xb8, 0x02, 0x00, 0x00, 0x00]);
                 code.extend_from_slice(&[0x0f, 0x05]);
+                emit_negative_syscall_result_check(code);
                 let result_offset = i32_slot_offset(program, *result_slot);
                 code.extend_from_slice(&[0x89, 0x85]);
                 code.extend_from_slice(&result_offset.to_le_bytes());
@@ -1334,7 +1335,7 @@ fn emit_runtime_arg_ptr_to_rax(
     code[valid_arg_patch..valid_arg_patch + 4].copy_from_slice(&valid_offset.to_le_bytes());
 }
 
-fn emit_mmap_error_check(code: &mut Vec<u8>) {
+fn emit_negative_syscall_result_check(code: &mut Vec<u8>) {
     code.extend_from_slice(&[0x48, 0x85, 0xc0]);
     code.extend_from_slice(&[0x0f, 0x88]);
     let error_patch = code.len();

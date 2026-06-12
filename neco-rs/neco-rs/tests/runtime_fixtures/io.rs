@@ -23,6 +23,18 @@ fn compiles_and_runs_open_read_close_fixture() {
 }
 
 #[test]
+fn open_read_close_fixture_exits_on_missing_file() {
+    let root = repo_root().join("tests/testcases/open-read-close");
+    let temp_dir = runtime_temp_dir("open-read-close-missing-file");
+    let run = run_fixture_output_in_dir(&root, "open-read-close", &temp_dir);
+    fs::remove_dir_all(&temp_dir).expect("cleanup runtime temp dir");
+
+    assert_eq!(run.status.code(), Some(101));
+    assert!(run.stdout.is_empty());
+    assert!(run.stderr.is_empty());
+}
+
+#[test]
 fn compiles_and_runs_open_array_path_fixture() {
     let root = repo_root().join("tests/testcases/open-array-path");
     let run = run_fixture_output_in_dir(&root, "open-array-path", &root);
