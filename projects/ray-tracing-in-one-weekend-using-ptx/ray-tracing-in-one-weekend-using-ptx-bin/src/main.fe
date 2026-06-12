@@ -171,7 +171,8 @@
     #letref #excl out_y_ref : &^ f32 #borrow out_y;
 
     #loop {
-        #let state_x : i32 = xorshift32 (ref_get i32 current_state_ref);
+        #let current_state_value : i32 = ref_get i32 current_state_ref;
+        #let state_x : i32 = xorshift32 current_state_value;
         #let state_y : i32 = xorshift32 state_x;
         #let p : Vec3 = vec3 (random_signed_unit_from_state state_x) (random_signed_unit_from_state state_y) 0.0f32;
         #let lensq : f32 = vec3_length_squared p;
@@ -185,7 +186,10 @@
         };
     };
 
-    RandomVec3 { value = vec3 (ref_get f32 out_x_ref) (ref_get f32 out_y_ref) 0.0f32, state = ref_get i32 current_state_ref }
+    #let out_x_value : f32 = ref_get f32 out_x_ref;
+    #let out_y_value : f32 = ref_get f32 out_y_ref;
+    #let current_state_value : i32 = ref_get i32 current_state_ref;
+    RandomVec3 { value = vec3 out_x_value out_y_value 0.0f32, state = current_state_value }
 }
 
 #fn random_unit_vector : (state : i32) -> RandomVec3 #with PTX {
@@ -199,7 +203,8 @@
     #letref #excl out_z_ref : &^ f32 #borrow out_z;
 
     #loop {
-        #let state_x : i32 = xorshift32 (ref_get i32 current_state_ref);
+        #let current_state_value : i32 = ref_get i32 current_state_ref;
+        #let state_x : i32 = xorshift32 current_state_value;
         #let state_y : i32 = xorshift32 state_x;
         #let state_z : i32 = xorshift32 state_y;
         #let p : Vec3 = vec3 (random_signed_unit_from_state state_x) (random_signed_unit_from_state state_y) (random_signed_unit_from_state state_z);
@@ -220,7 +225,11 @@
         };
     };
 
-    RandomVec3 { value = vec3 (ref_get f32 out_x_ref) (ref_get f32 out_y_ref) (ref_get f32 out_z_ref), state = ref_get i32 current_state_ref }
+    #let out_x_value : f32 = ref_get f32 out_x_ref;
+    #let out_y_value : f32 = ref_get f32 out_y_ref;
+    #let out_z_value : f32 = ref_get f32 out_z_ref;
+    #let current_state_value : i32 = ref_get i32 current_state_ref;
+    RandomVec3 { value = vec3 out_x_value out_y_value out_z_value, state = current_state_value }
 }
 
 #fn random_on_hemisphere : (normal : Vec3) -> (state : i32) -> RandomVec3 #with PTX {
@@ -239,7 +248,10 @@
     } #else {
         ()
     };
-    RandomVec3 { value = vec3 (ref_get f32 out_x_ref) (ref_get f32 out_y_ref) (ref_get f32 out_z_ref), state = random.state }
+    #let out_x_value : f32 = ref_get f32 out_x_ref;
+    #let out_y_value : f32 = ref_get f32 out_y_ref;
+    #let out_z_value : f32 = ref_get f32 out_z_ref;
+    RandomVec3 { value = vec3 out_x_value out_y_value out_z_value, state = random.state }
 }
 
 #fn random_lambertian_direction : (normal : Vec3) -> (state : i32) -> RandomVec3 #with PTX {
@@ -259,7 +271,8 @@
     } #else {
         ()
     };
-    ref_get f32 result_ref
+    #let result : f32 = ref_get f32 result_ref;
+    result
 }
 
 #fn f32_max : (a : f32) -> (b : f32) -> f32 #with PTX {
@@ -270,7 +283,8 @@
     } #else {
         ()
     };
-    ref_get f32 result_ref
+    #let result : f32 = ref_get f32 result_ref;
+    result
 }
 
 #fn refract : (uv : Vec3) -> (normal : Vec3) -> (etai_over_etat : f32) -> Vec3 #with PTX {
@@ -419,15 +433,19 @@
                 };
                 ref_set i32 out_hit_anything_ref 1i32;
                 ref_set f32 out_hit_t_ref t;
-                ref_set f32 out_normal_x_ref (ref_get f32 face_normal_x_ref);
-                ref_set f32 out_normal_y_ref (ref_get f32 face_normal_y_ref);
-                ref_set f32 out_normal_z_ref (ref_get f32 face_normal_z_ref);
+                #let face_normal_x_value : f32 = ref_get f32 face_normal_x_ref;
+                #let face_normal_y_value : f32 = ref_get f32 face_normal_y_ref;
+                #let face_normal_z_value : f32 = ref_get f32 face_normal_z_ref;
+                ref_set f32 out_normal_x_ref face_normal_x_value;
+                ref_set f32 out_normal_y_ref face_normal_y_value;
+                ref_set f32 out_normal_z_ref face_normal_z_value;
                 ref_set i32 out_material_ref material;
                 ref_set f32 out_albedo_x_ref albedo.x;
                 ref_set f32 out_albedo_y_ref albedo.y;
                 ref_set f32 out_albedo_z_ref albedo.z;
                 ref_set f32 out_fuzz_ref fuzz;
-                ref_set i32 out_front_face_ref (ref_get i32 front_face_ref);
+                #let front_face_value : i32 = ref_get i32 front_face_ref;
+                ref_set i32 out_front_face_ref front_face_value;
                 ref_set f32 out_refraction_index_ref refraction_index;
             } #else {
                 ()
@@ -610,12 +628,17 @@
                         };
                     };
 
+                    #let material_value : i32 = ref_get i32 material_ref;
+                    #let albedo_x_value : f32 = ref_get f32 albedo_x_ref;
+                    #let albedo_y_value : f32 = ref_get f32 albedo_y_ref;
+                    #let albedo_z_value : f32 = ref_get f32 albedo_z_ref;
+                    #let fuzz_value : f32 = ref_get f32 fuzz_ref;
                     #let small_record : HitRecord = hit_sphere_record
                         center
                         0.2f32
-                        (ref_get i32 material_ref)
-                        (vec3 (ref_get f32 albedo_x_ref) (ref_get f32 albedo_y_ref) (ref_get f32 albedo_z_ref))
-                        (ref_get f32 fuzz_ref)
+                        material_value
+                        (vec3 albedo_x_value albedo_y_value albedo_z_value)
+                        fuzz_value
                         1.5f32
                         current_ray
                         (HitRecord {
