@@ -69,6 +69,27 @@ pub(crate) fn select_package_for_run(
     }
 }
 
+pub(crate) fn select_packages_for_test(parsed: ParsedRoot) -> Vec<ParsedPackage> {
+    match parsed {
+        ParsedRoot::Package(package) => select_test_entrypoints_from_package(package),
+        ParsedRoot::Workspace(workspace) => workspace
+            .packages
+            .into_iter()
+            .flat_map(select_test_entrypoints_from_package)
+            .collect(),
+    }
+}
+
+fn select_test_entrypoints_from_package(package: ParsedPackage) -> Vec<ParsedPackage> {
+    package
+        .manifest
+        .felis_test_entrypoints
+        .clone()
+        .into_iter()
+        .filter_map(|selected| select_binary_entrypoint(package.clone(), selected).ok())
+        .collect()
+}
+
 fn select_package_for_named_binary(parsed: ParsedRoot, binary_name: &str) -> Result<ParsedPackage> {
     match parsed {
         ParsedRoot::Package(package) => select_named_binary_from_package(package, binary_name),
@@ -283,6 +304,7 @@ pub(crate) struct CliOptions {
 pub(crate) enum CliCommand {
     Build,
     Run,
+    Test,
 }
 
 impl CliOptions {
@@ -299,6 +321,7 @@ impl CliOptions {
         let command = match subcommand.as_str() {
             "build" => CliCommand::Build,
             "run" => CliCommand::Run,
+            "test" => CliCommand::Test,
             "--help" | "-h" => {
                 return Err(Error::Usage(usage().to_string()));
             }
@@ -307,7 +330,7 @@ impl CliOptions {
             }
             _ => {
                 return Err(Error::Usage(format!(
-                    "expected `build` or `run` subcommand, found `{subcommand}`"
+                    "expected `build`, `run`, or `test` subcommand, found `{subcommand}`"
                 )));
             }
         };
@@ -368,7 +391,7 @@ impl CliOptions {
 }
 
 fn usage() -> &'static str {
-    "usage: neco-rs build <package-root> [-o <output-elf>]\n       neco-rs run <package-root> [--bin <binary-name>]"
+    "usage: neco-rs build <package-root> [-o <output-elf>]\n       neco-rs run <package-root> [--bin <binary-name>]\n       neco-rs test <package-root>"
 }
 
 pub(crate) fn default_output_path(package: &ParsedPackage) -> PathBuf {
@@ -383,6 +406,18 @@ pub(crate) fn default_output_path(package: &ParsedPackage) -> PathBuf {
     package.root_dir.join(".neco").join(name)
 }
 
+pub(crate) fn test_output_path(package: &ParsedPackage) -> PathBuf {
+    let name = package
+        .manifest
+        .felis_bin_entrypoints
+        .first()
+        .and_then(|path| path.file_stem())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| std::ffi::OsStr::new("test"));
+
+    package.root_dir.join(".neco").join("test").join(name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{CliCommand, CliOptions};
@@ -393,6 +428,7 @@ mod tests {
                 let command = match options.command {
                     CliCommand::Build => "build",
                     CliCommand::Run => "run",
+                    CliCommand::Test => "test",
                 };
                 format!(
                     "command={},input={},output={},bin={}",
@@ -434,6 +470,14 @@ mod tests {
     }
 
     #[test]
+    fn parses_test_subcommand() {
+        assert_eq!(
+            parse(&["neco-rs", "test", "pkg"]),
+            "command=test,input=pkg,output=,bin="
+        );
+    }
+
+    #[test]
     fn allows_build_as_package_root_name() {
         assert_eq!(
             parse(&["neco-rs", "build", "build"]),
@@ -444,9 +488,12 @@ mod tests {
     #[test]
     fn rejects_missing_or_misplaced_build_subcommand() {
         assert!(parse(&["neco-rs"]).contains("usage: neco-rs build <package-root>"));
-        assert!(parse(&["neco-rs", "pkg"]).contains("expected `build` or `run` subcommand"));
         assert!(
-            parse(&["neco-rs", "pkg", "build"]).contains("expected `build` or `run` subcommand")
+            parse(&["neco-rs", "pkg"]).contains("expected `build`, `run`, or `test` subcommand")
+        );
+        assert!(
+            parse(&["neco-rs", "pkg", "build"])
+                .contains("expected `build`, `run`, or `test` subcommand")
         );
     }
 

@@ -9,6 +9,17 @@ A Felis package is described by a `neco-package.json` file. Executable packages 
 }
 ```
 
+Test entrypoint files are listed in `felis-test-entrypoints`. `neco test` builds
+and runs each listed entrypoint, and succeeds when all of them exit with status
+code 0.
+
+```json
+{
+    "name": "hello-world",
+    "felis-test-entrypoints": ["src/hello-world-test.fe"]
+}
+```
+
 Inside the source file, use `#entrypoint` to choose the function that should run.
 
 ```felis

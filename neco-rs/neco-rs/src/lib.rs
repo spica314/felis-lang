@@ -101,6 +101,17 @@ where
             compile_package_to_elf(&package, &output)?;
             run_output(&output)
         }
+        cli::CliCommand::Test => {
+            for package in cli::select_packages_for_test(parsed) {
+                let output = cli::test_output_path(&package);
+                compile_package_to_elf(&package, &output)?;
+                let status = run_output(&output)?;
+                if status != 0 {
+                    return Ok(status);
+                }
+            }
+            Ok(0)
+        }
     }
 }
 

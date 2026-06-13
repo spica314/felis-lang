@@ -29,6 +29,8 @@ The current manifest design covers these manifest fields:
 - `dependencies`: identifies other packages required by the package.
 - `felis-bin-entrypoints`: identifies one or more Felis binary entrypoint files
   for the package.
+- `felis-test-entrypoints`: identifies one or more Felis test entrypoint files
+  for the package. `neco test` builds and runs each of these entrypoints.
 - `native-link-mode`: selects how native executables are linked. The default
   `kernel-start` mode keeps the existing standalone ELF entry path. `libc-start`
   links through the system C toolchain so the executable starts in libc's
@@ -39,6 +41,9 @@ The current manifest design covers these manifest fields:
 Binary entrypoint source files can then mark the selected function with an
 `#entrypoint` declaration ending with `;`, for example
 `#entrypoint main;`.
+
+Test entrypoint source files use the same `#entrypoint` form. A test passes when
+its executable exits with status code 0.
 
 For example:
 
@@ -61,6 +66,7 @@ package:
     }
   },
   "felis-bin-entrypoints": ["src/main.fe"],
+  "felis-test-entrypoints": ["src/main-test.fe"],
   "native-link-mode": "libc-start",
   "native-libraries": ["m"]
 }
@@ -115,6 +121,7 @@ Additional manifest fields may be defined later, but the current scope
 constrains only:
 
 - package name and Felis entrypoint fields,
+- test entrypoint fields,
 - workspace member enumeration, and
 - package dependencies on workspace members,
 - native link mode and native shared library names.

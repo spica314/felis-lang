@@ -71,6 +71,7 @@ fn parse_inline_binary_package(name: &str, source: &str) -> ParsedPackage {
             dependencies: Vec::new(),
             felis_lib_entrypoint: None,
             felis_bin_entrypoints: vec![source_path.clone()],
+            felis_test_entrypoints: Vec::new(),
             native_link_mode: NativeLinkMode::KernelStart,
             native_libraries: Vec::new(),
         },
@@ -418,4 +419,34 @@ fn run_cli_selects_binary_by_bin_option() {
     fs::remove_dir(root.join(".neco")).expect("cleanup output dir");
 
     assert_eq!(status, 7);
+}
+
+#[test]
+fn test_cli_returns_zero_when_all_test_entrypoints_pass() {
+    let root = repo_root().join("tests/testcases/neco-test-success");
+    let status = run_cli(vec![
+        "neco-rs".to_string(),
+        "test".to_string(),
+        root.display().to_string(),
+    ])
+    .expect("run test fixtures");
+
+    fs::remove_dir_all(root.join(".neco")).expect("cleanup outputs");
+
+    assert_eq!(status, 0);
+}
+
+#[test]
+fn test_cli_returns_first_failing_test_status() {
+    let root = repo_root().join("tests/testcases/neco-test-failure");
+    let status = run_cli(vec![
+        "neco-rs".to_string(),
+        "test".to_string(),
+        root.display().to_string(),
+    ])
+    .expect("run test fixtures");
+
+    fs::remove_dir_all(root.join(".neco")).expect("cleanup outputs");
+
+    assert_eq!(status, 42);
 }

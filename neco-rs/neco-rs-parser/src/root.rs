@@ -42,6 +42,7 @@ pub struct ParsedSourceFile {
 pub enum SourceFileRole {
     LibraryEntrypoint,
     BinaryEntrypoint,
+    TestEntrypoint,
     Module,
 }
 
@@ -129,6 +130,17 @@ fn parse_package(
             &manifest_path,
             &entrypoint,
             SourceFileRole::BinaryEntrypoint,
+            &mut visited,
+            &mut source_files,
+        )?;
+    }
+
+    for path in &manifest.felis_test_entrypoints {
+        let entrypoint = root_dir.join(path);
+        collect_source_file(
+            &manifest_path,
+            &entrypoint,
+            SourceFileRole::TestEntrypoint,
             &mut visited,
             &mut source_files,
         )?;

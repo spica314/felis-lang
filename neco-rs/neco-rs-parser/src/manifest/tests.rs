@@ -10,6 +10,7 @@ fn parses_package_manifest_without_serde() {
         r#"{
                 "name": "hello-world",
                 "felis-bin-entrypoints": ["src/main.fe"],
+                "felis-test-entrypoints": ["src/main-test.fe"],
                 "dependencies": {
                     "std": { "workspace": true }
                 }
@@ -25,6 +26,10 @@ fn parses_package_manifest_without_serde() {
     assert_eq!(
         package.felis_bin_entrypoints,
         vec![PathBuf::from("src/main.fe")]
+    );
+    assert_eq!(
+        package.felis_test_entrypoints,
+        vec![PathBuf::from("src/main-test.fe")]
     );
     assert_eq!(package.dependencies.len(), 1);
     assert_eq!(package.dependencies[0].source, DependencySource::Workspace);
@@ -137,6 +142,27 @@ fn rejects_duplicate_binary_entrypoint_paths() {
         error
             .to_string()
             .contains("duplicate binary entrypoint path `src/main.fe`"),
+        "unexpected error: {error:?}"
+    );
+}
+
+#[test]
+fn rejects_duplicate_test_entrypoint_paths() {
+    let error = match parse_manifest(
+        Path::new("neco-package.json"),
+        r#"{
+                "name": "hello-world",
+                "felis-test-entrypoints": ["src/main-test.fe", "./src/main-test.fe"]
+            }"#,
+    ) {
+        Ok(_) => panic!("manifest should reject duplicate test entrypoint paths"),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate test entrypoint path `src/main-test.fe`"),
         "unexpected error: {error:?}"
     );
 }

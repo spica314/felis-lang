@@ -1,0 +1,7 @@
+{
+    "name": "neco-test-failure",
+    "felis-test-entrypoints": [
+        "src/pass.fe",
+        "src/fail.fe"
+    ]
+}

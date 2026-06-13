@@ -1,0 +1,7 @@
+{
+    "name": "neco-test-success",
+    "felis-test-entrypoints": [
+        "src/first.fe",
+        "src/second.fe"
+    ]
+}

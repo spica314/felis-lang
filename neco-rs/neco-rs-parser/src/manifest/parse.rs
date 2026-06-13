@@ -24,6 +24,7 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
             "dependencies",
             "felis-lib-entrypoint",
             "felis-bin-entrypoints",
+            "felis-test-entrypoints",
             "native-link-mode",
             "native-libraries",
         ],
@@ -35,6 +36,7 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
     let dependencies = optional_field(object, "dependencies")?;
     let felis_lib_entrypoint = optional_string_field(object, "felis-lib-entrypoint")?;
     let felis_bin_entrypoints = optional_string_array_field(object, "felis-bin-entrypoints")?;
+    let felis_test_entrypoints = optional_string_array_field(object, "felis-test-entrypoints")?;
     let native_link_mode = optional_string_field(object, "native-link-mode")?;
     let native_libraries = optional_string_array_field(object, "native-libraries")?;
 
@@ -42,6 +44,7 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
         (Some(workspace), None) => {
             if felis_lib_entrypoint.is_some()
                 || !felis_bin_entrypoints.is_empty()
+                || !felis_test_entrypoints.is_empty()
                 || dependencies.is_some()
                 || native_link_mode.is_some()
                 || !native_libraries.is_empty()
@@ -88,6 +91,11 @@ pub(crate) fn parse_manifest(path: &Path, raw: &str) -> Result<Manifest> {
                     path,
                     felis_bin_entrypoints,
                     "binary entrypoint",
+                )?,
+                felis_test_entrypoints: parse_manifest_paths(
+                    path,
+                    felis_test_entrypoints,
+                    "test entrypoint",
                 )?,
                 native_link_mode,
                 native_libraries,

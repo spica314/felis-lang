@@ -6,6 +6,7 @@ pub struct PackageManifest {
     pub dependencies: Vec<Dependency>,
     pub felis_lib_entrypoint: Option<PathBuf>,
     pub felis_bin_entrypoints: Vec<PathBuf>,
+    pub felis_test_entrypoints: Vec<PathBuf>,
     pub native_link_mode: NativeLinkMode,
     pub native_libraries: Vec<String>,
 }

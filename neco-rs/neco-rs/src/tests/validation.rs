@@ -69,6 +69,7 @@ fn parse_inline_binary_package(name: &str, source: &str) -> ParsedPackage {
             dependencies: Vec::new(),
             felis_lib_entrypoint: None,
             felis_bin_entrypoints: vec![source_path.clone()],
+            felis_test_entrypoints: Vec::new(),
             native_link_mode: NativeLinkMode::KernelStart,
             native_libraries: Vec::new(),
         },
