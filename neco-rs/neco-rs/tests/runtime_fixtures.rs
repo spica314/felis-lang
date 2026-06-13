@@ -7,6 +7,7 @@ mod neco_felis;
 #[path = "runtime_fixtures/support.rs"]
 mod support;
 
+use std::fs;
 use std::process::Command;
 use support::*;
 
@@ -195,6 +196,17 @@ fn compiles_and_runs_neco_sat_test_binaries() {
 
     let unsat = run_fixture_status(&root, "neco-sat-test-unsat");
     assert_eq!(unsat.code(), Some(0));
+}
+
+#[test]
+fn compiles_and_runs_neco_sat_main_with_dimacs_file_input() {
+    let root = repo_root().join("projects/neco-sat");
+    let input = fs::read(root.join("fixtures/sat.cnf")).expect("read DIMACS fixture");
+
+    let output = run_fixture_with_input(&root, "neco-sat-main", &input);
+    assert_eq!(output.status.code(), Some(10));
+    assert_eq!(output.stdout, b"SAT\n");
+    assert!(output.stderr.is_empty());
 }
 
 fn readelf_entry_address(output: &str) -> u64 {
