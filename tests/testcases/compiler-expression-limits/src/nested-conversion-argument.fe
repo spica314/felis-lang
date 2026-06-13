@@ -11,6 +11,6 @@
 
 #fn main : () #with IO {
     #let code : i32 = i32_from_u8 (byte_value 0i32);
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

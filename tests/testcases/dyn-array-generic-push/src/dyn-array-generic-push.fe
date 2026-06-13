@@ -77,6 +77,6 @@
 
     #let value_sum : i32 = i32_add byte_sum (i32_add number_sum long_sum);
     #let code : i32 = i32_add value_sum (i32_add len_sum capacity_sum);
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

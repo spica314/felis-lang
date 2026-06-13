@@ -20,6 +20,6 @@
     #let x3 : i64 = i64_mul x2 d;
     #let x4 : i64 = i64_div x3 e;
     #let x5 : i64 = i64_mod x4 f;
-    #let _ : () <- IO::exit x5;
+    #let _ : () <- IO::sys_exit x5;
     ()
 }

@@ -9,8 +9,8 @@
     #let minus_one : i64 = -1i64;
     #let forty_two : i64 = i64_add 43i64 minus_one;
     #if i64_eq forty_two 42i64 {
-        #let _ : () <- IO::exit 42i32;
+        #let _ : () <- IO::sys_exit 42i32;
     };
-    #let _ : () <- IO::exit 1i32;
+    #let _ : () <- IO::sys_exit 1i32;
     ()
 }

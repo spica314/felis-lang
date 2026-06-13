@@ -3,6 +3,6 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let _ : () <- IO::exit 0i32;
+    #let _ : () <- IO::sys_exit 0i32;
     ()
 }

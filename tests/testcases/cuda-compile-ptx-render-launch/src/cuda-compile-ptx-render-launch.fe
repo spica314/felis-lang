@@ -77,9 +77,9 @@
     #let copy_from_result : i32 <- IO::arrayvl_from_ptx i32 device_array host_array framebuffer_len;
     #let blue : i32 = array_get host_array 2i32;
     #if i32_eq blue 255i32 {
-        #let _ : () <- IO::exit 0i32;
+        #let _ : () <- IO::sys_exit 0i32;
     } #else {
-        #let _ : () <- IO::exit 1i32;
+        #let _ : () <- IO::sys_exit 1i32;
     };
     ()
 }

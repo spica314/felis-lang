@@ -6,6 +6,6 @@
     #let arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 42i32;
     #letref #excl arrayvl_ref : &^ ArrayVL u8 #borrow arrayvl;
     #let len : i32 = array_len arrayvl_ref;
-    #let _ : () <- IO::exit len;
+    #let _ : () <- IO::sys_exit len;
     ()
 }

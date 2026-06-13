@@ -34,6 +34,6 @@
     #let list : List = List::cons 20i32 (List::cons 22i32 List::nil);
     #letref list_ref : & List #borrow list;
     #let code : i32 <- list_sum_ref list_ref;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

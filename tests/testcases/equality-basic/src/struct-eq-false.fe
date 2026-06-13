@@ -18,8 +18,8 @@
     #let right : Code = Code { value = 42i32 };
     #let equal : bool = code_eq left right;
     #if equal {
-        #let _ : () <- IO::exit 1i32;
+        #let _ : () <- IO::sys_exit 1i32;
     };
-    #let _ : () <- IO::exit 42i32;
+    #let _ : () <- IO::sys_exit 42i32;
     ()
 }

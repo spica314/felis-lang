@@ -12,7 +12,7 @@
     #let flag : Flag = Flag::yes;
     #match flag {
         Flag::yes => {
-            #let _ : () <- IO::exit 1i32;
+            #let _ : () <- IO::sys_exit 1i32;
         },
         Flag::no => (),
     };

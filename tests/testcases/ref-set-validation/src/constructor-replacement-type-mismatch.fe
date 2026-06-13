@@ -18,6 +18,6 @@
     #let option : LocalOption = LocalOption::some 1i32;
     #letref #excl option_ref : &^ LocalOption #borrow option;
     ref_set LocalOption option_ref (LocalResult::ok 2i32);
-    #let _ : () <- IO::exit 0i32;
+    #let _ : () <- IO::sys_exit 0i32;
     ()
 }

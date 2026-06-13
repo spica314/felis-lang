@@ -11,6 +11,6 @@
 #fn main : () #with IO {
     #let array : ArrayVL i32 <- IO::arrayvl_new i32 1i32;
     #let value : i32 = read_first array;
-    #let _ : () <- IO::exit value;
+    #let _ : () <- IO::sys_exit value;
     ()
 }

@@ -21,6 +21,6 @@
 
 #fn main : () #with IO {
     #let code : i32 = list_sum (List::cons 20i32 (List::cons 22i32 List::nil));
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

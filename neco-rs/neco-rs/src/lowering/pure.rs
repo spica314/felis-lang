@@ -1460,7 +1460,7 @@ fn lower_function_body_statements(
     for statement in &body.statements {
         if terminated {
             return Err(Error::Unsupported(
-                "statements after `IO::exit` are not supported".to_string(),
+                "statements after `IO::sys_exit` are not supported".to_string(),
             ));
         }
         terminated = lower_statement(statement, scoped_state, program)?;

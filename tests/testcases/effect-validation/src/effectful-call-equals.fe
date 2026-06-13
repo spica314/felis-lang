@@ -10,6 +10,6 @@
 
 #fn main : () #with IO {
     #let status : i32 = read_status 42i32;
-    #let _ : () <- IO::exit status;
+    #let _ : () <- IO::sys_exit status;
     ()
 }

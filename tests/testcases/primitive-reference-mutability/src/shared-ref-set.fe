@@ -8,6 +8,6 @@
     #let value : i32 = 1i32;
     #letref value_ref : & i32 #borrow value;
     ref_set i32 value_ref 2i32;
-    #let _ : () <- IO::exit 0i32;
+    #let _ : () <- IO::sys_exit 0i32;
     ()
 }

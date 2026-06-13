@@ -8,7 +8,7 @@
     #if false {
         ();
     } #else {
-        #let _ : () <- IO::exit 1i32;
+        #let _ : () <- IO::sys_exit 1i32;
         #let unreachable : i32 = 2i32;
     };
     ()

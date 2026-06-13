@@ -19,6 +19,6 @@
     append_u8 buffer_arrayvl_ref index_ref 'c';
     #let exit_code : u8 = array_get buffer_arrayvl_ref 2i32;
     #let code : i32 = i32_from_u8 exit_code;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

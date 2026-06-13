@@ -18,6 +18,6 @@
 
 #fn main : () #with IO {
     #let code : i32 = value_code (Value::single 42i32);
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

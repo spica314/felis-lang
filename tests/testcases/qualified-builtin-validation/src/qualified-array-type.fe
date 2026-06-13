@@ -6,6 +6,6 @@
 
 #fn main : () #with IO {
     #let values : missing::Array i32 1i32 <- IO::array_new i32 1i32;
-    #let _ : () <- IO::exit 0i32;
+    #let _ : () <- IO::sys_exit 0i32;
     ()
 }

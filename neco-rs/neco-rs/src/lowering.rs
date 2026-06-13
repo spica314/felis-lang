@@ -291,7 +291,7 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
     for statement in &main_fn.body.statements {
         if terminated {
             return Err(Error::Unsupported(
-                "statements after `IO::exit` are not supported".to_string(),
+                "statements after `IO::sys_exit` are not supported".to_string(),
             ));
         }
 
@@ -616,7 +616,7 @@ fn reject_control_flow_block_tail(tail: Option<&Term>, block_kind: &str) -> Resu
 fn statements_after_termination_error(operations: &[Operation]) -> Error {
     match operations.last() {
         Some(Operation::Exit(_)) => {
-            Error::Unsupported("statements after `IO::exit` are not supported".to_string())
+            Error::Unsupported("statements after `IO::sys_exit` are not supported".to_string())
         }
         _ => Error::Unsupported("statements after loop control are not supported".to_string()),
     }

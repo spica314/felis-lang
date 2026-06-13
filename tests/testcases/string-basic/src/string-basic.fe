@@ -70,12 +70,12 @@
     #let exit_code : i32 = code;
     #let eq : i32 <- ref_get i32 eq_ref;
     #if i32_eq eq 0i32 {
-        #let _ : () <- IO::exit 1i32;
+        #let _ : () <- IO::sys_exit 1i32;
     };
     #let span_eq : i32 <- ref_get i32 span_eq_ref;
     #if i32_eq span_eq 0i32 {
-        #let _ : () <- IO::exit 2i32;
+        #let _ : () <- IO::sys_exit 2i32;
     };
-    #let _ : () <- IO::exit exit_code;
+    #let _ : () <- IO::sys_exit exit_code;
     ()
 }

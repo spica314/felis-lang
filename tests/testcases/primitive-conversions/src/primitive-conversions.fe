@@ -27,6 +27,6 @@
     #let second : i32 = i32_add first (i32_from_i64 from_u8_to_i64);
     #let third : i32 = i32_add second from_u8_sum;
     #let code : i32 = i32_add third (i32_from_u8 from_i64_to_u8);
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

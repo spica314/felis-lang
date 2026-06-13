@@ -4,6 +4,6 @@
 
 #fn main : () #with IO {
     #let result : i32 <- IO::cu_init 0i32;
-    #let _ : () <- IO::exit result;
+    #let _ : () <- IO::sys_exit result;
     ()
 }

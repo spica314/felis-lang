@@ -10,6 +10,6 @@
     #let hello_ref : & ArrayVL u8 =
         /* comments can appear before a literal */
         "Hello, world!\n";
-    #let _ : () <- IO::write stdout hello_ref 14i32; /* trailing block comment */
+    #let _ : () <- IO::sys_write stdout hello_ref 14i32; /* trailing block comment */
     ()
 }

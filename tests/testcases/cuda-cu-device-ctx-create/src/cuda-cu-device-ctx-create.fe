@@ -13,6 +13,6 @@
     #let ctx : i64 = 0i64;
     #letref #excl ctx : &^ i64 #borrow ctx;
     #let ctx_result : i32 <- IO::cu_ctx_create_v2 ctx 0i32 device_value;
-    #let _ : () <- IO::exit ctx_result;
+    #let _ : () <- IO::sys_exit ctx_result;
     ()
 }

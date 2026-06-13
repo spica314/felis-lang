@@ -100,7 +100,7 @@ fn rejects_reference_and_array_builtins_without_io_effect() {
     #let value : i32 = 42i32;
     #letref value_ref : & i32 #borrow value;
     #let code : i32 = read_ref value_ref;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#,
@@ -124,7 +124,7 @@ fn rejects_reference_and_array_builtins_without_io_effect() {
     #let value : i32 = 0i32;
     #letref #excl value_ref : &^ i32 #borrow value;
     write_ref value_ref;
-    #let _ : () <- IO::exit ((ref_get i32 value_ref));
+    #let _ : () <- IO::sys_exit ((ref_get i32 value_ref));
     ()
 }
 "#,
@@ -146,7 +146,7 @@ fn rejects_reference_and_array_builtins_without_io_effect() {
 #fn main : () #with IO {
     #let array_ref : Array i32 1i32 <- IO::array_new i32 1i32;
     #let code : i32 = read_array array_ref;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#,
@@ -171,7 +171,7 @@ fn rejects_reference_and_array_builtins_without_io_effect() {
     #let array_ref : Array i32 1i32 <- IO::array_new i32 1i32;
     #letref #excl array_write_ref : &^ Array i32 1i32 #borrow array_ref;
     write_array array_write_ref;
-    #let _ : () <- IO::exit (array_get array_ref 0i32);
+    #let _ : () <- IO::sys_exit (array_get array_ref 0i32);
     ()
 }
 "#,
@@ -194,7 +194,7 @@ fn rejects_reference_and_array_builtins_without_io_effect() {
     #let arrayvl : ArrayVL i32 <- IO::arrayvl_new i32 1i32;
     #letref array_ref : & ArrayVL i32 #borrow arrayvl;
     #let code : i32 = read_len array_ref;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#,
@@ -228,7 +228,7 @@ fn rejects_effectful_operations_in_function_arguments() {
     #let value : i32 = 41i32;
     #letref value_ref : & i32 #borrow value;
     #let code : i32 = i32_add (ref_get i32 value_ref) 1i32;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#,
@@ -243,7 +243,7 @@ fn rejects_effectful_operations_in_function_arguments() {
 
 #fn main : () #with IO {
     #let bytes_ref : & ArrayVL u8 = "x";
-    #let _ : () <- IO::write (IO::stdout) bytes_ref 1i32;
+    #let _ : () <- IO::sys_write (IO::stdout) bytes_ref 1i32;
     ()
 }
 "#,
@@ -266,7 +266,7 @@ fn rejects_effectful_operations_in_function_arguments() {
     #let value : i32 = 41i32;
     #letref value_ref : & i32 #borrow value;
     #let code : i32 = i32_add (read_ref value_ref) 1i32;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#,
@@ -289,7 +289,7 @@ fn rejects_effectful_operations_in_function_arguments() {
     #let value : i32 = 41i32;
     #letref value_ref : & i32 #borrow value;
     #let code : i32 = add1 value_ref;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#,
@@ -320,7 +320,7 @@ fn rejects_ref_get_bound_with_equals() {
     #let value : i32 = 42i32;
     #letref value_ref : & i32 #borrow value;
     #let code : i32 = ref_get i32 value_ref;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#;
@@ -346,7 +346,7 @@ fn lowers_ref_get_bound_with_left_arrow() {
     #let value : i32 = 42i32;
     #letref value_ref : & i32 #borrow value;
     #let code : i32 <- ref_get i32 value_ref;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#;

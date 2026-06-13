@@ -16,15 +16,15 @@
     #let or_true : bool = bool_or false and_true;
     #let not_false : bool = bool_not false;
     #if false {
-        #let _ : () <- IO::exit 1i32;
+        #let _ : () <- IO::sys_exit 1i32;
     };
     #if bool_and or_true not_false {
         #if bool_or false (bool_not false) {
             #if bool_not (bool_and true false) {
-                #let _ : () <- IO::exit 42i32;
+                #let _ : () <- IO::sys_exit 42i32;
             };
         };
     };
-    #let _ : () <- IO::exit 2i32;
+    #let _ : () <- IO::sys_exit 2i32;
     ()
 }

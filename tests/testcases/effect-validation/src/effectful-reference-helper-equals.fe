@@ -16,6 +16,6 @@
     #let value : i32 = 40i32;
     #letref #excl value_ref : &^ i32 #borrow value;
     #let code : i32 = add_into_ref value_ref 2i32;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

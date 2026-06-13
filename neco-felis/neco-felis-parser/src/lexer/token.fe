@@ -11,6 +11,7 @@
     identifier_IO : Token,
     identifier_main : Token,
     identifier_exit : Token,
+    identifier_sys_exit : Token,
     identifier_i32 : Token,
     integer_literal : i32 -> Token,
     left_paren : Token,

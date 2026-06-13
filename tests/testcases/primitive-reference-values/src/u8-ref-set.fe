@@ -10,6 +10,6 @@
     #letref #excl value_ref : &^ u8 #borrow value;
     ref_set u8 value_ref 42u8;
     #let code : u8 <- ref_get u8 value_ref;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

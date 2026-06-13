@@ -10,6 +10,6 @@
 
 #fn main : () #with IO {
     #let code : i32 = i32_add (value 0i32) 2i32;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

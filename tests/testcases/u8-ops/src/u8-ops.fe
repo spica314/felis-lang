@@ -20,6 +20,6 @@
     #let x3 : u8 = u8_mul x2 d;
     #let x4 : u8 = u8_div x3 e;
     #let x5 : u8 = u8_mod x4 f;
-    #let _ : () <- IO::exit x5;
+    #let _ : () <- IO::sys_exit x5;
     ()
 }

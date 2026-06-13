@@ -22,6 +22,6 @@
     #let first : i32 <- ref_get i32 value_ref;
     #let second : i32 <- read_ref value_ref;
     #let code : i32 = i32_add first second;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

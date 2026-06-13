@@ -28,8 +28,8 @@
 #fn main : () #with IO {
     #let equal : bool = token_eq (Token::int 42i32) (Token::int 42i32);
     #if equal {
-        #let _ : () <- IO::exit 42i32;
+        #let _ : () <- IO::sys_exit 42i32;
     };
-    #let _ : () <- IO::exit 1i32;
+    #let _ : () <- IO::sys_exit 1i32;
     ()
 }

@@ -17,6 +17,6 @@
     #let a2 : i32 = array_get array_ref 2i32;
     #let a0_plus_a1 : i32 = i32_add a0 a1;
     #let r : i32 = i32_add a0_plus_a1 a2;
-    #let _ : () <- IO::exit r;
+    #let _ : () <- IO::sys_exit r;
     ()
 }

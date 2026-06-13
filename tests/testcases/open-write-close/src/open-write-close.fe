@@ -8,9 +8,9 @@
     #let path : PathBuf <- IO::pathbuf_new 32i32;
     #letref #excl path_ref : &^ PathBuf #borrow path;
     #let _ : () <- IO::pathbuf_push path_ref "created.txt";
-    #let fd : FileDescriptor <- IO::open path_ref 577i32 420i32;
+    #let fd : FileDescriptor <- IO::sys_open path_ref 577i32 420i32;
     #let message_ref : & ArrayVL u8 = "open/write/close fixture\n";
-    #let _ : () <- IO::write fd message_ref 25i32;
-    #let _ : () <- IO::close fd;
+    #let _ : () <- IO::sys_write fd message_ref 25i32;
+    #let _ : () <- IO::sys_close fd;
     ()
 }

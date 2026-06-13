@@ -20,6 +20,6 @@
     #let x3 : i32 = i32_mul x2 d;
     #let x4 : i32 = i32_div x3 e;
     #let x5 : i32 = i32_mod x4 f;
-    #let _ : () <- IO::exit x5;
+    #let _ : () <- IO::sys_exit x5;
     ()
 }

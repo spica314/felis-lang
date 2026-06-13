@@ -41,7 +41,7 @@ Use `<-` when binding a value produced by an effect such as IO.
 
 ```felis
 #let stdout : FileDescriptor <- IO::stdout;
-#let _ : () <- IO::write stdout message 14i32;
+#let _ : () <- IO::sys_write stdout message 14i32;
 ```
 
 Bind to `_` when the returned value is intentionally ignored.

@@ -178,7 +178,7 @@ fn rejects_string_literal_as_open_path() {
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let fd : FileDescriptor <- IO::open "message.txt" 0i32 0i32;
+    #let fd : FileDescriptor <- IO::sys_open "message.txt" 0i32 0i32;
     ()
 }
 "#;
@@ -203,7 +203,11 @@ fn rejects_string_literal_as_open_path() {
     };
 
     let error = lower_package_to_program(&package).expect_err("lowering must reject string path");
-    assert!(error.to_string().contains("`IO::open` expects a `PathBuf`"));
+    assert!(
+        error
+            .to_string()
+            .contains("`IO::sys_open` expects a `PathBuf`")
+    );
 }
 
 #[test]
@@ -216,7 +220,7 @@ fn rejects_arrayvl_as_open_path() {
 
 #fn main : () #with IO {
     #let path : & ArrayVL u8 = "message.txt";
-    #let fd : FileDescriptor <- IO::open path 0i32 0i32;
+    #let fd : FileDescriptor <- IO::sys_open path 0i32 0i32;
     ()
 }
 "#;
@@ -241,7 +245,11 @@ fn rejects_arrayvl_as_open_path() {
     };
 
     let error = lower_package_to_program(&package).expect_err("lowering must reject ArrayVL path");
-    assert!(error.to_string().contains("`IO::open` expects a `PathBuf`"));
+    assert!(
+        error
+            .to_string()
+            .contains("`IO::sys_open` expects a `PathBuf`")
+    );
 }
 
 #[test]
@@ -346,7 +354,7 @@ fn lowers_renamed_bind_builtin_scalar_alias() {
 
 #fn main : () #with IO {
     #let code : i32 = add_i32 40i32 2i32;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#,
@@ -970,7 +978,7 @@ fn rejects_ref_set_through_shared_primitive_reference() {
     #let value : i32 = 1i32;
     #letref value_ref : & i32 #borrow value;
     ref_set i32 value_ref 2i32;
-    #let _ : () <- IO::exit 0i32;
+    #let _ : () <- IO::sys_exit 0i32;
     ()
 }
 "#,
@@ -1004,7 +1012,7 @@ fn rejects_shared_primitive_reference_for_exclusive_parameter() {
     #let value : i32 = 1i32;
     #letref value_ref : & i32 #borrow value;
     write_ref value_ref;
-    #let _ : () <- IO::exit 0i32;
+    #let _ : () <- IO::sys_exit 0i32;
     ()
 }
 "#,

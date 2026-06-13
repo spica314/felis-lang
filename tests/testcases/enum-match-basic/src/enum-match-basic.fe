@@ -19,6 +19,6 @@
 
 #fn main : () #with IO {
     #let code : i32 = color_code Color::green;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

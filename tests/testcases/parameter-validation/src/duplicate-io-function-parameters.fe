@@ -2,7 +2,7 @@
 #use std_core::primitive::i32::i32;
 
 #fn write_value : (value : i32) -> (value : i32) -> () #with IO {
-    #let _ : () <- IO::exit value;
+    #let _ : () <- IO::sys_exit value;
     ()
 }
 

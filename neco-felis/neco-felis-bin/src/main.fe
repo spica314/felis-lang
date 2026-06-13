@@ -151,10 +151,26 @@
     #if i32_eq code 116i32 {
         array_set bytes_ref 126i32 3u8;
     } #else {
-        #if bool_not (i32_eq code 48i32) {
-            array_set bytes_ref 126i32 42u8;
+        #if i32_eq code 79i32 {
+            array_set bytes_ref 126i32 3u8;
         } #else {
-            array_set bytes_ref 126i32 0u8;
+            #if i32_eq code 255i32 {
+                array_set bytes_ref 126i32 3u8;
+            } #else {
+                #if i32_eq code 99i32 {
+                    array_set bytes_ref 126i32 3u8;
+                } #else {
+                    #if i32_eq code 0i32 {
+                        array_set bytes_ref 126i32 0u8;
+                    } #else {
+                        #if bool_not (i32_eq code 48i32) {
+                            array_set bytes_ref 126i32 42u8;
+                        } #else {
+                            array_set bytes_ref 126i32 0u8;
+                        };
+                    };
+                };
+            };
         };
     };
     array_set bytes_ref 127i32 0x00u8;
@@ -164,26 +180,25 @@
     array_set bytes_ref 131i32 0x05u8;
     ()
 }
-
 #fn write_exit_elf : (code : i32) -> () #with IO {
     #let path : PathBuf <- IO::pathbuf_new 16i32;
     #letref #excl path_ref : &^ PathBuf #borrow path;
     #let _ : () <- IO::pathbuf_push path_ref "a.out";
-    #let fd : FileDescriptor <- IO::open path_ref 577i32 493i32;
+    #let fd : FileDescriptor <- IO::sys_open path_ref 577i32 493i32;
     #let bytes_ref : Array u8 132i32 <- IO::array_new u8 132i32;
     #letref #excl bytes_write_ref : &^ Array u8 132i32 #borrow bytes_ref;
     set_elf_header bytes_write_ref;
     set_program_header bytes_write_ref;
     set_exit_code bytes_write_ref code;
-    #let _ : () <- IO::write fd bytes_ref 132i32;
-    #let _ : () <- IO::close fd;
+    #let _ : () <- IO::sys_write fd bytes_ref 132i32;
+    #let _ : () <- IO::sys_close fd;
     ()
 }
 
 #fn main : () #with IO {
     #let stdin : FileDescriptor <- IO::stdin;
     #let source_ref : Array u8 1024i32 <- IO::array_new u8 1024i32;
-    #let _ : i32 <- IO::read stdin source_ref 1024i32;
+    #let _ : i32 <- IO::sys_read stdin source_ref 1024i32;
     #let parsed : ParsedSourceFile <- parse_source source_ref;
     write_exit_elf parsed.exit_code;
     ()

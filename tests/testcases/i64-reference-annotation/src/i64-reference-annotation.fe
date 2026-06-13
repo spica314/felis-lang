@@ -14,6 +14,6 @@
     #let value_ref : i64 = 41i64;
     #letref value_ref : & i64 #borrow value_ref;
     #let r : i64 <- add1 value_ref;
-    #let _ : () <- IO::exit r;
+    #let _ : () <- IO::sys_exit r;
     ()
 }

@@ -12,7 +12,7 @@
     #let stdout : FileDescriptor <- IO::stdout;
     #let input : Array u8 10000i32 <- IO::array_new u8 10000i32;
     #letref #excl input_ref : &^ Array u8 10000i32 #borrow input;
-    #let len : i32 <- IO::read stdin input_ref 10000i32;
+    #let len : i32 <- IO::sys_read stdin input_ref 10000i32;
     #let sat_ref : & ArrayVL u8 = "SAT\n";
     #let unsat_ref : & ArrayVL u8 = "UNSAT\n";
     #let error_ref : & ArrayVL u8 = "ERROR\n";
@@ -47,8 +47,8 @@
 
     #let ok_after_clauses : i32 <- ref_get i32 ok;
     #if i32_eq ok_after_clauses 0i32 {
-        #let _ : () <- IO::write stdout error_ref 6i32;
-        #let _ : () <- IO::exit 2i32;
+        #let _ : () <- IO::sys_write stdout error_ref 6i32;
+        #let _ : () <- IO::sys_exit 2i32;
     };
 
     #let found : i32 = 0i32;
@@ -59,11 +59,11 @@
 
     #let found_value : i32 <- ref_get i32 found;
     #if i32_eq found_value 1i32 {
-        #let _ : () <- IO::write stdout sat_ref 4i32;
-        #let _ : () <- IO::exit 10i32;
+        #let _ : () <- IO::sys_write stdout sat_ref 4i32;
+        #let _ : () <- IO::sys_exit 10i32;
     } #else {
-        #let _ : () <- IO::write stdout unsat_ref 6i32;
-        #let _ : () <- IO::exit 20i32;
+        #let _ : () <- IO::sys_write stdout unsat_ref 6i32;
+        #let _ : () <- IO::sys_exit 20i32;
     };
     ()
 }

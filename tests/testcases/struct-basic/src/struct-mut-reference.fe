@@ -24,6 +24,6 @@
     #letref #excl code_ref : &^ i32 #borrow code_ref;
     set_span_ref span_ref code_ref;
     #let code : i32 <- ref_get i32 code_ref;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

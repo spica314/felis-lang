@@ -66,14 +66,14 @@
     #if i32_eq launch_result 0i32 {
         ()
     } #else {
-        #let _ : () <- IO::exit 2i32;
+        #let _ : () <- IO::sys_exit 2i32;
         ()
     };
     #let copy_from_result : i32 <- IO::arrayvl_from_ptx i32 device_array host_array 4i32;
     #if i32_eq copy_from_result 0i32 {
         ()
     } #else {
-        #let _ : () <- IO::exit 3i32;
+        #let _ : () <- IO::sys_exit 3i32;
         ()
     };
     #let one : i32 = array_get host_array 0i32;
@@ -82,9 +82,9 @@
     #let root : i32 = array_get host_array 3i32;
     #let result : i32 = i32_add (i32_add (i32_add one three) two) root;
     #if i32_eq result 8i32 {
-        #let _ : () <- IO::exit 0i32;
+        #let _ : () <- IO::sys_exit 0i32;
     } #else {
-        #let _ : () <- IO::exit 1i32;
+        #let _ : () <- IO::sys_exit 1i32;
     };
     ()
 }

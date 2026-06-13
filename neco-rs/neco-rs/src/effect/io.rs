@@ -55,7 +55,7 @@ pub(crate) fn lower_io_call(
     program: &mut LoweredProgram,
 ) -> Option<Result<bool>> {
     match path {
-        ["IO", "read"] => {
+        ["IO", "sys_read"] => {
             let (fd, array_slot, len, result_slot) = match parse_read_arguments(arguments, state) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
@@ -77,7 +77,7 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(false))
         }
-        ["IO", "open"] => {
+        ["IO", "sys_open"] => {
             let (path, flags, mode, result_slot) = match parse_open_arguments(arguments, state) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
@@ -150,7 +150,7 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(false))
         }
-        ["IO", "close"] => {
+        ["IO", "sys_close"] => {
             let fd = match parse_close_arguments(arguments, state) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
@@ -161,7 +161,7 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(false))
         }
-        ["IO", "write"] => {
+        ["IO", "sys_write"] => {
             let operation = match parse_write_arguments(arguments, state) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
@@ -418,7 +418,7 @@ pub(crate) fn lower_io_call(
             }
             Some(Ok(false))
         }
-        ["IO", "exit"] => {
+        ["IO", "sys_exit"] => {
             let exit_code = match parse_exit_code_arguments(arguments, state) {
                 Ok(value) => value,
                 Err(err) => return Some(Err(err)),
@@ -536,7 +536,8 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [fd_term, bytes_term, len_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::write` must receive a file descriptor, an `ArrayVL u8`, and a length".to_string(),
+            "`IO::sys_write` must receive a file descriptor, an `ArrayVL u8`, and a length"
+                .to_string(),
         ));
     };
 
@@ -544,13 +545,15 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
         Value::FileDescriptor(fd) => fd,
         other => {
             return Err(Error::Unsupported(format!(
-                "`IO::write` expects a file descriptor as its first argument, got {other:?}"
+                "`IO::sys_write` expects a file descriptor as its first argument, got {other:?}"
             )));
         }
     };
 
     let len = lower_i32_expr(len_term, state).map_err(|_| {
-        Error::Unsupported("`IO::write` expects an `i32` length as its third argument".to_string())
+        Error::Unsupported(
+            "`IO::sys_write` expects an `i32` length as its third argument".to_string(),
+        )
     })?;
 
     match resolve_value(bytes_term, &state.environment)? {
@@ -568,7 +571,7 @@ fn parse_write_arguments(arguments: &[Term], state: &LoweringState) -> Result<Op
             })
         }
         other => Err(Error::Unsupported(format!(
-            "`IO::write` expects an `ArrayVL u8` or `u8` array as its second argument, got {other:?}"
+            "`IO::sys_write` expects an `ArrayVL u8` or `u8` array as its second argument, got {other:?}"
         ))),
     }
 }
@@ -580,7 +583,7 @@ fn parse_read_arguments(
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [fd_term, bytes_term, len_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::read` must receive a file descriptor, a `u8` array reference, and a length"
+            "`IO::sys_read` must receive a file descriptor, a `u8` array reference, and a length"
                 .to_string(),
         ));
     };
@@ -589,7 +592,7 @@ fn parse_read_arguments(
         Value::FileDescriptor(fd) => fd,
         other => {
             return Err(Error::Unsupported(format!(
-                "`IO::read` expects a file descriptor as its first argument, got {other:?}"
+                "`IO::sys_read` expects a file descriptor as its first argument, got {other:?}"
             )));
         }
     };
@@ -600,13 +603,15 @@ fn parse_read_arguments(
         }
         other => {
             return Err(Error::Unsupported(format!(
-                "`IO::read` expects a `u8` array reference as its second argument, got {other:?}"
+                "`IO::sys_read` expects a `u8` array reference as its second argument, got {other:?}"
             )));
         }
     };
 
     let len = lower_i32_expr(len_term, state).map_err(|_| {
-        Error::Unsupported("`IO::read` expects an `i32` length as its third argument".to_string())
+        Error::Unsupported(
+            "`IO::sys_read` expects an `i32` length as its third argument".to_string(),
+        )
     })?;
     let result_slot = state.allocate_i32_slot();
     Ok((fd, array_slot, len, result_slot))
@@ -666,23 +671,23 @@ fn parse_open_arguments(
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [path_term, flags_term, mode_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::open` must receive a `PathBuf`, flags, and mode".to_string(),
+            "`IO::sys_open` must receive a `PathBuf`, flags, and mode".to_string(),
         ));
     };
 
     let path = if matches!(path_term, Term::StringLiteral(_)) {
         return Err(Error::Unsupported(
-            "`IO::open` expects a `PathBuf` as its first argument".to_string(),
+            "`IO::sys_open` expects a `PathBuf` as its first argument".to_string(),
         ));
     } else {
-        OpenPath::PathBuf(parse_pathbuf_slot(path_term, state, "open", false)?)
+        OpenPath::PathBuf(parse_pathbuf_slot(path_term, state, "sys_open", false)?)
     };
 
     let flags = lower_i32_expr(flags_term, state).map_err(|_| {
-        Error::Unsupported("`IO::open` expects `i32` flags as its second argument".to_string())
+        Error::Unsupported("`IO::sys_open` expects `i32` flags as its second argument".to_string())
     })?;
     let mode = lower_i32_expr(mode_term, state).map_err(|_| {
-        Error::Unsupported("`IO::open` expects an `i32` mode as its third argument".to_string())
+        Error::Unsupported("`IO::sys_open` expects an `i32` mode as its third argument".to_string())
     })?;
 
     let result_slot = state.allocate_i32_slot();
@@ -780,14 +785,14 @@ fn parse_close_arguments(arguments: &[Term], state: &LoweringState) -> Result<I3
     let normalized = normalize_numeric_literal_arguments(arguments);
     let [fd_term] = normalized.as_slice() else {
         return Err(Error::Unsupported(
-            "`IO::close` must receive a file descriptor".to_string(),
+            "`IO::sys_close` must receive a file descriptor".to_string(),
         ));
     };
 
     match resolve_value(fd_term, &state.environment)? {
         Value::FileDescriptor(fd) => Ok(fd),
         other => Err(Error::Unsupported(format!(
-            "`IO::close` expects a file descriptor, got {other:?}"
+            "`IO::sys_close` expects a file descriptor, got {other:?}"
         ))),
     }
 }
@@ -1158,7 +1163,7 @@ fn parse_exit_code_arguments(arguments: &[Term], state: &LoweringState) -> Resul
                 .or_else(|_| lower_u8_expr(&term, state).map(ExitCodeExpr::U8))
         }
         _ => Err(Error::Unsupported(
-            "`IO::exit` must receive a single `i32`, `i64`, or `u8` expression".to_string(),
+            "`IO::sys_exit` must receive a single `i32`, `i64`, or `u8` expression".to_string(),
         )),
     }
 }

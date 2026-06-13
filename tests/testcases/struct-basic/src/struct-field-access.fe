@@ -16,6 +16,6 @@
 #fn main : () #with IO {
     #let span : Span = Span { start = 20i32, end = 22i32 };
     #let code : i32 = span_len span;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

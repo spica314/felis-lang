@@ -55,13 +55,13 @@
                         #if f32_eq root 4.0f32 {
                             #let exit_value : f32 = f32_add (f32_add result converted_sum) 22.0f32;
                             #let exit_code : i32 = i32_from_f32 exit_value;
-                            #let _ : () <- IO::exit exit_code;
+                            #let _ : () <- IO::sys_exit exit_code;
                         };
                     };
                 };
             };
         };
     };
-    #let _ : () <- IO::exit 1i32;
+    #let _ : () <- IO::sys_exit 1i32;
     ()
 }

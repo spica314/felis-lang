@@ -5,6 +5,6 @@
 
 #fn main : () #with IO {
     #let ok : bool = missing::i32_eq 42i32 42i32;
-    #let _ : () <- IO::exit 0i32;
+    #let _ : () <- IO::sys_exit 0i32;
     ()
 }

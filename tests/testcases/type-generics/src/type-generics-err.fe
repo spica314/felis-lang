@@ -17,6 +17,6 @@
 
 #fn main : () #with IO {
     #let code : i32 = result_code (LocalResult::err i32 i32 42i32);
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

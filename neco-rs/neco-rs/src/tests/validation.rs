@@ -126,7 +126,7 @@ fn rejects_reference_method_get() {
     #let value : i32 = 42i32;
     #letref value_ref : & i32 #borrow value;
     #let code : i32 = value_ref .> get;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#,
@@ -202,7 +202,7 @@ fn rejects_array_method_get() {
 #fn main : () #with IO {
     #let array_ref : Array i32 1i32 <- IO::array_new i32 1i32;
     #let code : i32 = array_ref .> get 0i32;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#,
@@ -254,7 +254,7 @@ fn rejects_array_method_len() {
     #let arrayvl : ArrayVL i32 <- IO::arrayvl_new i32 1i32;
     #letref #excl arrayvl_ref : &^ ArrayVL i32 #borrow arrayvl;
     #let code : i32 = arrayvl_ref .> len;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
 "#,
@@ -280,7 +280,7 @@ fn rejects_duplicate_struct_fields() {
 }
 
 #fn main : () #with IO {
-    #let _ : () <- IO::exit 0i32;
+    #let _ : () <- IO::sys_exit 0i32;
     ()
 }
 "#,
@@ -431,7 +431,7 @@ fn rejects_duplicate_pure_functions() {
 }
 
 #fn main : () #with IO {
-    #let _ : () <- IO::exit 0i32;
+    #let _ : () <- IO::sys_exit 0i32;
     ()
 }
 "#,
@@ -465,7 +465,7 @@ fn rejects_duplicate_statement_functions() {
 }
 
 #fn main : () #with IO {
-    #let _ : () <- IO::exit 0i32;
+    #let _ : () <- IO::sys_exit 0i32;
     ()
 }
 "#,

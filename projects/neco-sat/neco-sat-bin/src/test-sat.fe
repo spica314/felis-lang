@@ -37,9 +37,9 @@
 
     #let found_value : i32 <- ref_get i32 found;
     #if i32_eq found_value 1i32 {
-        #let _ : () <- IO::exit 0i32;
+        #let _ : () <- IO::sys_exit 0i32;
     } #else {
-        #let _ : () <- IO::exit 1i32;
+        #let _ : () <- IO::sys_exit 1i32;
     };
     ()
 }

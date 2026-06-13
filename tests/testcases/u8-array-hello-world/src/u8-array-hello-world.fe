@@ -23,6 +23,6 @@
     array_set bytes_write_ref 10i32 'l';
     array_set bytes_write_ref 11i32 'd';
     array_set bytes_write_ref 12i32 '\n';
-    #let _ : () <- IO::write stdout bytes_ref 13i32;
+    #let _ : () <- IO::sys_write stdout bytes_ref 13i32;
     ()
 }

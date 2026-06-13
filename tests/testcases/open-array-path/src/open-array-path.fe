@@ -26,10 +26,10 @@
     #let path : PathBuf <- IO::pathbuf_new 32i32;
     #letref #excl buf_ref : &^ PathBuf #borrow path;
     #let _ : () <- IO::pathbuf_push buf_ref path_ref;
-    #let fd : FileDescriptor <- IO::open buf_ref 0i32 0i32;
+    #let fd : FileDescriptor <- IO::sys_open buf_ref 0i32 0i32;
     #let bytes_ref : Array u8 128i32 <- IO::array_new u8 128i32;
-    #let len : i32 <- IO::read fd bytes_ref 128i32;
-    #let _ : () <- IO::close fd;
-    #let _ : () <- IO::write stdout bytes_ref len;
+    #let len : i32 <- IO::sys_read fd bytes_ref 128i32;
+    #let _ : () <- IO::sys_close fd;
+    #let _ : () <- IO::sys_write stdout bytes_ref len;
     ()
 }

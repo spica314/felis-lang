@@ -81,6 +81,6 @@
                             (Tokens::cons Token::eof Tokens::nil)))));
     #let expr : Expr = parse_expr tokens;
     #let code : i32 = eval_expr expr;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

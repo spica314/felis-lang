@@ -6,6 +6,6 @@
 #fn main : () #with IO {
     #let stdout : FileDescriptor <- IO::stdout;
     #let message_ref : & ArrayVL u8 = "Hello from libc start\n";
-    #let _ : () <- IO::write stdout message_ref 22i32;
+    #let _ : () <- IO::sys_write stdout message_ref 22i32;
     ()
 }

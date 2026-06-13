@@ -8,6 +8,7 @@
     #match tokens {
         Tokens::cons token _ => #match token {
             Token::integer_literal value => value,
+            Token::identifier_exit => 116i32,
             _ => 255i32,
         },
         _ => 255i32,
@@ -17,7 +18,7 @@
 #fn exit_after_double_colon : (tokens : Tokens) -> i32 {
     #match tokens {
         Tokens::cons token rest => #match token {
-            Token::identifier_exit => exit_integer_argument rest,
+            Token::identifier_sys_exit => exit_integer_argument rest,
             _ => find_io_exit_integer rest,
         },
         _ => 255i32,

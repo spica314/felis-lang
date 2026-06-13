@@ -16,6 +16,6 @@
 #fn main : () #with IO {
     #let point : Point = Point { x = 19i32, y = 23i32 };
     #let code : i32 = point_code point;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

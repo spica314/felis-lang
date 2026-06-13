@@ -11,10 +11,10 @@
     #let _ : () <- IO::pathbuf_push path_ref "discard.txt";
     #let _ : () <- IO::pathbuf_pop path_ref;
     #let _ : () <- IO::pathbuf_push path_ref "message.txt";
-    #let fd : FileDescriptor <- IO::open path_ref 0i32 0i32;
+    #let fd : FileDescriptor <- IO::sys_open path_ref 0i32 0i32;
     #let bytes_ref : Array u8 128i32 <- IO::array_new u8 128i32;
-    #let len : i32 <- IO::read fd bytes_ref 128i32;
-    #let _ : () <- IO::close fd;
-    #let _ : () <- IO::write stdout bytes_ref len;
+    #let len : i32 <- IO::sys_read fd bytes_ref 128i32;
+    #let _ : () <- IO::sys_close fd;
+    #let _ : () <- IO::sys_write stdout bytes_ref len;
     ()
 }

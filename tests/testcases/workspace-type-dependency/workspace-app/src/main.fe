@@ -17,6 +17,6 @@
     #let imported_list_sum : i32 = list_sum default_list;
     #let first_sum : i32 = i32_add explicit_code imported_code;
     #let code : i32 = i32_add first_sum imported_list_sum;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

@@ -28,6 +28,6 @@
     #let number : i32 <- dyn_array_get i32 numbers 0i32;
 
     #let value : i32 = i32_add (i32_from_u8 byte) number;
-    #let _ : () <- IO::exit value;
+    #let _ : () <- IO::sys_exit value;
     ()
 }

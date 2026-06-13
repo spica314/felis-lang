@@ -50,7 +50,7 @@
     #if i32_eq module_result 0i32 {
         ();
     } #else {
-        #let _ : () <- IO::exit 2i32;
+        #let _ : () <- IO::sys_exit 2i32;
     };
     #let module_value : i64 <- ref_get i64 module;
     #let function : i64 = 0i64;
@@ -59,7 +59,7 @@
     #if i32_eq function_result 0i32 {
         ();
     } #else {
-        #let _ : () <- IO::exit 3i32;
+        #let _ : () <- IO::sys_exit 3i32;
     };
     #let function_value : i64 <- ref_get i64 function;
     #let host_array : ArrayVL i32 <- IO::arrayvl_new i32 4i32;
@@ -74,9 +74,9 @@
     #let copy_from_result : i32 <- IO::arrayvl_from_ptx i32 device_array host_array 4i32;
     #let result : i32 = array_get host_array 3i32;
     #if i32_eq result 6i32 {
-        #let _ : () <- IO::exit 0i32;
+        #let _ : () <- IO::sys_exit 0i32;
     } #else {
-        #let _ : () <- IO::exit 7i32;
+        #let _ : () <- IO::sys_exit 7i32;
     };
     ()
 }

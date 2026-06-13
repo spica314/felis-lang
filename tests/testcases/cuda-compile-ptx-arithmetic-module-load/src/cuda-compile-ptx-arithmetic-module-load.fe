@@ -70,9 +70,9 @@
     #let f32_module_result : i32 <- IO::cu_module_load_data f32_module f32_ptx;
 
     #if bool_and (i32_eq i64_module_result 0i32) (i32_eq f32_module_result 0i32) {
-        #let _ : () <- IO::exit 0i32;
+        #let _ : () <- IO::sys_exit 0i32;
     } #else {
-        #let _ : () <- IO::exit 1i32;
+        #let _ : () <- IO::sys_exit 1i32;
     };
     ()
 }

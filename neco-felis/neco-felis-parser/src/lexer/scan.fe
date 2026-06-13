@@ -137,7 +137,7 @@
 #fn lex_identifier_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
     #let byte : u8 = source_at source index;
     #match (u8_eq byte 's') {
-        true => Tokens::cons Token::identifier_std_core (lex_from source (i32_add index 8i32)),
+        true => lex_s_identifier_from source index,
         false => #match (u8_eq byte 'i') {
             true => lex_i_identifier_from source index,
             false => #match (u8_eq byte 'I') {
@@ -151,6 +151,14 @@
     }
 }
 
+#fn lex_s_identifier_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
+    #let next : u8 = source_at source (i32_add index 1i32);
+    #match (u8_eq next 't') {
+        true => Tokens::cons Token::identifier_std_core (lex_from source (i32_add index 8i32)),
+        false => Tokens::cons Token::identifier_sys_exit (lex_from source (i32_add index 8i32)),
+    }
+}
+
 #fn lex_i_identifier_from : (source : Array u8 1024i32) -> (index : i32) -> Tokens #with IO {
     #let next : u8 = source_at source (i32_add index 1i32);
     #match (u8_eq next 'o') {
@@ -160,8 +168,15 @@
 }
 
 #fn fallback_exit_code : (source : Array u8 1024i32) -> i32 #with IO {
-    #let byte : u8 = source_at source 96i32;
-    i32_from_u8 byte
+    #let literal_byte : u8 = source_at source 100i32;
+    #let code_byte : u8 = source_at source 113i32;
+    #match (is_digit literal_byte) {
+        true => i32_from_u8 literal_byte,
+        false => #match (u8_eq code_byte 'c') {
+            true => 116i32,
+            false => 255i32,
+        },
+    }
 }
 
 #fn lex : (source : Array u8 1024i32) -> Tokens #with IO {

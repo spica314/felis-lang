@@ -17,16 +17,16 @@
     #let path : PathBuf <- IO::pathbuf_new 256i32;
     #letref #excl buf_ref : &^ PathBuf #borrow path;
     #let _ : () <- IO::pathbuf_push buf_ref path_ref;
-    #let fd : FileDescriptor <- IO::open buf_ref 0i32 0i32;
+    #let fd : FileDescriptor <- IO::sys_open buf_ref 0i32 0i32;
     #let bytes_ref : Array u8 64i32 <- IO::array_new u8 64i32;
-    #let len : i32 <- IO::read fd bytes_ref 64i32;
-    #let _ : () <- IO::close fd;
-    #let _ : () <- IO::write stdout bytes_ref len;
+    #let len : i32 <- IO::sys_read fd bytes_ref 64i32;
+    #let _ : () <- IO::sys_close fd;
+    #let _ : () <- IO::sys_write stdout bytes_ref len;
     #let left_digit : u8 = array_get digits_ref 0i32;
     #let right_digit : u8 = array_get digits_ref 1i32;
     #let left : i32 = i32_from_u8 left_digit;
     #let right : i32 = i32_from_u8 right_digit;
     #let code : i32 = i32_add left right;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }

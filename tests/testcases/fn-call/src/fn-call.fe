@@ -24,6 +24,6 @@
 
 #fn main : () #with IO {
     #let x : i32 = f 3i32;
-    #let _ : () <- IO::exit x;
+    #let _ : () <- IO::sys_exit x;
     ()
 }

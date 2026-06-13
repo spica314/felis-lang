@@ -22,6 +22,6 @@
     array_set array_write_ref 1i32 14i32;
     array_set array_write_ref 2i32 21i32;
     #let r : i32 <- sum3 array_write_ref;
-    #let _ : () <- IO::exit r;
+    #let _ : () <- IO::sys_exit r;
     ()
 }

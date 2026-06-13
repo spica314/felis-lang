@@ -1082,7 +1082,7 @@
     append_i32_decimal buffer_ref len_ref blue;
     append_byte buffer_ref len_ref '\n';
     #let len : i32 = ref_get i32 len_ref;
-    #let _ : () <- IO::write stdout buffer_ref len;
+    #let _ : () <- IO::sys_write stdout buffer_ref len;
     ()
 }
 
@@ -1116,7 +1116,7 @@
 
     #let stdout : FileDescriptor <- IO::stdout;
     #let header_ref : & ArrayVL u8 = "P3\n6016 3384\n255\n";
-    #let _ : () <- IO::write stdout header_ref 17i32;
+    #let _ : () <- IO::sys_write stdout header_ref 17i32;
     #let line_buffer : ArrayVL u8 <- IO::arrayvl_new u8 16i32;
     #letref #excl line_buffer_ref : &^ ArrayVL u8 #borrow line_buffer;
 

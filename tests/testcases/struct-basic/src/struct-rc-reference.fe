@@ -17,6 +17,6 @@
     #let point : Point = Point { x = 20i32, y = 22i32 };
     #letref point_ref : & Point #borrow point;
     #let code : i32 = point_ref_code point_ref;
-    #let _ : () <- IO::exit code;
+    #let _ : () <- IO::sys_exit code;
     ()
 }
