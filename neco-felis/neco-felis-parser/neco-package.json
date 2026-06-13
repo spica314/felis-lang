@@ -1,4 +1,7 @@
 {
     "name": "neco-felis-parser",
-    "felis-lib-entrypoint": "src/lib.fe"
+    "felis-lib-entrypoint": "src/lib.fe",
+    "felis-test-entrypoints": [
+        "src/test-parse-source.fe"
+    ]
 }

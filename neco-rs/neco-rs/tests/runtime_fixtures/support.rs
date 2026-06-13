@@ -1,4 +1,5 @@
 use neco_rs::compile_path_to_elf;
+use neco_rs::run_cli;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -122,6 +123,31 @@ pub(super) fn run_fixture_status(root: &Path, name: &str) -> std::process::ExitS
     let status = child.wait().expect("collect child status");
     cleanup_fixture_binary(&output);
     status
+}
+
+pub(super) fn run_neco_test(root: &Path) -> i32 {
+    let status = run_cli(vec![
+        "neco-rs".to_string(),
+        "test".to_string(),
+        root.display().to_string(),
+    ])
+    .expect("run neco test");
+    cleanup_neco_outputs(root);
+    status
+}
+
+fn cleanup_neco_outputs(root: &Path) {
+    if root.file_name().and_then(|name| name.to_str()) == Some(".neco") {
+        fs::remove_dir_all(root).expect("cleanup neco outputs");
+        return;
+    }
+
+    for entry in fs::read_dir(root).expect("read neco output parent") {
+        let path = entry.expect("read neco output entry").path();
+        if path.is_dir() {
+            cleanup_neco_outputs(&path);
+        }
+    }
 }
 
 pub(super) fn run_fixture_output(root: &Path, name: &str) -> Output {

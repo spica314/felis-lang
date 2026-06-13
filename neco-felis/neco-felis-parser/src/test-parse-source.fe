@@ -1,0 +1,35 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_set;
+#use std_core::primitive::i32::i32_eq;
+#use neco-felis-parser::ParsedSourceFile;
+#use neco-felis-parser::parse_source;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let source : Array u8 1024i32 <- IO::array_new u8 1024i32;
+    #letref #excl source_ref : &^ Array u8 1024i32 #borrow source;
+    array_set source_ref 0i32 'I';
+    array_set source_ref 1i32 'O';
+    array_set source_ref 2i32 ':';
+    array_set source_ref 3i32 ':';
+    array_set source_ref 4i32 's';
+    array_set source_ref 5i32 'y';
+    array_set source_ref 6i32 's';
+    array_set source_ref 7i32 '_';
+    array_set source_ref 8i32 'e';
+    array_set source_ref 9i32 'x';
+    array_set source_ref 10i32 'i';
+    array_set source_ref 11i32 't';
+    array_set source_ref 12i32 ' ';
+    array_set source_ref 13i32 '0';
+
+    #let parsed : ParsedSourceFile <- parse_source source;
+    #if i32_eq parsed.exit_code 0i32 {
+        #let _ : () <- IO::sys_exit 0i32;
+    } #else {
+        #let _ : () <- IO::sys_exit 1i32;
+    };
+    ()
+}

@@ -2,10 +2,7 @@
     "name": "neco-sat-bin",
     "felis-lib-entrypoint": "src/lib.fe",
     "felis-bin-entrypoints": [
-        "src/main.fe",
-        "src/test-sat.fe",
-        "src/test-unsat.fe",
-        "src/test-xor-associative.fe"
+        "src/main.fe"
     ],
     "felis-test-entrypoints": [
         "src/test-sat.fe",

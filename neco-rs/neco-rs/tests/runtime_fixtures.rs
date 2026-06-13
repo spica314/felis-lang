@@ -190,15 +190,7 @@ fn compiles_and_runs_compile_ptx_function_call_fixture() {
 #[test]
 fn compiles_and_runs_neco_sat_test_binaries() {
     let root = repo_root().join("projects/neco-sat");
-
-    let sat = run_fixture_status(&root, "neco-sat-test-sat");
-    assert_eq!(sat.code(), Some(0));
-
-    let unsat = run_fixture_status(&root, "neco-sat-test-unsat");
-    assert_eq!(unsat.code(), Some(0));
-
-    let xor_associative = run_fixture_status(&root, "neco-sat-test-xor-associative");
-    assert_eq!(xor_associative.code(), Some(0));
+    assert_eq!(run_neco_test(&root), 0);
 }
 
 #[test]
@@ -1034,17 +1026,7 @@ fn compiles_and_runs_type_rc_parser_basic_fixture() {
 }
 
 #[test]
-#[ignore]
-fn compiles_and_runs_neco_felis_parser_string_expr_fixture() {
+fn compiles_and_runs_neco_felis_parser_tests() {
     let root = repo_root().join("neco-felis/neco-felis-parser");
-    let status = run_fixture_status(&root, "felis-parser-string-expr");
-    assert_eq!(status.code(), Some(5));
-}
-
-#[test]
-#[ignore]
-fn compiles_and_runs_neco_felis_lexer_api_fixture() {
-    let root = repo_root().join("neco-felis/neco-felis-parser");
-    let status = run_fixture_status(&root, "felis-lexer-api");
-    assert_eq!(status.code(), Some(42));
+    assert_eq!(run_neco_test(&root), 0);
 }
