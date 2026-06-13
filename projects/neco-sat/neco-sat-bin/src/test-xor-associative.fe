@@ -1,0 +1,94 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::Array;
+#use std_core::primitive::array::array_set;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
+
+#entrypoint main;
+
+#fn add_lit : (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (literal_count_ref : &^ i32) -> (var_index : i32) -> (negated : i32) -> () #with IO {
+    #let literal_count : i32 <- ref_get i32 literal_count_ref;
+    array_set lit_vars_ref literal_count var_index;
+    array_set lit_negated_ref literal_count negated;
+    ref_set i32 literal_count_ref (i32_add literal_count 1i32);
+    ()
+}
+
+#fn begin_clause : (clause_starts_ref : &^ Array i32 256i32) -> (clause_count_ref : &^ i32) -> (literal_count_ref : &^ i32) -> () #with IO {
+    #let clause_count : i32 <- ref_get i32 clause_count_ref;
+    #let literal_count : i32 <- ref_get i32 literal_count_ref;
+    array_set clause_starts_ref clause_count literal_count;
+    ()
+}
+
+#fn end_clause : (clause_ends_ref : &^ Array i32 256i32) -> (clause_count_ref : &^ i32) -> (literal_count_ref : &^ i32) -> () #with IO {
+    #let clause_count : i32 <- ref_get i32 clause_count_ref;
+    #let literal_count : i32 <- ref_get i32 literal_count_ref;
+    array_set clause_ends_ref clause_count literal_count;
+    ref_set i32 clause_count_ref (i32_add clause_count 1i32);
+    ()
+}
+
+#fn add_clause_2 : (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (literal_count_ref : &^ i32) -> (clause_count_ref : &^ i32) -> (var_a : i32) -> (neg_a : i32) -> (var_b : i32) -> (neg_b : i32) -> () #with IO {
+    begin_clause clause_starts_ref clause_count_ref literal_count_ref;
+    add_lit lit_vars_ref lit_negated_ref literal_count_ref var_a neg_a;
+    add_lit lit_vars_ref lit_negated_ref literal_count_ref var_b neg_b;
+    end_clause clause_ends_ref clause_count_ref literal_count_ref;
+    ()
+}
+
+#fn add_clause_3 : (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (literal_count_ref : &^ i32) -> (clause_count_ref : &^ i32) -> (var_a : i32) -> (neg_a : i32) -> (var_b : i32) -> (neg_b : i32) -> (var_c : i32) -> (neg_c : i32) -> () #with IO {
+    begin_clause clause_starts_ref clause_count_ref literal_count_ref;
+    add_lit lit_vars_ref lit_negated_ref literal_count_ref var_a neg_a;
+    add_lit lit_vars_ref lit_negated_ref literal_count_ref var_b neg_b;
+    add_lit lit_vars_ref lit_negated_ref literal_count_ref var_c neg_c;
+    end_clause clause_ends_ref clause_count_ref literal_count_ref;
+    ()
+}
+
+#fn add_xor_definition : (lit_vars_ref : &^ Array i32 2048i32) -> (lit_negated_ref : &^ Array i32 2048i32) -> (clause_starts_ref : &^ Array i32 256i32) -> (clause_ends_ref : &^ Array i32 256i32) -> (literal_count_ref : &^ i32) -> (clause_count_ref : &^ i32) -> (lhs : i32) -> (rhs : i32) -> (out : i32) -> () #with IO {
+    add_clause_3 lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref literal_count_ref clause_count_ref lhs 0i32 rhs 0i32 out 1i32;
+    add_clause_3 lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref literal_count_ref clause_count_ref lhs 1i32 rhs 1i32 out 1i32;
+    add_clause_3 lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref literal_count_ref clause_count_ref lhs 0i32 rhs 1i32 out 0i32;
+    add_clause_3 lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref literal_count_ref clause_count_ref lhs 1i32 rhs 0i32 out 0i32;
+    ()
+}
+
+#fn main : () #with IO {
+    #let assignments : Array i32 12i32 <- IO::array_new i32 12i32;
+    #letref #excl assignments_ref : &^ Array i32 12i32 #borrow assignments;
+    #let lit_vars : Array i32 2048i32 <- IO::array_new i32 2048i32;
+    #letref #excl lit_vars_ref : &^ Array i32 2048i32 #borrow lit_vars;
+    #let lit_negated : Array i32 2048i32 <- IO::array_new i32 2048i32;
+    #letref #excl lit_negated_ref : &^ Array i32 2048i32 #borrow lit_negated;
+    #let clause_starts : Array i32 256i32 <- IO::array_new i32 256i32;
+    #letref #excl clause_starts_ref : &^ Array i32 256i32 #borrow clause_starts;
+    #let clause_ends : Array i32 256i32 <- IO::array_new i32 256i32;
+    #letref #excl clause_ends_ref : &^ Array i32 256i32 #borrow clause_ends;
+    #let literal_count : i32 = 0i32;
+    #letref #excl literal_count_ref : &^ i32 #borrow literal_count;
+    #let clause_count : i32 = 0i32;
+    #letref #excl clause_count_ref : &^ i32 #borrow clause_count;
+
+    add_xor_definition lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref literal_count_ref clause_count_ref 0i32 1i32 3i32;
+    add_xor_definition lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref literal_count_ref clause_count_ref 3i32 2i32 4i32;
+    add_xor_definition lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref literal_count_ref clause_count_ref 1i32 2i32 5i32;
+    add_xor_definition lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref literal_count_ref clause_count_ref 0i32 5i32 6i32;
+    add_clause_2 lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref literal_count_ref clause_count_ref 4i32 0i32 6i32 0i32;
+    add_clause_2 lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref literal_count_ref clause_count_ref 4i32 1i32 6i32 1i32;
+
+    #let found : i32 = 0i32;
+    #letref #excl found : &^ i32 #borrow found;
+    #let clause_count_value : i32 <- ref_get i32 clause_count_ref;
+    solve assignments_ref lit_vars_ref lit_negated_ref clause_starts_ref clause_ends_ref 7i32 clause_count_value found;
+
+    #let found_value : i32 <- ref_get i32 found;
+    #if i32_eq found_value 0i32 {
+        #let _ : () <- IO::sys_exit 0i32;
+    } #else {
+        #let _ : () <- IO::sys_exit 1i32;
+    };
+    ()
+}

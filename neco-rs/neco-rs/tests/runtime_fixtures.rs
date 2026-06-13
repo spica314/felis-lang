@@ -196,6 +196,9 @@ fn compiles_and_runs_neco_sat_test_binaries() {
 
     let unsat = run_fixture_status(&root, "neco-sat-test-unsat");
     assert_eq!(unsat.code(), Some(0));
+
+    let xor_associative = run_fixture_status(&root, "neco-sat-test-xor-associative");
+    assert_eq!(xor_associative.code(), Some(0));
 }
 
 #[test]

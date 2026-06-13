@@ -4,6 +4,12 @@
     "felis-bin-entrypoints": [
         "src/main.fe",
         "src/test-sat.fe",
-        "src/test-unsat.fe"
+        "src/test-unsat.fe",
+        "src/test-xor-associative.fe"
+    ],
+    "felis-test-entrypoints": [
+        "src/test-sat.fe",
+        "src/test-unsat.fe",
+        "src/test-xor-associative.fe"
     ]
 }
