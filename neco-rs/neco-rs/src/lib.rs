@@ -1,6 +1,8 @@
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::Duration;
 
 mod cli;
 mod codegen;
@@ -27,6 +29,7 @@ pub enum Error {
         status: Option<i32>,
         stderr: String,
     },
+    RunTerminatedBySignal,
     Unsupported(String),
 }
 
@@ -52,6 +55,7 @@ impl fmt::Display for Error {
                 }
                 Ok(())
             }
+            Self::RunTerminatedBySignal => f.write_str("run target terminated without exit status"),
         }
     }
 }
@@ -72,21 +76,32 @@ impl From<neco_rs_elf::Error> for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub fn run_cli<I>(args: I) -> Result<()>
+pub fn run_cli<I>(args: I) -> Result<i32>
 where
     I: IntoIterator<Item = String>,
 {
     let options = cli::CliOptions::parse(args)?;
     let parsed = parse_root(&options.input)?;
-    let (package, output) = match options.output {
-        Some(output) => (cli::select_package_for_build(parsed, &output)?, output),
-        None => {
-            let package = cli::select_package_for_default_build(parsed)?;
-            let output = cli::default_output_path(&package);
-            (package, output)
+    match options.command {
+        cli::CliCommand::Build => {
+            let (package, output) = match options.output {
+                Some(output) => (cli::select_package_for_build(parsed, &output)?, output),
+                None => {
+                    let package = cli::select_package_for_default_build(parsed)?;
+                    let output = cli::default_output_path(&package);
+                    (package, output)
+                }
+            };
+            compile_package_to_elf(&package, &output)?;
+            Ok(0)
         }
-    };
-    compile_package_to_elf(&package, &output)
+        cli::CliCommand::Run => {
+            let package = cli::select_package_for_run(parsed, options.binary_name.as_deref())?;
+            let output = cli::default_output_path(&package);
+            compile_package_to_elf(&package, &output)?;
+            run_output(&output)
+        }
+    }
 }
 
 pub fn compile_path_to_elf(input: &Path, output: &Path) -> Result<()> {
@@ -124,6 +139,33 @@ fn compile_package_to_elf(package: &neco_rs_parser::ParsedPackage, output: &Path
     }
     cli::set_output_executable(output)?;
     Ok(())
+}
+
+fn run_output(output: &Path) -> Result<i32> {
+    const TEXT_FILE_BUSY: i32 = 26;
+    const MAX_ATTEMPTS: usize = 20;
+
+    let status = 'retry: {
+        for attempt in 1..=MAX_ATTEMPTS {
+            match Command::new(output).status() {
+                Ok(status) => break 'retry status,
+                Err(error)
+                    if error.raw_os_error() == Some(TEXT_FILE_BUSY) && attempt < MAX_ATTEMPTS =>
+                {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                Err(source) => {
+                    return Err(Error::Io {
+                        path: Some(output.to_path_buf()),
+                        source,
+                    });
+                }
+            }
+        }
+        unreachable!("run retry loop always returns or breaks")
+    };
+
+    status.code().ok_or(Error::RunTerminatedBySignal)
 }
 
 fn write_compiled_ptx_artifacts(

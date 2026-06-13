@@ -59,12 +59,61 @@ pub(crate) fn select_package_for_default_build(parsed: ParsedRoot) -> Result<Par
     }
 }
 
+pub(crate) fn select_package_for_run(
+    parsed: ParsedRoot,
+    binary_name: Option<&str>,
+) -> Result<ParsedPackage> {
+    match binary_name {
+        Some(binary_name) => select_package_for_named_binary(parsed, binary_name),
+        None => select_package_for_default_build(parsed),
+    }
+}
+
+fn select_package_for_named_binary(parsed: ParsedRoot, binary_name: &str) -> Result<ParsedPackage> {
+    match parsed {
+        ParsedRoot::Package(package) => select_named_binary_from_package(package, binary_name),
+        ParsedRoot::Workspace(workspace) => {
+            let matches = workspace_binary_packages(workspace)
+                .into_iter()
+                .filter_map(|package| select_named_binary_from_package(package, binary_name).ok())
+                .collect::<Vec<_>>();
+
+            match matches.len() {
+                0 => Err(Error::Unsupported(format!(
+                    "workspace does not contain binary `{binary_name}`"
+                ))),
+                1 => Ok(matches.into_iter().next().expect("one match")),
+                _ => Err(Error::Unsupported(format!(
+                    "workspace contains multiple binaries named `{binary_name}`"
+                ))),
+            }
+        }
+    }
+}
+
 fn workspace_binary_packages(workspace: ParsedWorkspace) -> Vec<ParsedPackage> {
     workspace
         .packages
         .into_iter()
         .filter(|package| !package.manifest.felis_bin_entrypoints.is_empty())
         .collect()
+}
+
+fn select_named_binary_from_package(
+    package: ParsedPackage,
+    binary_name: &str,
+) -> Result<ParsedPackage> {
+    let selected = package
+        .manifest
+        .felis_bin_entrypoints
+        .iter()
+        .find(|path| binary_name_from_path(path) == binary_name)
+        .cloned()
+        .ok_or_else(|| {
+            Error::Unsupported(format!("package does not contain binary `{binary_name}`"))
+        })?;
+
+    select_binary_entrypoint(package, selected)
 }
 
 pub(crate) fn select_binary_from_package(
@@ -80,7 +129,7 @@ pub(crate) fn select_binary_from_package(
                 .felis_bin_entrypoints
                 .iter()
                 .filter_map(|path| {
-                    let name = binary_name(path);
+                    let name = binary_name_from_path(path);
                     output_name_match_score(&output_name, &name).map(|score| (score, path.clone()))
                 })
                 .collect::<Vec<_>>();
@@ -89,25 +138,28 @@ pub(crate) fn select_binary_from_package(
                     "package contains multiple binary entrypoints; choose an output path that identifies the target binary".to_string(),
                 ));
             };
-            let selected_path = package.root_dir.join(&selected);
-            let reachable_paths =
-                reachable_binary_source_paths(&package.source_files, &selected_path);
-            let source_files = package
-                .source_files
-                .into_iter()
-                .filter(|file| reachable_paths.contains(&file.path))
-                .collect();
-            let mut manifest = package.manifest;
-            manifest.felis_bin_entrypoints = vec![selected];
-
-            Ok(ParsedPackage {
-                root_dir: package.root_dir,
-                manifest_path: package.manifest_path,
-                manifest,
-                source_files,
-            })
+            select_binary_entrypoint(package, selected)
         }
     }
+}
+
+fn select_binary_entrypoint(package: ParsedPackage, selected: PathBuf) -> Result<ParsedPackage> {
+    let selected_path = package.root_dir.join(&selected);
+    let reachable_paths = reachable_binary_source_paths(&package.source_files, &selected_path);
+    let source_files = package
+        .source_files
+        .into_iter()
+        .filter(|file| reachable_paths.contains(&file.path))
+        .collect();
+    let mut manifest = package.manifest;
+    manifest.felis_bin_entrypoints = vec![selected];
+
+    Ok(ParsedPackage {
+        root_dir: package.root_dir,
+        manifest_path: package.manifest_path,
+        manifest,
+        source_files,
+    })
 }
 
 fn reachable_binary_source_paths(
@@ -167,7 +219,7 @@ fn select_default_binary_from_package(package: ParsedPackage) -> Result<ParsedPa
     }
 }
 
-fn binary_name(path: &Path) -> String {
+fn binary_name_from_path(path: &Path) -> String {
     path.file_stem()
         .and_then(|stem| stem.to_str())
         .unwrap_or_default()
@@ -221,8 +273,16 @@ pub(crate) fn set_output_executable(output: &Path) -> Result<()> {
 }
 
 pub(crate) struct CliOptions {
+    pub(crate) command: CliCommand,
     pub(crate) input: PathBuf,
     pub(crate) output: Option<PathBuf>,
+    pub(crate) binary_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CliCommand {
+    Build,
+    Run,
 }
 
 impl CliOptions {
@@ -234,42 +294,54 @@ impl CliOptions {
         let _program = args.next();
 
         let Some(subcommand) = args.next() else {
-            return Err(Error::Usage(
-                "usage: neco-rs build <package-root> [-o <output-elf>]".to_string(),
-            ));
+            return Err(Error::Usage(usage().to_string()));
         };
-        match subcommand.as_str() {
-            "build" => {}
+        let command = match subcommand.as_str() {
+            "build" => CliCommand::Build,
+            "run" => CliCommand::Run,
             "--help" | "-h" => {
-                return Err(Error::Usage(
-                    "usage: neco-rs build <package-root> [-o <output-elf>]".to_string(),
-                ));
+                return Err(Error::Usage(usage().to_string()));
             }
             _ if subcommand.starts_with('-') => {
                 return Err(Error::Usage(format!("unknown option `{subcommand}`")));
             }
             _ => {
                 return Err(Error::Usage(format!(
-                    "expected `build` subcommand, found `{subcommand}`"
+                    "expected `build` or `run` subcommand, found `{subcommand}`"
                 )));
             }
-        }
+        };
 
         let mut input = None;
         let mut output = None;
+        let mut binary_name = None;
 
         while let Some(arg) = args.next() {
             match arg.as_str() {
                 "-o" | "--output" => {
+                    if command != CliCommand::Build {
+                        return Err(Error::Usage(
+                            "--output is only supported by `build`".to_string(),
+                        ));
+                    }
                     let Some(path) = args.next() else {
                         return Err(Error::Usage("missing value for --output".to_string()));
                     };
                     output = Some(PathBuf::from(path));
                 }
+                "--bin" => {
+                    if command != CliCommand::Run {
+                        return Err(Error::Usage("--bin is only supported by `run`".to_string()));
+                    }
+                    let Some(name) = args.next() else {
+                        return Err(Error::Usage("missing value for --bin".to_string()));
+                    };
+                    if binary_name.replace(name).is_some() {
+                        return Err(Error::Usage("expected a single --bin option".to_string()));
+                    }
+                }
                 "--help" | "-h" => {
-                    return Err(Error::Usage(
-                        "usage: neco-rs build <package-root> [-o <output-elf>]".to_string(),
-                    ));
+                    return Err(Error::Usage(usage().to_string()));
                 }
                 _ if arg.starts_with('-') => {
                     return Err(Error::Usage(format!("unknown option `{arg}`")));
@@ -286,8 +358,17 @@ impl CliOptions {
         }
 
         let input = input.ok_or_else(|| Error::Usage("missing package root path".to_string()))?;
-        Ok(Self { input, output })
+        Ok(Self {
+            command,
+            input,
+            output,
+            binary_name,
+        })
     }
+}
+
+fn usage() -> &'static str {
+    "usage: neco-rs build <package-root> [-o <output-elf>]\n       neco-rs run <package-root> [--bin <binary-name>]"
 }
 
 pub(crate) fn default_output_path(package: &ParsedPackage) -> PathBuf {
@@ -304,19 +385,25 @@ pub(crate) fn default_output_path(package: &ParsedPackage) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::CliOptions;
+    use super::{CliCommand, CliOptions};
 
     fn parse(args: &[&str]) -> String {
         CliOptions::parse(args.iter().map(|arg| arg.to_string()))
             .map(|options| {
+                let command = match options.command {
+                    CliCommand::Build => "build",
+                    CliCommand::Run => "run",
+                };
                 format!(
-                    "input={},output={}",
+                    "command={},input={},output={},bin={}",
+                    command,
                     options.input.display(),
                     options
                         .output
                         .as_ref()
                         .map(|path| path.display().to_string())
-                        .unwrap_or_default()
+                        .unwrap_or_default(),
+                    options.binary_name.as_deref().unwrap_or_default()
                 )
             })
             .unwrap_or_else(|error| error.to_string())
@@ -324,23 +411,43 @@ mod tests {
 
     #[test]
     fn parses_build_subcommand() {
-        assert_eq!(parse(&["neco-rs", "build", "pkg"]), "input=pkg,output=");
+        assert_eq!(
+            parse(&["neco-rs", "build", "pkg"]),
+            "command=build,input=pkg,output=,bin="
+        );
         assert_eq!(
             parse(&["neco-rs", "build", "pkg", "-o", "out"]),
-            "input=pkg,output=out"
+            "command=build,input=pkg,output=out,bin="
+        );
+    }
+
+    #[test]
+    fn parses_run_subcommand() {
+        assert_eq!(
+            parse(&["neco-rs", "run", "pkg"]),
+            "command=run,input=pkg,output=,bin="
+        );
+        assert_eq!(
+            parse(&["neco-rs", "run", "pkg", "--bin", "tool"]),
+            "command=run,input=pkg,output=,bin=tool"
         );
     }
 
     #[test]
     fn allows_build_as_package_root_name() {
-        assert_eq!(parse(&["neco-rs", "build", "build"]), "input=build,output=");
+        assert_eq!(
+            parse(&["neco-rs", "build", "build"]),
+            "command=build,input=build,output=,bin="
+        );
     }
 
     #[test]
     fn rejects_missing_or_misplaced_build_subcommand() {
         assert!(parse(&["neco-rs"]).contains("usage: neco-rs build <package-root>"));
-        assert!(parse(&["neco-rs", "pkg"]).contains("expected `build` subcommand"));
-        assert!(parse(&["neco-rs", "pkg", "build"]).contains("expected `build` subcommand"));
+        assert!(parse(&["neco-rs", "pkg"]).contains("expected `build` or `run` subcommand"));
+        assert!(
+            parse(&["neco-rs", "pkg", "build"]).contains("expected `build` or `run` subcommand")
+        );
     }
 
     #[test]
@@ -348,6 +455,18 @@ mod tests {
         assert!(
             parse(&["neco-rs", "build", "pkg", "build"])
                 .contains("expected a single package root path")
+        );
+    }
+
+    #[test]
+    fn rejects_subcommand_specific_options() {
+        assert!(
+            parse(&["neco-rs", "build", "pkg", "--bin", "tool"])
+                .contains("--bin is only supported by `run`")
+        );
+        assert!(
+            parse(&["neco-rs", "run", "pkg", "-o", "out"])
+                .contains("--output is only supported by `build`")
         );
     }
 }

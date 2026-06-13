@@ -15,6 +15,7 @@ use crate::ir::{
     OpenPath, Operation, PathBufSource, U8Expr,
 };
 use crate::lowering::lower_package_to_program;
+use crate::run_cli;
 use crate::write_compiled_ptx_artifacts;
 
 fn repo_root() -> PathBuf {
@@ -383,4 +384,38 @@ fn selects_longest_matching_binary_name() {
         package.manifest.felis_bin_entrypoints,
         vec![PathBuf::from("src/if-else-if-true.fe")]
     );
+}
+
+#[test]
+fn run_cli_returns_target_exit_status() {
+    let root = repo_root().join("tests/testcases/exit-42");
+    let status = run_cli(vec![
+        "neco-rs".to_string(),
+        "run".to_string(),
+        root.display().to_string(),
+    ])
+    .expect("run fixture");
+
+    fs::remove_file(root.join(".neco/exit-42")).expect("cleanup output");
+    fs::remove_dir(root.join(".neco")).expect("cleanup output dir");
+
+    assert_eq!(status, 42);
+}
+
+#[test]
+fn run_cli_selects_binary_by_bin_option() {
+    let root = repo_root().join("tests/testcases/multi-bin-private-modules");
+    let status = run_cli(vec![
+        "neco-rs".to_string(),
+        "run".to_string(),
+        root.display().to_string(),
+        "--bin".to_string(),
+        "tool".to_string(),
+    ])
+    .expect("run fixture");
+
+    fs::remove_file(root.join(".neco/tool")).expect("cleanup output");
+    fs::remove_dir(root.join(".neco")).expect("cleanup output dir");
+
+    assert_eq!(status, 7);
 }
