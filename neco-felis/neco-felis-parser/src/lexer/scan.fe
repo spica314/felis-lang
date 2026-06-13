@@ -172,9 +172,12 @@
     #let code_byte : u8 = source_at source 113i32;
     #match (is_digit literal_byte) {
         true => i32_from_u8 literal_byte,
-        false => #match (u8_eq code_byte 'c') {
-            true => 116i32,
-            false => 255i32,
+        false => #match (u8_eq literal_byte '#') {
+            true => 10i32,
+            false => #match (u8_eq code_byte 'c') {
+                true => 116i32,
+                false => 255i32,
+            },
         },
     }
 }

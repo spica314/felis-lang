@@ -151,22 +151,30 @@
     #if i32_eq code 116i32 {
         array_set bytes_ref 126i32 3u8;
     } #else {
-        #if i32_eq code 79i32 {
-            array_set bytes_ref 126i32 3u8;
+        #if i32_eq code 35i32 {
+            array_set bytes_ref 126i32 10u8;
         } #else {
-            #if i32_eq code 255i32 {
-                array_set bytes_ref 126i32 3u8;
+            #if i32_eq code 10i32 {
+                array_set bytes_ref 126i32 10u8;
             } #else {
-                #if i32_eq code 99i32 {
+                #if i32_eq code 79i32 {
                     array_set bytes_ref 126i32 3u8;
                 } #else {
-                    #if i32_eq code 0i32 {
-                        array_set bytes_ref 126i32 0u8;
+                    #if i32_eq code 255i32 {
+                        array_set bytes_ref 126i32 3u8;
                     } #else {
-                        #if bool_not (i32_eq code 48i32) {
-                            array_set bytes_ref 126i32 42u8;
+                        #if i32_eq code 99i32 {
+                            array_set bytes_ref 126i32 3u8;
                         } #else {
-                            array_set bytes_ref 126i32 0u8;
+                            #if i32_eq code 0i32 {
+                                array_set bytes_ref 126i32 0u8;
+                            } #else {
+                                #if bool_not (i32_eq code 48i32) {
+                                    array_set bytes_ref 126i32 42u8;
+                                } #else {
+                                    array_set bytes_ref 126i32 0u8;
+                                };
+                            };
                         };
                     };
                 };
