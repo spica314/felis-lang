@@ -1,0 +1,19 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_json::Json;
+#use std_json::JsonArray;
+#use std_json::JsonObject;
+#use std_json::JsonString;
+#use std_json::json_score;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let key : JsonString = JsonString::string_cons 4i32 (JsonString::string_cons 5i32 JsonString::string_empty);
+    #let array : JsonArray = JsonArray::array_cons (Json::number_i32 20i32) (JsonArray::array_cons Json::json_true JsonArray::array_empty);
+    #let object : JsonObject = JsonObject::object_cons key (Json::array array) JsonObject::object_empty;
+    #let value : Json = Json::object object;
+    #let code : i32 = json_score value;
+    #let _ : () <- IO::sys_exit code;
+    ()
+}

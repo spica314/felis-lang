@@ -314,6 +314,13 @@ fn compiles_and_runs_std_result_err_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_std_json_fixture() {
+    let root = repo_root().join("tests/testcases/std-json");
+    let status = run_fixture_status(&root, "std-json");
+    assert_eq!(status.code(), Some(30));
+}
+
+#[test]
 fn compiles_and_runs_i64_ops_fixture() {
     let root = repo_root().join("tests/testcases/i64-ops");
     let status = run_fixture_status(&root, "i64-ops");

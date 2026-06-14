@@ -1,0 +1,72 @@
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+
+#pub #type(rc) Json : Type[0] {
+    null : Json,
+    json_true : Json,
+    json_false : Json,
+    number_i32 : i32 -> Json,
+    string : JsonString -> Json,
+    array : JsonArray -> Json,
+    object : JsonObject -> Json,
+}
+
+#pub #type(rc) JsonString : Type[0] {
+    string_empty : JsonString,
+    string_cons : i32 -> JsonString -> JsonString,
+}
+
+#pub #type(rc) JsonArray : Type[0] {
+    array_empty : JsonArray,
+    array_cons : Json -> JsonArray -> JsonArray,
+}
+
+#pub #type(rc) JsonObject : Type[0] {
+    object_empty : JsonObject,
+    object_cons : JsonString -> Json -> JsonObject -> JsonObject,
+}
+
+#pub #fn json_score : (value : Json) -> i32 {
+    #match value {
+        Json::null => 0i32,
+        Json::json_true => 1i32,
+        Json::json_false => 2i32,
+        Json::number_i32 number => number,
+        Json::string string => json_string_score string,
+        Json::array items => json_array_score items,
+        Json::object entries => json_object_score entries,
+    }
+}
+
+#pub #fn json_string_score : (string : JsonString) -> i32 {
+    #match string {
+        JsonString::string_empty => 0i32,
+        JsonString::string_cons byte rest => {
+            #let rest_score : i32 = json_string_score rest;
+            i32_add byte rest_score
+        }
+    }
+}
+
+#pub #fn json_array_score : (items : JsonArray) -> i32 {
+    #match items {
+        JsonArray::array_empty => 0i32,
+        JsonArray::array_cons value rest => {
+            #let value_score : i32 = json_score value;
+            #let rest_score : i32 = json_array_score rest;
+            i32_add value_score rest_score
+        }
+    }
+}
+
+#pub #fn json_object_score : (entries : JsonObject) -> i32 {
+    #match entries {
+        JsonObject::object_empty => 0i32,
+        JsonObject::object_cons key value rest => {
+            #let key_score : i32 = json_string_score key;
+            #let value_score : i32 = json_score value;
+            #let rest_score : i32 = json_object_score rest;
+            i32_add key_score (i32_add value_score rest_score)
+        }
+    }
+}

@@ -1,0 +1,4 @@
+{
+    "name": "std-json",
+    "felis-bin-entrypoints": ["src/std-json.fe"]
+}

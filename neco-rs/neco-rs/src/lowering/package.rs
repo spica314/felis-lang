@@ -100,9 +100,7 @@ fn package_has_zero_arg_pure_function(
 
 pub(super) fn collect_callable_packages(package: &ParsedPackage) -> Result<Vec<ParsedPackage>> {
     let mut packages = resolve_workspace_dependency_packages(package)?;
-    if let Some(std_core) = find_std_core_package(package)? {
-        packages.push(std_core);
-    }
+    packages.extend(find_standard_packages(package)?);
     packages.push(package.clone());
     Ok(packages)
 }
@@ -154,16 +152,27 @@ fn find_workspace_for_package(package: &ParsedPackage) -> Result<Option<ParsedWo
     Ok(None)
 }
 
-fn find_std_core_package(package: &ParsedPackage) -> Result<Option<ParsedPackage>> {
+fn find_standard_packages(package: &ParsedPackage) -> Result<Vec<ParsedPackage>> {
+    let mut packages = Vec::new();
     for ancestor in package.root_dir.ancestors() {
-        let candidate = ancestor.join("std/std_core");
-        if candidate.join("neco-package.json").exists()
-            && let Ok(ParsedRoot::Package(std_core)) = parse_root(&candidate)
-        {
-            return Ok(Some(std_core));
+        let std_root = ancestor.join("std");
+        if !std_root.exists() {
+            continue;
         }
+        for package_name in ["std_core", "std_json"] {
+            let candidate = std_root.join(package_name);
+            if paths_equal(&candidate, &package.root_dir) {
+                continue;
+            }
+            if candidate.join("neco-package.json").exists()
+                && let Ok(ParsedRoot::Package(package)) = parse_root(&candidate)
+            {
+                packages.push(package);
+            }
+        }
+        return Ok(packages);
     }
-    Ok(None)
+    Ok(packages)
 }
 
 fn paths_equal(lhs: &Path, rhs: &Path) -> bool {

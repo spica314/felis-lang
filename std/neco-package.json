@@ -2,6 +2,7 @@
     "workspace": {
         "members": [
             "std_core",
+            "std_json",
             "std_math"
         ]
     }
