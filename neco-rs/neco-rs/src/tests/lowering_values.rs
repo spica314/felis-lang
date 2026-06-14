@@ -257,6 +257,92 @@ fn rejects_arrayvl_as_open_path() {
 }
 
 #[test]
+fn lowers_struct_rc_nested_payload_retain_to_program() {
+    let package = parse_inline_binary_package(
+        "struct-rc-nested-payload-retain",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+
+#struct(rc) Point : Type[0] {
+    x : i32,
+    y : i32,
+}
+
+#struct(rc) BoxedPoint : Type[0] {
+    point : Point,
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let point : Point = Point { x = 10i32, y = 32i32 };
+    #let boxed : BoxedPoint = BoxedPoint { point = point };
+    #let _ : () <- IO::sys_exit boxed.point.y;
+    ()
+}
+"#,
+    );
+
+    let program = lower_package_to_program(&package).expect("lower package");
+    assert_eq!(
+        program.operations,
+        vec![
+            Operation::Mmap {
+                len: I32Expr::Literal(16),
+                result_slot: 0,
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 0,
+                byte_offset: 0,
+                value: I32Expr::Literal(0),
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 0,
+                byte_offset: 4,
+                value: I32Expr::Literal(1),
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 0,
+                byte_offset: 8,
+                value: I32Expr::Literal(10),
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 0,
+                byte_offset: 12,
+                value: I32Expr::Literal(32),
+            },
+            Operation::Mmap {
+                len: I32Expr::Literal(16),
+                result_slot: 1,
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 1,
+                byte_offset: 0,
+                value: I32Expr::Literal(0),
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 1,
+                byte_offset: 4,
+                value: I32Expr::Literal(1),
+            },
+            Operation::HeapAddI32 {
+                heap_slot: 0,
+                byte_offset: 4,
+                value: 1,
+            },
+            Operation::HeapStorePtr {
+                heap_slot: 1,
+                byte_offset: 8,
+                source_heap_slot: 0,
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(32))),
+        ]
+    );
+    assert_eq!(program.heap_slots, 2);
+}
+
+#[test]
 fn lowers_pathbuf_pop_to_runtime_operation() {
     let source_path = PathBuf::from("src/main.fe");
     let source = r#"

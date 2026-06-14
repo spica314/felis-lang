@@ -287,6 +287,18 @@ fn emit_operations(
                 code.extend_from_slice(&[0x89, 0x93]);
                 code.extend_from_slice(&byte_offset.to_le_bytes());
             }
+            Operation::HeapAddI32 {
+                heap_slot,
+                byte_offset,
+                value,
+            } => {
+                let slot_offset = heap_slot_offset(program, *heap_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0x9d]);
+                code.extend_from_slice(&slot_offset.to_le_bytes());
+                code.extend_from_slice(&[0x83, 0x83]);
+                code.extend_from_slice(&byte_offset.to_le_bytes());
+                code.push(*value as u8);
+            }
             Operation::HeapStoreI64 {
                 heap_slot,
                 byte_offset,

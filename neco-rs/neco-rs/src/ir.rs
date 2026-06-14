@@ -235,6 +235,11 @@ pub(crate) enum Operation {
         byte_offset: i32,
         value: I32Expr,
     },
+    HeapAddI32 {
+        heap_slot: usize,
+        byte_offset: i32,
+        value: i8,
+    },
     HeapStoreI64 {
         heap_slot: usize,
         byte_offset: i32,

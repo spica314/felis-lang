@@ -602,7 +602,7 @@ fn lower_rc_struct_allocation(
     program.operations.push(Operation::HeapStoreI32 {
         heap_slot,
         byte_offset: 4,
-        value: I32Expr::Literal(0),
+        value: I32Expr::Literal(1),
     });
 
     let mut byte_offset = 8;
@@ -664,6 +664,7 @@ fn lower_rc_struct_field_store(
             heap_slot: Some(source_heap_slot),
             ..
         }) => {
+            retain_rc_heap_slot(*source_heap_slot, program);
             program.operations.push(Operation::HeapStorePtr {
                 heap_slot,
                 byte_offset,
@@ -675,6 +676,14 @@ fn lower_rc_struct_field_store(
             "`struct(rc)` currently supports only integer and nested rc payload fields".to_string(),
         )),
     }
+}
+
+fn retain_rc_heap_slot(heap_slot: usize, program: &mut LoweredProgram) {
+    program.operations.push(Operation::HeapAddI32 {
+        heap_slot,
+        byte_offset: 4,
+        value: 1,
+    });
 }
 
 pub(super) fn lower_constructor_value(
