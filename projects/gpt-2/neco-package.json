@@ -1,0 +1,7 @@
+{
+    "workspace": {
+        "members": [
+            "gpt-2-bin"
+        ]
+    }
+}
