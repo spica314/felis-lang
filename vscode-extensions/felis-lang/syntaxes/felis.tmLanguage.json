@@ -1,0 +1,232 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Felis",
+  "scopeName": "source.felis",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#chars"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#declarations"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#constructors"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "builtins": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.felis",
+          "match": "\\b(?:true|false)\\b"
+        },
+        {
+          "name": "support.type.primitive.felis",
+          "match": "\\b(?:bool|f32|i32|i64|u8)\\b"
+        },
+        {
+          "name": "support.type.felis",
+          "match": "\\b(?:Array|ArrayVL|ArrayVLPTX|DynArray|IO|PTX|Prop|String|Type)\\b"
+        }
+      ]
+    },
+    "chars": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.felis",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.felis",
+              "match": "\\\\(?:[nrt0'\"\\\\]|x[0-9A-Fa-f]{2})"
+            }
+          ]
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.felis",
+          "begin": "//",
+          "end": "$"
+        },
+        {
+          "name": "comment.block.felis",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "constructors": {
+      "patterns": [
+        {
+          "name": "entity.name.type.constructor.felis",
+          "match": "\\b[A-Z][A-Za-z0-9_]*(?=::)"
+        },
+        {
+          "match": "(::)([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.path.felis"
+            },
+            "2": {
+              "name": "entity.name.function.constructor.felis"
+            }
+          }
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "(#fn)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.declaration.function.felis"
+            },
+            "2": {
+              "name": "entity.name.function.felis"
+            }
+          }
+        },
+        {
+          "match": "(#(?:struct|type|prop)(?:\\([A-Za-z_][A-Za-z0-9_]*\\))?)\\s+([A-Z][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.declaration.type.felis"
+            },
+            "2": {
+              "name": "entity.name.type.felis"
+            }
+          }
+        },
+        {
+          "match": "(#theorem)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.declaration.theorem.felis"
+            },
+            "2": {
+              "name": "entity.name.function.theorem.felis"
+            }
+          }
+        },
+        {
+          "match": "(#mod)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.declaration.module.felis"
+            },
+            "2": {
+              "name": "entity.name.namespace.felis"
+            }
+          }
+        },
+        {
+          "match": "(#(?:let|letref))\\s+(#excl\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.declaration.variable.felis"
+            },
+            "2": {
+              "name": "keyword.operator.felis"
+            },
+            "3": {
+              "name": "variable.other.readwrite.felis"
+            }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.felis",
+          "match": "#(?:break|continue|else|if|loop|match)\\b"
+        },
+        {
+          "name": "keyword.declaration.felis",
+          "match": "#(?:bind_builtin|compile_ptx|entrypoint|fn|let|letref|mod|prop|pub|struct|theorem|type|use)\\b"
+        },
+        {
+          "name": "keyword.operator.felis",
+          "match": "#(?:as|borrow|excl|forall|with)\\b"
+        },
+        {
+          "name": "keyword.operator.arrow.felis",
+          "match": "=>|<-|->"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.felis",
+          "match": "\\b-?0x[0-9A-Fa-f]+(?:i32|i64|u8)?\\b"
+        },
+        {
+          "name": "constant.numeric.float.felis",
+          "match": "\\b-?(?:[0-9]+\\.[0-9]*|\\.[0-9]+)(?:f32)?\\b"
+        },
+        {
+          "name": "constant.numeric.integer.felis",
+          "match": "\\b-?[0-9]+(?:i32|i64|u8)?\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.felis",
+          "match": "::|&\\^?|[=,:;]"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.felis",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.felis",
+              "match": "\\\\(?:[nrt0'\"\\\\]|x[0-9A-Fa-f]{2})"
+            }
+          ]
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "entity.name.type.felis",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}

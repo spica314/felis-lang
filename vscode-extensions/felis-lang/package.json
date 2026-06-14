@@ -1,0 +1,35 @@
+{
+  "name": "felis-lang",
+  "displayName": "Felis Language",
+  "description": "Syntax highlighting for the Felis programming language.",
+  "version": "0.1.0",
+  "publisher": "felis-lang",
+  "engines": {
+    "vscode": "1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "felis",
+        "aliases": [
+          "Felis",
+          "felis"
+        ],
+        "extensions": [
+          ".fe"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "felis",
+        "scopeName": "source.felis",
+        "path": "./syntaxes/felis.tmLanguage.json"
+      }
+    ]
+  }
+}
