@@ -1,9 +1,15 @@
 #use std_core::io::IO;
+#use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::array::array_set;
 #use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::string::String;
+#use std_core::string::string_from_arrayvl_parts;
 #use std_json::Json;
 #use std_json::JsonArray;
 #use std_json::JsonObject;
 #use std_json::JsonString;
+#use std_json::json_parse;
 #use std_json::json_score;
 
 #entrypoint main;
@@ -14,6 +20,12 @@
     #let object : JsonObject = JsonObject::object_cons key (Json::array array) JsonObject::object_empty;
     #let value : Json = Json::object object;
     #let code : i32 = json_score value;
-    #let _ : () <- IO::sys_exit code;
+    #let parse_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 1i32;
+    #letref #excl parse_source_arrayvl_ref : &^ ArrayVL u8 #borrow parse_source_arrayvl;
+    array_set parse_source_arrayvl_ref 0i32 '9';
+    #let parse_source : String = string_from_arrayvl_parts parse_source_arrayvl 1i32 1i32;
+    #let parsed : Json <- json_parse parse_source;
+    #let parsed_code : i32 = json_score parsed;
+    #let _ : () <- IO::sys_exit (i32_add code parsed_code);
     ()
 }

@@ -1,5 +1,9 @@
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_from_u8;
+#use std_core::primitive::i32::i32_sub;
+#use std_core::string::String;
+#use std_core::string::string_get_u8;
 
 #pub #type(rc) Json : Type[0] {
     null : Json,
@@ -69,4 +73,10 @@
             i32_add key_score (i32_add value_score rest_score)
         }
     }
+}
+
+#pub #fn json_parse : (source : String) -> Json #with IO {
+    #let first_byte : u8 <- string_get_u8 source 0i32;
+    #let first : i32 = i32_from_u8 first_byte;
+    Json::number_i32 (i32_sub first (i32_from_u8 '0'))
 }
