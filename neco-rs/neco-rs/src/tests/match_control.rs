@@ -336,7 +336,7 @@ fn lowers_type_rc_match_single_fixture_to_runtime_exit() {
             Operation::HeapStoreI32 {
                 heap_slot: 0,
                 byte_offset: 4,
-                value: I32Expr::Literal(0),
+                value: I32Expr::Literal(1),
             },
             Operation::HeapStoreI32 {
                 heap_slot: 0,
@@ -373,7 +373,7 @@ fn lowers_type_rc_match_pair_fixture_to_runtime_exit() {
             Operation::HeapStoreI32 {
                 heap_slot: 0,
                 byte_offset: 4,
-                value: I32Expr::Literal(0),
+                value: I32Expr::Literal(1),
             },
             Operation::HeapStoreI32 {
                 heap_slot: 0,
@@ -418,7 +418,7 @@ fn lowers_type_rc_match_list_fixture_to_runtime_exit() {
             Operation::HeapStoreI32 {
                 heap_slot: 0,
                 byte_offset: 4,
-                value: I32Expr::Literal(0),
+                value: I32Expr::Literal(1),
             },
             Operation::Mmap {
                 len: I32Expr::Literal(20),
@@ -432,12 +432,17 @@ fn lowers_type_rc_match_list_fixture_to_runtime_exit() {
             Operation::HeapStoreI32 {
                 heap_slot: 1,
                 byte_offset: 4,
-                value: I32Expr::Literal(0),
+                value: I32Expr::Literal(1),
             },
             Operation::HeapStoreI32 {
                 heap_slot: 1,
                 byte_offset: 8,
                 value: I32Expr::Literal(22),
+            },
+            Operation::HeapAddI32 {
+                heap_slot: 0,
+                byte_offset: 4,
+                value: 1,
             },
             Operation::HeapStorePtr {
                 heap_slot: 1,
@@ -456,12 +461,17 @@ fn lowers_type_rc_match_list_fixture_to_runtime_exit() {
             Operation::HeapStoreI32 {
                 heap_slot: 2,
                 byte_offset: 4,
-                value: I32Expr::Literal(0),
+                value: I32Expr::Literal(1),
             },
             Operation::HeapStoreI32 {
                 heap_slot: 2,
                 byte_offset: 8,
                 value: I32Expr::Literal(20),
+            },
+            Operation::HeapAddI32 {
+                heap_slot: 1,
+                byte_offset: 4,
+                value: 1,
             },
             Operation::HeapStorePtr {
                 heap_slot: 2,

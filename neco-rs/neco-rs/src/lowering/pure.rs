@@ -497,7 +497,7 @@ fn lower_path_value(
         program.operations.push(Operation::HeapStoreI32 {
             heap_slot,
             byte_offset: 4,
-            value: I32Expr::Literal(0),
+            value: I32Expr::Literal(1),
         });
         return Ok(Value::Constructor(ConstructorValue {
             type_name: signature.type_name,
@@ -906,7 +906,7 @@ fn lower_constructor_application(
         program.operations.push(Operation::HeapStoreI32 {
             heap_slot,
             byte_offset: 4,
-            value: I32Expr::Literal(0),
+            value: I32Expr::Literal(1),
         });
         let mut byte_offset = 8;
         for field in &fields {
@@ -935,6 +935,7 @@ fn lower_constructor_application(
                     heap_slot: Some(source_heap_slot),
                     ..
                 }) => {
+                    retain_rc_heap_slot(*source_heap_slot, program);
                     program.operations.push(Operation::HeapStorePtr {
                         heap_slot,
                         byte_offset,
