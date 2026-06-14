@@ -2,30 +2,23 @@
 #use std_core::primitive::array::ArrayVL;
 #use std_core::primitive::array::array_set;
 #use std_core::primitive::i32::i32;
-#use std_core::primitive::i32::i32_add;
 #use std_core::string::String;
 #use std_core::string::string_from_arrayvl_parts;
 #use std_json::Json;
-#use std_json::JsonArray;
-#use std_json::JsonObject;
-#use std_json::JsonString;
 #use std_json::json_parse;
 #use std_json::json_score;
 
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let key : JsonString = JsonString::string_cons 4i32 (JsonString::string_cons 5i32 JsonString::string_empty);
-    #let array : JsonArray = JsonArray::array_cons (Json::number_i32 20i32) (JsonArray::array_cons Json::json_true JsonArray::array_empty);
-    #let object : JsonObject = JsonObject::object_cons key (Json::array array) JsonObject::object_empty;
-    #let value : Json = Json::object object;
-    #let code : i32 = json_score value;
-    #let parse_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 1i32;
+    #let parse_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 3i32;
     #letref #excl parse_source_arrayvl_ref : &^ ArrayVL u8 #borrow parse_source_arrayvl;
-    array_set parse_source_arrayvl_ref 0i32 '9';
-    #let parse_source : String = string_from_arrayvl_parts parse_source_arrayvl 1i32 1i32;
+    array_set parse_source_arrayvl_ref 0i32 ' ';
+    array_set parse_source_arrayvl_ref 1i32 '1';
+    array_set parse_source_arrayvl_ref 2i32 '2';
+    #let parse_source : String = string_from_arrayvl_parts parse_source_arrayvl 3i32 3i32;
     #let parsed : Json <- json_parse parse_source;
     #let parsed_code : i32 = json_score parsed;
-    #let _ : () <- IO::sys_exit (i32_add code parsed_code);
+    #let _ : () <- IO::sys_exit parsed_code;
     ()
 }

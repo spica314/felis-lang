@@ -1,9 +1,17 @@
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_from_u8;
+#use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_lt;
+#use std_core::primitive::i32::i32_mul;
 #use std_core::primitive::i32::i32_sub;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
+#use std_core::primitive::u8::u8;
+#use std_core::primitive::u8::u8_eq;
 #use std_core::string::String;
 #use std_core::string::string_get_u8;
+#use std_core::string::string_len;
 
 #pub #type(rc) Json : Type[0] {
     null : Json,
@@ -75,8 +83,48 @@
     }
 }
 
+#fn json_digit_value : (byte : u8) -> i32 {
+    i32_sub (i32_from_u8 byte) (i32_from_u8 '0')
+}
+
 #pub #fn json_parse : (source : String) -> Json #with IO {
-    #let first_byte : u8 <- string_get_u8 source 0i32;
-    #let first : i32 = i32_from_u8 first_byte;
-    Json::number_i32 (i32_sub first (i32_from_u8 '0'))
+    #let len : i32 = string_len source;
+    #let index : i32 = 0i32;
+    #letref #excl index_ref : &^ i32 #borrow index;
+    #loop {
+        #let index_value : i32 <- ref_get i32 index_ref;
+        #if i32_gte index_value len {
+            #break;
+        };
+        #let byte : u8 <- string_get_u8 source index_value;
+        #if u8_eq byte ' ' {
+            ref_set i32 index_ref (i32_add index_value 1i32);
+        } #else {
+            #break;
+        };
+    };
+    #let start : i32 <- ref_get i32 index_ref;
+    #let number : i32 = 0i32;
+    #letref #excl number_ref : &^ i32 #borrow number;
+    #let number_index : i32 = start;
+    #letref #excl number_index_ref : &^ i32 #borrow number_index;
+    #loop {
+        #let current_index : i32 <- ref_get i32 number_index_ref;
+        #if i32_gte current_index len {
+            #break;
+        };
+        #let byte : u8 <- string_get_u8 source current_index;
+        #let digit : i32 = json_digit_value byte;
+        #if i32_lt digit 0i32 {
+            #break;
+        };
+        #if i32_gte digit 10i32 {
+            #break;
+        };
+        #let current_number : i32 <- ref_get i32 number_ref;
+        ref_set i32 number_ref (i32_add (i32_mul current_number 10i32) digit);
+        ref_set i32 number_index_ref (i32_add current_index 1i32);
+    };
+    #let parsed_number : i32 <- ref_get i32 number_ref;
+    Json::number_i32 parsed_number
 }
