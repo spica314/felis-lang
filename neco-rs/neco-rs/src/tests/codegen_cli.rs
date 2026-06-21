@@ -1,18 +1,19 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use neco_rs_parser::{NativeLinkMode, ParsedPackage, ParsedRoot, parse_root};
 
-use crate::cli::{default_output_path, select_binary_from_package};
+use crate::cli::{default_output_path, select_binary_from_package, set_output_executable};
 use crate::codegen::{
     EntryAbi, LINUX_X86_64_EXECUTABLE_LAYOUT, build_linux_x86_64_program_executable,
     build_linux_x86_64_program_image,
 };
 use crate::ir::{
     ArrayAllocation, ArrayElementType, ArrayKind, ComparisonKind, CompiledPtxArtifact,
-    ConditionExpr, ExitCodeExpr, F32Expr, I32Expr, I64Expr, KernelArgumentRef, LoweredProgram,
-    OpenPath, Operation, PathBufSource, U8Expr,
+    ConditionExpr, ExitCodeExpr, F32Expr, I32Expr, I64Expr, InternalAbiValue, InternalCallArgument,
+    KernelArgumentRef, LoweredProgram, OpenPath, Operation, PathBufSource, U8Expr,
 };
 use crate::lowering::lower_package_to_program;
 use crate::run_cli;
@@ -84,6 +85,36 @@ fn parse_inline_binary_package(name: &str, source: &str) -> ParsedPackage {
     }
 }
 
+fn run_lowered_program(program: &LoweredProgram, name: &str) -> i32 {
+    const TEXT_FILE_BUSY: i32 = 26;
+    const MAX_ATTEMPTS: usize = 20;
+
+    let temp_dir = unique_temp_dir(name);
+    fs::create_dir_all(&temp_dir).expect("create temp dir");
+    let output = temp_dir.join(name);
+    let elf = build_linux_x86_64_program_executable(program)
+        .to_bytes()
+        .expect("serialize ELF");
+    fs::write(&output, elf).expect("write executable");
+    set_output_executable(&output).expect("chmod executable");
+    let status = 'retry: {
+        for attempt in 1..=MAX_ATTEMPTS {
+            match Command::new(&output).status() {
+                Ok(status) => break 'retry status,
+                Err(error)
+                    if error.raw_os_error() == Some(TEXT_FILE_BUSY) && attempt < MAX_ATTEMPTS =>
+                {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                Err(error) => panic!("run executable: {error}"),
+            }
+        }
+        unreachable!("run retry loop always returns or breaks")
+    };
+    let _ = fs::remove_dir_all(&temp_dir);
+    status.code().expect("process exit code")
+}
+
 #[test]
 fn lowers_fn_call_fixture_to_runtime_expression_tree() {
     let root = repo_root().join("tests/testcases/fn-call");
@@ -114,6 +145,197 @@ fn lowers_fn_call_fixture_to_runtime_expression_tree() {
     assert!(program.data.is_empty());
     assert!(program.arrays.is_empty());
     assert_eq!(program.i32_slots, 0);
+}
+
+#[test]
+fn runs_internal_i32_function_call() {
+    let program = LoweredProgram {
+        operations: vec![
+            Operation::CallInternal {
+                name: "add_one".to_string(),
+                arguments: vec![InternalCallArgument::I32(I32Expr::Literal(41))],
+                result: Some(InternalAbiValue::I32(0)),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(0))),
+            Operation::InternalFunction {
+                name: "add_one".to_string(),
+                parameters: vec![InternalAbiValue::I32(0)],
+                body_operations: vec![Operation::ReturnInternal {
+                    value: Some(InternalCallArgument::I32(I32Expr::Add(
+                        Box::new(I32Expr::Local(0)),
+                        Box::new(I32Expr::Literal(1)),
+                    ))),
+                }],
+            },
+        ],
+        data: Vec::new(),
+        compiled_ptx: Vec::new(),
+        arrays: Vec::new(),
+        heap_slots: 0,
+        i32_slots: 1,
+        i64_slots: 0,
+        f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
+        requires_argv: false,
+    };
+
+    assert_eq!(run_lowered_program(&program, "internal-add-one"), 42);
+}
+
+#[test]
+fn runs_recursive_internal_i32_function_with_isolated_frames() {
+    let program = LoweredProgram {
+        operations: vec![
+            Operation::CallInternal {
+                name: "sum_to".to_string(),
+                arguments: vec![InternalCallArgument::I32(I32Expr::Literal(4))],
+                result: Some(InternalAbiValue::I32(0)),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(0))),
+            Operation::InternalFunction {
+                name: "sum_to".to_string(),
+                parameters: vec![InternalAbiValue::I32(0)],
+                body_operations: vec![Operation::If {
+                    condition: ConditionExpr::I32 {
+                        kind: ComparisonKind::Eq,
+                        lhs: I32Expr::Local(0),
+                        rhs: I32Expr::Literal(0),
+                    },
+                    then_operations: vec![Operation::ReturnInternal {
+                        value: Some(InternalCallArgument::I32(I32Expr::Literal(0))),
+                    }],
+                    else_operations: vec![
+                        Operation::StoreI32 {
+                            slot: 1,
+                            value: I32Expr::Sub(
+                                Box::new(I32Expr::Local(0)),
+                                Box::new(I32Expr::Literal(1)),
+                            ),
+                        },
+                        Operation::CallInternal {
+                            name: "sum_to".to_string(),
+                            arguments: vec![InternalCallArgument::I32(I32Expr::Local(1))],
+                            result: Some(InternalAbiValue::I32(1)),
+                        },
+                        Operation::ReturnInternal {
+                            value: Some(InternalCallArgument::I32(I32Expr::Add(
+                                Box::new(I32Expr::Local(0)),
+                                Box::new(I32Expr::Local(1)),
+                            ))),
+                        },
+                    ],
+                }],
+            },
+        ],
+        data: Vec::new(),
+        compiled_ptx: Vec::new(),
+        arrays: Vec::new(),
+        heap_slots: 0,
+        i32_slots: 2,
+        i64_slots: 0,
+        f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
+        requires_argv: false,
+    };
+
+    assert_eq!(run_lowered_program(&program, "internal-sum-to"), 10);
+}
+
+#[test]
+fn runs_internal_call_with_i64_u8_and_bool_arguments() {
+    let program = LoweredProgram {
+        operations: vec![
+            Operation::CallInternal {
+                name: "mix".to_string(),
+                arguments: vec![
+                    InternalCallArgument::I64(I64Expr::Literal(40)),
+                    InternalCallArgument::U8(U8Expr::Literal(2)),
+                    InternalCallArgument::Bool(ConditionExpr::Literal(true)),
+                ],
+                result: Some(InternalAbiValue::I64(0)),
+            },
+            Operation::Exit(ExitCodeExpr::I64(I64Expr::Local(0))),
+            Operation::InternalFunction {
+                name: "mix".to_string(),
+                parameters: vec![
+                    InternalAbiValue::I64(0),
+                    InternalAbiValue::U8(0),
+                    InternalAbiValue::Bool(0),
+                ],
+                body_operations: vec![Operation::If {
+                    condition: ConditionExpr::Local(0),
+                    then_operations: vec![Operation::ReturnInternal {
+                        value: Some(InternalCallArgument::I64(I64Expr::Add(
+                            Box::new(I64Expr::Local(0)),
+                            Box::new(I64Expr::FromU8(Box::new(U8Expr::Local(0)))),
+                        ))),
+                    }],
+                    else_operations: vec![Operation::ReturnInternal {
+                        value: Some(InternalCallArgument::I64(I64Expr::Literal(1))),
+                    }],
+                }],
+            },
+        ],
+        data: Vec::new(),
+        compiled_ptx: Vec::new(),
+        arrays: Vec::new(),
+        heap_slots: 0,
+        i32_slots: 0,
+        i64_slots: 1,
+        f32_slots: 0,
+        u8_slots: 1,
+        bool_slots: 1,
+        requires_argv: false,
+    };
+
+    assert_eq!(run_lowered_program(&program, "internal-mix"), 42);
+}
+
+#[test]
+fn runs_internal_call_with_heap_pointer_argument() {
+    let program = LoweredProgram {
+        operations: vec![
+            Operation::Mmap {
+                len: I32Expr::Literal(16),
+                result_slot: 0,
+            },
+            Operation::HeapStoreI32 {
+                heap_slot: 0,
+                byte_offset: 8,
+                value: I32Expr::Literal(42),
+            },
+            Operation::CallInternal {
+                name: "load_payload".to_string(),
+                arguments: vec![InternalCallArgument::HeapPtr(0)],
+                result: Some(InternalAbiValue::I32(0)),
+            },
+            Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(0))),
+            Operation::InternalFunction {
+                name: "load_payload".to_string(),
+                parameters: vec![InternalAbiValue::HeapPtr(0)],
+                body_operations: vec![Operation::ReturnInternal {
+                    value: Some(InternalCallArgument::I32(I32Expr::HeapLoadI32 {
+                        heap_slot: 0,
+                        byte_offset: 8,
+                    })),
+                }],
+            },
+        ],
+        data: Vec::new(),
+        compiled_ptx: Vec::new(),
+        arrays: Vec::new(),
+        heap_slots: 1,
+        i32_slots: 1,
+        i64_slots: 0,
+        f32_slots: 0,
+        u8_slots: 0,
+        bool_slots: 0,
+        requires_argv: false,
+    };
+
+    assert_eq!(run_lowered_program(&program, "internal-heap-ptr"), 42);
 }
 
 #[test]

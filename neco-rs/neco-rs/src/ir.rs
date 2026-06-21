@@ -177,6 +177,24 @@ pub(crate) enum ExitCodeExpr {
     U8(U8Expr),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum InternalAbiValue {
+    I32(usize),
+    I64(usize),
+    U8(usize),
+    Bool(usize),
+    HeapPtr(usize),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum InternalCallArgument {
+    I32(I32Expr),
+    I64(I64Expr),
+    U8(U8Expr),
+    Bool(ConditionExpr),
+    HeapPtr(usize),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ArrayElementType {
     I32,
@@ -202,6 +220,19 @@ pub(crate) struct ArrayAllocation {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Operation {
+    InternalFunction {
+        name: String,
+        parameters: Vec<InternalAbiValue>,
+        body_operations: Vec<Operation>,
+    },
+    CallInternal {
+        name: String,
+        arguments: Vec<InternalCallArgument>,
+        result: Option<InternalAbiValue>,
+    },
+    ReturnInternal {
+        value: Option<InternalCallArgument>,
+    },
     StoreI32 {
         slot: usize,
         value: I32Expr,

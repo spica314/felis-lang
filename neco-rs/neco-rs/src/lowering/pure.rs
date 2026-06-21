@@ -1302,15 +1302,6 @@ fn lower_pure_function_call(
     if state.environment.contains_key(name) {
         return Ok(None);
     }
-    if state
-        .pure_function_call_stack
-        .iter()
-        .any(|active| active == name)
-    {
-        return Err(Error::Unsupported(format!(
-            "recursive pure function `{name}` cannot be lowered by inlining"
-        )));
-    }
     let normalized_arguments = normalize_numeric_literal_arguments(arguments);
     if function.parameters.len() != normalized_arguments.len() {
         return Err(Error::Unsupported(format!(
@@ -1339,11 +1330,83 @@ fn lower_pure_function_call(
             .environment
             .insert(parameter.name.clone(), value);
     }
+    if state
+        .pure_function_call_stack
+        .iter()
+        .any(|active| active == name)
+        && !recursive_call_is_structurally_smaller(&function.parameters, state, &scoped_state)
+    {
+        return Err(Error::Unsupported(format!(
+            "recursive pure function `{name}` cannot be lowered by inlining"
+        )));
+    }
 
     let value = lower_pure_block_value(&function.body, &scoped_state, program)?;
     let result_ty = substitute_type_bindings(&function.result_ty, &type_bindings);
     validate_value_against_type(&value, &result_ty, program)?;
     Ok(Some(value))
+}
+
+fn recursive_call_is_structurally_smaller(
+    parameters: &[super::declarations::PureFunctionParameter],
+    caller_state: &LoweringState,
+    callee_state: &LoweringState,
+) -> bool {
+    parameters.iter().any(|parameter| {
+        let Some(caller_value) = caller_state.environment.get(&parameter.name) else {
+            return false;
+        };
+        let Some(callee_value) = callee_state.environment.get(&parameter.name) else {
+            return false;
+        };
+        match (
+            finite_static_constructor_size(caller_value),
+            finite_static_constructor_size(callee_value),
+        ) {
+            (Some(caller_size), Some(callee_size)) => callee_size < caller_size,
+            _ => false,
+        }
+    })
+}
+
+fn finite_static_constructor_size(value: &Value) -> Option<usize> {
+    match value {
+        Value::Reference { value, .. } => finite_static_constructor_size(value),
+        Value::Constructor(constructor) => {
+            if constructor.runtime_tag {
+                return None;
+            }
+            let mut size = 1;
+            for field in &constructor.fields {
+                size += finite_static_value_size(field)?;
+            }
+            Some(size)
+        }
+        Value::Struct(struct_value) => {
+            let mut size = 1;
+            for field in &struct_value.fields {
+                size += finite_static_value_size(&field.value)?;
+            }
+            Some(size)
+        }
+        _ => None,
+    }
+}
+
+fn finite_static_value_size(value: &Value) -> Option<usize> {
+    match value {
+        Value::I32(_)
+        | Value::I64(_)
+        | Value::F32(_)
+        | Value::U8(_)
+        | Value::Bool(_)
+        | Value::Unit
+        | Value::Type(_)
+        | Value::StaticSlice { .. } => Some(1),
+        Value::Reference { value, .. } => finite_static_value_size(value),
+        Value::Constructor(_) | Value::Struct(_) => finite_static_constructor_size(value),
+        _ => None,
+    }
 }
 
 fn lower_io_function_call_value(

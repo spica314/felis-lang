@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use neco_rs_elf::{Elf64Executable, LoadSegment, SegmentFlags};
 
 use crate::ir::{
     ArrayElementType, ComparisonKind, ConditionExpr, ExitCodeExpr, F32Expr, I32Expr, I64Expr,
-    LoweredProgram, OpenPath, Operation, U8Expr,
+    InternalAbiValue, InternalCallArgument, LoweredProgram, OpenPath, Operation, U8Expr,
 };
 
 mod layout;
@@ -144,18 +146,17 @@ fn program_syscall_code(
     }
 
     if stack_frame_size > 0 {
-        code.push(0x55);
-        code.extend_from_slice(&[0x48, 0x89, 0xe5]);
-        code.extend_from_slice(&[0x48, 0x81, 0xec]);
-        code.extend_from_slice(&(stack_frame_size as u32).to_le_bytes());
+        emit_frame_prologue(stack_frame_size, &mut code);
         emit_array_initializers(program, &frame_layout, &mut code);
     }
 
+    let mut internal_call_patches = Vec::new();
     let mut emit_context = EmitOperationsContext {
         program,
         addresses: &addresses,
         entry_abi,
         external_calls,
+        internal_call_patches: &mut internal_call_patches,
     };
     emit_operations(
         &program.operations,
@@ -165,6 +166,15 @@ fn program_syscall_code(
         None,
     );
 
+    let function_labels = emit_internal_functions(
+        &program.operations,
+        &mut code,
+        &mut emit_context,
+        stack_frame_size,
+        &frame_layout,
+    );
+    patch_internal_calls(&internal_call_patches, &function_labels, &mut code);
+
     code
 }
 
@@ -173,6 +183,13 @@ struct EmitOperationsContext<'a> {
     addresses: &'a [u64],
     entry_abi: EntryAbi,
     external_calls: &'a mut Vec<ExternalCall>,
+    internal_call_patches: &'a mut Vec<InternalCallPatch>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct InternalCallPatch {
+    patch_at: usize,
+    name: String,
 }
 
 fn emit_operations(
@@ -188,6 +205,26 @@ fn emit_operations(
 
     for operation in operations {
         match operation {
+            Operation::InternalFunction { .. } => {}
+            Operation::CallInternal {
+                name,
+                arguments,
+                result,
+            } => {
+                emit_internal_call_arguments(arguments, code, program);
+                code.push(0xe8);
+                let patch_at = code.len();
+                code.extend_from_slice(&0i32.to_le_bytes());
+                context.internal_call_patches.push(InternalCallPatch {
+                    patch_at,
+                    name: name.clone(),
+                });
+                emit_internal_call_result_store(result.as_ref(), code, program);
+            }
+            Operation::ReturnInternal { value } => {
+                emit_internal_return_value(value.as_ref(), code, program);
+                emit_frame_epilogue(code, program);
+            }
             Operation::StoreI32 { slot, value } => {
                 emit_i32_expr_to_eax(value, code, program);
                 let slot_offset = i32_slot_offset(program, *slot);
@@ -767,6 +804,243 @@ fn emit_operations(
             }
         }
     }
+}
+
+fn emit_internal_functions(
+    operations: &[Operation],
+    code: &mut Vec<u8>,
+    context: &mut EmitOperationsContext<'_>,
+    stack_frame_size: usize,
+    frame_layout: &FrameLayout,
+) -> HashMap<String, usize> {
+    let mut labels = HashMap::new();
+    for operation in operations {
+        let Operation::InternalFunction {
+            name,
+            parameters,
+            body_operations,
+        } = operation
+        else {
+            continue;
+        };
+
+        labels.insert(name.clone(), code.len());
+        emit_frame_prologue(stack_frame_size, code);
+        emit_array_initializers(context.program, frame_layout, code);
+        emit_internal_parameters(parameters, code, context.program);
+        emit_operations(body_operations, code, context, None, None);
+        emit_internal_return_value(None, code, context.program);
+        emit_frame_epilogue(code, context.program);
+    }
+    labels
+}
+
+fn patch_internal_calls(
+    patches: &[InternalCallPatch],
+    labels: &HashMap<String, usize>,
+    code: &mut [u8],
+) {
+    for patch in patches {
+        let target = labels
+            .get(&patch.name)
+            .unwrap_or_else(|| panic!("unknown internal function `{}`", patch.name));
+        let call_len = *target as i32 - (patch.patch_at as i32 + 4);
+        code[patch.patch_at..patch.patch_at + 4].copy_from_slice(&call_len.to_le_bytes());
+    }
+}
+
+fn emit_frame_prologue(stack_frame_size: usize, code: &mut Vec<u8>) {
+    code.push(0x55);
+    code.extend_from_slice(&[0x48, 0x89, 0xe5]);
+    if stack_frame_size > 0 {
+        code.extend_from_slice(&[0x48, 0x81, 0xec]);
+        code.extend_from_slice(&(stack_frame_size as u32).to_le_bytes());
+    }
+}
+
+fn emit_frame_epilogue(code: &mut Vec<u8>, program: &LoweredProgram) {
+    if stack_frame_size(program) > 0 {
+        code.push(0xc9);
+    } else {
+        code.push(0x5d);
+    }
+    code.push(0xc3);
+}
+
+fn emit_internal_parameters(
+    parameters: &[InternalAbiValue],
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    for (index, parameter) in parameters.iter().enumerate() {
+        emit_register_to_internal_value(index, parameter, code, program);
+    }
+}
+
+fn emit_internal_call_arguments(
+    arguments: &[InternalCallArgument],
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    assert!(
+        arguments.len() <= 6,
+        "internal calls currently support up to six arguments"
+    );
+    for argument in arguments {
+        emit_internal_argument_to_rax(argument, code, program);
+        code.push(0x50);
+    }
+    for index in (0..arguments.len()).rev() {
+        emit_pop_to_argument_register(index, code);
+    }
+}
+
+fn emit_internal_argument_to_rax(
+    argument: &InternalCallArgument,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    match argument {
+        InternalCallArgument::I32(value) => emit_i32_expr_to_eax(value, code, program),
+        InternalCallArgument::I64(value) => emit_i64_expr_to_rax(value, code, program),
+        InternalCallArgument::U8(value) => emit_u8_expr_to_eax(value, code, program),
+        InternalCallArgument::Bool(value) => emit_bool_condition_to_al(value, code, program),
+        InternalCallArgument::HeapPtr(slot) => {
+            let slot_offset = heap_slot_offset(program, *slot);
+            code.extend_from_slice(&[0x48, 0x8b, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
+        }
+    }
+}
+
+fn emit_internal_return_value(
+    value: Option<&InternalCallArgument>,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    if let Some(value) = value {
+        emit_internal_argument_to_rax(value, code, program);
+    }
+}
+
+fn emit_internal_call_result_store(
+    result: Option<&InternalAbiValue>,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    let Some(result) = result else {
+        return;
+    };
+    match result {
+        InternalAbiValue::I32(slot) => {
+            let slot_offset = i32_slot_offset(program, *slot);
+            code.extend_from_slice(&[0x89, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
+        }
+        InternalAbiValue::I64(slot) => {
+            let slot_offset = i64_slot_offset(program, *slot);
+            code.extend_from_slice(&[0x48, 0x89, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
+        }
+        InternalAbiValue::U8(slot) => {
+            let slot_offset = u8_slot_offset(program, *slot);
+            code.extend_from_slice(&[0x88, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
+        }
+        InternalAbiValue::Bool(slot) => {
+            let slot_offset = bool_slot_offset(program, *slot);
+            code.extend_from_slice(&[0x88, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
+        }
+        InternalAbiValue::HeapPtr(slot) => {
+            let slot_offset = heap_slot_offset(program, *slot);
+            code.extend_from_slice(&[0x48, 0x89, 0x85]);
+            code.extend_from_slice(&slot_offset.to_le_bytes());
+        }
+    }
+}
+
+fn emit_register_to_internal_value(
+    register_index: usize,
+    value: &InternalAbiValue,
+    code: &mut Vec<u8>,
+    program: &LoweredProgram,
+) {
+    match value {
+        InternalAbiValue::I32(slot) => {
+            let slot_offset = i32_slot_offset(program, *slot);
+            emit_argument_register_to_slot(register_index, slot_offset, false, code);
+        }
+        InternalAbiValue::I64(slot) => {
+            let slot_offset = i64_slot_offset(program, *slot);
+            emit_argument_register_to_slot(register_index, slot_offset, true, code);
+        }
+        InternalAbiValue::U8(slot) => {
+            let slot_offset = u8_slot_offset(program, *slot);
+            emit_argument_register_byte_to_slot(register_index, slot_offset, code);
+        }
+        InternalAbiValue::Bool(slot) => {
+            let slot_offset = bool_slot_offset(program, *slot);
+            emit_argument_register_byte_to_slot(register_index, slot_offset, code);
+        }
+        InternalAbiValue::HeapPtr(slot) => {
+            let slot_offset = heap_slot_offset(program, *slot);
+            emit_argument_register_to_slot(register_index, slot_offset, true, code);
+        }
+    }
+}
+
+fn emit_pop_to_argument_register(register_index: usize, code: &mut Vec<u8>) {
+    match register_index {
+        0 => code.push(0x5f),
+        1 => code.push(0x5e),
+        2 => code.push(0x5a),
+        3 => code.push(0x59),
+        4 => code.extend_from_slice(&[0x41, 0x58]),
+        5 => code.extend_from_slice(&[0x41, 0x59]),
+        _ => unreachable!("checked before emission"),
+    }
+}
+
+fn emit_argument_register_to_slot(
+    register_index: usize,
+    slot_offset: i32,
+    qword: bool,
+    code: &mut Vec<u8>,
+) {
+    match (register_index, qword) {
+        (0, false) => code.extend_from_slice(&[0x89, 0xbd]),
+        (1, false) => code.extend_from_slice(&[0x89, 0xb5]),
+        (2, false) => code.extend_from_slice(&[0x89, 0x95]),
+        (3, false) => code.extend_from_slice(&[0x89, 0x8d]),
+        (4, false) => code.extend_from_slice(&[0x44, 0x89, 0x85]),
+        (5, false) => code.extend_from_slice(&[0x44, 0x89, 0x8d]),
+        (0, true) => code.extend_from_slice(&[0x48, 0x89, 0xbd]),
+        (1, true) => code.extend_from_slice(&[0x48, 0x89, 0xb5]),
+        (2, true) => code.extend_from_slice(&[0x48, 0x89, 0x95]),
+        (3, true) => code.extend_from_slice(&[0x48, 0x89, 0x8d]),
+        (4, true) => code.extend_from_slice(&[0x4c, 0x89, 0x85]),
+        (5, true) => code.extend_from_slice(&[0x4c, 0x89, 0x8d]),
+        _ => unreachable!("checked before emission"),
+    }
+    code.extend_from_slice(&slot_offset.to_le_bytes());
+}
+
+fn emit_argument_register_byte_to_slot(
+    register_index: usize,
+    slot_offset: i32,
+    code: &mut Vec<u8>,
+) {
+    match register_index {
+        0 => code.extend_from_slice(&[0x40, 0x88, 0xbd]),
+        1 => code.extend_from_slice(&[0x40, 0x88, 0xb5]),
+        2 => code.extend_from_slice(&[0x88, 0x95]),
+        3 => code.extend_from_slice(&[0x88, 0x8d]),
+        4 => code.extend_from_slice(&[0x44, 0x88, 0x85]),
+        5 => code.extend_from_slice(&[0x44, 0x88, 0x8d]),
+        _ => unreachable!("checked before emission"),
+    }
+    code.extend_from_slice(&slot_offset.to_le_bytes());
 }
 
 fn emit_condition_false_jumps(
