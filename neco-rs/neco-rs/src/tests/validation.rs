@@ -481,3 +481,51 @@ fn rejects_duplicate_statement_functions() {
         "unexpected error: {error}"
     );
 }
+
+#[test]
+fn rejects_recursive_pure_function_with_diagnostic() {
+    let package = parse_inline_binary_package(
+        "recursive-pure-function",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
+
+#entrypoint main;
+
+#type(rc) List : Type[0] {
+    nil : List,
+    cons : i32 -> List -> List,
+}
+
+#fn list_score : (items : List) -> i32 {
+    #match items {
+        List::nil => 0i32,
+        List::cons value rest => i32_add value (list_score rest),
+    }
+}
+
+#fn main : () #with IO {
+    #let items : List = List::cons 1i32 List::nil;
+    #let runtime_items : List = List::nil;
+    #letref #excl runtime_items_ref : &^ List #borrow runtime_items;
+    ref_set List runtime_items_ref items;
+    #let runtime_list : List <- ref_get List runtime_items_ref;
+    #let code : i32 = list_score runtime_list;
+    #let _ : () <- IO::sys_exit code;
+    ()
+}
+"#,
+    );
+
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject recursive pure calls");
+    assert!(
+        error
+            .to_string()
+            .contains("recursive pure function `list_score` cannot be lowered by inlining"),
+        "unexpected error: {error}"
+    );
+}

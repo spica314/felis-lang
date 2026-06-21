@@ -54,6 +54,7 @@ pub(crate) struct LoweringState {
     constructors: HashMap<String, ConstructorSignature>,
     structs: HashMap<String, StructSignature>,
     builtin_aliases: HashMap<String, String>,
+    pure_function_call_stack: Vec<String>,
     loop_depth: usize,
 }
 
@@ -73,6 +74,7 @@ impl LoweringState {
             constructors: HashMap::new(),
             structs: HashMap::new(),
             builtin_aliases: HashMap::new(),
+            pure_function_call_stack: Vec::new(),
             loop_depth: 0,
         }
     }

@@ -1302,6 +1302,15 @@ fn lower_pure_function_call(
     if state.environment.contains_key(name) {
         return Ok(None);
     }
+    if state
+        .pure_function_call_stack
+        .iter()
+        .any(|active| active == name)
+    {
+        return Err(Error::Unsupported(format!(
+            "recursive pure function `{name}` cannot be lowered by inlining"
+        )));
+    }
     let normalized_arguments = normalize_numeric_literal_arguments(arguments);
     if function.parameters.len() != normalized_arguments.len() {
         return Err(Error::Unsupported(format!(
@@ -1312,6 +1321,7 @@ fn lower_pure_function_call(
 
     let mut scoped_state = state.child_scope();
     scoped_state.io_effect_allowed = false;
+    scoped_state.pure_function_call_stack.push(name.to_string());
     let mut type_bindings = HashMap::new();
     for (parameter, argument) in function.parameters.iter().zip(normalized_arguments.iter()) {
         let parameter_ty = substitute_type_bindings(&parameter.ty, &type_bindings);
