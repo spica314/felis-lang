@@ -370,5 +370,8 @@
     #letref #excl success_ref : &^ i32 #borrow success;
     json_parse_value_at source len index_ref parsed_value_ref success_ref;
     #let parsed : Json <- ref_get Json parsed_value_ref;
-    Result::ok Json JsonParseError parsed
+    #let result : Result Json JsonParseError = Result::err Json JsonParseError JsonParseError::unknown_error;
+    #letref #excl result_ref : &^ Result Json JsonParseError #borrow result;
+    ref_set (Result Json JsonParseError) result_ref (Result::ok Json JsonParseError parsed);
+    ref_get (Result Json JsonParseError) result_ref
 }

@@ -3,11 +3,14 @@
 #use std_core::primitive::array::array_set;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
 #use std_core::result::Result;
 #use std_core::string::String;
 #use std_core::string::string_from_arrayvl_parts;
 #use std_json::Json;
 #use std_json::JsonParseError;
+#use std_json::JsonString;
 #use std_json::json_parse;
 #use std_json::json_score;
 
@@ -19,6 +22,14 @@
         Result::err _ _ _ => Json::null,
     };
     json_score parsed
+}
+
+#fn result_ref_score : (value : Json) -> i32 #with IO {
+    #let result : Result Json JsonParseError = Result::err Json JsonParseError JsonParseError::unknown_error;
+    #letref #excl result_ref : &^ Result Json JsonParseError #borrow result;
+    ref_set (Result Json JsonParseError) result_ref (Result::ok Json JsonParseError value);
+    #let stored : Result Json JsonParseError <- ref_get (Result Json JsonParseError) result_ref;
+    parsed_result_score stored
 }
 
 #fn main : () #with IO {
@@ -71,6 +82,7 @@
     #let string_source : String = string_from_arrayvl_parts string_source_arrayvl 4i32 4i32;
     #let string_result : Result Json JsonParseError <- json_parse string_source;
     #let string_code : i32 = parsed_result_score string_result;
+    #let string_ref_code : i32 <- result_ref_score (Json::string (JsonString::string_cons 7i32 JsonString::string_empty));
 
     #let array_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 3i32;
     #letref #excl array_source_arrayvl_ref : &^ ArrayVL u8 #borrow array_source_arrayvl;
@@ -81,7 +93,7 @@
     #let array_result : Result Json JsonParseError <- json_parse array_source;
     #let array_code : i32 = parsed_result_score array_result;
 
-    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add string_code array_code));
+    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add (i32_add string_code string_ref_code) array_code));
     #let _ : () <- IO::sys_exit code;
     ()
 }
