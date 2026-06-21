@@ -57,6 +57,7 @@
             JsonString::string_empty => 0i32,
             JsonString::string_cons byte _ => byte,
         },
+        Json::array _ => 3i32,
     }
 }
 
@@ -133,6 +134,22 @@
     ref_get JsonString value_ref
 }
 
+#fn json_skip_spaces : (source : String) -> (len : i32) -> (index_ref : &^ i32) -> () #with IO {
+    #loop {
+        #let index_value : i32 <- ref_get i32 index_ref;
+        #if i32_gte index_value len {
+            #break;
+        };
+        #let byte : u8 <- string_get_u8 source index_value;
+        #if u8_eq byte ' ' {
+            ref_set i32 index_ref (i32_add index_value 1i32);
+        } #else {
+            #break;
+        };
+    };
+    ()
+}
+
 #fn json_match_null : (source : String) -> (len : i32) -> (start : i32) -> bool #with IO {
     #let matched : i32 = 0i32;
     #letref #excl matched_ref : &^ i32 #borrow matched;
@@ -202,73 +219,156 @@
     i32_eq matched_value 1i32
 }
 
-#pub #fn json_parse : (source : String) -> Result Json JsonParseError #with IO {
-    #let len : i32 = string_len source;
-    #let index : i32 = 0i32;
-    #letref #excl index_ref : &^ i32 #borrow index;
-    #loop {
-        #let index_value : i32 <- ref_get i32 index_ref;
-        #if i32_gte index_value len {
-            #break;
-        };
-        #let byte : u8 <- string_get_u8 source index_value;
-        #if u8_eq byte ' ' {
-            ref_set i32 index_ref (i32_add index_value 1i32);
-        } #else {
-            #break;
-        };
-    };
+#fn json_parse_scalar_at : (source : String) -> (len : i32) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
+    ref_set i32 success_ref 0i32;
+    json_skip_spaces source len index_ref;
     #let start : i32 <- ref_get i32 index_ref;
-    #let parsed_value : Json = Json::null;
-    #letref #excl parsed_value_ref : &^ Json #borrow parsed_value;
     #if i32_lt start len {
         #let first_byte : u8 <- string_get_u8 source start;
         #if u8_eq first_byte '"' {
             #let string_end : i32 <- json_find_string_end source len start;
             #if i32_lt string_end len {
                 #let string_value : JsonString <- json_string_from_range source (i32_add start 1i32) string_end;
-                ref_set Json parsed_value_ref (Json::string string_value);
+                ref_set Json value_ref (Json::string string_value);
+                ref_set i32 index_ref (i32_add string_end 1i32);
+                ref_set i32 success_ref 1i32;
+            };
+        };
+        #let is_null : bool <- json_match_null source len start;
+        #if is_null {
+            ref_set Json value_ref Json::null;
+            ref_set i32 index_ref (i32_add start 4i32);
+            ref_set i32 success_ref 1i32;
+        };
+        #let is_true : bool <- json_match_true source len start;
+        #if is_true {
+            ref_set Json value_ref Json::json_true;
+            ref_set i32 index_ref (i32_add start 4i32);
+            ref_set i32 success_ref 1i32;
+        };
+        #let is_false : bool <- json_match_false source len start;
+        #if is_false {
+            ref_set Json value_ref Json::json_false;
+            ref_set i32 index_ref (i32_add start 5i32);
+            ref_set i32 success_ref 1i32;
+        };
+        #let number : i32 = 0i32;
+        #letref #excl number_ref : &^ i32 #borrow number;
+        #let number_index : i32 = start;
+        #letref #excl number_index_ref : &^ i32 #borrow number_index;
+        #loop {
+            #let current_index : i32 <- ref_get i32 number_index_ref;
+            #if i32_gte current_index len {
+                #break;
+            };
+            #let byte : u8 <- string_get_u8 source current_index;
+            #let digit : i32 = json_digit_value byte;
+            #if i32_lt digit 0i32 {
+                #break;
+            };
+            #if i32_gte digit 10i32 {
+                #break;
+            };
+            #let current_number : i32 <- ref_get i32 number_ref;
+            ref_set i32 number_ref (i32_add (i32_mul current_number 10i32) digit);
+            ref_set i32 number_index_ref (i32_add current_index 1i32);
+        };
+        #let parsed_number : i32 <- ref_get i32 number_ref;
+        #let parsed_number_end : i32 <- ref_get i32 number_index_ref;
+        #if i32_gt parsed_number_end start {
+            ref_set Json value_ref (Json::number_i32 parsed_number);
+            ref_set i32 index_ref parsed_number_end;
+            ref_set i32 success_ref 1i32;
+        };
+    };
+    ()
+}
+
+#fn json_parse_array_at : (source : String) -> (len : i32) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
+    ref_set i32 success_ref 0i32;
+    json_skip_spaces source len index_ref;
+    #let start : i32 <- ref_get i32 index_ref;
+    #if i32_lt start len {
+        #let first_byte : u8 <- string_get_u8 source start;
+        #if u8_eq first_byte '[' {
+            ref_set i32 index_ref (i32_add start 1i32);
+            #let items : JsonArray = JsonArray::array_empty;
+            #letref #excl items_ref : &^ JsonArray #borrow items;
+            #loop {
+                json_skip_spaces source len index_ref;
+                #let current_index : i32 <- ref_get i32 index_ref;
+                #if i32_gte current_index len {
+                    #break;
+                };
+                #let current_byte : u8 <- string_get_u8 source current_index;
+                #if u8_eq current_byte ']' {
+                    #let parsed_items : JsonArray <- ref_get JsonArray items_ref;
+                    ref_set Json value_ref (Json::array parsed_items);
+                    ref_set i32 index_ref (i32_add current_index 1i32);
+                    ref_set i32 success_ref 1i32;
+                    #break;
+                };
+                #let element : Json = Json::null;
+                #letref #excl element_ref : &^ Json #borrow element;
+                #let element_success : i32 = 0i32;
+                #letref #excl element_success_ref : &^ i32 #borrow element_success;
+                json_parse_scalar_at source len index_ref element_ref element_success_ref;
+                #let element_success_value : i32 <- ref_get i32 element_success_ref;
+                #if i32_eq element_success_value 0i32 {
+                    #break;
+                };
+                #let parsed_element : Json <- ref_get Json element_ref;
+                #let current_items : JsonArray <- ref_get JsonArray items_ref;
+                ref_set JsonArray items_ref (JsonArray::array_cons parsed_element current_items);
+                json_skip_spaces source len index_ref;
+                #let separator_index : i32 <- ref_get i32 index_ref;
+                #if i32_gte separator_index len {
+                    #break;
+                };
+                #let separator : u8 <- string_get_u8 source separator_index;
+                #if u8_eq separator ',' {
+                    ref_set i32 index_ref (i32_add separator_index 1i32);
+                } #else {
+                    #if u8_eq separator ']' {
+                        #let parsed_items : JsonArray <- ref_get JsonArray items_ref;
+                        ref_set Json value_ref (Json::array parsed_items);
+                        ref_set i32 index_ref (i32_add separator_index 1i32);
+                        ref_set i32 success_ref 1i32;
+                        #break;
+                    } #else {
+                        #break;
+                    };
+                };
             };
         };
     };
-    #let is_null : bool <- json_match_null source len start;
-    #if is_null {
-        ref_set Json parsed_value_ref Json::null;
-    };
-    #let is_true : bool <- json_match_true source len start;
-    #if is_true {
-        ref_set Json parsed_value_ref Json::json_true;
-    };
-    #let is_false : bool <- json_match_false source len start;
-    #if is_false {
-        ref_set Json parsed_value_ref Json::json_false;
-    };
-    #let number : i32 = 0i32;
-    #letref #excl number_ref : &^ i32 #borrow number;
-    #let number_index : i32 = start;
-    #letref #excl number_index_ref : &^ i32 #borrow number_index;
-    #loop {
-        #let current_index : i32 <- ref_get i32 number_index_ref;
-        #if i32_gte current_index len {
-            #break;
+    ()
+}
+
+#fn json_parse_value_at : (source : String) -> (len : i32) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
+    ref_set i32 success_ref 0i32;
+    json_skip_spaces source len index_ref;
+    #let start : i32 <- ref_get i32 index_ref;
+    #if i32_lt start len {
+        #let first_byte : u8 <- string_get_u8 source start;
+        #if u8_eq first_byte '[' {
+            json_parse_array_at source len index_ref value_ref success_ref;
+        } #else {
+            json_parse_scalar_at source len index_ref value_ref success_ref;
         };
-        #let byte : u8 <- string_get_u8 source current_index;
-        #let digit : i32 = json_digit_value byte;
-        #if i32_lt digit 0i32 {
-            #break;
-        };
-        #if i32_gte digit 10i32 {
-            #break;
-        };
-        #let current_number : i32 <- ref_get i32 number_ref;
-        ref_set i32 number_ref (i32_add (i32_mul current_number 10i32) digit);
-        ref_set i32 number_index_ref (i32_add current_index 1i32);
     };
-    #let parsed_number : i32 <- ref_get i32 number_ref;
-    #let parsed_number_end : i32 <- ref_get i32 number_index_ref;
-    #if i32_gt parsed_number_end start {
-        ref_set Json parsed_value_ref (Json::number_i32 parsed_number);
-    };
+    ()
+}
+
+#pub #fn json_parse : (source : String) -> Result Json JsonParseError #with IO {
+    #let len : i32 = string_len source;
+    #let index : i32 = 0i32;
+    #letref #excl index_ref : &^ i32 #borrow index;
+    #let parsed_value : Json = Json::null;
+    #letref #excl parsed_value_ref : &^ Json #borrow parsed_value;
+    #let success : i32 = 0i32;
+    #letref #excl success_ref : &^ i32 #borrow success;
+    json_parse_value_at source len index_ref parsed_value_ref success_ref;
     #let parsed : Json <- ref_get Json parsed_value_ref;
     Result::ok Json JsonParseError parsed
 }

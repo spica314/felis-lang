@@ -72,7 +72,16 @@
     #let string_result : Result Json JsonParseError <- json_parse string_source;
     #let string_code : i32 = parsed_result_score string_result;
 
-    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) string_code);
+    #let array_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 3i32;
+    #letref #excl array_source_arrayvl_ref : &^ ArrayVL u8 #borrow array_source_arrayvl;
+    array_set array_source_arrayvl_ref 0i32 '[';
+    array_set array_source_arrayvl_ref 1i32 '1';
+    array_set array_source_arrayvl_ref 2i32 ']';
+    #let array_source : String = string_from_arrayvl_parts array_source_arrayvl 3i32 3i32;
+    #let array_result : Result Json JsonParseError <- json_parse array_source;
+    #let array_code : i32 = parsed_result_score array_result;
+
+    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add string_code array_code));
     #let _ : () <- IO::sys_exit code;
     ()
 }

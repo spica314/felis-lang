@@ -317,7 +317,7 @@ fn compiles_and_runs_std_result_err_fixture() {
 fn compiles_and_runs_std_json_fixture() {
     let root = repo_root().join("tests/testcases/std-json");
     let status = run_fixture_status(&root, "std-json");
-    assert_eq!(status.code(), Some(80));
+    assert_eq!(status.code(), Some(83));
 }
 
 #[test]
