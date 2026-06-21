@@ -47,11 +47,6 @@ pub(crate) enum I32Expr {
         heap_slot: usize,
         byte_offset: i32,
     },
-    Select {
-        condition: Box<ConditionExpr>,
-        then_expr: Box<I32Expr>,
-        else_expr: Box<I32Expr>,
-    },
     FromU8(Box<U8Expr>),
     FromI64(Box<I64Expr>),
     FromF32(Box<F32Expr>),
@@ -258,6 +253,11 @@ pub(crate) enum Operation {
         heap_slot: usize,
         byte_offset: i32,
         source_heap_slot: usize,
+    },
+    HeapLoadPtr {
+        dest_heap_slot: usize,
+        source_heap_slot: usize,
+        byte_offset: i32,
     },
     HeapSlotReplace {
         dest_heap_slot: usize,

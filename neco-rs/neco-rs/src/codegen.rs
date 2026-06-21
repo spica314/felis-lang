@@ -327,6 +327,20 @@ fn emit_operations(
                 code.extend_from_slice(&[0x48, 0x89, 0x8a]);
                 code.extend_from_slice(&byte_offset.to_le_bytes());
             }
+            Operation::HeapLoadPtr {
+                dest_heap_slot,
+                source_heap_slot,
+                byte_offset,
+            } => {
+                let source_slot_offset = heap_slot_offset(program, *source_heap_slot);
+                code.extend_from_slice(&[0x48, 0x8b, 0x85]);
+                code.extend_from_slice(&source_slot_offset.to_le_bytes());
+                code.extend_from_slice(&[0x48, 0x8b, 0x80]);
+                code.extend_from_slice(&byte_offset.to_le_bytes());
+                let dest_slot_offset = heap_slot_offset(program, *dest_heap_slot);
+                code.extend_from_slice(&[0x48, 0x89, 0x85]);
+                code.extend_from_slice(&dest_slot_offset.to_le_bytes());
+            }
             Operation::HeapSlotReplace {
                 dest_heap_slot,
                 source_heap_slot,
@@ -996,19 +1010,6 @@ fn emit_i32_expr_to_eax(expr: &I32Expr, code: &mut Vec<u8>, program: &LoweredPro
             code.extend_from_slice(&slot_offset.to_le_bytes());
             code.extend_from_slice(&[0x8b, 0x83]);
             code.extend_from_slice(&byte_offset.to_le_bytes());
-        }
-        I32Expr::Select {
-            condition,
-            then_expr,
-            else_expr,
-        } => {
-            let false_patch_ats = emit_condition_false_jumps(condition, code, program);
-            emit_i32_expr_to_eax(then_expr, code, program);
-            code.push(0xe9);
-            let done_patch = emit_jump_placeholder(code);
-            patch_jumps_to_current(&false_patch_ats, code);
-            emit_i32_expr_to_eax(else_expr, code, program);
-            patch_jumps_to_current(&[done_patch], code);
         }
         I32Expr::FromU8(value) => emit_u8_expr_to_eax(value, code, program),
         I32Expr::FromI64(value) => emit_i64_expr_to_rax(value, code, program),

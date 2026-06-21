@@ -53,6 +53,10 @@
         Json::json_true => 1i32,
         Json::json_false => 2i32,
         Json::number_i32 number => number,
+        Json::string string => #match string {
+            JsonString::string_empty => 0i32,
+            JsonString::string_cons byte _ => byte,
+        },
     }
 }
 

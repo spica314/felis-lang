@@ -746,42 +746,80 @@ fn lower_dynamic_rc_match_value(
     state: &LoweringState,
     program: &mut LoweredProgram,
 ) -> Result<Value> {
+    let result_heap_slot = allocate_heap_slot(program);
+    program.operations.push(Operation::Mmap {
+        len: I32Expr::Literal(4),
+        result_slot: result_heap_slot,
+    });
+
     let mut arms = Vec::new();
     for arm in &match_expr.arms {
-        let (tag, bindings) =
-            dynamic_rc_constructor_pattern_bindings(&arm.pattern, constructor, heap_slot, state)?;
+        let mut arm_program = program.clone();
+        let arm_operation_start = arm_program.operations.len();
+        let (tag, bindings) = dynamic_rc_constructor_pattern_bindings(
+            &arm.pattern,
+            constructor,
+            heap_slot,
+            state,
+            &mut arm_program,
+        )?;
         let mut scoped_state = state.child_scope();
         scoped_state.environment.extend(bindings);
-        let value = lower_pure_value(arm.result.as_ref(), &scoped_state, program)?;
+        let value = lower_pure_value(arm.result.as_ref(), &scoped_state, &mut arm_program)?;
         let Value::I32(expr) = value else {
             return Err(Error::Unsupported(
                 "runtime `type(rc)` matches currently support only `i32` result expressions"
                     .to_string(),
             ));
         };
-        arms.push((tag, expr));
+        let arm_operations = arm_program.operations.split_off(arm_operation_start);
+        program.data = arm_program.data;
+        program.compiled_ptx = arm_program.compiled_ptx;
+        program.arrays = arm_program.arrays;
+        program.heap_slots = program.heap_slots.max(arm_program.heap_slots);
+        program.i32_slots = program.i32_slots.max(arm_program.i32_slots);
+        program.i64_slots = program.i64_slots.max(arm_program.i64_slots);
+        program.f32_slots = program.f32_slots.max(arm_program.f32_slots);
+        program.u8_slots = program.u8_slots.max(arm_program.u8_slots);
+        program.bool_slots = program.bool_slots.max(arm_program.bool_slots);
+        program.requires_argv |= arm_program.requires_argv;
+        arms.push((tag, arm_operations, expr));
     }
 
-    let Some((_, mut expr)) = arms.pop() else {
+    let Some((_, mut else_operations, else_expr)) = arms.pop() else {
         return Err(Error::Unsupported(
             "`#match` must contain at least one constructor arm".to_string(),
         ));
     };
-    while let Some((tag, then_expr)) = arms.pop() {
-        expr = I32Expr::Select {
-            condition: Box::new(ConditionExpr::I32 {
+    else_operations.push(Operation::HeapStoreI32 {
+        heap_slot: result_heap_slot,
+        byte_offset: 0,
+        value: else_expr,
+    });
+    while let Some((tag, mut then_operations, then_expr)) = arms.pop() {
+        then_operations.push(Operation::HeapStoreI32 {
+            heap_slot: result_heap_slot,
+            byte_offset: 0,
+            value: then_expr,
+        });
+        else_operations = vec![Operation::If {
+            condition: ConditionExpr::I32 {
                 kind: ComparisonKind::Eq,
                 lhs: I32Expr::HeapLoadI32 {
                     heap_slot,
                     byte_offset: 0,
                 },
                 rhs: I32Expr::Literal(tag),
-            }),
-            then_expr: Box::new(then_expr),
-            else_expr: Box::new(expr),
-        };
+            },
+            then_operations,
+            else_operations,
+        }];
     }
-    Ok(Value::I32(expr))
+    program.operations.extend(else_operations);
+    Ok(Value::I32(I32Expr::HeapLoadI32 {
+        heap_slot: result_heap_slot,
+        byte_offset: 0,
+    }))
 }
 
 fn dynamic_rc_constructor_pattern_bindings(
@@ -789,6 +827,7 @@ fn dynamic_rc_constructor_pattern_bindings(
     constructor: &ConstructorValue,
     heap_slot: usize,
     state: &LoweringState,
+    program: &mut LoweredProgram,
 ) -> Result<(i32, HashMap<String, Value>)> {
     let Pattern::Constructor { path, subpatterns } = pattern else {
         return Err(Error::Unsupported(
@@ -822,8 +861,8 @@ fn dynamic_rc_constructor_pattern_bindings(
             }
             continue;
         }
-        let value = dynamic_rc_field_value(&parameter.ty, heap_slot, byte_offset)?;
-        byte_offset += dynamic_rc_field_size(&parameter.ty)?;
+        let value = dynamic_rc_field_value(&parameter.ty, heap_slot, byte_offset, state, program)?;
+        byte_offset += dynamic_rc_field_size(&parameter.ty, state)?;
         match subpattern {
             Pattern::Wildcard => {}
             Pattern::Bind(name) => {
@@ -845,11 +884,32 @@ fn dynamic_rc_constructor_pattern_bindings(
     Ok((expected.tag, bindings))
 }
 
-fn dynamic_rc_field_value(ty: &Term, heap_slot: usize, byte_offset: i32) -> Result<Value> {
+fn dynamic_rc_field_value(
+    ty: &Term,
+    heap_slot: usize,
+    byte_offset: i32,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Value> {
     if is_simple_term_path(ty, "i32") {
         return Ok(Value::I32(I32Expr::HeapLoadI32 {
             heap_slot,
             byte_offset,
+        }));
+    }
+    if let Some(type_name) = runtime_rc_type_name(ty, state) {
+        let field_heap_slot = allocate_heap_slot(program);
+        program.operations.push(Operation::HeapLoadPtr {
+            dest_heap_slot: field_heap_slot,
+            source_heap_slot: heap_slot,
+            byte_offset,
+        });
+        return Ok(Value::Constructor(ConstructorValue {
+            type_name,
+            constructor_name: String::new(),
+            heap_slot: Some(field_heap_slot),
+            runtime_tag: true,
+            fields: Vec::new(),
         }));
     }
     Err(Error::Unsupported(
@@ -857,13 +917,38 @@ fn dynamic_rc_field_value(ty: &Term, heap_slot: usize, byte_offset: i32) -> Resu
     ))
 }
 
-fn dynamic_rc_field_size(ty: &Term) -> Result<i32> {
+fn dynamic_rc_field_size(ty: &Term, state: &LoweringState) -> Result<i32> {
     if is_simple_term_path(ty, "i32") {
         return Ok(4);
+    }
+    if runtime_rc_type_name(ty, state).is_some() {
+        return Ok(8);
     }
     Err(Error::Unsupported(
         "runtime `type(rc)` matches currently support only `i32` payload fields".to_string(),
     ))
+}
+
+fn runtime_rc_type_name(ty: &Term, state: &LoweringState) -> Option<String> {
+    let type_name = simple_nominal_type_name(ty)?;
+    state
+        .constructors
+        .values()
+        .any(|constructor| constructor.is_rc && constructor.type_name == type_name)
+        .then(|| type_name.to_string())
+}
+
+fn simple_nominal_type_name(term: &Term) -> Option<&str> {
+    match term {
+        Term::Path(path)
+            if path.token_keyword_package.is_none()
+                && path.segments.len() == 1
+                && !is_simple_term_path(term, "i32") =>
+        {
+            Some(path.segments[0].lexeme.as_str())
+        }
+        _ => None,
+    }
 }
 
 fn is_simple_term_path(term: &Term, expected: &str) -> bool {

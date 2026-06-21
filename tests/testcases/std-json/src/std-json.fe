@@ -70,8 +70,9 @@
     array_set string_source_arrayvl_ref 3i32 '"';
     #let string_source : String = string_from_arrayvl_parts string_source_arrayvl 4i32 4i32;
     #let string_result : Result Json JsonParseError <- json_parse string_source;
+    #let string_code : i32 = parsed_result_score string_result;
 
-    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add true_code false_code);
+    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) string_code);
     #let _ : () <- IO::sys_exit code;
     ()
 }
