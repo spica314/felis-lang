@@ -747,10 +747,6 @@ fn lower_dynamic_rc_match_value(
     program: &mut LoweredProgram,
 ) -> Result<Value> {
     let result_heap_slot = allocate_heap_slot(program);
-    program.operations.push(Operation::Mmap {
-        len: I32Expr::Literal(4),
-        result_slot: result_heap_slot,
-    });
 
     let mut arms = Vec::new();
     for arm in &match_expr.arms {
@@ -766,12 +762,7 @@ fn lower_dynamic_rc_match_value(
         let mut scoped_state = state.child_scope();
         scoped_state.environment.extend(bindings);
         let value = lower_pure_value(arm.result.as_ref(), &scoped_state, &mut arm_program)?;
-        let Value::I32(expr) = value else {
-            return Err(Error::Unsupported(
-                "runtime `type(rc)` matches currently support only `i32` result expressions"
-                    .to_string(),
-            ));
-        };
+        let result = DynamicRcMatchArmResult::from_value(value)?;
         let arm_operations = arm_program.operations.split_off(arm_operation_start);
         program.data = arm_program.data;
         program.compiled_ptx = arm_program.compiled_ptx;
@@ -783,25 +774,25 @@ fn lower_dynamic_rc_match_value(
         program.u8_slots = program.u8_slots.max(arm_program.u8_slots);
         program.bool_slots = program.bool_slots.max(arm_program.bool_slots);
         program.requires_argv |= arm_program.requires_argv;
-        arms.push((tag, arm_operations, expr));
+        arms.push((tag, arm_operations, result));
     }
 
-    let Some((_, mut else_operations, else_expr)) = arms.pop() else {
+    let Some(first_result) = arms.first().map(|(_, _, result)| result.clone()) else {
         return Err(Error::Unsupported(
             "`#match` must contain at least one constructor arm".to_string(),
         ));
     };
-    else_operations.push(Operation::HeapStoreI32 {
-        heap_slot: result_heap_slot,
-        byte_offset: 0,
-        value: else_expr,
-    });
-    while let Some((tag, mut then_operations, then_expr)) = arms.pop() {
-        then_operations.push(Operation::HeapStoreI32 {
-            heap_slot: result_heap_slot,
-            byte_offset: 0,
-            value: then_expr,
-        });
+    first_result.prepare_result_slot(result_heap_slot, program)?;
+    for (_, _, result) in &arms {
+        first_result.validate_same_kind(result)?;
+    }
+
+    let Some((_, mut else_operations, else_result)) = arms.pop() else {
+        unreachable!("empty arms handled above");
+    };
+    else_result.push_store(result_heap_slot, &mut else_operations);
+    while let Some((tag, mut then_operations, then_result)) = arms.pop() {
+        then_result.push_store(result_heap_slot, &mut then_operations);
         else_operations = vec![Operation::If {
             condition: ConditionExpr::I32 {
                 kind: ComparisonKind::Eq,
@@ -816,10 +807,93 @@ fn lower_dynamic_rc_match_value(
         }];
     }
     program.operations.extend(else_operations);
-    Ok(Value::I32(I32Expr::HeapLoadI32 {
-        heap_slot: result_heap_slot,
-        byte_offset: 0,
-    }))
+    first_result.result_value(result_heap_slot)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DynamicRcMatchArmResult {
+    I32(I32Expr),
+    Constructor { type_name: String, heap_slot: usize },
+}
+
+impl DynamicRcMatchArmResult {
+    fn from_value(value: Value) -> Result<Self> {
+        match value {
+            Value::I32(expr) => Ok(Self::I32(expr)),
+            Value::Constructor(ConstructorValue {
+                type_name,
+                heap_slot: Some(heap_slot),
+                ..
+            }) => Ok(Self::Constructor {
+                type_name,
+                heap_slot,
+            }),
+            _ => Err(Error::Unsupported(
+                "runtime `type(rc)` matches currently support only `i32` and `type(rc)` result expressions"
+                    .to_string(),
+            )),
+        }
+    }
+
+    fn prepare_result_slot(
+        &self,
+        result_heap_slot: usize,
+        program: &mut LoweredProgram,
+    ) -> Result<()> {
+        if matches!(self, Self::I32(_)) {
+            program.operations.push(Operation::Mmap {
+                len: I32Expr::Literal(4),
+                result_slot: result_heap_slot,
+            });
+        }
+        Ok(())
+    }
+
+    fn validate_same_kind(&self, other: &Self) -> Result<()> {
+        match (self, other) {
+            (Self::I32(_), Self::I32(_)) => Ok(()),
+            (
+                Self::Constructor { type_name, .. },
+                Self::Constructor {
+                    type_name: other_type,
+                    ..
+                },
+            ) if type_name == other_type => Ok(()),
+            _ => Err(Error::Unsupported(
+                "runtime `type(rc)` match arms must return the same result kind".to_string(),
+            )),
+        }
+    }
+
+    fn push_store(&self, result_heap_slot: usize, operations: &mut Vec<Operation>) {
+        match self {
+            Self::I32(expr) => operations.push(Operation::HeapStoreI32 {
+                heap_slot: result_heap_slot,
+                byte_offset: 0,
+                value: expr.clone(),
+            }),
+            Self::Constructor { heap_slot, .. } => operations.push(Operation::HeapSlotReplace {
+                dest_heap_slot: result_heap_slot,
+                source_heap_slot: *heap_slot,
+            }),
+        }
+    }
+
+    fn result_value(&self, result_heap_slot: usize) -> Result<Value> {
+        match self {
+            Self::I32(_) => Ok(Value::I32(I32Expr::HeapLoadI32 {
+                heap_slot: result_heap_slot,
+                byte_offset: 0,
+            })),
+            Self::Constructor { type_name, .. } => Ok(Value::Constructor(ConstructorValue {
+                type_name: type_name.clone(),
+                constructor_name: String::new(),
+                heap_slot: Some(result_heap_slot),
+                runtime_tag: true,
+                fields: Vec::new(),
+            })),
+        }
+    }
 }
 
 fn dynamic_rc_constructor_pattern_bindings(

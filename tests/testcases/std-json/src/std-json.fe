@@ -58,6 +58,28 @@
     }
 }
 
+#fn json_array_tail_or_empty : (items : JsonArray) -> JsonArray {
+    #match items {
+        JsonArray::array_empty => JsonArray::array_empty,
+        JsonArray::array_cons _ rest => rest,
+    }
+}
+
+#fn parsed_result_array_tail_marker : (parsed_result : Result Json JsonParseError) -> i32 {
+    #let parsed : Json = #match parsed_result {
+        Result::ok _ _ value => value,
+        Result::err _ _ _ => Json::null,
+    };
+    #let tail : JsonArray = #match parsed {
+        Json::array items => json_array_tail_or_empty items,
+        Json::null => JsonArray::array_empty,
+    };
+    #match tail {
+        JsonArray::array_empty => 8i32,
+        JsonArray::array_cons _ _ => 9i32,
+    }
+}
+
 #fn main : () #with IO {
     #let parse_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 3i32;
     #letref #excl parse_source_arrayvl_ref : &^ ArrayVL u8 #borrow parse_source_arrayvl;
@@ -119,8 +141,9 @@
     #let array_result : Result Json JsonParseError <- json_parse array_source;
     #let array_code : i32 = parsed_result_score array_result;
     #let array_head_code : i32 = parsed_result_array_head_score array_result;
+    #let array_tail_code : i32 = parsed_result_array_tail_marker array_result;
 
-    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add (i32_add string_code string_ref_code) (i32_add array_code array_head_code)));
+    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add (i32_add string_code string_ref_code) (i32_add (i32_add array_code array_head_code) array_tail_code)));
     #let _ : () <- IO::sys_exit code;
     ()
 }
