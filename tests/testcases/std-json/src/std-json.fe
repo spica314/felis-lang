@@ -80,6 +80,21 @@
     }
 }
 
+#fn parsed_result_array_tail_head_score : (parsed_result : Result Json JsonParseError) -> i32 {
+    #let parsed : Json = #match parsed_result {
+        Result::ok _ _ value => value,
+        Result::err _ _ _ => Json::null,
+    };
+    #let tail : JsonArray = #match parsed {
+        Json::array items => json_array_tail_or_empty items,
+        Json::null => JsonArray::array_empty,
+    };
+    #match tail {
+        JsonArray::array_empty => 0i32,
+        JsonArray::array_cons value _ => json_scalar_score value,
+    }
+}
+
 #fn main : () #with IO {
     #let parse_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 3i32;
     #letref #excl parse_source_arrayvl_ref : &^ ArrayVL u8 #borrow parse_source_arrayvl;
@@ -143,7 +158,31 @@
     #let array_head_code : i32 = parsed_result_array_head_score array_result;
     #let array_tail_code : i32 = parsed_result_array_tail_marker array_result;
 
-    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add (i32_add string_code string_ref_code) (i32_add (i32_add array_code array_head_code) array_tail_code)));
+    #let empty_array_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 2i32;
+    #letref #excl empty_array_source_arrayvl_ref : &^ ArrayVL u8 #borrow empty_array_source_arrayvl;
+    array_set empty_array_source_arrayvl_ref 0i32 '[';
+    array_set empty_array_source_arrayvl_ref 1i32 ']';
+    #let empty_array_source : String = string_from_arrayvl_parts empty_array_source_arrayvl 2i32 2i32;
+    #let empty_array_result : Result Json JsonParseError <- json_parse empty_array_source;
+    #let empty_array_code : i32 = parsed_result_score empty_array_result;
+    #let empty_array_head_code : i32 = parsed_result_array_head_score empty_array_result;
+    #let empty_array_tail_code : i32 = parsed_result_array_tail_marker empty_array_result;
+
+    #let pair_array_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 5i32;
+    #letref #excl pair_array_source_arrayvl_ref : &^ ArrayVL u8 #borrow pair_array_source_arrayvl;
+    array_set pair_array_source_arrayvl_ref 0i32 '[';
+    array_set pair_array_source_arrayvl_ref 1i32 '1';
+    array_set pair_array_source_arrayvl_ref 2i32 ',';
+    array_set pair_array_source_arrayvl_ref 3i32 '2';
+    array_set pair_array_source_arrayvl_ref 4i32 ']';
+    #let pair_array_source : String = string_from_arrayvl_parts pair_array_source_arrayvl 5i32 5i32;
+    #let pair_array_result : Result Json JsonParseError <- json_parse pair_array_source;
+    #let pair_array_code : i32 = parsed_result_score pair_array_result;
+    #let pair_array_head_code : i32 = parsed_result_array_head_score pair_array_result;
+    #let pair_array_tail_code : i32 = parsed_result_array_tail_marker pair_array_result;
+    #let pair_array_tail_head_code : i32 = parsed_result_array_tail_head_score pair_array_result;
+
+    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add (i32_add string_code string_ref_code) (i32_add (i32_add array_code array_head_code) (i32_add array_tail_code (i32_add (i32_add empty_array_code empty_array_head_code) (i32_add empty_array_tail_code (i32_add (i32_add pair_array_code pair_array_head_code) (i32_add pair_array_tail_code pair_array_tail_head_code))))))));
     #let _ : () <- IO::sys_exit code;
     ()
 }
