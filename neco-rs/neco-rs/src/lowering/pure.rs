@@ -7,8 +7,9 @@ use neco_rs_parser::{
 
 use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::ir::{
-    ComparisonKind, ConditionExpr, ConstructorValue, F32Expr, I32Expr, I64Expr, LoweredProgram,
-    Operation, StructFieldValue, StructValue, U8Expr, intern_data,
+    ComparisonKind, ConditionExpr, ConstructorValue, F32Expr, I32Expr, I64Expr, InternalAbiValue,
+    InternalCallArgument, LoweredProgram, Operation, StructFieldValue, StructValue, U8Expr,
+    intern_data,
 };
 use crate::{Error, Result};
 
@@ -763,7 +764,8 @@ fn lower_dynamic_rc_match_value(
         scoped_state.environment.extend(bindings);
         let value = lower_pure_value(arm.result.as_ref(), &scoped_state, &mut arm_program)?;
         let result = DynamicRcMatchArmResult::from_value(value)?;
-        let arm_operations = arm_program.operations.split_off(arm_operation_start);
+        let mut arm_operations = arm_program.operations.split_off(arm_operation_start);
+        let internal_functions = take_internal_functions(&mut arm_operations);
         program.data = arm_program.data;
         program.compiled_ptx = arm_program.compiled_ptx;
         program.arrays = arm_program.arrays;
@@ -774,6 +776,7 @@ fn lower_dynamic_rc_match_value(
         program.u8_slots = program.u8_slots.max(arm_program.u8_slots);
         program.bool_slots = program.bool_slots.max(arm_program.bool_slots);
         program.requires_argv |= arm_program.requires_argv;
+        program.operations.extend(internal_functions);
         arms.push((tag, arm_operations, result));
     }
 
@@ -808,6 +811,19 @@ fn lower_dynamic_rc_match_value(
     }
     program.operations.extend(else_operations);
     first_result.result_value(result_heap_slot)
+}
+
+fn take_internal_functions(operations: &mut Vec<Operation>) -> Vec<Operation> {
+    let mut internal_functions = Vec::new();
+    let mut retained = Vec::with_capacity(operations.len());
+    for operation in operations.drain(..) {
+        match operation {
+            Operation::InternalFunction { .. } => internal_functions.push(operation),
+            operation => retained.push(operation),
+        }
+    }
+    *operations = retained;
+    internal_functions
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1336,15 +1352,252 @@ fn lower_pure_function_call(
         .any(|active| active == name)
         && !recursive_call_is_structurally_smaller(&function.parameters, state, &scoped_state)
     {
-        return Err(Error::Unsupported(format!(
-            "recursive pure function `{name}` cannot be lowered by inlining"
-        )));
+        return lower_runtime_pure_function_call(
+            name,
+            &function,
+            &normalized_arguments,
+            state,
+            program,
+            &type_bindings,
+        );
     }
 
     let value = lower_pure_block_value(&function.body, &scoped_state, program)?;
     let result_ty = substitute_type_bindings(&function.result_ty, &type_bindings);
     validate_value_against_type(&value, &result_ty, program)?;
     Ok(Some(value))
+}
+
+fn lower_runtime_pure_function_call(
+    name: &str,
+    function: &super::declarations::PureFunction,
+    normalized_arguments: &[Term],
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+    type_bindings: &HashMap<String, Term>,
+) -> Result<Option<Value>> {
+    let arguments = runtime_internal_call_arguments(
+        &function.parameters,
+        normalized_arguments,
+        state,
+        program,
+    )?;
+    ensure_internal_pure_function(name, function, state, program, type_bindings)?;
+
+    let result_ty = substitute_type_bindings(&function.result_ty, type_bindings);
+    let (result, value) = internal_result_slot(&result_ty, program)?;
+    program.operations.push(Operation::CallInternal {
+        name: name.to_string(),
+        arguments,
+        result: Some(result),
+    });
+    Ok(Some(value))
+}
+
+fn ensure_internal_pure_function(
+    name: &str,
+    function: &super::declarations::PureFunction,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+    type_bindings: &HashMap<String, Term>,
+) -> Result<()> {
+    if program
+        .operations
+        .iter()
+        .any(|operation| matches!(operation, Operation::InternalFunction { name: existing, .. } if existing == name))
+    {
+        return Ok(());
+    }
+
+    let placeholder_index = program.operations.len();
+    program.operations.push(Operation::InternalFunction {
+        name: name.to_string(),
+        parameters: Vec::new(),
+        body_operations: Vec::new(),
+    });
+
+    let mut scoped_state = state.child_scope();
+    scoped_state.io_effect_allowed = false;
+    scoped_state.pure_function_call_stack.push(name.to_string());
+    let parameters = bind_internal_parameters(&function.parameters, &mut scoped_state, program)?;
+
+    let operation_start = program.operations.len();
+    let value = lower_pure_block_value(&function.body, &scoped_state, program)?;
+    let result_ty = substitute_type_bindings(&function.result_ty, type_bindings);
+    validate_value_against_type(&value, &result_ty, program)?;
+    let return_value = internal_return_argument(&value)?;
+    let mut body_operations = program.operations.split_off(operation_start);
+    body_operations.push(Operation::ReturnInternal {
+        value: Some(return_value),
+    });
+    program.operations[placeholder_index] = Operation::InternalFunction {
+        name: name.to_string(),
+        parameters,
+        body_operations,
+    };
+    Ok(())
+}
+
+fn bind_internal_parameters(
+    parameters: &[super::declarations::PureFunctionParameter],
+    scoped_state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Vec<InternalAbiValue>> {
+    let mut lowered = Vec::with_capacity(parameters.len());
+    for parameter in parameters {
+        if is_type_universe_annotation(&parameter.ty) {
+            return Err(Error::Unsupported(
+                "runtime recursive pure functions with type parameters are not supported"
+                    .to_string(),
+            ));
+        }
+        let (abi, value) = internal_parameter_slot(&parameter.ty, program)?;
+        scoped_state
+            .environment
+            .insert(parameter.name.clone(), value);
+        lowered.push(abi);
+    }
+    Ok(lowered)
+}
+
+fn internal_parameter_slot(
+    ty: &Term,
+    program: &mut LoweredProgram,
+) -> Result<(InternalAbiValue, Value)> {
+    if is_simple_term_path(ty, "i32") {
+        let slot = program.i32_slots;
+        program.i32_slots += 1;
+        return Ok((
+            InternalAbiValue::I32(slot),
+            Value::I32(I32Expr::Local(slot)),
+        ));
+    }
+    if is_simple_term_path(ty, "i64") {
+        let slot = program.i64_slots;
+        program.i64_slots += 1;
+        return Ok((
+            InternalAbiValue::I64(slot),
+            Value::I64(I64Expr::Local(slot)),
+        ));
+    }
+    if is_simple_term_path(ty, "u8") {
+        let slot = program.u8_slots;
+        program.u8_slots += 1;
+        return Ok((InternalAbiValue::U8(slot), Value::U8(U8Expr::Local(slot))));
+    }
+    if is_simple_term_path(ty, "bool") {
+        let slot = program.bool_slots;
+        program.bool_slots += 1;
+        return Ok((
+            InternalAbiValue::Bool(slot),
+            Value::Bool(ConditionExpr::Local(slot)),
+        ));
+    }
+    let heap_slot = allocate_heap_slot(program);
+    Ok((
+        InternalAbiValue::HeapPtr(heap_slot),
+        Value::Constructor(ConstructorValue {
+            type_name: simple_nominal_type_name(ty).unwrap_or("").to_string(),
+            constructor_name: String::new(),
+            heap_slot: Some(heap_slot),
+            runtime_tag: true,
+            fields: Vec::new(),
+        }),
+    ))
+}
+
+fn runtime_internal_call_arguments(
+    parameters: &[super::declarations::PureFunctionParameter],
+    normalized_arguments: &[Term],
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Vec<InternalCallArgument>> {
+    parameters
+        .iter()
+        .zip(normalized_arguments.iter())
+        .map(|(parameter, argument)| {
+            if is_type_universe_annotation(&parameter.ty) {
+                return Err(Error::Unsupported(
+                    "runtime recursive pure functions with type parameters are not supported"
+                        .to_string(),
+                ));
+            }
+            let value = lower_pure_value(argument, state, program)?;
+            validate_value_against_type(&value, &parameter.ty, program)?;
+            internal_call_argument(&value)
+        })
+        .collect()
+}
+
+fn internal_call_argument(value: &Value) -> Result<InternalCallArgument> {
+    match value {
+        Value::I32(expr) => Ok(InternalCallArgument::I32(expr.clone())),
+        Value::I64(expr) => Ok(InternalCallArgument::I64(expr.clone())),
+        Value::U8(expr) => Ok(InternalCallArgument::U8(expr.clone())),
+        Value::Bool(expr) => Ok(InternalCallArgument::Bool(expr.clone())),
+        Value::Constructor(ConstructorValue {
+            heap_slot: Some(slot),
+            ..
+        })
+        | Value::Struct(StructValue {
+            heap_slot: Some(slot),
+            ..
+        }) => Ok(InternalCallArgument::HeapPtr(*slot)),
+        _ => Err(Error::Unsupported(
+            "runtime recursive pure functions support only scalar and `type(rc)` arguments"
+                .to_string(),
+        )),
+    }
+}
+
+fn internal_result_slot(
+    ty: &Term,
+    program: &mut LoweredProgram,
+) -> Result<(InternalAbiValue, Value)> {
+    if is_simple_term_path(ty, "i32") {
+        let slot = program.i32_slots;
+        program.i32_slots += 1;
+        return Ok((
+            InternalAbiValue::I32(slot),
+            Value::I32(I32Expr::Local(slot)),
+        ));
+    }
+    if is_simple_term_path(ty, "i64") {
+        let slot = program.i64_slots;
+        program.i64_slots += 1;
+        return Ok((
+            InternalAbiValue::I64(slot),
+            Value::I64(I64Expr::Local(slot)),
+        ));
+    }
+    if is_simple_term_path(ty, "u8") {
+        let slot = program.u8_slots;
+        program.u8_slots += 1;
+        return Ok((InternalAbiValue::U8(slot), Value::U8(U8Expr::Local(slot))));
+    }
+    if is_simple_term_path(ty, "bool") {
+        let slot = program.bool_slots;
+        program.bool_slots += 1;
+        return Ok((
+            InternalAbiValue::Bool(slot),
+            Value::Bool(ConditionExpr::Local(slot)),
+        ));
+    }
+    let heap_slot = allocate_heap_slot(program);
+    Ok((
+        InternalAbiValue::HeapPtr(heap_slot),
+        Value::Constructor(ConstructorValue {
+            type_name: simple_nominal_type_name(ty).unwrap_or("").to_string(),
+            constructor_name: String::new(),
+            heap_slot: Some(heap_slot),
+            runtime_tag: true,
+            fields: Vec::new(),
+        }),
+    ))
+}
+
+fn internal_return_argument(value: &Value) -> Result<InternalCallArgument> {
+    internal_call_argument(value)
 }
 
 fn recursive_call_is_structurally_smaller(

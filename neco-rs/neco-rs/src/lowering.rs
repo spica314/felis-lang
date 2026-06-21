@@ -306,11 +306,11 @@ pub(crate) fn lower_package_to_program(package: &ParsedPackage) -> Result<Lowere
             .push(Operation::Exit(ExitCodeExpr::I32(I32Expr::Literal(0))));
     }
 
-    program.i32_slots = state.next_i32_slot;
-    program.i64_slots = state.next_i64_slot;
-    program.f32_slots = state.next_f32_slot;
-    program.u8_slots = state.next_u8_slot;
-    program.bool_slots = state.next_bool_slot;
+    program.i32_slots = program.i32_slots.max(state.next_i32_slot);
+    program.i64_slots = program.i64_slots.max(state.next_i64_slot);
+    program.f32_slots = program.f32_slots.max(state.next_f32_slot);
+    program.u8_slots = program.u8_slots.max(state.next_u8_slot);
+    program.bool_slots = program.bool_slots.max(state.next_bool_slot);
 
     Ok(program)
 }
