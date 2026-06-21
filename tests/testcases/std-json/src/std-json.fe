@@ -2,9 +2,11 @@
 #use std_core::primitive::array::ArrayVL;
 #use std_core::primitive::array::array_set;
 #use std_core::primitive::i32::i32;
+#use std_core::result::Result;
 #use std_core::string::String;
 #use std_core::string::string_from_arrayvl_parts;
 #use std_json::Json;
+#use std_json::JsonParseError;
 #use std_json::json_parse;
 #use std_json::json_score;
 
@@ -17,7 +19,11 @@
     array_set parse_source_arrayvl_ref 1i32 '1';
     array_set parse_source_arrayvl_ref 2i32 '2';
     #let parse_source : String = string_from_arrayvl_parts parse_source_arrayvl 3i32 3i32;
-    #let parsed : Json <- json_parse parse_source;
+    #let parsed_result : Result Json JsonParseError <- json_parse parse_source;
+    #let parsed : Json = #match parsed_result {
+        Result::ok _ _ value => value,
+        Result::err _ _ _ => Json::null,
+    };
     #let parsed_code : i32 = json_score parsed;
     #let _ : () <- IO::sys_exit parsed_code;
     ()

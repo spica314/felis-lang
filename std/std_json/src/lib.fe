@@ -9,6 +9,7 @@
 #use std_core::primitive::reference::ref_set;
 #use std_core::primitive::u8::u8;
 #use std_core::primitive::u8::u8_eq;
+#use std_core::result::Result;
 #use std_core::string::String;
 #use std_core::string::string_get_u8;
 #use std_core::string::string_len;
@@ -36,6 +37,10 @@
 #pub #type(rc) JsonObject : Type[0] {
     object_empty : JsonObject,
     object_cons : JsonString -> Json -> JsonObject -> JsonObject,
+}
+
+#pub #type(rc) JsonParseError : Type[0] {
+    unknown_error : JsonParseError,
 }
 
 #pub #fn json_score : (value : Json) -> i32 {
@@ -87,7 +92,7 @@
     i32_sub (i32_from_u8 byte) (i32_from_u8 '0')
 }
 
-#pub #fn json_parse : (source : String) -> Json #with IO {
+#pub #fn json_parse : (source : String) -> Result Json JsonParseError #with IO {
     #let len : i32 = string_len source;
     #let index : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index;
@@ -126,5 +131,5 @@
         ref_set i32 number_index_ref (i32_add current_index 1i32);
     };
     #let parsed_number : i32 <- ref_get i32 number_ref;
-    Json::number_i32 parsed_number
+    Result::ok Json JsonParseError (Json::number_i32 parsed_number)
 }
