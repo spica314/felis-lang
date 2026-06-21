@@ -142,7 +142,11 @@ pub(crate) fn select_binary_from_package(
     output: &Path,
 ) -> Result<ParsedPackage> {
     match package.manifest.felis_bin_entrypoints.len() {
-        0 | 1 => Ok(package),
+        0 => Ok(package),
+        1 => {
+            let selected = package.manifest.felis_bin_entrypoints[0].clone();
+            select_binary_entrypoint(package, selected)
+        }
         _ => {
             let output_name = output_selection_name(output);
             let matches = package
@@ -233,7 +237,11 @@ fn module_source_path(current_file: &Path, module_name: &str) -> PathBuf {
 
 fn select_default_binary_from_package(package: ParsedPackage) -> Result<ParsedPackage> {
     match package.manifest.felis_bin_entrypoints.len() {
-        0 | 1 => Ok(package),
+        0 => Ok(package),
+        1 => {
+            let selected = package.manifest.felis_bin_entrypoints[0].clone();
+            select_binary_entrypoint(package, selected)
+        }
         _ => Err(Error::Unsupported(
             "package contains multiple binary entrypoints; choose an output path that identifies the target binary".to_string(),
         )),
