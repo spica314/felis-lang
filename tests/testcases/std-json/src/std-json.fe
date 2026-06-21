@@ -9,6 +9,7 @@
 #use std_core::string::String;
 #use std_core::string::string_from_arrayvl_parts;
 #use std_json::Json;
+#use std_json::JsonArray;
 #use std_json::JsonParseError;
 #use std_json::JsonString;
 #use std_json::json_parse;
@@ -30,6 +31,31 @@
     ref_set (Result Json JsonParseError) result_ref (Result::ok Json JsonParseError value);
     #let stored : Result Json JsonParseError <- ref_get (Result Json JsonParseError) result_ref;
     parsed_result_score stored
+}
+
+#fn json_scalar_score : (value : Json) -> i32 {
+    #match value {
+        Json::null => 0i32,
+        Json::json_true => 1i32,
+        Json::json_false => 2i32,
+        Json::number_i32 number => number,
+        Json::string _ => 4i32,
+        Json::array _ => 5i32,
+    }
+}
+
+#fn parsed_result_array_head_score : (parsed_result : Result Json JsonParseError) -> i32 {
+    #let parsed : Json = #match parsed_result {
+        Result::ok _ _ value => value,
+        Result::err _ _ _ => Json::null,
+    };
+    #match parsed {
+        Json::array items => #match items {
+            JsonArray::array_empty => 0i32,
+            JsonArray::array_cons value _ => json_scalar_score value,
+        },
+        Json::null => 20i32,
+    }
 }
 
 #fn main : () #with IO {
@@ -92,8 +118,9 @@
     #let array_source : String = string_from_arrayvl_parts array_source_arrayvl 3i32 3i32;
     #let array_result : Result Json JsonParseError <- json_parse array_source;
     #let array_code : i32 = parsed_result_score array_result;
+    #let array_head_code : i32 = parsed_result_array_head_score array_result;
 
-    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add (i32_add string_code string_ref_code) array_code));
+    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add (i32_add string_code string_ref_code) (i32_add array_code array_head_code)));
     #let _ : () <- IO::sys_exit code;
     ()
 }
