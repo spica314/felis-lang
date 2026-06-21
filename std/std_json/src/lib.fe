@@ -93,6 +93,42 @@
     i32_sub (i32_from_u8 byte) (i32_from_u8 '0')
 }
 
+#fn json_find_string_end : (source : String) -> (len : i32) -> (start : i32) -> i32 #with IO {
+    #let index : i32 = i32_add start 1i32;
+    #letref #excl index_ref : &^ i32 #borrow index;
+    #loop {
+        #let current_index : i32 <- ref_get i32 index_ref;
+        #if i32_gte current_index len {
+            #break;
+        };
+        #let byte : u8 <- string_get_u8 source current_index;
+        #if u8_eq byte '"' {
+            #break;
+        };
+        ref_set i32 index_ref (i32_add current_index 1i32);
+    };
+    ref_get i32 index_ref
+}
+
+#fn json_string_from_range : (source : String) -> (start : i32) -> (end : i32) -> JsonString #with IO {
+    #let value : JsonString = JsonString::string_empty;
+    #letref #excl value_ref : &^ JsonString #borrow value;
+    #let index : i32 = end;
+    #letref #excl index_ref : &^ i32 #borrow index;
+    #loop {
+        #let current_index : i32 <- ref_get i32 index_ref;
+        #if i32_lte current_index start {
+            #break;
+        };
+        #let byte_index : i32 = i32_sub current_index 1i32;
+        #let byte : u8 <- string_get_u8 source byte_index;
+        #let rest : JsonString <- ref_get JsonString value_ref;
+        ref_set JsonString value_ref (JsonString::string_cons (i32_from_u8 byte) rest);
+        ref_set i32 index_ref byte_index;
+    };
+    ref_get JsonString value_ref
+}
+
 #fn json_match_null : (source : String) -> (len : i32) -> (start : i32) -> bool #with IO {
     #let matched : i32 = 0i32;
     #letref #excl matched_ref : &^ i32 #borrow matched;
@@ -181,6 +217,16 @@
     #let start : i32 <- ref_get i32 index_ref;
     #let parsed_value : Json = Json::null;
     #letref #excl parsed_value_ref : &^ Json #borrow parsed_value;
+    #if i32_lt start len {
+        #let first_byte : u8 <- string_get_u8 source start;
+        #if u8_eq first_byte '"' {
+            #let string_end : i32 <- json_find_string_end source len start;
+            #if i32_lt string_end len {
+                #let string_value : JsonString <- json_string_from_range source (i32_add start 1i32) string_end;
+                ref_set Json parsed_value_ref (Json::string string_value);
+            };
+        };
+    };
     #let is_null : bool <- json_match_null source len start;
     #if is_null {
         ref_set Json parsed_value_ref Json::null;
