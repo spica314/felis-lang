@@ -294,6 +294,8 @@
             ref_set i32 index_ref (i32_add start 1i32);
             #let items : JsonArray = JsonArray::array_empty;
             #letref #excl items_ref : &^ JsonArray #borrow items;
+            #let after_comma : i32 = 0i32;
+            #letref #excl after_comma_ref : &^ i32 #borrow after_comma;
             #loop {
                 json_skip_spaces source len index_ref;
                 #let current_index : i32 <- ref_get i32 index_ref;
@@ -302,10 +304,13 @@
                 };
                 #let current_byte : u8 <- string_get_u8 source current_index;
                 #if u8_eq current_byte ']' {
-                    #let parsed_items : JsonArray <- ref_get JsonArray items_ref;
-                    ref_set Json value_ref (Json::array parsed_items);
-                    ref_set i32 index_ref (i32_add current_index 1i32);
-                    ref_set i32 success_ref 1i32;
+                    #let after_comma_value : i32 <- ref_get i32 after_comma_ref;
+                    #if i32_eq after_comma_value 0i32 {
+                        #let parsed_items : JsonArray <- ref_get JsonArray items_ref;
+                        ref_set Json value_ref (Json::array parsed_items);
+                        ref_set i32 index_ref (i32_add current_index 1i32);
+                        ref_set i32 success_ref 1i32;
+                    };
                     #break;
                 };
                 #let element : Json = Json::null;
@@ -320,6 +325,7 @@
                 #let parsed_element : Json <- ref_get Json element_ref;
                 #let current_items : JsonArray <- ref_get JsonArray items_ref;
                 ref_set JsonArray items_ref (JsonArray::array_cons parsed_element current_items);
+                ref_set i32 after_comma_ref 0i32;
                 json_skip_spaces source len index_ref;
                 #let separator_index : i32 <- ref_get i32 index_ref;
                 #if i32_gte separator_index len {
@@ -328,6 +334,7 @@
                 #let separator : u8 <- string_get_u8 source separator_index;
                 #if u8_eq separator ',' {
                     ref_set i32 index_ref (i32_add separator_index 1i32);
+                    ref_set i32 after_comma_ref 1i32;
                 } #else {
                     #if u8_eq separator ']' {
                         #let parsed_items : JsonArray <- ref_get JsonArray items_ref;
