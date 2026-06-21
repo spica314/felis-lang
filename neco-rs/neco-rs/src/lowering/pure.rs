@@ -7,8 +7,8 @@ use neco_rs_parser::{
 
 use crate::effect::{Value, bind_pattern, resolve_value};
 use crate::ir::{
-    ConditionExpr, ConstructorValue, F32Expr, I32Expr, I64Expr, LoweredProgram, Operation,
-    StructFieldValue, StructValue, U8Expr, intern_data,
+    ComparisonKind, ConditionExpr, ConstructorValue, F32Expr, I32Expr, I64Expr, LoweredProgram,
+    Operation, StructFieldValue, StructValue, U8Expr, intern_data,
 };
 use crate::{Error, Result};
 
@@ -503,6 +503,7 @@ fn lower_path_value(
             type_name: signature.type_name,
             constructor_name: signature.constructor_name,
             heap_slot: Some(heap_slot),
+            runtime_tag: false,
             fields: Vec::new(),
         }));
     }
@@ -511,6 +512,7 @@ fn lower_path_value(
         type_name: signature.type_name,
         constructor_name: signature.constructor_name,
         heap_slot: None,
+        runtime_tag: false,
         fields: Vec::new(),
     }))
 }
@@ -716,6 +718,12 @@ fn lower_match_value(
     program: &mut LoweredProgram,
 ) -> Result<Value> {
     let scrutinee = lower_pure_value(match_expr.scrutinee.as_ref(), state, program)?;
+    if let Value::Constructor(constructor) = &scrutinee
+        && constructor.runtime_tag
+        && let Some(heap_slot) = constructor.heap_slot
+    {
+        return lower_dynamic_rc_match_value(match_expr, constructor, heap_slot, state, program);
+    }
     for arm in &match_expr.arms {
         if let Some(bindings) =
             pattern_match_bindings(&arm.pattern, &scrutinee, &state.constructors)?
@@ -729,6 +737,143 @@ fn lower_match_value(
     Err(Error::Unsupported(
         "`#match` did not match any constructor arm".to_string(),
     ))
+}
+
+fn lower_dynamic_rc_match_value(
+    match_expr: &MatchExpression,
+    constructor: &ConstructorValue,
+    heap_slot: usize,
+    state: &LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<Value> {
+    let mut arms = Vec::new();
+    for arm in &match_expr.arms {
+        let (tag, bindings) =
+            dynamic_rc_constructor_pattern_bindings(&arm.pattern, constructor, heap_slot, state)?;
+        let mut scoped_state = state.child_scope();
+        scoped_state.environment.extend(bindings);
+        let value = lower_pure_value(arm.result.as_ref(), &scoped_state, program)?;
+        let Value::I32(expr) = value else {
+            return Err(Error::Unsupported(
+                "runtime `type(rc)` matches currently support only `i32` result expressions"
+                    .to_string(),
+            ));
+        };
+        arms.push((tag, expr));
+    }
+
+    let Some((_, mut expr)) = arms.pop() else {
+        return Err(Error::Unsupported(
+            "`#match` must contain at least one constructor arm".to_string(),
+        ));
+    };
+    while let Some((tag, then_expr)) = arms.pop() {
+        expr = I32Expr::Select {
+            condition: Box::new(ConditionExpr::I32 {
+                kind: ComparisonKind::Eq,
+                lhs: I32Expr::HeapLoadI32 {
+                    heap_slot,
+                    byte_offset: 0,
+                },
+                rhs: I32Expr::Literal(tag),
+            }),
+            then_expr: Box::new(then_expr),
+            else_expr: Box::new(expr),
+        };
+    }
+    Ok(Value::I32(expr))
+}
+
+fn dynamic_rc_constructor_pattern_bindings(
+    pattern: &Pattern,
+    constructor: &ConstructorValue,
+    heap_slot: usize,
+    state: &LoweringState,
+) -> Result<(i32, HashMap<String, Value>)> {
+    let Pattern::Constructor { path, subpatterns } = pattern else {
+        return Err(Error::Unsupported(
+            "runtime `type(rc)` matches require constructor arms".to_string(),
+        ));
+    };
+    let expected = lower_constructor_value(path, &state.constructors)?;
+    if !expected.is_rc || expected.type_name != constructor.type_name {
+        return Err(Error::Unsupported(format!(
+            "runtime match expected a `{}` constructor arm",
+            constructor.type_name
+        )));
+    }
+
+    let mut bindings = HashMap::new();
+    let mut byte_offset = 8;
+    let mut subpattern_iter = subpatterns.iter();
+    for parameter in &expected.parameters {
+        let Some(subpattern) = subpattern_iter.next() else {
+            return Err(Error::Unsupported(format!(
+                "constructor `{}::{}` pattern has too few fields",
+                expected.type_name, expected.constructor_name
+            )));
+        };
+        if is_type_universe_annotation(&parameter.ty) {
+            if !matches!(subpattern, Pattern::Wildcard) {
+                return Err(Error::Unsupported(
+                    "constructor type parameters in match patterns currently support only `_`"
+                        .to_string(),
+                ));
+            }
+            continue;
+        }
+        let value = dynamic_rc_field_value(&parameter.ty, heap_slot, byte_offset)?;
+        byte_offset += dynamic_rc_field_size(&parameter.ty)?;
+        match subpattern {
+            Pattern::Wildcard => {}
+            Pattern::Bind(name) => {
+                bindings.insert(name.clone(), value);
+            }
+            Pattern::Constructor { .. } => {
+                return Err(Error::Unsupported(
+                    "nested runtime constructor patterns are not supported".to_string(),
+                ));
+            }
+        }
+    }
+    if subpattern_iter.next().is_some() {
+        return Err(Error::Unsupported(format!(
+            "constructor `{}::{}` pattern has too many fields",
+            expected.type_name, expected.constructor_name
+        )));
+    }
+    Ok((expected.tag, bindings))
+}
+
+fn dynamic_rc_field_value(ty: &Term, heap_slot: usize, byte_offset: i32) -> Result<Value> {
+    if is_simple_term_path(ty, "i32") {
+        return Ok(Value::I32(I32Expr::HeapLoadI32 {
+            heap_slot,
+            byte_offset,
+        }));
+    }
+    Err(Error::Unsupported(
+        "runtime `type(rc)` matches currently support only `i32` payload fields".to_string(),
+    ))
+}
+
+fn dynamic_rc_field_size(ty: &Term) -> Result<i32> {
+    if is_simple_term_path(ty, "i32") {
+        return Ok(4);
+    }
+    Err(Error::Unsupported(
+        "runtime `type(rc)` matches currently support only `i32` payload fields".to_string(),
+    ))
+}
+
+fn is_simple_term_path(term: &Term, expected: &str) -> bool {
+    matches!(
+        term,
+        Term::Path(path)
+            if path.token_keyword_package.is_none()
+                && path.segments.len() == 1
+                && path.segments[0].lexeme == expected
+    )
 }
 
 pub(super) fn pattern_match_bindings(
@@ -962,6 +1107,7 @@ fn lower_constructor_application(
             type_name: signature.type_name,
             constructor_name: signature.constructor_name,
             heap_slot: Some(heap_slot),
+            runtime_tag: false,
             fields,
         })));
     }
@@ -970,6 +1116,7 @@ fn lower_constructor_application(
         type_name: signature.type_name,
         constructor_name: signature.constructor_name,
         heap_slot: None,
+        runtime_tag: false,
         fields,
     })))
 }

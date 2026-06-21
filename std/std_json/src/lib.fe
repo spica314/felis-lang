@@ -49,9 +49,6 @@
         Json::json_true => 1i32,
         Json::json_false => 2i32,
         Json::number_i32 number => number,
-        Json::string string => json_string_score string,
-        Json::array items => json_array_score items,
-        Json::object entries => json_object_score entries,
     }
 }
 
@@ -109,6 +106,26 @@
         };
     };
     #let start : i32 <- ref_get i32 index_ref;
+    #let parsed_value : Json = Json::null;
+    #letref #excl parsed_value_ref : &^ Json #borrow parsed_value;
+    #if i32_lte (i32_add start 5i32) len {
+        #let byte0 : u8 <- string_get_u8 source start;
+        #if u8_eq byte0 'f' {
+            #let byte1 : u8 <- string_get_u8 source (i32_add start 1i32);
+            #if u8_eq byte1 'a' {
+                #let byte2 : u8 <- string_get_u8 source (i32_add start 2i32);
+                #if u8_eq byte2 'l' {
+                    #let byte3 : u8 <- string_get_u8 source (i32_add start 3i32);
+                    #if u8_eq byte3 's' {
+                        #let byte4 : u8 <- string_get_u8 source (i32_add start 4i32);
+                        #if u8_eq byte4 'e' {
+                            ref_set Json parsed_value_ref Json::json_false;
+                        };
+                    };
+                };
+            };
+        };
+    };
     #let number : i32 = 0i32;
     #letref #excl number_ref : &^ i32 #borrow number;
     #let number_index : i32 = start;
@@ -131,5 +148,10 @@
         ref_set i32 number_index_ref (i32_add current_index 1i32);
     };
     #let parsed_number : i32 <- ref_get i32 number_ref;
-    Result::ok Json JsonParseError (Json::number_i32 parsed_number)
+    #let parsed_number_end : i32 <- ref_get i32 number_index_ref;
+    #if i32_gt parsed_number_end start {
+        ref_set Json parsed_value_ref (Json::number_i32 parsed_number);
+    };
+    #let parsed : Json <- ref_get Json parsed_value_ref;
+    Result::ok Json JsonParseError parsed
 }

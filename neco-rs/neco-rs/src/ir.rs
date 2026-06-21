@@ -43,6 +43,15 @@ pub(crate) enum KernelArgumentRef {
 pub(crate) enum I32Expr {
     Literal(i32),
     Local(usize),
+    HeapLoadI32 {
+        heap_slot: usize,
+        byte_offset: i32,
+    },
+    Select {
+        condition: Box<ConditionExpr>,
+        then_expr: Box<I32Expr>,
+        else_expr: Box<I32Expr>,
+    },
     FromU8(Box<U8Expr>),
     FromI64(Box<I64Expr>),
     FromF32(Box<F32Expr>),
@@ -250,6 +259,10 @@ pub(crate) enum Operation {
         byte_offset: i32,
         source_heap_slot: usize,
     },
+    HeapSlotReplace {
+        dest_heap_slot: usize,
+        source_heap_slot: usize,
+    },
     Open {
         path: OpenPath,
         flags: I32Expr,
@@ -376,6 +389,7 @@ pub(crate) struct ConstructorValue {
     pub(crate) type_name: String,
     pub(crate) constructor_name: String,
     pub(crate) heap_slot: Option<usize>,
+    pub(crate) runtime_tag: bool,
     pub(crate) fields: Vec<crate::effect::Value>,
 }
 

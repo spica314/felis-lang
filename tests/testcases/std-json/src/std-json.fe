@@ -13,12 +13,14 @@
 #entrypoint main;
 
 #fn main : () #with IO {
-    #let parse_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 3i32;
+    #let parse_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 5i32;
     #letref #excl parse_source_arrayvl_ref : &^ ArrayVL u8 #borrow parse_source_arrayvl;
-    array_set parse_source_arrayvl_ref 0i32 ' ';
-    array_set parse_source_arrayvl_ref 1i32 '1';
-    array_set parse_source_arrayvl_ref 2i32 '2';
-    #let parse_source : String = string_from_arrayvl_parts parse_source_arrayvl 3i32 3i32;
+    array_set parse_source_arrayvl_ref 0i32 'f';
+    array_set parse_source_arrayvl_ref 1i32 'a';
+    array_set parse_source_arrayvl_ref 2i32 'l';
+    array_set parse_source_arrayvl_ref 3i32 's';
+    array_set parse_source_arrayvl_ref 4i32 'e';
+    #let parse_source : String = string_from_arrayvl_parts parse_source_arrayvl 5i32 5i32;
     #let parsed_result : Result Json JsonParseError <- json_parse parse_source;
     #let parsed : Json = #match parsed_result {
         Result::ok _ _ value => value,

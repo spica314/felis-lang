@@ -509,7 +509,7 @@ fn lowers_type_rc_match_reference_fixture_to_runtime_exit() {
     assert!(program.arrays.is_empty());
     assert!(program.data.is_empty());
     assert_eq!(program.i32_slots, 0);
-    assert_eq!(program.heap_slots, 3);
+    assert_eq!(program.heap_slots, 4);
 }
 
 #[test]

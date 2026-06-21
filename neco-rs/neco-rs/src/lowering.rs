@@ -716,6 +716,20 @@ fn lower_letref_borrow_statement(
                 .push(Operation::StoreBool { slot, condition });
             Value::BoolReference { slot, exclusive }
         }
+        Value::Constructor(mut constructor) if constructor.heap_slot.is_some() => {
+            let source_heap_slot = constructor.heap_slot.expect("checked above");
+            let reference_heap_slot = allocate_heap_slot(program);
+            program.operations.push(Operation::HeapSlotReplace {
+                dest_heap_slot: reference_heap_slot,
+                source_heap_slot,
+            });
+            constructor.heap_slot = Some(reference_heap_slot);
+            constructor.runtime_tag = true;
+            Value::Reference {
+                value: Box::new(Value::Constructor(constructor)),
+                exclusive,
+            }
+        }
         other => Value::Reference {
             value: Box::new(other),
             exclusive,
@@ -971,6 +985,26 @@ fn lower_reference_set_builtin_statement(
             }
         };
         validate_value_against_type(&lowered_value, &ty, program)?;
+        if let (Value::Constructor(current_constructor), Value::Constructor(mut new_constructor)) =
+            (referent.as_ref(), lowered_value.clone())
+            && let (Some(dest_heap_slot), Some(source_heap_slot)) =
+                (current_constructor.heap_slot, new_constructor.heap_slot)
+        {
+            program.operations.push(Operation::HeapSlotReplace {
+                dest_heap_slot,
+                source_heap_slot,
+            });
+            new_constructor.heap_slot = Some(dest_heap_slot);
+            new_constructor.runtime_tag = true;
+            state.environment.insert(
+                name.to_string(),
+                Value::Reference {
+                    value: Box::new(Value::Constructor(new_constructor)),
+                    exclusive: true,
+                },
+            );
+            return Ok(true);
+        }
         state.environment.insert(
             name.to_string(),
             Value::Reference {
