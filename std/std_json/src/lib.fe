@@ -2,7 +2,9 @@
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_from_u8;
 #use std_core::primitive::i32::i32_gte;
+#use std_core::primitive::i32::i32_gt;
 #use std_core::primitive::i32::i32_lt;
+#use std_core::primitive::i32::i32_lte;
 #use std_core::primitive::i32::i32_mul;
 #use std_core::primitive::i32::i32_sub;
 #use std_core::primitive::reference::ref_get;
@@ -108,6 +110,36 @@
     #let start : i32 <- ref_get i32 index_ref;
     #let parsed_value : Json = Json::null;
     #letref #excl parsed_value_ref : &^ Json #borrow parsed_value;
+    #if i32_lte (i32_add start 4i32) len {
+        #let byte0 : u8 <- string_get_u8 source start;
+        #if u8_eq byte0 'n' {
+            #let byte1 : u8 <- string_get_u8 source (i32_add start 1i32);
+            #if u8_eq byte1 'u' {
+                #let byte2 : u8 <- string_get_u8 source (i32_add start 2i32);
+                #if u8_eq byte2 'l' {
+                    #let byte3 : u8 <- string_get_u8 source (i32_add start 3i32);
+                    #if u8_eq byte3 'l' {
+                        ref_set Json parsed_value_ref Json::null;
+                    };
+                };
+            };
+        };
+    };
+    #if i32_lte (i32_add start 4i32) len {
+        #let byte0 : u8 <- string_get_u8 source start;
+        #if u8_eq byte0 't' {
+            #let byte1 : u8 <- string_get_u8 source (i32_add start 1i32);
+            #if u8_eq byte1 'r' {
+                #let byte2 : u8 <- string_get_u8 source (i32_add start 2i32);
+                #if u8_eq byte2 'u' {
+                    #let byte3 : u8 <- string_get_u8 source (i32_add start 3i32);
+                    #if u8_eq byte3 'e' {
+                        ref_set Json parsed_value_ref Json::json_true;
+                    };
+                };
+            };
+        };
+    };
     #if i32_lte (i32_add start 5i32) len {
         #let byte0 : u8 <- string_get_u8 source start;
         #if u8_eq byte0 'f' {

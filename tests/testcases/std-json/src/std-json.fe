@@ -2,6 +2,7 @@
 #use std_core::primitive::array::ArrayVL;
 #use std_core::primitive::array::array_set;
 #use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
 #use std_core::result::Result;
 #use std_core::string::String;
 #use std_core::string::string_from_arrayvl_parts;
@@ -12,21 +13,56 @@
 
 #entrypoint main;
 
-#fn main : () #with IO {
-    #let parse_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 5i32;
-    #letref #excl parse_source_arrayvl_ref : &^ ArrayVL u8 #borrow parse_source_arrayvl;
-    array_set parse_source_arrayvl_ref 0i32 'f';
-    array_set parse_source_arrayvl_ref 1i32 'a';
-    array_set parse_source_arrayvl_ref 2i32 'l';
-    array_set parse_source_arrayvl_ref 3i32 's';
-    array_set parse_source_arrayvl_ref 4i32 'e';
-    #let parse_source : String = string_from_arrayvl_parts parse_source_arrayvl 5i32 5i32;
-    #let parsed_result : Result Json JsonParseError <- json_parse parse_source;
+#fn parsed_result_score : (parsed_result : Result Json JsonParseError) -> i32 {
     #let parsed : Json = #match parsed_result {
         Result::ok _ _ value => value,
         Result::err _ _ _ => Json::null,
     };
-    #let parsed_code : i32 = json_score parsed;
-    #let _ : () <- IO::sys_exit parsed_code;
+    json_score parsed
+}
+
+#fn main : () #with IO {
+    #let parse_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 3i32;
+    #letref #excl parse_source_arrayvl_ref : &^ ArrayVL u8 #borrow parse_source_arrayvl;
+    array_set parse_source_arrayvl_ref 0i32 ' ';
+    array_set parse_source_arrayvl_ref 1i32 '1';
+    array_set parse_source_arrayvl_ref 2i32 '2';
+    #let parse_source : String = string_from_arrayvl_parts parse_source_arrayvl 3i32 3i32;
+    #let parsed_result : Result Json JsonParseError <- json_parse parse_source;
+    #let parsed_code : i32 = parsed_result_score parsed_result;
+
+    #let null_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 4i32;
+    #letref #excl null_source_arrayvl_ref : &^ ArrayVL u8 #borrow null_source_arrayvl;
+    array_set null_source_arrayvl_ref 0i32 'n';
+    array_set null_source_arrayvl_ref 1i32 'u';
+    array_set null_source_arrayvl_ref 2i32 'l';
+    array_set null_source_arrayvl_ref 3i32 'l';
+    #let null_source : String = string_from_arrayvl_parts null_source_arrayvl 4i32 4i32;
+    #let null_result : Result Json JsonParseError <- json_parse null_source;
+    #let null_code : i32 = parsed_result_score null_result;
+
+    #let true_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 4i32;
+    #letref #excl true_source_arrayvl_ref : &^ ArrayVL u8 #borrow true_source_arrayvl;
+    array_set true_source_arrayvl_ref 0i32 't';
+    array_set true_source_arrayvl_ref 1i32 'r';
+    array_set true_source_arrayvl_ref 2i32 'u';
+    array_set true_source_arrayvl_ref 3i32 'e';
+    #let true_source : String = string_from_arrayvl_parts true_source_arrayvl 4i32 4i32;
+    #let true_result : Result Json JsonParseError <- json_parse true_source;
+    #let true_code : i32 = parsed_result_score true_result;
+
+    #let false_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 5i32;
+    #letref #excl false_source_arrayvl_ref : &^ ArrayVL u8 #borrow false_source_arrayvl;
+    array_set false_source_arrayvl_ref 0i32 'f';
+    array_set false_source_arrayvl_ref 1i32 'a';
+    array_set false_source_arrayvl_ref 2i32 'l';
+    array_set false_source_arrayvl_ref 3i32 's';
+    array_set false_source_arrayvl_ref 4i32 'e';
+    #let false_source : String = string_from_arrayvl_parts false_source_arrayvl 5i32 5i32;
+    #let false_result : Result Json JsonParseError <- json_parse false_source;
+    #let false_code : i32 = parsed_result_score false_result;
+
+    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add true_code false_code);
+    #let _ : () <- IO::sys_exit code;
     ()
 }
