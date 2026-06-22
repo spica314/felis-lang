@@ -310,6 +310,40 @@ fn rejects_effectful_operations_in_function_arguments() {
 }
 
 #[test]
+fn rejects_recursive_statement_function_calls() {
+    let source = r#"
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#entrypoint main;
+
+#fn first : (value : i32) -> () #with IO {
+    second value;
+    ()
+}
+
+#fn second : (value : i32) -> () #with IO {
+    first value;
+    ()
+}
+
+#fn main : () #with IO {
+    #let value : i32 = 0i32;
+    first value;
+    ()
+}
+"#;
+    let package = parse_inline_binary_package("recursive-statement-function-calls", source);
+    let error =
+        lower_package_to_program(&package).expect_err("lowering must reject recursive calls");
+    assert!(
+        error.to_string().contains(
+            "recursive statement function calls are not supported: first -> second -> first"
+        ),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn rejects_ref_get_bound_with_equals() {
     let source = r#"
 #use std_core::io::IO;

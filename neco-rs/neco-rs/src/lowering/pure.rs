@@ -1702,6 +1702,7 @@ fn lower_io_function_call_value(
 
     let mut scoped_state = state.child_scope();
     scoped_state.io_effect_allowed = true;
+    push_statement_function_call(&mut scoped_state, name)?;
     let mut type_bindings = HashMap::new();
     for (parameter, argument) in function.parameters.iter().zip(normalized_arguments.iter()) {
         let parameter_ty = substitute_type_bindings(&parameter.ty, &type_bindings);
@@ -1901,6 +1902,7 @@ pub(super) fn lower_function_call_statement(
     let (mut scoped_state, _type_bindings) =
         bind_function_arguments(&function.parameters, &normalized_arguments, state, program)?;
     scoped_state.io_effect_allowed = statement_function_has_io_effect(&function);
+    push_statement_function_call(&mut scoped_state, name)?;
 
     let terminated = lower_function_body_statements(&function.body, &mut scoped_state, program)?;
     propagate_reference_arguments(
@@ -1931,6 +1933,7 @@ pub(super) fn lower_function_call_value(
     let (mut scoped_state, type_bindings) =
         bind_function_arguments(&function.parameters, &normalized_arguments, state, program)?;
     scoped_state.io_effect_allowed = statement_function_has_io_effect(&function);
+    push_statement_function_call(&mut scoped_state, name)?;
 
     let terminated = lower_function_body_statements(&function.body, &mut scoped_state, program)?;
     if terminated {
@@ -1978,6 +1981,23 @@ fn ensure_function_effect_allowed(
 
 fn statement_function_has_io_effect(function: &StatementFunction) -> bool {
     function.effect.as_deref() == Some("IO")
+}
+
+fn push_statement_function_call(state: &mut LoweringState, name: &str) -> Result<()> {
+    if let Some(start) = state
+        .statement_function_call_stack
+        .iter()
+        .position(|active| active == name)
+    {
+        let mut cycle = state.statement_function_call_stack[start..].to_vec();
+        cycle.push(name.to_string());
+        return Err(Error::Unsupported(format!(
+            "recursive statement function calls are not supported: {}",
+            cycle.join(" -> ")
+        )));
+    }
+    state.statement_function_call_stack.push(name.to_string());
+    Ok(())
 }
 
 fn resolve_function_call<'a>(
