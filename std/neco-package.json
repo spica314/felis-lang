@@ -3,6 +3,7 @@
         "members": [
             "std_core",
             "std_json",
+            "std_safetensors",
             "std_math"
         ]
     }

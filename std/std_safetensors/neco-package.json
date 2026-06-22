@@ -1,0 +1,9 @@
+{
+    "name": "std_safetensors",
+    "dependencies": {
+        "std_core": {
+            "workspace": true
+        }
+    },
+    "felis-lib-entrypoint": "src/lib.fe"
+}

@@ -1,18 +1,19 @@
-#use std_core::io::IO;
 #use std_core::io::FileDescriptor;
+#use std_core::io::IO;
 #use std_core::path::PathBuf;
 #use std_core::primitive::array::ArrayVL;
 #use std_core::primitive::array::array_get;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
-#use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::i32::i32_from_u8;
 #use std_core::primitive::i32::i32_mul;
-#use std_core::primitive::u8::u8;
+#use std_core::result::Result;
 
-#entrypoint main;
+#pub #type SafetensorsReadError : Type[0] {
+    unknown_error : SafetensorsReadError,
+}
 
-#fn read_safetensors_header_len_from_prefix : (byte0 : u8) -> (byte1 : u8) -> (byte2 : u8) -> (byte3 : u8) -> i32 {
+#pub #fn safetensors_header_len_from_bytes : (byte0 : u8) -> (byte1 : u8) -> (byte2 : u8) -> (byte3 : u8) -> i32 {
     #let part0 : i32 = i32_from_u8 byte0;
     #let part1 : i32 = i32_mul (i32_from_u8 byte1) 256i32;
     #let part2 : i32 = i32_mul (i32_from_u8 byte2) 65536i32;
@@ -20,10 +21,7 @@
     i32_add (i32_add part0 part1) (i32_add part2 part3)
 }
 
-#fn main : () #with IO {
-    #let path : PathBuf <- IO::pathbuf_new 64i32;
-    #letref #excl path_ref : &^ PathBuf #borrow path;
-    #let _ : () <- IO::pathbuf_push path_ref "projects/gpt-2/.local/model.safetensors";
+#pub #fn safetensors_read_header_len : (path_ref : &^ PathBuf) -> Result i32 SafetensorsReadError #with IO {
     #let fd : FileDescriptor <- IO::sys_open path_ref 0i32 0i32;
     #let prefix : ArrayVL u8 <- IO::arrayvl_new u8 8i32;
     #letref #excl prefix_ref : &^ ArrayVL u8 #borrow prefix;
@@ -33,11 +31,6 @@
     #let byte1 : u8 = array_get prefix_ref 1i32;
     #let byte2 : u8 = array_get prefix_ref 2i32;
     #let byte3 : u8 = array_get prefix_ref 3i32;
-    #let header_len : i32 = read_safetensors_header_len_from_prefix byte0 byte1 byte2 byte3;
-    #if i32_eq header_len 14283i32 {
-        #let _ : () <- IO::sys_exit 0i32;
-    } #else {
-        #let _ : () <- IO::sys_exit 1i32;
-    };
-    ()
+    #let header_len : i32 = safetensors_header_len_from_bytes byte0 byte1 byte2 byte3;
+    Result::ok i32 SafetensorsReadError header_len
 }
