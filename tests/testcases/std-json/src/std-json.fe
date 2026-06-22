@@ -3,6 +3,7 @@
 #use std_core::primitive::array::array_set;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::reference::ref_get;
 #use std_core::primitive::reference::ref_set;
 #use std_core::result::Result;
@@ -12,6 +13,7 @@
 #use std_json::JsonArray;
 #use std_json::JsonParseError;
 #use std_json::JsonString;
+#use std_json::json_object_score;
 #use std_json::json_parse;
 #use std_json::json_score;
 
@@ -92,6 +94,17 @@
     #match tail {
         JsonArray::array_empty => 0i32,
         JsonArray::array_cons value _ => json_scalar_score value,
+    }
+}
+
+#fn parsed_result_object_score : (parsed_result : Result Json JsonParseError) -> i32 {
+    #let parsed : Json = #match parsed_result {
+        Result::ok _ _ value => value,
+        Result::err _ _ _ => Json::null,
+    };
+    #match parsed {
+        Json::object entries => json_object_score entries,
+        Json::null => 0i32,
     }
 }
 
@@ -181,6 +194,24 @@
     #let pair_array_head_code : i32 = parsed_result_array_head_score pair_array_result;
     #let pair_array_tail_code : i32 = parsed_result_array_tail_marker pair_array_result;
     #let pair_array_tail_head_code : i32 = parsed_result_array_tail_head_score pair_array_result;
+
+    #let object_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 7i32;
+    #letref #excl object_source_arrayvl_ref : &^ ArrayVL u8 #borrow object_source_arrayvl;
+    array_set object_source_arrayvl_ref 0i32 '{';
+    array_set object_source_arrayvl_ref 1i32 '"';
+    array_set object_source_arrayvl_ref 2i32 'a';
+    array_set object_source_arrayvl_ref 3i32 '"';
+    array_set object_source_arrayvl_ref 4i32 ':';
+    array_set object_source_arrayvl_ref 5i32 '2';
+    array_set object_source_arrayvl_ref 6i32 '}';
+    #let object_source : String = string_from_arrayvl_parts object_source_arrayvl 7i32 7i32;
+    #let object_result : Result Json JsonParseError <- json_parse object_source;
+    #let object_code : i32 = parsed_result_object_score object_result;
+    #if i32_eq object_code 99i32 {
+        #let object_ok : i32 = 0i32;
+    } #else {
+        #let _ : () <- IO::sys_exit 30i32;
+    };
 
     #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add (i32_add string_code string_ref_code) (i32_add (i32_add array_code array_head_code) (i32_add array_tail_code (i32_add (i32_add empty_array_code empty_array_head_code) (i32_add empty_array_tail_code (i32_add (i32_add pair_array_code pair_array_head_code) (i32_add pair_array_tail_code pair_array_tail_head_code))))))));
     #let _ : () <- IO::sys_exit code;

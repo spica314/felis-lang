@@ -63,6 +63,7 @@
             JsonString::string_cons byte _ => byte,
         },
         Json::array _ => 3i32,
+        Json::object _ => 4i32,
     }
 }
 
@@ -312,6 +313,104 @@
     ()
 }
 
+#fn json_parse_object_at : (source : String) -> (len : i32) -> (null_prefix : String) -> (true_prefix : String) -> (false_prefix : String) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
+    ref_set i32 success_ref 0i32;
+    json_skip_spaces source len index_ref;
+    #let start : i32 <- ref_get i32 index_ref;
+    #if i32_lt start len {
+        #let first_byte : u8 <- string_get_u8 source start;
+        #if u8_eq first_byte '{' {
+            ref_set i32 index_ref (i32_add start 1i32);
+            #let entries : JsonObject = JsonObject::object_empty;
+            #letref #excl entries_ref : &^ JsonObject #borrow entries;
+            #let after_comma : i32 = 0i32;
+            #letref #excl after_comma_ref : &^ i32 #borrow after_comma;
+            #loop {
+                json_skip_spaces source len index_ref;
+                #let current_index : i32 <- ref_get i32 index_ref;
+                #if i32_gte current_index len {
+                    #break;
+                };
+                #let current_byte : u8 <- string_get_u8 source current_index;
+                #if u8_eq current_byte '}' {
+                    #let after_comma_value : i32 <- ref_get i32 after_comma_ref;
+                    #if i32_eq after_comma_value 0i32 {
+                        #let parsed_entries : JsonObject <- ref_get JsonObject entries_ref;
+                        ref_set Json value_ref (Json::object parsed_entries);
+                        ref_set i32 index_ref (i32_add current_index 1i32);
+                        ref_set i32 success_ref 1i32;
+                    };
+                    #break;
+                };
+                #if u8_eq current_byte '"' {
+                    #let string_end : i32 <- json_find_string_end source len current_index;
+                    #if i32_gte string_end len {
+                        #break;
+                    };
+                    #let key : JsonString <- json_string_from_range source (i32_add current_index 1i32) string_end;
+                    ref_set i32 index_ref (i32_add string_end 1i32);
+                    json_skip_spaces source len index_ref;
+                    #let colon_index : i32 <- ref_get i32 index_ref;
+                    #if i32_gte colon_index len {
+                        #break;
+                    };
+                    #let colon : u8 <- string_get_u8 source colon_index;
+                    #if u8_eq colon ':' {
+                        ref_set i32 index_ref (i32_add colon_index 1i32);
+                        #let entry_value : Json = Json::null;
+                        #letref #excl entry_value_ref : &^ Json #borrow entry_value;
+                        #let entry_success : i32 = 0i32;
+                        #letref #excl entry_success_ref : &^ i32 #borrow entry_success;
+                        json_skip_spaces source len index_ref;
+                        #let value_start : i32 <- ref_get i32 index_ref;
+                        #if i32_lt value_start len {
+                            #let value_first_byte : u8 <- string_get_u8 source value_start;
+                            #if u8_eq value_first_byte '[' {
+                                json_parse_array_at source len null_prefix true_prefix false_prefix index_ref entry_value_ref entry_success_ref;
+                            } #else {
+                                json_parse_scalar_at source len null_prefix true_prefix false_prefix index_ref entry_value_ref entry_success_ref;
+                            };
+                        };
+                        #let entry_success_value : i32 <- ref_get i32 entry_success_ref;
+                        #if i32_eq entry_success_value 0i32 {
+                            #break;
+                        };
+                        #let parsed_value : Json <- ref_get Json entry_value_ref;
+                        #let current_entries : JsonObject <- ref_get JsonObject entries_ref;
+                        ref_set JsonObject entries_ref (JsonObject::object_cons key parsed_value current_entries);
+                        ref_set i32 after_comma_ref 0i32;
+                        json_skip_spaces source len index_ref;
+                        #let separator_index : i32 <- ref_get i32 index_ref;
+                        #if i32_gte separator_index len {
+                            #break;
+                        };
+                        #let separator : u8 <- string_get_u8 source separator_index;
+                        #if u8_eq separator ',' {
+                            ref_set i32 index_ref (i32_add separator_index 1i32);
+                            ref_set i32 after_comma_ref 1i32;
+                        } #else {
+                            #if u8_eq separator '}' {
+                                #let parsed_entries : JsonObject <- ref_get JsonObject entries_ref;
+                                ref_set Json value_ref (Json::object parsed_entries);
+                                ref_set i32 index_ref (i32_add separator_index 1i32);
+                                ref_set i32 success_ref 1i32;
+                                #break;
+                            } #else {
+                                #break;
+                            };
+                        };
+                    } #else {
+                        #break;
+                    };
+                } #else {
+                    #break;
+                };
+            };
+        };
+    };
+    ()
+}
+
 #fn json_parse_value_at : (source : String) -> (len : i32) -> (null_prefix : String) -> (true_prefix : String) -> (false_prefix : String) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
     ref_set i32 success_ref 0i32;
     json_skip_spaces source len index_ref;
@@ -321,7 +420,11 @@
         #if u8_eq first_byte '[' {
             json_parse_array_at source len null_prefix true_prefix false_prefix index_ref value_ref success_ref;
         } #else {
-            json_parse_scalar_at source len null_prefix true_prefix false_prefix index_ref value_ref success_ref;
+            #if u8_eq first_byte '{' {
+                json_parse_object_at source len null_prefix true_prefix false_prefix index_ref value_ref success_ref;
+            } #else {
+                json_parse_scalar_at source len null_prefix true_prefix false_prefix index_ref value_ref success_ref;
+            };
         };
     };
     ()
