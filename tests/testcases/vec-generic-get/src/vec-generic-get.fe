@@ -1,31 +1,31 @@
 #use std_core::io::IO;
-#use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::Vec;
 #use std_core::primitive::array::ArrayVL;
-#use std_core::primitive::array::dyn_array_get;
-#use std_core::primitive::array::dyn_array_set;
+#use std_core::primitive::array::vec_get;
+#use std_core::primitive::array::vec_set;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_from_u8;
 
 #entrypoint main;
 
-#fn write_first : (t : Type[0]) -> (array : DynArray t) -> (value : t) -> () #with IO {
-    dyn_array_set t array 0i32 value;
+#fn write_first : (t : Type[0]) -> (array : Vec t) -> (value : t) -> () #with IO {
+    vec_set t array 0i32 value;
     ()
 }
 
 #fn main : () #with IO {
     #let bytes_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 4i32;
     #letref #excl bytes_arrayvl_ref : &^ ArrayVL u8 #borrow bytes_arrayvl;
-    #let bytes : DynArray u8 = DynArray::dyn_array u8 bytes_arrayvl 1i64;
+    #let bytes : Vec u8 = Vec::vec u8 bytes_arrayvl 1i64;
     write_first u8 bytes 1u8;
-    #let byte : u8 <- dyn_array_get u8 bytes 0i32;
+    #let byte : u8 <- vec_get u8 bytes 0i32;
 
     #let numbers_arrayvl : ArrayVL i32 <- IO::arrayvl_new i32 4i32;
     #letref #excl numbers_arrayvl_ref : &^ ArrayVL i32 #borrow numbers_arrayvl;
-    #let numbers : DynArray i32 = DynArray::dyn_array i32 numbers_arrayvl 1i64;
+    #let numbers : Vec i32 = Vec::vec i32 numbers_arrayvl 1i64;
     write_first i32 numbers 41i32;
-    #let number : i32 <- dyn_array_get i32 numbers 0i32;
+    #let number : i32 <- vec_get i32 numbers 0i32;
 
     #let value : i32 = i32_add (i32_from_u8 byte) number;
     #let _ : () <- IO::sys_exit value;

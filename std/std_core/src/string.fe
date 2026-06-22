@@ -1,12 +1,12 @@
 #use std_core::primitive::reference::ref_get;
 #use std_core::primitive::reference::ref_set;
-#use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::Vec;
 #use std_core::primitive::array::ArrayVL;
-#use std_core::primitive::array::dyn_array_capacity;
-#use std_core::primitive::array::dyn_array_get;
-#use std_core::primitive::array::dyn_array_len;
-#use std_core::primitive::array::dyn_array_arrayvl;
-#use std_core::primitive::array::dyn_array_set;
+#use std_core::primitive::array::vec_capacity;
+#use std_core::primitive::array::vec_get;
+#use std_core::primitive::array::vec_len;
+#use std_core::primitive::array::vec_arrayvl;
+#use std_core::primitive::array::vec_set;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_eq;
 #use std_core::primitive::i32::i32_gte;
@@ -15,24 +15,24 @@
 #use std_core::primitive::u8::u8_eq;
 
 #type String : Type[0] {
-    string : DynArray u8 -> String,
+    string : Vec u8 -> String,
 }
 
-#fn string_from_dyn_array : (array : DynArray u8) -> String {
+#fn string_from_vec : (array : Vec u8) -> String {
     String::string array
 }
 
 #fn string_from_arrayvl_parts : (arrayvl : ArrayVL u8) -> (capacity : i32) -> (len : i32) -> String {
-    #let array : DynArray u8 = DynArray::dyn_array u8 arrayvl (i64_from_i32 len);
+    #let array : Vec u8 = Vec::vec u8 arrayvl (i64_from_i32 len);
     String::string array
 }
 
 #fn string_with_len : (string : String) -> (len : i32) -> String {
-    #let array : DynArray u8 = string_as_dyn_array string;
-    String::string (DynArray::dyn_array u8 (dyn_array_arrayvl u8 array) (i64_from_i32 len))
+    #let array : Vec u8 = string_as_vec string;
+    String::string (Vec::vec u8 (vec_arrayvl u8 array) (i64_from_i32 len))
 }
 
-#fn string_copy_from_dyn_array_range_into : (source : DynArray u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () #with IO {
+#fn string_copy_from_vec_range_into : (source : Vec u8) -> (start : i32) -> (end : i32) -> (dest : String) -> () #with IO {
     #let len : i32 = i32_sub end start;
     #let index_ref : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
@@ -42,7 +42,7 @@
             #break;
         };
         #let source_index : i32 = i32_add start index;
-        #let byte : u8 <- dyn_array_get u8 source source_index;
+        #let byte : u8 <- vec_get u8 source source_index;
         string_set_u8 dest index byte;
         #let next_index : i32 = i32_add index 1i32;
         ref_set i32 index_ref next_index;
@@ -51,7 +51,7 @@
 }
 
 #fn string_copy_from_string_range_into : (source : String) -> (start : i32) -> (end : i32) -> (dest : String) -> () #with IO {
-    string_copy_from_dyn_array_range_into (string_as_dyn_array source) start end dest;
+    string_copy_from_vec_range_into (string_as_vec source) start end dest;
     ()
 }
 
@@ -60,30 +60,30 @@
     string_with_len dest (i32_sub end start)
 }
 
-#fn string_as_dyn_array : (string : String) -> DynArray u8 {
+#fn string_as_vec : (string : String) -> Vec u8 {
     #match string {
         String::string array => array,
     }
 }
 
 #fn string_as_arrayvl : (string : String) -> ArrayVL u8 {
-    dyn_array_arrayvl u8 (string_as_dyn_array string)
+    vec_arrayvl u8 (string_as_vec string)
 }
 
 #fn string_len : (string : String) -> i32 {
-    dyn_array_len u8 (string_as_dyn_array string)
+    vec_len u8 (string_as_vec string)
 }
 
 #fn string_capacity : (string : String) -> i32 #with IO {
-    dyn_array_capacity u8 (string_as_dyn_array string)
+    vec_capacity u8 (string_as_vec string)
 }
 
 #fn string_get_u8 : (string : String) -> (index : i32) -> u8 #with IO {
-    dyn_array_get u8 (string_as_dyn_array string) index
+    vec_get u8 (string_as_vec string) index
 }
 
 #fn string_set_u8 : (string : String) -> (index : i32) -> (byte : u8) -> () #with IO {
-    dyn_array_set u8 (string_as_dyn_array string) index byte;
+    vec_set u8 (string_as_vec string) index byte;
     ()
 }
 
@@ -122,7 +122,7 @@
     ()
 }
 
-#fn mark_string_span_eq : (string : String) -> (source : DynArray u8) -> (start : i32) -> (end : i32) -> (result_ref : &^ i32) -> () #with IO {
+#fn mark_string_span_eq : (string : String) -> (source : Vec u8) -> (start : i32) -> (end : i32) -> (result_ref : &^ i32) -> () #with IO {
     #let string_len_value : i32 = string_len string;
     #let span_len : i32 = i32_sub end start;
     ref_set i32 result_ref 0i32;
@@ -137,7 +137,7 @@
             };
             #let source_index : i32 = i32_add start index;
             #let string_byte : u8 <- string_get_u8 string index;
-            #let source_byte : u8 <- dyn_array_get u8 source source_index;
+            #let source_byte : u8 <- vec_get u8 source source_index;
             #if u8_eq string_byte source_byte {
                 #let next_index : i32 = i32_add index 1i32;
                 ref_set i32 index_ref next_index;
@@ -151,13 +151,13 @@
 }
 
 #pub #use String;
-#pub #use string_from_dyn_array;
+#pub #use string_from_vec;
 #pub #use string_from_arrayvl_parts;
 #pub #use string_with_len;
-#pub #use string_copy_from_dyn_array_range_into;
+#pub #use string_copy_from_vec_range_into;
 #pub #use string_copy_from_string_range_into;
 #pub #use string_copy_from_string_range;
-#pub #use string_as_dyn_array;
+#pub #use string_as_vec;
 #pub #use string_as_arrayvl;
 #pub #use string_len;
 #pub #use string_capacity;

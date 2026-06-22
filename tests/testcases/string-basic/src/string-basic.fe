@@ -1,7 +1,7 @@
 #use std_core::primitive::reference::ref_get;
 #use std_core::io::IO;
 #use std_core::primitive::array::ArrayVL;
-#use std_core::primitive::array::DynArray;
+#use std_core::primitive::array::Vec;
 #use std_core::primitive::array::array_set;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_eq;
@@ -9,8 +9,8 @@
 #use std_core::string::String;
 #use std_core::string::mark_string_eq;
 #use std_core::string::mark_string_span_eq;
-#use std_core::string::string_copy_from_dyn_array_range_into;
-#use std_core::string::string_from_dyn_array;
+#use std_core::string::string_copy_from_vec_range_into;
+#use std_core::string::string_from_vec;
 #use std_core::string::string_from_arrayvl_parts;
 #use std_core::string::string_get_u8;
 #use std_core::string::string_len;
@@ -25,8 +25,8 @@
     #letref #excl arrayvl_ref : &^ ArrayVL u8 #borrow arrayvl;
     array_set arrayvl_ref 0i32 40u8;
     array_set arrayvl_ref 1i32 2u8;
-    #let array : DynArray u8 = DynArray::dyn_array u8 arrayvl 2i64;
-    #let string : String = string_from_dyn_array array;
+    #let array : Vec u8 = Vec::vec u8 arrayvl 2i64;
+    #let string : String = string_from_vec array;
     #let first : u8 <- string_get_u8 string 0i32;
     #let len : i32 = string_len string;
     #let first_code : i32 = i32_from_u8 first;
@@ -41,11 +41,11 @@
     array_set source_arrayvl_ref 4i32 'f';
     array_set source_arrayvl_ref 5i32 'o';
     array_set source_arrayvl_ref 6i32 'o';
-    #let source : DynArray u8 = DynArray::dyn_array u8 source_arrayvl 7i64;
+    #let source : Vec u8 = Vec::vec u8 source_arrayvl 7i64;
     #let copied_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 3i32;
     #letref #excl copied_arrayvl_ref : &^ ArrayVL u8 #borrow copied_arrayvl;
     #let copied_dest : String = string_from_arrayvl_parts copied_arrayvl 3i32 0i32;
-    string_copy_from_dyn_array_range_into source 4i32 7i32 copied_dest;
+    string_copy_from_vec_range_into source 4i32 7i32 copied_dest;
     #let copied_name : String = string_with_len copied_dest 3i32;
 
     #let name_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 4i32;

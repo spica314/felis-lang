@@ -1,0 +1,4 @@
+{
+    "name": "vec-u8-helpers",
+    "felis-bin-entrypoints": ["src/vec-u8-helpers.fe"]
+}

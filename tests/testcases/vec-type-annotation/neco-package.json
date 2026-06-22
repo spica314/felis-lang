@@ -1,0 +1,4 @@
+{
+    "name": "vec-type-annotation",
+    "felis-bin-entrypoints": ["src/vec-type-annotation.fe"]
+}

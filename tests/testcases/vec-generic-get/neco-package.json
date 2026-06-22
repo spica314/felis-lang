@@ -1,0 +1,4 @@
+{
+    "name": "vec-generic-get",
+    "felis-bin-entrypoints": ["src/vec-generic-get.fe"]
+}

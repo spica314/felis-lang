@@ -15,49 +15,49 @@
 #bind_builtin "array_set" #as array_set;
 #bind_builtin "array_len" #as array_len;
 
-#type DynArray : (t : Type[0]) -> Type[0] {
-    dyn_array : (t : Type[0]) -> ArrayVL t -> i64 -> DynArray t,
+#type Vec : (t : Type[0]) -> Type[0] {
+    vec : (t : Type[0]) -> ArrayVL t -> i64 -> Vec t,
 }
 
-#fn dyn_array_arrayvl : (t : Type[0]) -> (array : DynArray t) -> ArrayVL t {
+#fn vec_arrayvl : (t : Type[0]) -> (array : Vec t) -> ArrayVL t {
     #match array {
-        DynArray::dyn_array _ arrayvl _ => arrayvl,
+        Vec::vec _ arrayvl _ => arrayvl,
     }
 }
 
-#fn dyn_array_capacity : (t : Type[0]) -> (array : DynArray t) -> i32 #with IO {
-    #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
+#fn vec_capacity : (t : Type[0]) -> (array : Vec t) -> i32 #with IO {
+    #let arrayvl : ArrayVL t = vec_arrayvl t array;
     array_len arrayvl
 }
 
-#fn dyn_array_len : (t : Type[0]) -> (array : DynArray t) -> i32 {
+#fn vec_len : (t : Type[0]) -> (array : Vec t) -> i32 {
     #match array {
-        DynArray::dyn_array _ _ len => i32_from_i64 len,
+        Vec::vec _ _ len => i32_from_i64 len,
     }
 }
 
-#fn dyn_array_get : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> t #with IO {
-    #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
+#fn vec_get : (t : Type[0]) -> (array : Vec t) -> (index : i32) -> t #with IO {
+    #let arrayvl : ArrayVL t = vec_arrayvl t array;
     array_get arrayvl (i64_from_i32 index)
 }
 
-#fn dyn_array_set : (t : Type[0]) -> (array : DynArray t) -> (index : i32) -> (value : t) -> () #with IO {
-    #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
+#fn vec_set : (t : Type[0]) -> (array : Vec t) -> (index : i32) -> (value : t) -> () #with IO {
+    #let arrayvl : ArrayVL t = vec_arrayvl t array;
     #letref #excl arrayvl_ref : &^ ArrayVL t #borrow arrayvl;
     array_set arrayvl_ref (i64_from_i32 index) value;
     ()
 }
 
-#fn dyn_array_copy_into : (t : Type[0]) -> (source : DynArray t) -> (dest_ref : &^ ArrayVL t) -> () #with IO {
+#fn vec_copy_into : (t : Type[0]) -> (source : Vec t) -> (dest_ref : &^ ArrayVL t) -> () #with IO {
     #let index_ref : i32 = 0i32;
-    #let len : i32 = dyn_array_len t source;
+    #let len : i32 = vec_len t source;
     #letref #excl index_ref : &^ i32 #borrow index_ref;
     #loop {
         #let index : i32 <- ref_get i32 index_ref;
         #if i32_gte index len {
             #break;
         };
-        #let value : t <- dyn_array_get t source index;
+        #let value : t <- vec_get t source index;
         array_set dest_ref index value;
         #let next_index : i32 = i32_add index 1i32;
         ref_set i32 index_ref next_index;
@@ -65,33 +65,33 @@
     ()
 }
 
-#fn dyn_array_grow : (t : Type[0]) -> (array_ref : &^ DynArray t) -> () #with IO {
-    #let array : DynArray t <- ref_get (DynArray t) array_ref;
-    #let capacity : i32 <- dyn_array_capacity t array;
+#fn vec_grow : (t : Type[0]) -> (array_ref : &^ Vec t) -> () #with IO {
+    #let array : Vec t <- ref_get (Vec t) array_ref;
+    #let capacity : i32 <- vec_capacity t array;
     #let next_capacity_ref : i32 = 1i32;
     #letref #excl next_capacity_ref : &^ i32 #borrow next_capacity_ref;
     #if i32_gt capacity 0i32 {
         ref_set i32 next_capacity_ref (i32_mul capacity 2i32);
     };
     #let next_capacity : i32 <- ref_get i32 next_capacity_ref;
-    #let arrayvl : ArrayVL t = dyn_array_arrayvl t array;
+    #let arrayvl : ArrayVL t = vec_arrayvl t array;
     #let next_arrayvl : ArrayVL t <- IO::arrayvl_new t next_capacity;
     #letref #excl next_arrayvl_ref : &^ ArrayVL t #borrow next_arrayvl;
-    dyn_array_copy_into t array next_arrayvl_ref;
+    vec_copy_into t array next_arrayvl_ref;
     #let _ : () <- IO::arrayvl_replace t arrayvl next_arrayvl;
     ()
 }
 
-#fn dyn_array_push : (t : Type[0]) -> (array_ref : &^ DynArray t) -> (value : t) -> () #with IO {
-    #let array : DynArray t <- ref_get (DynArray t) array_ref;
-    #let len : i32 = dyn_array_len t array;
-    #let capacity : i32 <- dyn_array_capacity t array;
+#fn vec_push : (t : Type[0]) -> (array_ref : &^ Vec t) -> (value : t) -> () #with IO {
+    #let array : Vec t <- ref_get (Vec t) array_ref;
+    #let len : i32 = vec_len t array;
+    #let capacity : i32 <- vec_capacity t array;
     #if i32_gte len capacity {
-        dyn_array_grow t array_ref;
+        vec_grow t array_ref;
     };
-    #let grown_array : DynArray t <- ref_get (DynArray t) array_ref;
-    dyn_array_set t grown_array len value;
-    ref_set (DynArray t) array_ref (DynArray::dyn_array t (dyn_array_arrayvl t grown_array) (i64_from_i32 (i32_add len 1i32)));
+    #let grown_array : Vec t <- ref_get (Vec t) array_ref;
+    vec_set t grown_array len value;
+    ref_set (Vec t) array_ref (Vec::vec t (vec_arrayvl t grown_array) (i64_from_i32 (i32_add len 1i32)));
     ()
 }
 
@@ -157,13 +157,13 @@
 #pub #use array_get;
 #pub #use array_set;
 #pub #use array_len;
-#pub #use DynArray;
-#pub #use dyn_array_arrayvl;
-#pub #use dyn_array_capacity;
-#pub #use dyn_array_len;
-#pub #use dyn_array_get;
-#pub #use dyn_array_set;
-#pub #use dyn_array_push;
+#pub #use Vec;
+#pub #use vec_arrayvl;
+#pub #use vec_capacity;
+#pub #use vec_len;
+#pub #use vec_get;
+#pub #use vec_set;
+#pub #use vec_push;
 #pub #use append_u8;
 #pub #use append_nul_terminated_u8;
 #pub #use append_dyn_nul_terminated_u8;

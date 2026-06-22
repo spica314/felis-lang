@@ -37,26 +37,28 @@ String literals can be used as `& ArrayVL u8`.
 #let bytes : & ArrayVL u8 = "message.txt";
 ```
 
-## DynArray
+## Vec
 
-`std_core::primitive::array::DynArray` is a dynamic array. Operations take the element type explicitly.
+`std_core::primitive::array::Vec` is a dynamic array. Operations take the element type explicitly.
 
 ```felis
-#use std_core::primitive::array::DynArray;
-#use std_core::primitive::array::dyn_array_get;
-#use std_core::primitive::array::dyn_array_len;
-#use std_core::primitive::array::dyn_array_push;
+#use std_core::primitive::array::Vec;
+#use std_core::primitive::array::vec_get;
+#use std_core::primitive::array::vec_len;
+#use std_core::primitive::array::vec_push;
 
 #let bytes_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 1i32;
 #letref #excl bytes_arrayvl_ref : &^ ArrayVL u8 #borrow bytes_arrayvl;
-#let bytes : DynArray u8 = DynArray::dyn_array u8 bytes_arrayvl 0i64;
-dyn_array_push u8 bytes 1u8;
-dyn_array_push u8 bytes 2u8;
-#let first : u8 = dyn_array_get u8 bytes 0i32;
-#let len : i32 = dyn_array_len u8 bytes;
+#let bytes : Vec u8 = Vec::vec u8 bytes_arrayvl 0i64;
+#letref #excl bytes_ref : &^ Vec u8 #borrow bytes;
+vec_push u8 bytes_ref 1u8;
+vec_push u8 bytes_ref 2u8;
+#let current : Vec u8 <- ref_get (Vec u8) bytes_ref;
+#let first : u8 = vec_get u8 current 0i32;
+#let len : i32 = vec_len u8 current;
 ```
 
-Use `dyn_array_capacity` to read the current capacity.
+Use `vec_capacity` to read the current capacity.
 
 ## String
 
@@ -64,11 +66,11 @@ Use `dyn_array_capacity` to read the current capacity.
 
 ```felis
 #use std_core::string::String;
-#use std_core::string::string_from_dyn_array;
+#use std_core::string::string_from_vec;
 #use std_core::string::string_get_u8;
 #use std_core::string::string_len;
 
-#let string : String = string_from_dyn_array bytes;
+#let string : String = string_from_vec bytes;
 #let first : u8 = string_get_u8 string 0i32;
 #let len : i32 = string_len string;
 ```

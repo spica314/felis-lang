@@ -1,4 +1,0 @@
-{
-    "name": "dyn-array-generic-get",
-    "felis-bin-entrypoints": ["src/dyn-array-generic-get.fe"]
-}

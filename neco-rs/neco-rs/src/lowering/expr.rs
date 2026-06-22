@@ -57,7 +57,7 @@ pub(crate) fn lower_i32_expr(term: &Term, state: &LoweringState) -> Result<I32Ex
             if let Some(expr) = lower_i32_reference_get_builtin_call(callee, arguments, state)? {
                 return Ok(expr);
             }
-            if let Some(expr) = lower_dyn_array_get_i32_call(callee, arguments, state)? {
+            if let Some(expr) = lower_vec_get_i32_call(callee, arguments, state)? {
                 return Ok(expr);
             }
             if let Some(expr) = lower_array_len_call(callee, arguments, state)? {
@@ -96,7 +96,7 @@ pub(crate) fn lower_i64_expr(term: &Term, state: &LoweringState) -> Result<I64Ex
             if let Some(expr) = lower_i64_reference_get_builtin_call(callee, arguments, state)? {
                 return Ok(expr);
             }
-            if let Some(expr) = lower_dyn_array_get_i64_call(callee, arguments, state)? {
+            if let Some(expr) = lower_vec_get_i64_call(callee, arguments, state)? {
                 return Ok(expr);
             }
             if let Some(expr) = lower_i64_array_len_call(callee, arguments, state)? {
@@ -132,7 +132,7 @@ pub(crate) fn lower_f32_expr(term: &Term, state: &LoweringState) -> Result<F32Ex
             if let Some(expr) = lower_f32_reference_get_builtin_call(callee, arguments, state)? {
                 return Ok(expr);
             }
-            if let Some(expr) = lower_dyn_array_get_f32_call(callee, arguments, state)? {
+            if let Some(expr) = lower_vec_get_f32_call(callee, arguments, state)? {
                 return Ok(expr);
             }
             if let Some(expr) = lower_f32_array_get_call(callee, arguments, state)? {
@@ -166,7 +166,7 @@ pub(crate) fn lower_u8_expr(term: &Term, state: &LoweringState) -> Result<U8Expr
             if let Some(expr) = lower_u8_reference_get_builtin_call(callee, arguments, state)? {
                 return Ok(expr);
             }
-            if let Some(expr) = lower_dyn_array_get_u8_call(callee, arguments, state)? {
+            if let Some(expr) = lower_vec_get_u8_call(callee, arguments, state)? {
                 return Ok(expr);
             }
             if let Some(expr) = lower_u8_array_get_call(callee, arguments, state)? {
@@ -905,95 +905,90 @@ fn array_len_call_receiver<'a>(
     Ok(Some(&arguments[0]))
 }
 
-fn lower_dyn_array_get_i32_call(
+fn lower_vec_get_i32_call(
     callee: &Term,
     arguments: &[Term],
     state: &LoweringState,
 ) -> Result<Option<I32Expr>> {
-    let Some((array, index)) = dyn_array_get_call_parts(
+    let Some((array, index)) = vec_get_call_parts(
         callee,
         arguments,
-        "dyn_array_get_i32",
+        "vec_get_i32",
         ArrayElementType::I32,
         state,
     )?
     else {
         return Ok(None);
     };
-    let array_slot = dyn_array_slot(array, state, ArrayElementType::I32)?;
+    let array_slot = vec_slot(array, state, ArrayElementType::I32)?;
     Ok(Some(I32Expr::ArrayGet {
         array_slot,
         index: Box::new(lower_array_index_expr(index, state)?),
     }))
 }
 
-fn lower_dyn_array_get_i64_call(
+fn lower_vec_get_i64_call(
     callee: &Term,
     arguments: &[Term],
     state: &LoweringState,
 ) -> Result<Option<I64Expr>> {
-    let Some((array, index)) = dyn_array_get_call_parts(
+    let Some((array, index)) = vec_get_call_parts(
         callee,
         arguments,
-        "dyn_array_get_i64",
+        "vec_get_i64",
         ArrayElementType::I64,
         state,
     )?
     else {
         return Ok(None);
     };
-    let array_slot = dyn_array_slot(array, state, ArrayElementType::I64)?;
+    let array_slot = vec_slot(array, state, ArrayElementType::I64)?;
     Ok(Some(I64Expr::ArrayGet {
         array_slot,
         index: Box::new(lower_array_index_expr(index, state)?),
     }))
 }
 
-fn lower_dyn_array_get_f32_call(
+fn lower_vec_get_f32_call(
     callee: &Term,
     arguments: &[Term],
     state: &LoweringState,
 ) -> Result<Option<F32Expr>> {
-    let Some((array, index)) = dyn_array_get_call_parts(
+    let Some((array, index)) = vec_get_call_parts(
         callee,
         arguments,
-        "dyn_array_get_f32",
+        "vec_get_f32",
         ArrayElementType::F32,
         state,
     )?
     else {
         return Ok(None);
     };
-    let array_slot = dyn_array_slot(array, state, ArrayElementType::F32)?;
+    let array_slot = vec_slot(array, state, ArrayElementType::F32)?;
     Ok(Some(F32Expr::ArrayGet {
         array_slot,
         index: Box::new(lower_array_index_expr(index, state)?),
     }))
 }
 
-fn lower_dyn_array_get_u8_call(
+fn lower_vec_get_u8_call(
     callee: &Term,
     arguments: &[Term],
     state: &LoweringState,
 ) -> Result<Option<U8Expr>> {
-    let Some((array, index)) = dyn_array_get_call_parts(
-        callee,
-        arguments,
-        "dyn_array_get_u8",
-        ArrayElementType::U8,
-        state,
-    )?
+    let Some((array, index)) =
+        vec_get_call_parts(callee, arguments, "vec_get_u8", ArrayElementType::U8, state)?
     else {
         return Ok(None);
     };
-    let array_slot = dyn_array_slot(array, state, ArrayElementType::U8)?;
+    let array_slot = vec_slot(array, state, ArrayElementType::U8)?;
     Ok(Some(U8Expr::ArrayGet {
         array_slot,
         index: Box::new(lower_array_index_expr(index, state)?),
     }))
 }
 
-fn dyn_array_get_call_parts<'a>(
+fn vec_get_call_parts<'a>(
     callee: &'a Term,
     arguments: &'a [Term],
     expected_name: &str,
@@ -1015,12 +1010,12 @@ fn dyn_array_get_call_parts<'a>(
         }
         return Ok(Some((&arguments[0], &arguments[1])));
     }
-    if path.segments[0].lexeme != "dyn_array_get" {
+    if path.segments[0].lexeme != "vec_get" {
         return Ok(None);
     }
     if normalized.len() != 3 {
         return Err(Error::Unsupported(
-            "`dyn_array_get` must receive exactly three arguments".to_string(),
+            "`vec_get` must receive exactly three arguments".to_string(),
         ));
     }
     if !type_argument_matches(&arguments[0], expected_element_type, state) {
@@ -1057,15 +1052,14 @@ fn type_argument_matches(
     )
 }
 
-fn dyn_array_slot(
+fn vec_slot(
     term: &Term,
     state: &LoweringState,
     expected_element_type: ArrayElementType,
 ) -> Result<usize> {
     match resolve_value(term, &state.environment)? {
         Value::Constructor(constructor)
-            if constructor.type_name == "DynArray"
-                && constructor.constructor_name == "dyn_array" =>
+            if constructor.type_name == "Vec" && constructor.constructor_name == "vec" =>
         {
             let Some(Value::Array {
                 slot,
@@ -1074,18 +1068,18 @@ fn dyn_array_slot(
             }) = constructor.fields.first()
             else {
                 return Err(Error::Unsupported(format!(
-                    "`DynArray::dyn_array` does not contain a dynamic array field: {constructor:?}"
+                    "`Vec::vec` does not contain a dynamic array field: {constructor:?}"
                 )));
             };
             if *element_type != expected_element_type {
                 return Err(Error::Unsupported(format!(
-                    "`DynArray` element type mismatch: expected {expected_element_type:?}, got {element_type:?}"
+                    "`Vec` element type mismatch: expected {expected_element_type:?}, got {element_type:?}"
                 )));
             }
             Ok(*slot)
         }
         other => Err(Error::Unsupported(format!(
-            "`DynArray` helper expects a `DynArray`, got {other:?}"
+            "`Vec` helper expects a `Vec`, got {other:?}"
         ))),
     }
 }

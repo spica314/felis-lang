@@ -47,7 +47,7 @@
         },
         {
           "name": "support.type.felis",
-          "match": "\\b(?:Array|ArrayVL|ArrayVLPTX|DynArray|IO|PTX|Prop|String|Type)\\b"
+          "match": "\\b(?:Array|ArrayVL|ArrayVLPTX|Vec|IO|PTX|Prop|String|Type)\\b"
         }
       ]
     },

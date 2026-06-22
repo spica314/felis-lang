@@ -244,16 +244,16 @@ fn compiles_and_runs_function_generics_fixture() {
 }
 
 #[test]
-fn compiles_and_runs_dyn_array_generic_get_fixture() {
-    let root = repo_root().join("tests/testcases/dyn-array-generic-get");
-    let status = run_fixture_status(&root, "dyn-array-generic-get");
+fn compiles_and_runs_vec_generic_get_fixture() {
+    let root = repo_root().join("tests/testcases/vec-generic-get");
+    let status = run_fixture_status(&root, "vec-generic-get");
     assert_eq!(status.code(), Some(42));
 }
 
 #[test]
-fn compiles_and_runs_dyn_array_generic_push_fixture() {
-    let root = repo_root().join("tests/testcases/dyn-array-generic-push");
-    let status = run_fixture_status(&root, "dyn-array-generic-push");
+fn compiles_and_runs_vec_generic_push_fixture() {
+    let root = repo_root().join("tests/testcases/vec-generic-push");
+    let status = run_fixture_status(&root, "vec-generic-push");
     assert_eq!(status.code(), Some(42));
 }
 
@@ -461,16 +461,16 @@ fn compiles_and_runs_array_type_annotation_fixture() {
 }
 
 #[test]
-fn compiles_and_runs_dyn_array_type_annotation_fixture() {
-    let root = repo_root().join("tests/testcases/dyn-array-type-annotation");
-    let status = run_fixture_status(&root, "dyn-array-type-annotation");
+fn compiles_and_runs_vec_type_annotation_fixture() {
+    let root = repo_root().join("tests/testcases/vec-type-annotation");
+    let status = run_fixture_status(&root, "vec-type-annotation");
     assert_eq!(status.code(), Some(42));
 }
 
 #[test]
-fn compiles_and_runs_dyn_array_u8_helpers_fixture() {
-    let root = repo_root().join("tests/testcases/dyn-array-u8-helpers");
-    let status = run_fixture_status(&root, "dyn-array-u8-helpers");
+fn compiles_and_runs_vec_u8_helpers_fixture() {
+    let root = repo_root().join("tests/testcases/vec-u8-helpers");
+    let status = run_fixture_status(&root, "vec-u8-helpers");
     assert_eq!(status.code(), Some(99));
 }
 

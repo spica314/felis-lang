@@ -1,0 +1,82 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::Vec;
+#use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::array::vec_capacity;
+#use std_core::primitive::array::vec_get;
+#use std_core::primitive::array::vec_len;
+#use std_core::primitive::array::vec_push;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_add;
+#use std_core::primitive::i32::i32_from_i64;
+#use std_core::primitive::i32::i32_from_u8;
+#use std_core::primitive::reference::ref_get;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let bytes_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 1i32;
+    #letref #excl bytes_arrayvl_ref : &^ ArrayVL u8 #borrow bytes_arrayvl;
+    #let bytes_ref : Vec u8 = Vec::vec u8 bytes_arrayvl 0i64;
+    #letref #excl bytes_ref_ref : &^ Vec u8 #borrow bytes_ref;
+    vec_push u8 bytes_ref_ref 1u8;
+    vec_push u8 bytes_ref_ref 2u8;
+
+    #let empty_bytes_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 0i32;
+    #letref #excl empty_bytes_arrayvl_ref : &^ ArrayVL u8 #borrow empty_bytes_arrayvl;
+    #let empty_bytes_ref : Vec u8 = Vec::vec u8 empty_bytes_arrayvl 0i64;
+    #letref #excl empty_bytes_ref_ref : &^ Vec u8 #borrow empty_bytes_ref;
+    vec_push u8 empty_bytes_ref_ref 1u8;
+
+    #let numbers_arrayvl : ArrayVL i32 <- IO::arrayvl_new i32 1i32;
+    #letref #excl numbers_arrayvl_ref : &^ ArrayVL i32 #borrow numbers_arrayvl;
+    #let numbers_ref : Vec i32 = Vec::vec i32 numbers_arrayvl 0i64;
+    #letref #excl numbers_ref_ref : &^ Vec i32 #borrow numbers_ref;
+    vec_push i32 numbers_ref_ref 3i32;
+    vec_push i32 numbers_ref_ref 4i32;
+
+    #let longs_arrayvl : ArrayVL i64 <- IO::arrayvl_new i64 1i32;
+    #letref #excl longs_arrayvl_ref : &^ ArrayVL i64 #borrow longs_arrayvl;
+    #let longs_ref : Vec i64 = Vec::vec i64 longs_arrayvl 0i64;
+    #letref #excl longs_ref_ref : &^ Vec i64 #borrow longs_ref;
+    vec_push i64 longs_ref_ref 9i64;
+    vec_push i64 longs_ref_ref 8i64;
+
+    #let bytes_current : Vec u8 <- ref_get (Vec u8) bytes_ref_ref;
+    #let empty_bytes_current : Vec u8 <- ref_get (Vec u8) empty_bytes_ref_ref;
+    #let numbers_current : Vec i32 <- ref_get (Vec i32) numbers_ref_ref;
+    #let longs_current : Vec i64 <- ref_get (Vec i64) longs_ref_ref;
+
+    #let byte0 : u8 <- vec_get u8 bytes_current 0i32;
+    #let byte1 : u8 <- vec_get u8 bytes_current 1i32;
+    #let byte0_i32 : i32 = i32_from_u8 byte0;
+    #let byte1_i32 : i32 = i32_from_u8 byte1;
+    #let empty_byte : u8 <- vec_get u8 empty_bytes_current 0i32;
+    #let empty_byte_i32 : i32 = i32_from_u8 empty_byte;
+    #let byte_sum : i32 = i32_add (i32_add byte0_i32 byte1_i32) empty_byte_i32;
+
+    #let number0 : i32 <- vec_get i32 numbers_current 0i32;
+    #let number1 : i32 <- vec_get i32 numbers_current 1i32;
+    #let number_sum : i32 = i32_add number0 number1;
+
+    #let long0 : i64 <- vec_get i64 longs_current 0i32;
+    #let long1 : i64 <- vec_get i64 longs_current 1i32;
+    #let long0_i32 : i32 = i32_from_i64 long0;
+    #let long1_i32 : i32 = i32_from_i64 long1;
+    #let long_sum : i32 = i32_add long0_i32 long1_i32;
+
+    #let bytes_len : i32 = vec_len u8 bytes_current;
+    #let empty_bytes_len : i32 = vec_len u8 empty_bytes_current;
+    #let numbers_len : i32 = vec_len i32 numbers_current;
+    #let longs_len : i32 = vec_len i64 longs_current;
+    #let bytes_capacity : i32 <- vec_capacity u8 bytes_current;
+    #let empty_bytes_capacity : i32 <- vec_capacity u8 empty_bytes_current;
+    #let numbers_capacity : i32 <- vec_capacity i32 numbers_current;
+    #let longs_capacity : i32 <- vec_capacity i64 longs_current;
+    #let len_sum : i32 = i32_add (i32_add (i32_add bytes_len empty_bytes_len) numbers_len) longs_len;
+    #let capacity_sum : i32 = i32_add (i32_add (i32_add bytes_capacity empty_bytes_capacity) numbers_capacity) longs_capacity;
+
+    #let value_sum : i32 = i32_add byte_sum (i32_add number_sum long_sum);
+    #let code : i32 = i32_add value_sum (i32_add len_sum capacity_sum);
+    #let _ : () <- IO::sys_exit code;
+    ()
+}

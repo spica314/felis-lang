@@ -826,8 +826,8 @@ fn lowers_array_type_annotation_fixture_to_runtime_array_operations() {
 }
 
 #[test]
-fn lowers_dyn_array_type_annotation_fixture_to_runtime_array_operations() {
-    let root = repo_root().join("tests/testcases/dyn-array-type-annotation");
+fn lowers_vec_type_annotation_fixture_to_runtime_array_operations() {
+    let root = repo_root().join("tests/testcases/vec-type-annotation");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
         panic!("expected package root");
     };
@@ -881,8 +881,8 @@ fn lowers_dyn_array_type_annotation_fixture_to_runtime_array_operations() {
 }
 
 #[test]
-fn lowers_dyn_array_u8_helpers_fixture_to_runtime_array_operations() {
-    let root = repo_root().join("tests/testcases/dyn-array-u8-helpers");
+fn lowers_vec_u8_helpers_fixture_to_runtime_array_operations() {
+    let root = repo_root().join("tests/testcases/vec-u8-helpers");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {
         panic!("expected package root");
     };
@@ -1229,31 +1229,31 @@ fn rejects_pathbuf_push_through_shared_reference() {
 }
 
 #[test]
-fn rejects_dyn_array_push_without_exclusive_reference() {
+fn rejects_vec_push_without_exclusive_reference() {
     let package = parse_inline_binary_package(
-        "dyn-array-push-without-exclusive-reference",
+        "vec-push-without-exclusive-reference",
         r#"
 #use std_core::io::IO;
 #use std_core::primitive::array::ArrayVL;
-#use std_core::primitive::array::DynArray;
-#use std_core::primitive::array::dyn_array_push;
+#use std_core::primitive::array::Vec;
+#use std_core::primitive::array::vec_push;
 #entrypoint main;
 
 #fn main : () #with IO {
     #let arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 1i32;
-    #let array : DynArray u8 = DynArray::dyn_array u8 arrayvl 0i64;
-    dyn_array_push u8 array 1u8;
+    #let array : Vec u8 = Vec::vec u8 arrayvl 0i64;
+    vec_push u8 array 1u8;
     ()
 }
 "#,
     );
 
     let error = lower_package_to_program(&package)
-        .expect_err("lowering must reject dyn_array_push without an exclusive reference");
+        .expect_err("lowering must reject vec_push without an exclusive reference");
     assert!(
         error
             .to_string()
-            .contains("expected a value of type `&^ DynArray u8`")
+            .contains("expected a value of type `&^ Vec u8`")
     );
 }
 
