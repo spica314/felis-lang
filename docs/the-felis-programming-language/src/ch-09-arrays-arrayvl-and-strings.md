@@ -39,13 +39,13 @@ String literals can be used as `& ArrayVL u8`.
 
 ## Vec
 
-`std_core::primitive::array::Vec` is a dynamic array. Operations take the element type explicitly.
+`std_core::primitive::vec::Vec` is a dynamic array. Operations take the element type explicitly.
 
 ```felis
-#use std_core::primitive::array::Vec;
-#use std_core::primitive::array::vec_get;
-#use std_core::primitive::array::vec_len;
-#use std_core::primitive::array::vec_push;
+#use std_core::primitive::vec::Vec;
+#use std_core::primitive::vec::vec_get;
+#use std_core::primitive::vec::vec_len;
+#use std_core::primitive::vec::vec_push;
 
 #let bytes_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 1i32;
 #letref #excl bytes_arrayvl_ref : &^ ArrayVL u8 #borrow bytes_arrayvl;

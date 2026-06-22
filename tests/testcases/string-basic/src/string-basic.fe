@@ -1,7 +1,7 @@
 #use std_core::primitive::reference::ref_get;
 #use std_core::io::IO;
 #use std_core::primitive::array::ArrayVL;
-#use std_core::primitive::array::Vec;
+#use std_core::primitive::vec::Vec;
 #use std_core::primitive::array::array_set;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_eq;

@@ -28,6 +28,14 @@ currently re-exports:
 - `array_get`
 - `array_set`
 - `array_len`
+- `append_u8`
+- `append_nul_terminated_u8`
+- `append_dyn_nul_terminated_u8`
+- `fill_u8`
+
+[`std/std_core/src/primitive/vec.fe`](../std/std_core/src/primitive/vec.fe)
+currently re-exports:
+
 - `Vec`
 - `vec_arrayvl`
 - `vec_capacity`
@@ -35,10 +43,6 @@ currently re-exports:
 - `vec_get`
 - `vec_set`
 - `vec_push`
-- `append_u8`
-- `append_nul_terminated_u8`
-- `append_dyn_nul_terminated_u8`
-- `fill_u8`
 
 [`std/std_core/src/primitive/bool.fe`](../std/std_core/src/primitive/bool.fe)
 currently re-exports:

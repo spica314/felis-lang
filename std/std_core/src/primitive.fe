@@ -5,3 +5,4 @@
 #pub #mod i64;
 #pub #mod reference;
 #pub #mod u8;
+#pub #mod vec;

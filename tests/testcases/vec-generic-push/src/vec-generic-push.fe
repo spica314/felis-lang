@@ -1,10 +1,10 @@
 #use std_core::io::IO;
-#use std_core::primitive::array::Vec;
+#use std_core::primitive::vec::Vec;
 #use std_core::primitive::array::ArrayVL;
-#use std_core::primitive::array::vec_capacity;
-#use std_core::primitive::array::vec_get;
-#use std_core::primitive::array::vec_len;
-#use std_core::primitive::array::vec_push;
+#use std_core::primitive::vec::vec_capacity;
+#use std_core::primitive::vec::vec_get;
+#use std_core::primitive::vec::vec_len;
+#use std_core::primitive::vec::vec_push;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
 #use std_core::primitive::i32::i32_from_i64;
