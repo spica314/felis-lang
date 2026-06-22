@@ -10,6 +10,7 @@
 #use std_core::string::mark_string_eq;
 #use std_core::string::mark_string_span_eq;
 #use std_core::string::mark_string_starts_with;
+#use std_core::string::mark_string_starts_with_at;
 #use std_core::string::string_copy_from_vec_range_into;
 #use std_core::string::string_from_vec;
 #use std_core::string::string_from_arrayvl_parts;
@@ -79,6 +80,18 @@
     #let empty_prefix_ref : i32 = 0i32;
     #letref #excl empty_prefix_ref : &^ i32 #borrow empty_prefix_ref;
     mark_string_starts_with copied_name empty_prefix empty_prefix_ref;
+    #let starts_with_at_ref : i32 = 0i32;
+    #letref #excl starts_with_at_ref : &^ i32 #borrow starts_with_at_ref;
+    mark_string_starts_with_at source_string 4i32 copied_name starts_with_at_ref;
+    #let non_prefix_at_ref : i32 = 0i32;
+    #letref #excl non_prefix_at_ref : &^ i32 #borrow non_prefix_at_ref;
+    mark_string_starts_with_at source_string 3i32 copied_name non_prefix_at_ref;
+    #let empty_prefix_at_end_ref : i32 = 0i32;
+    #letref #excl empty_prefix_at_end_ref : &^ i32 #borrow empty_prefix_at_end_ref;
+    mark_string_starts_with_at source_string 7i32 empty_prefix empty_prefix_at_end_ref;
+    #let empty_prefix_after_end_ref : i32 = 0i32;
+    #letref #excl empty_prefix_after_end_ref : &^ i32 #borrow empty_prefix_after_end_ref;
+    mark_string_starts_with_at source_string 8i32 empty_prefix empty_prefix_after_end_ref;
 
     #let exit_code : i32 = code;
     #let eq : i32 <- ref_get i32 eq_ref;
@@ -100,6 +113,22 @@
     #let empty_prefix_result : i32 <- ref_get i32 empty_prefix_ref;
     #if i32_eq empty_prefix_result 0i32 {
         #let _ : () <- IO::sys_exit 5i32;
+    };
+    #let starts_with_at : i32 <- ref_get i32 starts_with_at_ref;
+    #if i32_eq starts_with_at 0i32 {
+        #let _ : () <- IO::sys_exit 6i32;
+    };
+    #let non_prefix_at : i32 <- ref_get i32 non_prefix_at_ref;
+    #if i32_eq non_prefix_at 1i32 {
+        #let _ : () <- IO::sys_exit 7i32;
+    };
+    #let empty_prefix_at_end : i32 <- ref_get i32 empty_prefix_at_end_ref;
+    #if i32_eq empty_prefix_at_end 0i32 {
+        #let _ : () <- IO::sys_exit 8i32;
+    };
+    #let empty_prefix_after_end : i32 <- ref_get i32 empty_prefix_after_end_ref;
+    #if i32_eq empty_prefix_after_end 1i32 {
+        #let _ : () <- IO::sys_exit 9i32;
     };
     #let _ : () <- IO::sys_exit exit_code;
     ()

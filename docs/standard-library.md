@@ -197,6 +197,7 @@ and special-register helpers used by GPU fixtures:
 - `mark_string_eq`
 - `mark_string_span_eq`
 - `mark_string_starts_with`
+- `mark_string_starts_with_at`
 
 ## Option And Result
 
