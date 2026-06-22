@@ -1,3 +1,6 @@
+#use std_core::io::IO;
+#use std_core::primitive::array::ArrayVL;
+#use std_core::primitive::array::array_set;
 #use std_core::primitive::bool::bool;
 #use std_core::primitive::i32::i32;
 #use std_core::primitive::i32::i32_add;
@@ -15,6 +18,8 @@
 #use std_core::primitive::u8::u8_eq;
 #use std_core::result::Result;
 #use std_core::string::String;
+#use std_core::string::mark_string_starts_with_at;
+#use std_core::string::string_from_arrayvl_parts;
 #use std_core::string::string_get_u8;
 #use std_core::string::string_len;
 
@@ -150,76 +155,31 @@
     ()
 }
 
-#fn json_match_null : (source : String) -> (len : i32) -> (start : i32) -> bool #with IO {
+#fn json_match_null : (source : String) -> (start : i32) -> (null_prefix : String) -> bool #with IO {
     #let matched : i32 = 0i32;
     #letref #excl matched_ref : &^ i32 #borrow matched;
-    #if i32_lte (i32_add start 4i32) len {
-        #let byte0 : u8 <- string_get_u8 source start;
-        #if u8_eq byte0 'n' {
-            #let byte1 : u8 <- string_get_u8 source (i32_add start 1i32);
-            #if u8_eq byte1 'u' {
-                #let byte2 : u8 <- string_get_u8 source (i32_add start 2i32);
-                #if u8_eq byte2 'l' {
-                    #let byte3 : u8 <- string_get_u8 source (i32_add start 3i32);
-                    #if u8_eq byte3 'l' {
-                        ref_set i32 matched_ref 1i32;
-                    };
-                };
-            };
-        };
-    };
+    mark_string_starts_with_at source start null_prefix matched_ref;
     #let matched_value : i32 <- ref_get i32 matched_ref;
     i32_eq matched_value 1i32
 }
 
-#fn json_match_true : (source : String) -> (len : i32) -> (start : i32) -> bool #with IO {
+#fn json_match_true : (source : String) -> (start : i32) -> (true_prefix : String) -> bool #with IO {
     #let matched : i32 = 0i32;
     #letref #excl matched_ref : &^ i32 #borrow matched;
-    #if i32_lte (i32_add start 4i32) len {
-        #let byte0 : u8 <- string_get_u8 source start;
-        #if u8_eq byte0 't' {
-            #let byte1 : u8 <- string_get_u8 source (i32_add start 1i32);
-            #if u8_eq byte1 'r' {
-                #let byte2 : u8 <- string_get_u8 source (i32_add start 2i32);
-                #if u8_eq byte2 'u' {
-                    #let byte3 : u8 <- string_get_u8 source (i32_add start 3i32);
-                    #if u8_eq byte3 'e' {
-                        ref_set i32 matched_ref 1i32;
-                    };
-                };
-            };
-        };
-    };
+    mark_string_starts_with_at source start true_prefix matched_ref;
     #let matched_value : i32 <- ref_get i32 matched_ref;
     i32_eq matched_value 1i32
 }
 
-#fn json_match_false : (source : String) -> (len : i32) -> (start : i32) -> bool #with IO {
+#fn json_match_false : (source : String) -> (start : i32) -> (false_prefix : String) -> bool #with IO {
     #let matched : i32 = 0i32;
     #letref #excl matched_ref : &^ i32 #borrow matched;
-    #if i32_lte (i32_add start 5i32) len {
-        #let byte0 : u8 <- string_get_u8 source start;
-        #if u8_eq byte0 'f' {
-            #let byte1 : u8 <- string_get_u8 source (i32_add start 1i32);
-            #if u8_eq byte1 'a' {
-                #let byte2 : u8 <- string_get_u8 source (i32_add start 2i32);
-                #if u8_eq byte2 'l' {
-                    #let byte3 : u8 <- string_get_u8 source (i32_add start 3i32);
-                    #if u8_eq byte3 's' {
-                        #let byte4 : u8 <- string_get_u8 source (i32_add start 4i32);
-                        #if u8_eq byte4 'e' {
-                            ref_set i32 matched_ref 1i32;
-                        };
-                    };
-                };
-            };
-        };
-    };
+    mark_string_starts_with_at source start false_prefix matched_ref;
     #let matched_value : i32 <- ref_get i32 matched_ref;
     i32_eq matched_value 1i32
 }
 
-#fn json_parse_scalar_at : (source : String) -> (len : i32) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
+#fn json_parse_scalar_at : (source : String) -> (len : i32) -> (null_prefix : String) -> (true_prefix : String) -> (false_prefix : String) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
     ref_set i32 success_ref 0i32;
     json_skip_spaces source len index_ref;
     #let start : i32 <- ref_get i32 index_ref;
@@ -234,19 +194,19 @@
                 ref_set i32 success_ref 1i32;
             };
         };
-        #let is_null : bool <- json_match_null source len start;
+        #let is_null : bool <- json_match_null source start null_prefix;
         #if is_null {
             ref_set Json value_ref Json::null;
             ref_set i32 index_ref (i32_add start 4i32);
             ref_set i32 success_ref 1i32;
         };
-        #let is_true : bool <- json_match_true source len start;
+        #let is_true : bool <- json_match_true source start true_prefix;
         #if is_true {
             ref_set Json value_ref Json::json_true;
             ref_set i32 index_ref (i32_add start 4i32);
             ref_set i32 success_ref 1i32;
         };
-        #let is_false : bool <- json_match_false source len start;
+        #let is_false : bool <- json_match_false source start false_prefix;
         #if is_false {
             ref_set Json value_ref Json::json_false;
             ref_set i32 index_ref (i32_add start 5i32);
@@ -284,7 +244,7 @@
     ()
 }
 
-#fn json_parse_array_at : (source : String) -> (len : i32) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
+#fn json_parse_array_at : (source : String) -> (len : i32) -> (null_prefix : String) -> (true_prefix : String) -> (false_prefix : String) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
     ref_set i32 success_ref 0i32;
     json_skip_spaces source len index_ref;
     #let start : i32 <- ref_get i32 index_ref;
@@ -317,7 +277,7 @@
                 #letref #excl element_ref : &^ Json #borrow element;
                 #let element_success : i32 = 0i32;
                 #letref #excl element_success_ref : &^ i32 #borrow element_success;
-                json_parse_scalar_at source len index_ref element_ref element_success_ref;
+                json_parse_scalar_at source len null_prefix true_prefix false_prefix index_ref element_ref element_success_ref;
                 #let element_success_value : i32 <- ref_get i32 element_success_ref;
                 #if i32_eq element_success_value 0i32 {
                     #break;
@@ -352,16 +312,16 @@
     ()
 }
 
-#fn json_parse_value_at : (source : String) -> (len : i32) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
+#fn json_parse_value_at : (source : String) -> (len : i32) -> (null_prefix : String) -> (true_prefix : String) -> (false_prefix : String) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
     ref_set i32 success_ref 0i32;
     json_skip_spaces source len index_ref;
     #let start : i32 <- ref_get i32 index_ref;
     #if i32_lt start len {
         #let first_byte : u8 <- string_get_u8 source start;
         #if u8_eq first_byte '[' {
-            json_parse_array_at source len index_ref value_ref success_ref;
+            json_parse_array_at source len null_prefix true_prefix false_prefix index_ref value_ref success_ref;
         } #else {
-            json_parse_scalar_at source len index_ref value_ref success_ref;
+            json_parse_scalar_at source len null_prefix true_prefix false_prefix index_ref value_ref success_ref;
         };
     };
     ()
@@ -369,13 +329,35 @@
 
 #pub #fn json_parse : (source : String) -> Result Json JsonParseError #with IO {
     #let len : i32 = string_len source;
+    #let null_prefix_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 4i32;
+    #letref #excl null_prefix_arrayvl_ref : &^ ArrayVL u8 #borrow null_prefix_arrayvl;
+    array_set null_prefix_arrayvl_ref 0i32 'n';
+    array_set null_prefix_arrayvl_ref 1i32 'u';
+    array_set null_prefix_arrayvl_ref 2i32 'l';
+    array_set null_prefix_arrayvl_ref 3i32 'l';
+    #let null_prefix : String = string_from_arrayvl_parts null_prefix_arrayvl 4i32 4i32;
+    #let true_prefix_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 4i32;
+    #letref #excl true_prefix_arrayvl_ref : &^ ArrayVL u8 #borrow true_prefix_arrayvl;
+    array_set true_prefix_arrayvl_ref 0i32 't';
+    array_set true_prefix_arrayvl_ref 1i32 'r';
+    array_set true_prefix_arrayvl_ref 2i32 'u';
+    array_set true_prefix_arrayvl_ref 3i32 'e';
+    #let true_prefix : String = string_from_arrayvl_parts true_prefix_arrayvl 4i32 4i32;
+    #let false_prefix_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 5i32;
+    #letref #excl false_prefix_arrayvl_ref : &^ ArrayVL u8 #borrow false_prefix_arrayvl;
+    array_set false_prefix_arrayvl_ref 0i32 'f';
+    array_set false_prefix_arrayvl_ref 1i32 'a';
+    array_set false_prefix_arrayvl_ref 2i32 'l';
+    array_set false_prefix_arrayvl_ref 3i32 's';
+    array_set false_prefix_arrayvl_ref 4i32 'e';
+    #let false_prefix : String = string_from_arrayvl_parts false_prefix_arrayvl 5i32 5i32;
     #let index : i32 = 0i32;
     #letref #excl index_ref : &^ i32 #borrow index;
     #let parsed_value : Json = Json::null;
     #letref #excl parsed_value_ref : &^ Json #borrow parsed_value;
     #let success : i32 = 0i32;
     #letref #excl success_ref : &^ i32 #borrow success;
-    json_parse_value_at source len index_ref parsed_value_ref success_ref;
+    json_parse_value_at source len null_prefix true_prefix false_prefix index_ref parsed_value_ref success_ref;
     #let parsed : Json <- ref_get Json parsed_value_ref;
     #let result : Result Json JsonParseError = Result::err Json JsonParseError JsonParseError::unknown_error;
     #letref #excl result_ref : &^ Result Json JsonParseError #borrow result;
