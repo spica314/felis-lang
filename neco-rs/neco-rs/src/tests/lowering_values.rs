@@ -556,6 +556,57 @@ fn lowers_u8_ops_fixture_to_runtime_expression_tree() {
 }
 
 #[test]
+fn lowers_imported_std_safetensors_pure_call() {
+    let package = parse_inline_binary_package(
+        "std-safetensors-pure-call",
+        r#"
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::u8::u8;
+#use std_safetensors::safetensors_header_len_from_bytes;
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let byte0 : u8 = 1u8;
+    #let byte1 : u8 = 2u8;
+    #let byte2 : u8 = 0u8;
+    #let byte3 : u8 = 0u8;
+    #let header_len : i32 = safetensors_header_len_from_bytes byte0 byte1 byte2 byte3;
+    #let _ : () <- IO::sys_exit header_len;
+    ()
+}
+"#,
+    );
+
+    let program = lower_package_to_program(&package).expect("lower imported pure call");
+    assert_eq!(
+        program.operations,
+        vec![Operation::Exit(ExitCodeExpr::I32(I32Expr::Add(
+            Box::new(I32Expr::Add(
+                Box::new(I32Expr::FromU8(Box::new(U8Expr::Literal(1)))),
+                Box::new(I32Expr::Mul(
+                    Box::new(I32Expr::FromU8(Box::new(U8Expr::Literal(2)))),
+                    Box::new(I32Expr::Literal(256)),
+                )),
+            )),
+            Box::new(I32Expr::Add(
+                Box::new(I32Expr::Mul(
+                    Box::new(I32Expr::FromU8(Box::new(U8Expr::Literal(0)))),
+                    Box::new(I32Expr::Literal(65536)),
+                )),
+                Box::new(I32Expr::Mul(
+                    Box::new(I32Expr::FromU8(Box::new(U8Expr::Literal(0)))),
+                    Box::new(I32Expr::Literal(16777216)),
+                )),
+            )),
+        )))]
+    );
+    assert!(program.data.is_empty());
+    assert!(program.arrays.is_empty());
+}
+
+#[test]
 fn lowers_bool_basic_fixture_to_runtime_conditions() {
     let root = repo_root().join("tests/testcases/bool-basic");
     let ParsedRoot::Package(package) = parse_root(&root).expect("fixture parses") else {

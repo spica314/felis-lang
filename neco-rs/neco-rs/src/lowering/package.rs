@@ -221,7 +221,7 @@ fn find_standard_packages(package: &ParsedPackage) -> Result<Vec<ParsedPackage>>
         if !std_root.exists() {
             continue;
         }
-        for package_name in ["std_core", "std_json"] {
+        for package_name in ["std_core", "std_json", "std_safetensors"] {
             let candidate = std_root.join(package_name);
             if paths_equal(&candidate, &package.root_dir) {
                 continue;
