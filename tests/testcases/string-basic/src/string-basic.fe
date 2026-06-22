@@ -9,6 +9,7 @@
 #use std_core::string::String;
 #use std_core::string::mark_string_eq;
 #use std_core::string::mark_string_span_eq;
+#use std_core::string::mark_string_starts_with;
 #use std_core::string::string_copy_from_vec_range_into;
 #use std_core::string::string_from_vec;
 #use std_core::string::string_from_arrayvl_parts;
@@ -66,6 +67,18 @@
     #let span_eq_ref : i32 = 0i32;
     #letref #excl span_eq_ref : &^ i32 #borrow span_eq_ref;
     mark_string_span_eq built_name source 4i32 7i32 span_eq_ref;
+    #let source_string : String = string_from_vec source;
+    #let source_prefix : String = string_from_arrayvl_parts source_arrayvl 7i32 3i32;
+    #let empty_prefix : String = string_with_len source_string 0i32;
+    #let starts_with_ref : i32 = 0i32;
+    #letref #excl starts_with_ref : &^ i32 #borrow starts_with_ref;
+    mark_string_starts_with source_string source_prefix starts_with_ref;
+    #let non_prefix_ref : i32 = 0i32;
+    #letref #excl non_prefix_ref : &^ i32 #borrow non_prefix_ref;
+    mark_string_starts_with copied_name source_prefix non_prefix_ref;
+    #let empty_prefix_ref : i32 = 0i32;
+    #letref #excl empty_prefix_ref : &^ i32 #borrow empty_prefix_ref;
+    mark_string_starts_with copied_name empty_prefix empty_prefix_ref;
 
     #let exit_code : i32 = code;
     #let eq : i32 <- ref_get i32 eq_ref;
@@ -75,6 +88,18 @@
     #let span_eq : i32 <- ref_get i32 span_eq_ref;
     #if i32_eq span_eq 0i32 {
         #let _ : () <- IO::sys_exit 2i32;
+    };
+    #let starts_with : i32 <- ref_get i32 starts_with_ref;
+    #if i32_eq starts_with 0i32 {
+        #let _ : () <- IO::sys_exit 3i32;
+    };
+    #let non_prefix : i32 <- ref_get i32 non_prefix_ref;
+    #if i32_eq non_prefix 1i32 {
+        #let _ : () <- IO::sys_exit 4i32;
+    };
+    #let empty_prefix_result : i32 <- ref_get i32 empty_prefix_ref;
+    #if i32_eq empty_prefix_result 0i32 {
+        #let _ : () <- IO::sys_exit 5i32;
     };
     #let _ : () <- IO::sys_exit exit_code;
     ()

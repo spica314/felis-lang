@@ -150,6 +150,33 @@
     ()
 }
 
+#fn mark_string_starts_with : (string : String) -> (prefix : String) -> (result_ref : &^ i32) -> () #with IO {
+    #let string_len_value : i32 = string_len string;
+    #let prefix_len : i32 = string_len prefix;
+    ref_set i32 result_ref 0i32;
+    #if i32_gte string_len_value prefix_len {
+        ref_set i32 result_ref 1i32;
+        #let index_ref : i32 = 0i32;
+        #letref #excl index_ref : &^ i32 #borrow index_ref;
+        #loop {
+            #let index : i32 <- ref_get i32 index_ref;
+            #if i32_gte index prefix_len {
+                #break;
+            };
+            #let string_byte : u8 <- string_get_u8 string index;
+            #let prefix_byte : u8 <- string_get_u8 prefix index;
+            #if u8_eq string_byte prefix_byte {
+                #let next_index : i32 = i32_add index 1i32;
+                ref_set i32 index_ref next_index;
+            } #else {
+                ref_set i32 result_ref 0i32;
+                #break;
+            };
+        };
+    };
+    ()
+}
+
 #pub #use String;
 #pub #use string_from_vec;
 #pub #use string_from_arrayvl_parts;
@@ -166,3 +193,4 @@
 #pub #use string_push_u8_unchecked;
 #pub #use mark_string_eq;
 #pub #use mark_string_span_eq;
+#pub #use mark_string_starts_with;

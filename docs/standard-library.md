@@ -175,6 +175,29 @@ and special-register helpers used by GPU fixtures:
 - `pathbuf_push`
 - `pathbuf_pop`
 
+## String Module
+
+[`std/std_core/src/string.fe`](../std/std_core/src/string.fe) defines a public
+`String` type backed by `Vec u8` and currently re-exports:
+
+- `String`
+- `string_from_vec`
+- `string_from_arrayvl_parts`
+- `string_with_len`
+- `string_copy_from_vec_range_into`
+- `string_copy_from_string_range_into`
+- `string_copy_from_string_range`
+- `string_as_vec`
+- `string_as_arrayvl`
+- `string_len`
+- `string_capacity`
+- `string_get_u8`
+- `string_set_u8`
+- `string_push_u8_unchecked`
+- `mark_string_eq`
+- `mark_string_span_eq`
+- `mark_string_starts_with`
+
 ## Option And Result
 
 [`std/std_core/src/option.fe`](../std/std_core/src/option.fe) defines a public
