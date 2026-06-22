@@ -160,6 +160,26 @@
     #let string_code : i32 = parsed_result_score string_result;
     #let string_ref_code : i32 <- result_ref_score (Json::string (JsonString::string_cons 7i32 JsonString::string_empty));
 
+    #let escaped_quote_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 4i32;
+    #letref #excl escaped_quote_source_arrayvl_ref : &^ ArrayVL u8 #borrow escaped_quote_source_arrayvl;
+    array_set escaped_quote_source_arrayvl_ref 0i32 '"';
+    array_set escaped_quote_source_arrayvl_ref 1i32 '\\';
+    array_set escaped_quote_source_arrayvl_ref 2i32 '"';
+    array_set escaped_quote_source_arrayvl_ref 3i32 '"';
+    #let escaped_quote_source : String = string_from_arrayvl_parts escaped_quote_source_arrayvl 4i32 4i32;
+    #let escaped_quote_result : Result Json JsonParseError <- json_parse escaped_quote_source;
+    #let escaped_quote_code : i32 = parsed_result_score escaped_quote_result;
+
+    #let escaped_backslash_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 4i32;
+    #letref #excl escaped_backslash_source_arrayvl_ref : &^ ArrayVL u8 #borrow escaped_backslash_source_arrayvl;
+    array_set escaped_backslash_source_arrayvl_ref 0i32 '"';
+    array_set escaped_backslash_source_arrayvl_ref 1i32 '\\';
+    array_set escaped_backslash_source_arrayvl_ref 2i32 '\\';
+    array_set escaped_backslash_source_arrayvl_ref 3i32 '"';
+    #let escaped_backslash_source : String = string_from_arrayvl_parts escaped_backslash_source_arrayvl 4i32 4i32;
+    #let escaped_backslash_result : Result Json JsonParseError <- json_parse escaped_backslash_source;
+    #let escaped_backslash_code : i32 = parsed_result_score escaped_backslash_result;
+
     #let array_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 3i32;
     #letref #excl array_source_arrayvl_ref : &^ ArrayVL u8 #borrow array_source_arrayvl;
     array_set array_source_arrayvl_ref 0i32 '[';
@@ -213,7 +233,8 @@
         #let _ : () <- IO::sys_exit 30i32;
     };
 
-    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add (i32_add string_code string_ref_code) (i32_add (i32_add array_code array_head_code) (i32_add array_tail_code (i32_add (i32_add empty_array_code empty_array_head_code) (i32_add empty_array_tail_code (i32_add (i32_add pair_array_code pair_array_head_code) (i32_add pair_array_tail_code pair_array_tail_head_code))))))));
+    #let string_total_code : i32 = i32_add (i32_add string_code string_ref_code) (i32_add escaped_quote_code escaped_backslash_code);
+    #let code : i32 = i32_add (i32_add parsed_code null_code) (i32_add (i32_add true_code false_code) (i32_add string_total_code (i32_add (i32_add array_code array_head_code) (i32_add array_tail_code (i32_add (i32_add empty_array_code empty_array_head_code) (i32_add empty_array_tail_code (i32_add (i32_add pair_array_code pair_array_head_code) (i32_add pair_array_tail_code pair_array_tail_head_code))))))));
     #let _ : () <- IO::sys_exit code;
     ()
 }

@@ -113,10 +113,20 @@
             #break;
         };
         #let byte : u8 <- string_get_u8 source current_index;
-        #if u8_eq byte '"' {
-            #break;
+        #if u8_eq byte '\\' {
+            #let next_index : i32 = i32_add current_index 1i32;
+            #if i32_lt next_index len {
+                ref_set i32 index_ref (i32_add current_index 2i32);
+            } #else {
+                ref_set i32 index_ref next_index;
+            };
+        } #else {
+            #if u8_eq byte '"' {
+                #break;
+            } #else {
+                ref_set i32 index_ref (i32_add current_index 1i32);
+            };
         };
-        ref_set i32 index_ref (i32_add current_index 1i32);
     };
     ref_get i32 index_ref
 }
@@ -133,9 +143,33 @@
         };
         #let byte_index : i32 = i32_sub current_index 1i32;
         #let byte : u8 <- string_get_u8 source byte_index;
-        #let rest : JsonString <- ref_get JsonString value_ref;
-        ref_set JsonString value_ref (JsonString::string_cons (i32_from_u8 byte) rest);
-        ref_set i32 index_ref byte_index;
+        #let consumed_escape : i32 = 0i32;
+        #letref #excl consumed_escape_ref : &^ i32 #borrow consumed_escape;
+        #if i32_lt start byte_index {
+            #let escape_index : i32 = i32_sub byte_index 1i32;
+            #let escape : u8 <- string_get_u8 source escape_index;
+            #if u8_eq escape '\\' {
+                #if u8_eq byte '"' {
+                    #let rest : JsonString <- ref_get JsonString value_ref;
+                    ref_set JsonString value_ref (JsonString::string_cons (i32_from_u8 byte) rest);
+                    ref_set i32 index_ref escape_index;
+                    ref_set i32 consumed_escape_ref 1i32;
+                } #else {
+                    #if u8_eq byte '\\' {
+                        #let rest : JsonString <- ref_get JsonString value_ref;
+                        ref_set JsonString value_ref (JsonString::string_cons (i32_from_u8 byte) rest);
+                        ref_set i32 index_ref escape_index;
+                        ref_set i32 consumed_escape_ref 1i32;
+                    };
+                };
+            };
+        };
+        #let consumed_escape_value : i32 <- ref_get i32 consumed_escape_ref;
+        #if i32_eq consumed_escape_value 0i32 {
+            #let rest : JsonString <- ref_get JsonString value_ref;
+            ref_set JsonString value_ref (JsonString::string_cons (i32_from_u8 byte) rest);
+            ref_set i32 index_ref byte_index;
+        };
     };
     ref_get JsonString value_ref
 }
