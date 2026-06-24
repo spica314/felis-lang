@@ -1019,6 +1019,13 @@ fn compiles_and_runs_type_rc_match_mut_rc_reference_fixture() {
 }
 
 #[test]
+fn compiles_and_runs_type_rc_match_ref_updated_recursive_stack_fixture() {
+    let root = repo_root().join("tests/testcases/type-rc-match");
+    let status = run_fixture_status(&root, "type-rc-match-ref-updated-recursive-stack");
+    assert_eq!(status.code(), Some(4));
+}
+
+#[test]
 fn compiles_and_runs_type_rc_match_fn_fixture() {
     let root = repo_root().join("tests/testcases/type-rc-match");
     let status = run_fixture_status(&root, "type-rc-match-fn");

@@ -14,8 +14,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::effect::{Value, bind_pattern, lower_effect, resolve_value};
 use crate::ir::{
-    ArrayAllocation, ArrayElementType, ArrayKind, ConditionExpr, ExitCodeExpr, I32Expr,
-    LoweredProgram, Operation,
+    ArrayAllocation, ArrayElementType, ArrayKind, ConditionExpr, ConstructorValue, ExitCodeExpr,
+    I32Expr, LoweredProgram, Operation,
 };
 use crate::{Error, Result};
 
@@ -28,8 +28,8 @@ use expr::lower_condition_expr;
 use package::{collect_callable_packages, initialize_zero_arg_use_bindings};
 use ptx::{collect_ptx_functions, initialize_compile_ptx_bindings};
 use pure::{
-    lower_function_call_statement, lower_function_call_value, lower_pure_value,
-    pattern_match_bindings, substitute_type_bindings,
+    dynamic_rc_constructor_pattern_bindings, lower_function_call_statement,
+    lower_function_call_value, lower_pure_value, pattern_match_bindings, substitute_type_bindings,
 };
 use symbol::SymbolTable;
 pub(crate) use typecheck::validate_value_against_type;
@@ -1448,6 +1448,17 @@ fn lower_match_expression_statement(
     program: &mut LoweredProgram,
 ) -> Result<bool> {
     let scrutinee = lower_pure_value(match_expr.scrutinee.as_ref(), state, program)?;
+    if let Value::Constructor(constructor) = &scrutinee
+        && let Some(heap_slot) = constructor.heap_slot
+    {
+        return lower_dynamic_rc_match_expression_statement(
+            match_expr,
+            constructor,
+            heap_slot,
+            state,
+            program,
+        );
+    }
     for arm in &match_expr.arms {
         if let Some(bindings) =
             pattern_match_bindings(&arm.pattern, &scrutinee, &state.constructors)?
@@ -1465,4 +1476,80 @@ fn lower_match_expression_statement(
     Err(Error::Unsupported(
         "`#match` did not match any constructor arm".to_string(),
     ))
+}
+
+fn lower_dynamic_rc_match_expression_statement(
+    match_expr: &MatchExpression,
+    constructor: &ConstructorValue,
+    heap_slot: usize,
+    state: &mut LoweringState,
+    program: &mut LoweredProgram,
+) -> Result<bool> {
+    let mut arms = Vec::new();
+    for arm in &match_expr.arms {
+        let mut arm_program = program.clone();
+        let arm_operation_start = arm_program.operations.len();
+        let (tag, bindings) = dynamic_rc_constructor_pattern_bindings(
+            &arm.pattern,
+            constructor,
+            heap_slot,
+            state,
+            &mut arm_program,
+        )?;
+        let mut scoped_state = state.child_scope();
+        scoped_state.environment.extend(bindings);
+        let _terminated =
+            lower_expression_statement(arm.result.as_ref(), &mut scoped_state, &mut arm_program)?;
+        let mut arm_operations = arm_program.operations.split_off(arm_operation_start);
+        let internal_functions = take_internal_functions(&mut arm_operations);
+
+        program.data = arm_program.data;
+        program.compiled_ptx = arm_program.compiled_ptx;
+        program.arrays = arm_program.arrays;
+        program.heap_slots = program.heap_slots.max(arm_program.heap_slots);
+        program.i32_slots = program.i32_slots.max(arm_program.i32_slots);
+        program.i64_slots = program.i64_slots.max(arm_program.i64_slots);
+        program.f32_slots = program.f32_slots.max(arm_program.f32_slots);
+        program.u8_slots = program.u8_slots.max(arm_program.u8_slots);
+        program.bool_slots = program.bool_slots.max(arm_program.bool_slots);
+        program.requires_argv |= arm_program.requires_argv;
+        program.operations.extend(internal_functions);
+        state.merge_allocations_from(&scoped_state);
+        arms.push((tag, arm_operations));
+    }
+
+    let Some((_, mut else_operations)) = arms.pop() else {
+        return Err(Error::Unsupported(
+            "`#match` must contain at least one constructor arm".to_string(),
+        ));
+    };
+    while let Some((tag, then_operations)) = arms.pop() {
+        else_operations = vec![Operation::If {
+            condition: ConditionExpr::I32 {
+                kind: crate::ir::ComparisonKind::Eq,
+                lhs: I32Expr::HeapLoadI32 {
+                    heap_slot,
+                    byte_offset: 0,
+                },
+                rhs: I32Expr::Literal(tag),
+            },
+            then_operations,
+            else_operations,
+        }];
+    }
+    program.operations.extend(else_operations);
+    Ok(false)
+}
+
+fn take_internal_functions(operations: &mut Vec<Operation>) -> Vec<Operation> {
+    let mut internal_functions = Vec::new();
+    let mut retained = Vec::with_capacity(operations.len());
+    for operation in operations.drain(..) {
+        match operation {
+            Operation::InternalFunction { .. } => internal_functions.push(operation),
+            operation => retained.push(operation),
+        }
+    }
+    *operations = retained;
+    internal_functions
 }

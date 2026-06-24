@@ -450,7 +450,13 @@ fn lower_reference_get_receiver_value(receiver: &Term, state: &LoweringState) ->
         Value::F32Reference { slot, .. } => Value::F32(F32Expr::Local(slot)),
         Value::U8Reference { slot, .. } => Value::U8(U8Expr::Local(slot)),
         Value::BoolReference { slot, .. } => Value::Bool(ConditionExpr::Local(slot)),
-        Value::Reference { value, .. } => *value,
+        Value::Reference { value, .. } => match *value {
+            Value::Constructor(mut constructor) if constructor.heap_slot.is_some() => {
+                constructor.runtime_tag = true;
+                Value::Constructor(constructor)
+            }
+            value => value,
+        },
         other => other,
     })
 }
@@ -912,7 +918,7 @@ impl DynamicRcMatchArmResult {
     }
 }
 
-fn dynamic_rc_constructor_pattern_bindings(
+pub(super) fn dynamic_rc_constructor_pattern_bindings(
     pattern: &Pattern,
     constructor: &ConstructorValue,
     heap_slot: usize,
@@ -2077,13 +2083,14 @@ fn propagate_reference_arguments(
             continue;
         };
         match value {
-            Value::Constructor(_) | Value::Struct(_) => {
+            Value::Constructor(_) | Value::Struct(_) if !aggregate_value_has_heap_slot(&value) => {
                 caller_state
                     .environment
                     .insert(argument_name.to_string(), value);
             }
             Value::Reference { value, exclusive }
-                if matches!(value.as_ref(), Value::Constructor(_) | Value::Struct(_)) =>
+                if matches!(value.as_ref(), Value::Constructor(_) | Value::Struct(_))
+                    && !aggregate_value_has_heap_slot(value.as_ref()) =>
             {
                 let propagated = if matches!(
                     caller_state.environment.get(argument_name),
@@ -2099,6 +2106,14 @@ fn propagate_reference_arguments(
             }
             _ => {}
         }
+    }
+}
+
+fn aggregate_value_has_heap_slot(value: &Value) -> bool {
+    match value {
+        Value::Constructor(constructor) => constructor.heap_slot.is_some(),
+        Value::Struct(struct_value) => struct_value.heap_slot.is_some(),
+        _ => false,
     }
 }
 

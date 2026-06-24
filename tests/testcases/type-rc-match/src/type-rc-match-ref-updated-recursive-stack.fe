@@ -1,0 +1,81 @@
+#use std_core::io::IO;
+#use std_core::primitive::i32::i32;
+#use std_core::primitive::i32::i32_eq;
+#use std_core::primitive::reference::ref_get;
+#use std_core::primitive::reference::ref_set;
+
+#type(rc) StackJsonString : Type[0] {
+    stack_string_empty : StackJsonString,
+    stack_string_cons : i32 -> StackJsonString -> StackJsonString,
+}
+
+#type(rc) StackJsonObject : Type[0] {
+    stack_object_empty : StackJsonObject,
+    stack_object_cons : StackJsonString -> StackJson -> StackJsonObject -> StackJsonObject,
+}
+
+#type(rc) StackJson : Type[0] {
+    stack_null : StackJson,
+    stack_string : StackJsonString -> StackJson,
+    stack_object : StackJsonObject -> StackJson,
+}
+
+#type(rc) Frame : Type[0] {
+    object_frame : StackJsonObject -> StackJsonString -> Frame,
+}
+
+#type(rc) Stack : Type[0] {
+    empty : Stack,
+    cons : Frame -> Stack -> Stack,
+}
+
+#entrypoint main;
+
+#fn main : () #with IO {
+    #let stack : Stack = Stack::empty;
+    #letref #excl stack_ref : &^ Stack #borrow stack;
+    #let value : StackJson = StackJson::stack_null;
+    #letref #excl value_ref : &^ StackJson #borrow value;
+    #let code : i32 = 0i32;
+    #letref #excl code_ref : &^ i32 #borrow code;
+    #let step : i32 = 0i32;
+    #letref #excl step_ref : &^ i32 #borrow step;
+    #loop {
+        #let current_step : i32 <- ref_get i32 step_ref;
+        #if i32_eq current_step 0i32 {
+            #let key : StackJsonString = StackJsonString::stack_string_cons 97i32 StackJsonString::stack_string_empty;
+            #let frame : Frame = Frame::object_frame StackJsonObject::stack_object_empty key;
+            ref_set Stack stack_ref (Stack::cons frame Stack::empty);
+            ref_set StackJson value_ref (StackJson::stack_string key);
+            ref_set i32 step_ref 1i32;
+            #continue;
+        };
+        #let stored : Stack <- ref_get Stack stack_ref;
+        #let done : i32 = 0i32;
+        #letref #excl done_ref : &^ i32 #borrow done;
+        #match stored {
+            Stack::empty => (),
+            Stack::cons frame _ => #match frame {
+                Frame::object_frame entries key => {
+                    #let value : StackJson <- ref_get StackJson value_ref;
+                    ref_set StackJson value_ref (StackJson::stack_object (StackJsonObject::stack_object_cons key value entries));
+                    ref_set i32 done_ref 1i32;
+                },
+            },
+        };
+        #let reduced : StackJson <- ref_get StackJson value_ref;
+        #let score : i32 = #match reduced {
+            StackJson::stack_null => 0i32,
+            StackJson::stack_string string => #match string {
+                StackJsonString::stack_string_empty => 0i32,
+                StackJsonString::stack_string_cons byte _ => byte,
+            },
+            StackJson::stack_object _ => 4i32,
+        };
+        ref_set i32 code_ref score;
+        #break;
+    };
+    #let code : i32 <- ref_get i32 code_ref;
+    #let _ : () <- IO::sys_exit code;
+    ()
+}

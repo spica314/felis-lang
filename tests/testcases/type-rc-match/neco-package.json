@@ -8,6 +8,7 @@
         "src/type-rc-match-reference.fe",
         "src/type-rc-match-mut-reference.fe",
         "src/type-rc-match-mut-rc-reference.fe",
+        "src/type-rc-match-ref-updated-recursive-stack.fe",
         "src/type-rc-match-fn.fe"
     ]
 }

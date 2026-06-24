@@ -57,6 +57,39 @@ fn operations_contain_static_data_get(operations: &[Operation]) -> bool {
     })
 }
 
+fn contains_heap_tag_match(operations: &[Operation], heap_slot: usize) -> bool {
+    operations.iter().any(|operation| match operation {
+        Operation::If {
+            condition:
+                ConditionExpr::I32 {
+                    kind: ComparisonKind::Eq,
+                    lhs:
+                        I32Expr::HeapLoadI32 {
+                            heap_slot: actual_heap_slot,
+                            byte_offset: 0,
+                        },
+                    ..
+                },
+            then_operations,
+            else_operations,
+        } => {
+            *actual_heap_slot == heap_slot
+                || contains_heap_tag_match(then_operations, heap_slot)
+                || contains_heap_tag_match(else_operations, heap_slot)
+        }
+        Operation::If {
+            then_operations,
+            else_operations,
+            ..
+        } => {
+            contains_heap_tag_match(then_operations, heap_slot)
+                || contains_heap_tag_match(else_operations, heap_slot)
+        }
+        Operation::Loop { body_operations } => contains_heap_tag_match(body_operations, heap_slot),
+        _ => false,
+    })
+}
+
 fn parse_inline_binary_package(name: &str, source: &str) -> ParsedPackage {
     let source_path = PathBuf::from("src/main.fe");
     let (tokens, syntax) = neco_rs_parser::parse_source(source).expect("parse source");
@@ -432,6 +465,19 @@ fn lowers_type_rc_match_reference_fixture_to_runtime_exit() {
     assert!(program.data.is_empty());
     assert_eq!(program.i32_slots, 0);
     assert_eq!(program.heap_slots, 4);
+}
+
+#[test]
+fn lowers_type_rc_match_ref_updated_recursive_stack_fixture_to_runtime_exit() {
+    let root = repo_root().join("tests/testcases/type-rc-match");
+    let package = selected_fixture_package(&root, "type-rc-match-ref-updated-recursive-stack");
+
+    let program = lower_package_to_program(&package).expect("lower fixture");
+    assert!(contains_heap_tag_match(&program.operations, 1));
+    assert!(matches!(
+        program.operations.last(),
+        Some(Operation::Exit(ExitCodeExpr::I32(I32Expr::Local(0))))
+    ));
 }
 
 #[test]
