@@ -279,6 +279,94 @@
     ()
 }
 
+#fn json_consume_compound_at : (source : String) -> (len : i32) -> (index_ref : &^ i32) -> (success_ref : &^ i32) -> () #with IO {
+    ref_set i32 success_ref 0i32;
+    #let array_depth : i32 = 0i32;
+    #letref #excl array_depth_ref : &^ i32 #borrow array_depth;
+    #let object_depth : i32 = 0i32;
+    #letref #excl object_depth_ref : &^ i32 #borrow object_depth;
+    #loop {
+        #let current_index : i32 <- ref_get i32 index_ref;
+        #if i32_gte current_index len {
+            #break;
+        };
+        #let byte : u8 <- string_get_u8 source current_index;
+        #if u8_eq byte '"' {
+            #let string_end : i32 <- json_find_string_end source len current_index;
+            #if i32_gte string_end len {
+                #break;
+            };
+            ref_set i32 index_ref (i32_add string_end 1i32);
+        } #else {
+            #if u8_eq byte '[' {
+                #let current_depth : i32 <- ref_get i32 array_depth_ref;
+                ref_set i32 array_depth_ref (i32_add current_depth 1i32);
+                ref_set i32 index_ref (i32_add current_index 1i32);
+            } #else {
+                #if u8_eq byte '{' {
+                    #let current_depth : i32 <- ref_get i32 object_depth_ref;
+                    ref_set i32 object_depth_ref (i32_add current_depth 1i32);
+                    ref_set i32 index_ref (i32_add current_index 1i32);
+                } #else {
+                    #if u8_eq byte ']' {
+                        #let current_depth : i32 <- ref_get i32 array_depth_ref;
+                        #if i32_lte current_depth 0i32 {
+                            #break;
+                        };
+                        ref_set i32 array_depth_ref (i32_sub current_depth 1i32);
+                        ref_set i32 index_ref (i32_add current_index 1i32);
+                    } #else {
+                        #if u8_eq byte '}' {
+                            #let current_depth : i32 <- ref_get i32 object_depth_ref;
+                            #if i32_lte current_depth 0i32 {
+                                #break;
+                            };
+                            ref_set i32 object_depth_ref (i32_sub current_depth 1i32);
+                            ref_set i32 index_ref (i32_add current_index 1i32);
+                        } #else {
+                            ref_set i32 index_ref (i32_add current_index 1i32);
+                        };
+                    };
+                };
+            };
+            #let remaining_arrays : i32 <- ref_get i32 array_depth_ref;
+            #let remaining_objects : i32 <- ref_get i32 object_depth_ref;
+            #if i32_eq remaining_arrays 0i32 {
+                #if i32_eq remaining_objects 0i32 {
+                    ref_set i32 success_ref 1i32;
+                    #break;
+                };
+            };
+        };
+    };
+    ()
+}
+
+#fn json_parse_compound_stub_at : (source : String) -> (len : i32) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
+    ref_set i32 success_ref 0i32;
+    json_skip_spaces source len index_ref;
+    #let start : i32 <- ref_get i32 index_ref;
+    #if i32_lt start len {
+        #let first_byte : u8 <- string_get_u8 source start;
+        #if u8_eq first_byte '[' {
+            json_consume_compound_at source len index_ref success_ref;
+            #let consumed : i32 <- ref_get i32 success_ref;
+            #if i32_eq consumed 1i32 {
+                ref_set Json value_ref (Json::array JsonArray::array_empty);
+            };
+        } #else {
+            #if u8_eq first_byte '{' {
+                json_consume_compound_at source len index_ref success_ref;
+                #let consumed : i32 <- ref_get i32 success_ref;
+                #if i32_eq consumed 1i32 {
+                    ref_set Json value_ref (Json::object JsonObject::object_empty);
+                };
+            };
+        };
+    };
+    ()
+}
+
 #fn json_parse_array_at : (source : String) -> (len : i32) -> (null_prefix : String) -> (true_prefix : String) -> (false_prefix : String) -> (index_ref : &^ i32) -> (value_ref : &^ Json) -> (success_ref : &^ i32) -> () #with IO {
     ref_set i32 success_ref 0i32;
     json_skip_spaces source len index_ref;
@@ -312,7 +400,15 @@
                 #letref #excl element_ref : &^ Json #borrow element;
                 #let element_success : i32 = 0i32;
                 #letref #excl element_success_ref : &^ i32 #borrow element_success;
-                json_parse_scalar_at source len null_prefix true_prefix false_prefix index_ref element_ref element_success_ref;
+                #if u8_eq current_byte '[' {
+                    json_parse_compound_stub_at source len index_ref element_ref element_success_ref;
+                } #else {
+                    #if u8_eq current_byte '{' {
+                        json_parse_compound_stub_at source len index_ref element_ref element_success_ref;
+                    } #else {
+                        json_parse_scalar_at source len null_prefix true_prefix false_prefix index_ref element_ref element_success_ref;
+                    };
+                };
                 #let element_success_value : i32 <- ref_get i32 element_success_ref;
                 #if i32_eq element_success_value 0i32 {
                     #break;
@@ -402,7 +498,11 @@
                             #if u8_eq value_first_byte '[' {
                                 json_parse_array_at source len null_prefix true_prefix false_prefix index_ref entry_value_ref entry_success_ref;
                             } #else {
-                                json_parse_scalar_at source len null_prefix true_prefix false_prefix index_ref entry_value_ref entry_success_ref;
+                                #if u8_eq value_first_byte '{' {
+                                    json_parse_compound_stub_at source len index_ref entry_value_ref entry_success_ref;
+                                } #else {
+                                    json_parse_scalar_at source len null_prefix true_prefix false_prefix index_ref entry_value_ref entry_success_ref;
+                                };
                             };
                         };
                         #let entry_success_value : i32 <- ref_get i32 entry_success_ref;

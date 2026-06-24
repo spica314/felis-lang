@@ -43,6 +43,7 @@
         Json::number_i32 number => number,
         Json::string _ => 4i32,
         Json::array _ => 5i32,
+        Json::object _ => 6i32,
     }
 }
 
@@ -231,6 +232,66 @@
         #let object_ok : i32 = 0i32;
     } #else {
         #let _ : () <- IO::sys_exit 30i32;
+    };
+
+    #let nested_object_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 15i32;
+    #letref #excl nested_object_source_arrayvl_ref : &^ ArrayVL u8 #borrow nested_object_source_arrayvl;
+    array_set nested_object_source_arrayvl_ref 0i32 '{';
+    array_set nested_object_source_arrayvl_ref 1i32 '"';
+    array_set nested_object_source_arrayvl_ref 2i32 'a';
+    array_set nested_object_source_arrayvl_ref 3i32 '"';
+    array_set nested_object_source_arrayvl_ref 4i32 ':';
+    array_set nested_object_source_arrayvl_ref 5i32 '{';
+    array_set nested_object_source_arrayvl_ref 6i32 '"';
+    array_set nested_object_source_arrayvl_ref 7i32 'b';
+    array_set nested_object_source_arrayvl_ref 8i32 '"';
+    array_set nested_object_source_arrayvl_ref 9i32 ':';
+    array_set nested_object_source_arrayvl_ref 10i32 '[';
+    array_set nested_object_source_arrayvl_ref 11i32 '1';
+    array_set nested_object_source_arrayvl_ref 12i32 ']';
+    array_set nested_object_source_arrayvl_ref 13i32 '}';
+    array_set nested_object_source_arrayvl_ref 14i32 '}';
+    #let nested_object_source : String = string_from_arrayvl_parts nested_object_source_arrayvl 15i32 15i32;
+    #let nested_object_result : Result Json JsonParseError <- json_parse nested_object_source;
+    #let nested_object_code : i32 = parsed_result_object_score nested_object_result;
+    #if i32_eq nested_object_code 101i32 {
+        #let nested_object_ok : i32 = 0i32;
+    } #else {
+        #let _ : () <- IO::sys_exit 31i32;
+    };
+
+    #let nested_array_source_arrayvl : ArrayVL u8 <- IO::arrayvl_new u8 13i32;
+    #letref #excl nested_array_source_arrayvl_ref : &^ ArrayVL u8 #borrow nested_array_source_arrayvl;
+    array_set nested_array_source_arrayvl_ref 0i32 '[';
+    array_set nested_array_source_arrayvl_ref 1i32 '{';
+    array_set nested_array_source_arrayvl_ref 2i32 '"';
+    array_set nested_array_source_arrayvl_ref 3i32 'a';
+    array_set nested_array_source_arrayvl_ref 4i32 '"';
+    array_set nested_array_source_arrayvl_ref 5i32 ':';
+    array_set nested_array_source_arrayvl_ref 6i32 '1';
+    array_set nested_array_source_arrayvl_ref 7i32 '}';
+    array_set nested_array_source_arrayvl_ref 8i32 ',';
+    array_set nested_array_source_arrayvl_ref 9i32 '[';
+    array_set nested_array_source_arrayvl_ref 10i32 '2';
+    array_set nested_array_source_arrayvl_ref 11i32 ']';
+    array_set nested_array_source_arrayvl_ref 12i32 ']';
+    #let nested_array_source : String = string_from_arrayvl_parts nested_array_source_arrayvl 13i32 13i32;
+    #let nested_array_result : Result Json JsonParseError <- json_parse nested_array_source;
+    #let nested_array_code : i32 = parsed_result_score nested_array_result;
+    #let nested_array_head_code : i32 = parsed_result_array_head_score nested_array_result;
+    #let nested_array_tail_head_code : i32 = parsed_result_array_tail_head_score nested_array_result;
+    #if i32_eq nested_array_code 3i32 {
+        #if i32_eq nested_array_head_code 5i32 {
+            #if i32_eq nested_array_tail_head_code 6i32 {
+                #let nested_array_ok : i32 = 0i32;
+            } #else {
+                #let _ : () <- IO::sys_exit 34i32;
+            };
+        } #else {
+            #let _ : () <- IO::sys_exit 33i32;
+        };
+    } #else {
+        #let _ : () <- IO::sys_exit 32i32;
     };
 
     #let string_total_code : i32 = i32_add (i32_add string_code string_ref_code) (i32_add escaped_quote_code escaped_backslash_code);
